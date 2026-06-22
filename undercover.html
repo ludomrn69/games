@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="stylesheet" href="/theme.css">
+  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+  <title>Undercover 🕵️‍♂️</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️‍♂️</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .app { margin-top: 52px; min-height: calc(100vh - 52px); }
+    .screen { display: none; animation: fadeUp 0.3s ease both; }
+    .screen.active { display: flex; flex-direction: column; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: translateY(0);} }
+
+    .btn-primary { display: block; width: 100%; max-width: 340px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.5; }
+    .btn-link { background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--ink-light); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
+    .mt-4 { margin-top: 18px; }
+
+    .uc-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .uc-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+    .uc-set-row { display: flex; gap: 8px; justify-content: center; }
+    .uc-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .uc-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+
+    .uc-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .uc-head { background: rgba(20,16,28,0.97); }
+    .uc-round { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--gold); white-space: nowrap; }
+    .uc-head-actions { display: flex; gap: 6px; }
+    .uc-wrap { width: 100%; max-width: 560px; margin: 0 auto; padding: 16px 16px 60px; }
+
+    .uc-elim-banner { background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); text-align: center; margin-bottom: 14px; font-size: 0.92rem; }
+    .uc-elim-banner b { color: var(--terracotta); }
+
+    /* Carte mot secret */
+    .uc-card { background: var(--white); border-radius: 22px; box-shadow: var(--shadow-hover); padding: 28px 24px; text-align: center; max-width: 360px; margin: 0 auto 18px; cursor: pointer; user-select: none; }
+    .uc-card .lbl { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-light); }
+    .uc-card .word { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2rem; margin-top: 8px; color: var(--terracotta); min-height: 2.2rem; }
+    .uc-card .word.hidden-w { color: var(--ink-light); letter-spacing: 0.2em; }
+    .uc-card .tap-hint { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); margin-top: 10px; }
+    .uc-card.mrwhite .word { color: #6b5d56; font-size: 1.4rem; }
+
+    .uc-info { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--ink-light); margin: 4px 0 16px; line-height: 1.5; }
+
+    .uc-players { display: flex; flex-direction: column; gap: 8px; max-width: 420px; margin: 0 auto 16px; }
+    .uc-prow { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 9px 13px; box-shadow: var(--shadow); border: 2px solid transparent; transition: border-color .15s; }
+    .uc-prow.votable { cursor: pointer; }
+    .uc-prow.votable:hover { border-color: var(--gold); }
+    .uc-prow.voted-by-me { border-color: var(--terracotta); }
+    .uc-prow.dead { opacity: 0.5; }
+    .uc-prow.dead .uc-pname { text-decoration: line-through; }
+    .uc-pav { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0; }
+    .uc-pname { flex: 1; font-weight: 700; }
+    .uc-porder { font-size: 0.72rem; color: var(--ink-light); }
+    .uc-pvote { font-size: 0.78rem; font-weight: 700; color: var(--terracotta); }
+    .uc-prow.dead .uc-prole { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+    .uc-prole.civil { background: #cfe0d2; color: #2f5d3a; } .uc-prole.undercover { background: #f3d0cc; color: #8a2c24; } .uc-prole.mrwhite { background: #d9d2e8; color: #4a3d6b; }
+
+    .uc-guess-form { display: flex; gap: 8px; max-width: 380px; margin: 12px auto 0; }
+    .uc-guess-input { flex: 1; padding: 0.7rem 0.9rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1rem; }
+    .uc-guess-submit { border: none; border-radius: 12px; padding: 0 16px; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-weight: 700; cursor: pointer; }
+
+    #s-results { align-items: center; justify-content: flex-start; min-height: calc(100vh - 52px); padding: 36px 20px 60px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-sub { color: var(--ink-light); margin-bottom: 18px; }
+    .uc-reveal { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+    .uc-reveal-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 9px 13px; box-shadow: var(--shadow); }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script>
+  <script src="/presence.js"></script>
+  <script src="/avatars.js"></script>
+  <script src="/lobby.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="uc-head">
+        <span class="uc-round" id="uc-round">Manche 1</span>
+        <div class="uc-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="uc-wrap">
+        <div id="uc-elim-banner" class="uc-elim-banner" style="display:none"></div>
+        <div id="uc-card" class="uc-card" style="display:none" onclick="toggleWord()">
+          <div class="lbl">Ton mot secret</div>
+          <div class="word hidden-w" id="uc-word">• • • •</div>
+          <div class="tap-hint" id="uc-tap-hint">Touche pour révéler / cacher</div>
+        </div>
+        <div class="uc-info" id="uc-info"></div>
+        <div class="uc-players" id="uc-players"></div>
+        <div id="uc-guess-area" style="display:none">
+          <div class="uc-info" id="uc-guess-info"></div>
+          <div class="uc-guess-form" id="uc-guess-form" style="display:none">
+            <input id="uc-guess-input" class="uc-guess-input" type="text" placeholder="Le mot des civils…" maxlength="40" autocomplete="off" />
+            <button class="uc-guess-submit" onclick="submitGuess()">Deviner</button>
+          </div>
+        </div>
+        <button class="btn-primary" id="uc-vote-btn" style="display:none" onclick="startVote()">Lancer le vote</button>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <p class="res-sub" id="res-sub"></p>
+      <div class="uc-reveal" id="uc-reveal"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera abandonnée, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Undercover</div>
+      <div class="modal-body">
+        <p>Presque tout le monde reçoit le <b>même mot</b> (les civils). Mais 1 ou 2 <b>undercover</b> reçoivent un mot <b>légèrement différent</b> — sans le savoir.</p>
+        <p style="margin-top:8px">À tour de rôle, chacun dit <b>un seul mot</b> pour décrire le sien, sans se faire repérer. Puis tout le monde <b>vote</b> pour éliminer un suspect.</p>
+        <p style="margin-top:8px">Les civils gagnent s'ils éliminent tous les undercover. Les undercover gagnent s'il en reste autant que de civils.</p>
+        <p style="margin-top:8px">Option <b>Mr. White</b> : il n'a aucun mot et bluffe ; éliminé, il peut gagner s'il devine le mot des civils.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Banque de paires de mots (civil / undercover) ━━ */
+    var PAIRS = [
+      ['Chat', 'Chien'], ['Café', 'Thé'], ['Mer', 'Océan'], ['Pizza', 'Tarte'], ['Vélo', 'Moto'],
+      ['Citron', 'Orange'], ['Neige', 'Glace'], ['Roman', 'BD'], ['Plage', 'Désert'], ['Avion', 'Fusée'],
+      ['Roi', 'Reine'], ['Loup', 'Renard'], ['Guitare', 'Violon'], ['Fraise', 'Framboise'], ['Métro', 'Tram'],
+      ['Crêpe', 'Gaufre'], ['Lune', 'Soleil'], ['Forêt', 'Jungle'], ['Château', 'Palais'], ['Médecin', 'Infirmier'],
+      ['Bière', 'Vin'], ['Bateau', 'Sous-marin'], ['Montre', 'Bracelet'], ['Pull', 'Manteau'], ['Tigre', 'Lion'],
+      ['Sandwich', 'Burger'], ['Piano', 'Orgue'], ['Pluie', 'Brouillard'], ['Pirate', 'Corsaire'], ['Ski', 'Surf'],
+      ['Abeille', 'Guêpe'], ['Crayon', 'Stylo'], ['Pomme', 'Poire'], ['Train', 'Bus'], ['Sorcier', 'Magicien'],
+      ['Riz', 'Pâtes'], ['Canard', 'Oie'], ['Lac', 'Étang'], ['Tente', 'Caravane'], ['Comédie', 'Théâtre']
+    ];
+
+    var ROLE_LABEL = { civil: 'Civil', undercover: 'Undercover', mrwhite: 'Mr. White' };
+    var prevPhase = null, wordShown = false;
+
+    function rref() { return window.roomRef; }
+    function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function normalize(s) { return (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, ''); }
+    function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'undercover',
+      name: 'Undercover',
+      emoji: '🕵️‍♂️',
+      tagline: 'Trouve l\'imposteur',
+      minPlayers: 3,
+      maxPlayers: 12,
+      rules: [
+        'Presque tous ont le même mot ; 1-2 undercover ont un mot voisin',
+        'Chacun dit un seul mot pour décrire le sien, sans se faire griller',
+        'On vote pour éliminer un suspect à chaque manche',
+        'Civils : éliminez les undercover · Undercover : survivez'
+      ],
+      lobbyExtraHTML: lobbyExtraHTML,
+      onState: onState,
+      onStart: onStart
+    });
+
+    function lobbyExtraHTML(room) {
+      var on = !!(room && room.useMrWhite);
+      return '<div class="uc-settings"><div class="uc-settings-label">Mr. White (dès 5 joueurs)</div><div class="uc-set-row">' +
+        '<button class="uc-set-btn' + (!on ? ' active' : '') + '" onclick="setMrWhite(false)">Sans</button>' +
+        '<button class="uc-set-btn' + (on ? ' active' : '') + '" onclick="setMrWhite(true)">Avec</button></div></div>';
+    }
+    function setMrWhite(v) { if (window.roomRef) window.roomRef.child('useMrWhite').set(!!v); }
+
+    function onStart(players, cur) {
+      var n = players.length;
+      var nUnder = n >= 7 ? 2 : 1;
+      var nMrWhite = (cur && cur.useMrWhite && n >= 5) ? 1 : 0;
+      // sécurité : garder au moins 2 civils
+      while (nUnder + nMrWhite > n - 2) { if (nMrWhite > 0) nMrWhite--; else nUnder = Math.max(1, nUnder - 1); }
+      var pair = PAIRS[Math.floor(Math.random() * PAIRS.length)];
+      var civilFirst = Math.random() < 0.5;
+      var civilWord = civilFirst ? pair[0] : pair[1];
+      var underWord = civilFirst ? pair[1] : pair[0];
+
+      var ids = shuffle(players.map(function (p) { return p.pid; }));
+      var roles = {};
+      var i = 0;
+      for (var u = 0; u < nUnder; u++) roles[ids[i++]] = 'undercover';
+      for (var w = 0; w < nMrWhite; w++) roles[ids[i++]] = 'mrwhite';
+      while (i < ids.length) roles[ids[i++]] = 'civil';
+
+      // ordre de parole : un civil commence (jamais un undercover/mr white en 1er)
+      var speakOrder = shuffle(players.map(function (p) { return p.pid; }));
+      for (var s = 0; s < speakOrder.length; s++) { if (roles[speakOrder[s]] === 'civil') { var first = speakOrder.splice(s, 1)[0]; speakOrder.unshift(first); break; } }
+
+      players.forEach(function (p) {
+        var r = roles[p.pid];
+        cur.players[p.pid].role = r;
+        cur.players[p.pid].word = (r === 'undercover') ? underWord : (r === 'mrwhite') ? '' : civilWord;
+        cur.players[p.pid].alive = true;
+        cur.players[p.pid].vote = null;
+      });
+
+      return {
+        phase: 'word', round: 1, civilWord: civilWord, underWord: underWord,
+        speakOrder: speakOrder, lastEliminated: null, mrWhiteId: null, mrWhiteGuess: null, winner: null
+      };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status !== 'playing') { prevPhase = null; return; }
+      showScreen('s-playing');
+      if (state.phase === 'ended') { showResults(state); return; }
+      render(state);
+      // résolutions automatiques (déclenchées par n'importe quel client, transaction verrouillée)
+      if (state.phase === 'vote') maybeResolveVotes(state);
+      prevPhase = state.phase;
+    }
+
+    function alivePids(state) { var o = state.order || []; return o.filter(function (p) { return state.players[p] && state.players[p].alive; }); }
+    function onlineAlive(state) { return alivePids(state).filter(function (p) { return state.players[p].online; }); }
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      setText('uc-round', 'Manche ' + (state.round || 1));
+      var me = (state.players && state.players[window.myPid]) || {};
+      var iAmAlive = !!me.alive;
+
+      // bandeau dernière élimination
+      var banner = document.getElementById('uc-elim-banner');
+      if (state.lastEliminated) {
+        banner.style.display = 'block';
+        banner.innerHTML = '☠️ <b>' + escapeHtml(Room.name(state.lastEliminated.pid)) + '</b> a été éliminé·e — c\'était un <b>' + ROLE_LABEL[state.lastEliminated.role] + '</b>';
+      } else banner.style.display = 'none';
+
+      // carte mot
+      var card = document.getElementById('uc-card');
+      card.style.display = 'block';
+      card.classList.toggle('mrwhite', me.role === 'mrwhite');
+      var wordEl = document.getElementById('uc-word');
+      if (me.role === 'mrwhite') {
+        wordEl.classList.remove('hidden-w');
+        wordEl.textContent = wordShown ? 'Tu es Mr. White 🤫 (aucun mot, bluffe !)' : '• • • •';
+        if (!wordShown) wordEl.classList.add('hidden-w');
+      } else {
+        if (wordShown) { wordEl.classList.remove('hidden-w'); wordEl.textContent = me.word || '?'; }
+        else { wordEl.classList.add('hidden-w'); wordEl.textContent = '• • • •'; }
+      }
+
+      // zone guess (Mr White)
+      var guessArea = document.getElementById('uc-guess-area');
+      var guessForm = document.getElementById('uc-guess-form');
+      if (state.phase === 'guess') {
+        guessArea.style.display = 'block';
+        var amMrWhite = state.mrWhiteId === window.myPid;
+        if (amMrWhite) { setText('uc-guess-info', 'Tu es démasqué·e ! Devine le mot des civils pour gagner quand même 👇'); guessForm.style.display = 'flex'; }
+        else { setText('uc-guess-info', '🕵️ ' + Room.name(state.mrWhiteId) + ' (Mr. White) tente de deviner le mot des civils…'); guessForm.style.display = 'none'; }
+      } else guessArea.style.display = 'none';
+
+      // info + bouton vote + liste joueurs
+      var info = document.getElementById('uc-info');
+      var voteBtn = document.getElementById('uc-vote-btn');
+      voteBtn.style.display = 'none';
+
+      if (state.phase === 'word') {
+        var so = state.speakOrder || alivePids(state);
+        info.innerHTML = 'Lisez votre mot 👀<br>À tour de rôle, dites <b>un mot</b> pour le décrire :<br>' +
+          so.map(function (p) { return escapeHtml(Room.name(p)); }).join(' → ');
+        if (iAmAlive) { voteBtn.style.display = 'block'; voteBtn.textContent = 'Tout le monde a parlé → voter'; }
+      } else if (state.phase === 'vote') {
+        var oa = onlineAlive(state);
+        var voted = oa.filter(function (p) { return state.players[p].vote; });
+        info.innerHTML = iAmAlive ? 'Touche le nom de la personne à éliminer.' : 'Tu es éliminé·e — tu observes.';
+        info.innerHTML += '<br><span style="font-size:0.9em">' + voted.length + '/' + oa.length + ' ont voté</span>';
+      } else if (state.phase === 'guess') {
+        info.innerHTML = '';
+      }
+
+      renderPlayers(state, iAmAlive);
+    }
+
+    function renderPlayers(state, iAmAlive) {
+      var ord = state.order || [];
+      var me = state.players[window.myPid] || {};
+      var canVote = (state.phase === 'vote' && iAmAlive);
+      var cont = document.getElementById('uc-players');
+      cont.innerHTML = ord.map(function (pid) {
+        var p = state.players[pid] || {};
+        var dead = !p.alive;
+        var votable = canVote && !dead && pid !== window.myPid;
+        var votedByMe = me.vote === pid;
+        var right = '';
+        if (dead && p.role) right = '<span class="uc-prole ' + p.role + '">' + ROLE_LABEL[p.role] + '</span>';
+        else if (votedByMe) right = '<span class="uc-pvote">ton vote ✓</span>';
+        return '<div class="uc-prow' + (votable ? ' votable' : '') + (votedByMe ? ' voted-by-me' : '') + (dead ? ' dead' : '') + '" ' + (votable ? 'data-pid="' + pid + '"' : '') + '>' +
+          '<span class="uc-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="uc-pname">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          right + '</div>';
+      }).join('');
+    }
+
+    function toggleWord() { wordShown = !wordShown; if (window.room) render(window.room); }
+
+    /* ━━ Actions ━━ */
+    function startVote() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'word') return cur;
+        cur.phase = 'vote';
+        return cur;
+      });
+    }
+
+    function castVote(targetPid) {
+      var st = window.room || {};
+      if (st.phase !== 'vote') return;
+      var me = st.players[window.myPid];
+      if (!me || !me.alive) return;
+      rref().child('players/' + window.myPid + '/vote').set(targetPid);
+    }
+
+    function maybeResolveVotes(state) {
+      var oa = onlineAlive(state);
+      if (!oa.length || !oa.every(function (p) { return state.players[p].vote; })) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'vote') return cur;
+        var order = cur.order || [];
+        var aliveOn = order.filter(function (p) { return cur.players[p] && cur.players[p].alive && cur.players[p].online; });
+        if (!aliveOn.length || !aliveOn.every(function (p) { return cur.players[p].vote; })) return cur;
+        // décompte (sur tous les vivants ayant voté)
+        var counts = {};
+        order.forEach(function (p) {
+          var v = cur.players[p] && cur.players[p].alive && cur.players[p].vote;
+          if (v && cur.players[v]) counts[v] = (counts[v] || 0) + 1;
+        });
+        var best = null, bestN = -1;
+        order.forEach(function (p) { if ((counts[p] || 0) > bestN) { bestN = counts[p] || 0; best = p; } });
+        // élimination
+        cur.players[best].alive = false;
+        cur.lastEliminated = { pid: best, role: cur.players[best].role };
+        order.forEach(function (p) { if (cur.players[p]) cur.players[p].vote = null; });
+        if (cur.players[best].role === 'mrwhite') { cur.phase = 'guess'; cur.mrWhiteId = best; return cur; }
+        applyWinCheck(cur);
+        return cur;
+      });
+    }
+
+    function applyWinCheck(cur) {
+      var order = cur.order || [];
+      var alive = order.filter(function (p) { return cur.players[p] && cur.players[p].alive; });
+      var imp = alive.filter(function (p) { return cur.players[p].role === 'undercover' || cur.players[p].role === 'mrwhite'; });
+      var civ = alive.filter(function (p) { return cur.players[p].role === 'civil'; });
+      if (imp.length === 0) { cur.winner = 'civils'; cur.phase = 'ended'; }
+      else if (imp.length >= civ.length) { cur.winner = 'impostors'; cur.phase = 'ended'; }
+      else { cur.phase = 'vote'; cur.round = (cur.round || 1) + 1; }
+    }
+
+    function submitGuess() {
+      var input = document.getElementById('uc-guess-input');
+      var guess = input.value;
+      if (!guess.trim()) { lbToast('Écris un mot'); return; }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'guess' || cur.mrWhiteId !== window.myPid) return cur;
+        var correct = normalize(guess) === normalize(cur.civilWord || '');
+        cur.mrWhiteGuess = { text: guess, correct: correct };
+        if (correct) { cur.winner = 'mrwhite'; cur.phase = 'ended'; }
+        else applyWinCheck(cur);
+        return cur;
+      });
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var win = state.winner;
+      var me = state.players[window.myPid] || {};
+      var myTeam = (me.role === 'undercover' || me.role === 'mrwhite') ? (me.role === 'mrwhite' ? 'mrwhite' : 'impostors') : 'civils';
+      var iWon = (win === 'civils' && myTeam === 'civils') || (win === 'impostors' && myTeam === 'impostors') || (win === 'mrwhite' && me.role === 'mrwhite');
+      setText('res-emoji', iWon ? '🏆' : '🙈');
+      var title = win === 'civils' ? 'Les civils gagnent !' : win === 'mrwhite' ? 'Mr. White gagne !' : 'Les undercover gagnent !';
+      setText('res-title', title);
+      var sub = 'Mot des civils : « ' + (state.civilWord || '?') + ' » · mot undercover : « ' + (state.underWord || '?') + ' »';
+      if (state.mrWhiteGuess) sub += ' · Mr. White : « ' + state.mrWhiteGuess.text + ' » ' + (state.mrWhiteGuess.correct ? '✓' : '✗');
+      setText('res-sub', sub);
+      var ord = state.order || [];
+      document.getElementById('uc-reveal').innerHTML = ord.map(function (pid) {
+        var p = state.players[pid] || {};
+        return '<div class="uc-reveal-row"><span class="uc-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="uc-pname">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="uc-prole ' + (p.role || 'civil') + '">' + ROLE_LABEL[p.role || 'civil'] + '</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { wordShown = false; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); wordShown = false; Lobby.resetToLobby([]); }
+
+    /* ━━ Clics ━━ */
+    document.getElementById('uc-players').addEventListener('click', function (e) {
+      var row = e.target.closest('.uc-prow');
+      if (row && row.dataset.pid) castVote(row.dataset.pid);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && document.activeElement && document.activeElement.id === 'uc-guess-input') submitGuess();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+[build]
+  command = "# pas de build : site statique"
+  publish = "."

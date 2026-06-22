@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="stylesheet" href="/theme.css">
+  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+  <title>Dobble Emoji ✨</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .app { margin-top: 52px; min-height: calc(100vh - 52px); }
+    .screen { display: none; animation: fadeUp 0.3s ease both; }
+    .screen.active { display: flex; flex-direction: column; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: translateY(0);} }
+
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-link { background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--ink-light); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
+    .mt-4 { margin-top: 18px; }
+
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); }
+    .db-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .db-head { background: rgba(20,16,28,0.97); }
+    .db-deck-label { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--gold); }
+    .db-head-actions { display: flex; gap: 6px; }
+
+    .db-arena { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; padding: 12px 12px 18px; gap: 10px; }
+    .db-card-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); }
+    .db-card-label.center { color: var(--terracotta); font-weight: 700; }
+    .db-card-label.mine { color: var(--gold); font-weight: 700; }
+    .db-card { width: min(64vw, 230px); height: min(64vw, 230px); border-radius: 50%; background: var(--white); box-shadow: 0 6px 28px rgba(44,37,32,0.13); position: relative; border: 3px solid var(--gold-light); flex-shrink: 0; }
+    .db-card.center { border-color: var(--terracotta); box-shadow: 0 0 0 4px rgba(196,116,90,0.16), 0 6px 28px rgba(44,37,32,0.13); }
+    .db-card.mine { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(198,152,90,0.18), 0 6px 28px rgba(44,37,32,0.13); }
+    html[data-theme="dark"] .db-card { background: #f4efe7; }
+    .db-card.entering { animation: dbIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+    @keyframes dbIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .db-emoji-btn { position: absolute; width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; background: transparent; border: none; cursor: pointer; border-radius: 50%; line-height: 1; user-select: none; -webkit-tap-highlight-color: transparent; }
+    .db-emoji-btn.read { cursor: default; }
+    .db-emoji-btn.shake { animation: emojiShake 0.38s ease; }
+    @keyframes emojiShake { 0%,100% { transform: translate(-50%,-50%) rotate(var(--rot,0deg)) scale(var(--scale,1)); } 25% { transform: translate(calc(-50% - 7px),-50%) rotate(var(--rot,0deg)) scale(var(--scale,1)); } 75% { transform: translate(calc(-50% + 7px),-50%) rotate(var(--rot,0deg)) scale(var(--scale,1)); } }
+    @media (max-width: 380px) { .db-emoji-btn { font-size: 1.1rem; width: 2rem; height: 2rem; } }
+
+    .db-scoreboard { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 0 12px; }
+    .db-sb-chip { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-weight: 700; font-size: 0.85rem; }
+    .db-sb-chip.me { outline: 2px solid var(--gold); }
+    .db-sb-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .db-status { text-align: center; padding: 4px 16px 12px; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); min-height: 26px; }
+
+    #round-overlay { position: fixed; inset: 0; background: rgba(44,37,32,0.45); backdrop-filter: blur(4px); z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; }
+    #round-overlay.active { display: flex; }
+    .round-overlay-card { background: var(--white); border-radius: 22px; padding: 24px; box-shadow: var(--shadow-hover); text-align: center; }
+    .round-overlay-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.3rem; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.6rem; margin-bottom: 8px; }
+    .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.9rem; margin-bottom: 18px; }
+    .res-rank { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 26px; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-score { font-weight: 800; color: var(--gold); }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script>
+  <script src="/presence.js"></script>
+  <script src="/avatars.js"></script>
+  <script src="/lobby.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="db-head">
+        <span class="db-deck-label" id="deck-label">Paquet : —</span>
+        <div class="db-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="db-arena">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div class="db-card-label center">Paquet</div>
+          <div class="db-card center" id="card-center"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div class="db-card-label mine">Ta carte</div>
+          <div class="db-card mine" id="card-mine"></div>
+        </div>
+        <div class="db-scoreboard" id="db-scoreboard"></div>
+      </div>
+      <div class="db-status" id="db-status">Trouve l'emoji commun entre ta carte et celle du paquet !</div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div id="round-overlay"><div class="round-overlay-card"><div class="round-overlay-title" id="ov-title">—</div></div></div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera abandonnée, retour au salon.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Dobble Emoji</div>
+      <div class="modal-body">
+        <p>Tu as <b>ta carte</b>. Une carte est au centre (le paquet). Entre deux cartes, il y a toujours <b>exactement 1 emoji en commun</b>.</p>
+        <p style="margin-top:10px">Le premier qui tape l'emoji commun sur sa carte <b>rafle la carte du paquet</b> (qui devient sa nouvelle carte). Tout le monde joue en même temps !</p>
+        <p style="margin-top:10px">Quand le paquet est vide, celui qui a raflé le plus de cartes gagne.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Constantes ━━ */
+    var EMOJIS = [
+      '⭐','🌙','☀️','🌈','❄️','🔥','💧','🌊',
+      '🌸','🌺','🌻','🌹','🍀','🌿','🌵','🌴',
+      '🍎','🍊','🍋','🍇','🍓','🍒','🍑','🍌',
+      '🐱','🐶','🐻','🦊','🐯','🦁','🐸','🐼',
+      '🦋','🐝','🦅','🦜','🐬','🦈','🐙','🦑',
+      '🏔️','🌋','🏖️','🏜️','🌏','🏡','🏰','🗼',
+      '🎸','🎺','🎻','🥁','🎹','🎨','🎭','🎪','🚀'
+    ];
+
+    function generateDobbleDeck() {
+      var n = 7, cards = [];
+      var c0 = []; for (var i = 0; i <= n; i++) c0.push(i); cards.push(c0);
+      for (var i = 0; i < n; i++) { var card = [0]; for (var j = 0; j < n; j++) card.push(n + 1 + n * i + j); cards.push(card); }
+      for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) { var card = [i + 1]; for (var k = 0; k < n; k++) card.push(n + 1 + n * k + (j + i * k) % n); cards.push(card); }
+      return cards; // 57 cartes
+    }
+    function shuffle(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    function seededRand(seed) { var x = Math.sin(seed * 9301 + 49297) * 233280; return x - Math.floor(x); }
+    function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+    /* ━━ State ━━ */
+    var prevStatus = null, roundLocked = false, advanceTimer = null;
+    function rref() { return window.roomRef; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'dobble-emoji',
+      name: 'Dobble Emoji',
+      emoji: '✨',
+      tagline: 'Le plus rapide rafle',
+      minPlayers: 2,
+      maxPlayers: 8,
+      rules: [
+        'Chacun a sa carte, une carte est au centre (le paquet)',
+        'Entre deux cartes, il y a toujours 1 emoji en commun',
+        'Tape l\'emoji commun pour rafler la carte du paquet',
+        'Tout le monde joue en même temps · le plus de cartes gagne'
+      ],
+      onState: onState,
+      onStart: onStart,
+      beforeJoin: function () { roundLocked = false; }
+    });
+
+    function onStart(players) {
+      var deck = generateDobbleDeck();
+      var idx = shuffle(deck.map(function (_, i) { return i; }));
+      var cards = {};
+      players.forEach(function (p, i) { cards[p.pid] = deck[idx[i]]; });
+      var pile = [];
+      for (var k = players.length; k < idx.length; k++) pile.push(deck[idx[k]]);
+      cards.deck = pile;
+      var scores = {};
+      players.forEach(function (p) { scores[p.pid] = 0; });
+      return { cards: cards, deck: null, scores: scores, roundWinner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status !== 'playing' && advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { roundLocked = false; showOverlay(false); showScreen('s-playing'); }
+        renderPlaying(state);
+      } else if (status === 'finished') {
+        showOverlay(false);
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Rendu ━━ */
+    function renderCard(elId, symbols, interactive) {
+      var el = document.getElementById(elId);
+      el.innerHTML = '';
+      var positions = [{ x: 50, y: 50 }];
+      for (var i = 0; i < 7; i++) { var a = (2 * Math.PI * i / 7) - Math.PI / 2; positions.push({ x: 50 + 36 * Math.cos(a), y: 50 + 36 * Math.sin(a) }); }
+      symbols.forEach(function (symIdx, idx) {
+        var pos = positions[idx];
+        var seed = symIdx * 31 + idx * 7 + (elId === 'card-center' ? 13 : 0);
+        var rot = Math.floor(seededRand(seed) * 360);
+        var scale = 0.78 + seededRand(seed + 1) * 0.5;
+        var btn = document.createElement('button');
+        btn.className = 'db-emoji-btn' + (interactive ? '' : ' read');
+        btn.style.left = pos.x + '%'; btn.style.top = pos.y + '%';
+        btn.style.setProperty('--rot', rot + 'deg'); btn.style.setProperty('--scale', scale.toFixed(3));
+        btn.style.transform = 'translate(-50%,-50%) rotate(' + rot + 'deg) scale(' + scale.toFixed(3) + ')';
+        btn.textContent = EMOJIS[symIdx];
+        btn.dataset.sym = symIdx;
+        if (interactive) btn.onclick = (function (s, b) { return function () { onEmojiTap(s, b); }; })(symIdx, btn);
+        el.appendChild(btn);
+      });
+    }
+
+    function renderPlaying(state) {
+      var cards = state.cards || {};
+      var deckArr = cards.deck || [];
+      var center = deckArr.length ? deckArr[deckArr.length - 1] : null;
+      var myCard = cards[window.myPid];
+      var rw = state.roundWinner;
+
+      setText('deck-label', 'Paquet : ' + deckArr.length);
+
+      // Carte du centre (lecture seule)
+      var centerEl = document.getElementById('card-center');
+      if (center) {
+        centerEl.style.visibility = '';
+        var key = deckArr.length + ':' + center.join(',');
+        if (centerEl.dataset.key !== key) {
+          renderCard('card-center', center, false);
+          centerEl.dataset.key = key;
+          centerEl.classList.remove('entering'); void centerEl.offsetWidth; centerEl.classList.add('entering');
+        }
+      } else { centerEl.style.visibility = 'hidden'; }
+
+      // Ma carte (tapable si pas de gagnant en cours)
+      var mineEl = document.getElementById('card-mine');
+      if (myCard) {
+        var mkey = (rw ? 'lock:' : '') + myCard.join(',');
+        if (mineEl.dataset.key !== mkey) { renderCard('card-mine', myCard, !rw); mineEl.dataset.key = mkey; }
+      }
+
+      // Tableau des scores
+      var ord = state.order || [];
+      var scores = state.scores || {};
+      document.getElementById('db-scoreboard').innerHTML = ord.map(function (pid) {
+        return '<span class="db-sb-chip' + (pid === window.myPid ? ' me' : '') + '">' +
+          '<span class="db-sb-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' ' + (scores[pid] || 0) + '</span>';
+      }).join('');
+
+      var statusEl = document.getElementById('db-status');
+      if (rw) {
+        statusEl.textContent = (rw === window.myPid ? 'Tu rafles la carte !' : Room.name(rw) + ' rafle la carte !');
+        // Le gagnant fait avancer la manche tout de suite ; les autres joueurs
+        // servent de filet de sécurité (si le gagnant se déconnecte juste après
+        // avoir raflé, la manche ne reste pas figée). La transaction d'avancement
+        // est verrouillée par roundWinner → un seul avancement par carte raflée.
+        if (!advanceTimer) {
+          var delay = (rw === window.myPid) ? 280 : 1800;
+          advanceTimer = setTimeout(function () { advanceTimer = null; advanceRound(); }, delay);
+        }
+      } else {
+        statusEl.textContent = deckArr.length ? 'Trouve l\'emoji commun !' : 'Paquet épuisé !';
+        if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+      }
+    }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+    /* ━━ Tap ━━ */
+    function onEmojiTap(symIdx, btn) {
+      var state = window.room || {};
+      if (state.status !== 'playing' || roundLocked || state.roundWinner) return;
+      var cards = state.cards || {};
+      var myCard = cards[window.myPid];
+      var deckArr = cards.deck || [];
+      var center = deckArr.length ? deckArr[deckArr.length - 1] : null;
+      if (!myCard || !center) return;
+      if (myCard.indexOf(symIdx) === -1 || center.indexOf(symIdx) === -1) {
+        btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+        return;
+      }
+      roundLocked = true;
+      var capturedKey = center.join(',');
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.roundWinner) return cur;
+        var d = (cur.cards && cur.cards.deck) || [];
+        if (!d.length) return cur;
+        if ((d[d.length - 1] || []).join(',') !== capturedKey) return cur; // anti-collision
+        cur.scores = cur.scores || {};
+        cur.scores[window.myPid] = (cur.scores[window.myPid] || 0) + 1;
+        cur.roundWinner = window.myPid;
+        return cur;
+      });
+    }
+
+    function advanceRound() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.roundWinner) return cur;
+        var d = (cur.cards && cur.cards.deck) || [];
+        if (d.length) {
+          var captured = d[d.length - 1];
+          cur.cards.deck = d.slice(0, d.length - 1);
+          cur.cards[cur.roundWinner] = captured; // la carte raflée devient celle du gagnant
+        }
+        cur.roundWinner = null;
+        if (!(cur.cards.deck || []).length) cur.status = 'finished';
+        return cur;
+      }, function (err, committed) { if (committed) roundLocked = false; });
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var ord = (state.order || []).slice();
+      var scores = state.scores || {};
+      ord.sort(function (a, b) { return (scores[b] || 0) - (scores[a] || 0); });
+      var top = scores[ord[0]] || 0;
+      var winners = ord.filter(function (p) { return (scores[p] || 0) === top; });
+      var iWon = winners.indexOf(window.myPid) >= 0;
+      setText('res-emoji', winners.length > 1 ? '🤝' : '🏆');
+      setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !'));
+      var medals = ['🥇', '🥈', '🥉'];
+      document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-score">' + (scores[pid] || 0) + '</span></div>';
+      }).join('');
+    }
+
+    function showOverlay(v) { var ov = document.getElementById('round-overlay'); if (ov) ov.classList.toggle('active', !!v); }
+    function handleReplay() { roundLocked = false; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); roundLocked = false; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

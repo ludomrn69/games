@@ -1,0 +1,3 @@
+# Site privé entre copains — aucun crawl, aucune indexation
+User-agent: *
+Disallow: /

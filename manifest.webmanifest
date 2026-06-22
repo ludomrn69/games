@@ -1,0 +1,19 @@
+{
+  "name": "Les jeux",
+  "short_name": "Les jeux",
+  "description": "Jeux à jouer entre copains — en ligne ou hors-ligne (solo / local).",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FDF6EC",
+  "theme_color": "#C4745A",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23FDF6EC'/><text y='.9em' x='50' text-anchor='middle' font-size='64'>🎲</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

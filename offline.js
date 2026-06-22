@@ -1,0 +1,277 @@
+/*
+  offline.js — Moteur HORS-LIGNE (solo contre l'ordi + local « passe l'appareil »).
+
+  Activé uniquement si l'URL contient ?mode=solo ou ?mode=local. Dans ce cas, il
+  REMPLACE Firebase + le salon en ligne par un moteur 100 % en mémoire, et rejoue
+  la logique EXISTANTE de chaque jeu (mêmes onStart/onState, mêmes transactions)
+  — donc aucune règle n'est dupliquée ni divergente.
+
+  Il ne fonctionne que pour les jeux AU TOUR PAR TOUR (un champ `turn` = joueur
+  actif). Un jeu déclare son support via GameRoom({ offline:{solo,local}, bot }).
+   • solo  : 1 humain + des ordis. À chaque tour d'ordi, on appelle cfg.bot().
+   • local : plusieurs humains sur un appareil ; on bascule l'identité (myPid) sur
+     le joueur actif et on affiche un écran « passe l'appareil ».
+
+  Réutilise tels quels les utilitaires déjà fournis par lobby.js : window.Room,
+  showScreen, openModal, closeModal, lbToast.
+*/
+(function () {
+  var params = new URLSearchParams(location.search);
+  var mode = params.get('mode');
+  if (mode !== 'solo' && mode !== 'local') return; // mode EN LIGNE → on ne touche à rien
+
+  // ── firebase factice (au cas où le SDK n'a pas pu se charger, ex. en avion) ──
+  if (typeof window.firebase === 'undefined') {
+    window.firebase = { apps: [], initializeApp: function () {}, database: function () { return {}; } };
+  }
+  if (typeof window.firebase.database !== 'function') window.firebase.database = function () { return {}; };
+  window.firebase.database.ServerValue = window.firebase.database.ServerValue || { TIMESTAMP: Date.now() };
+
+  // ── état du moteur ──────────────────────────────────────────────────────────
+  var cfg = null, room = null, players = [], totalPlayers = 2;
+  var humanPids = [], humanPid = null, lastTurnShown = null;
+  var BOT_DELAY = 650;
+
+  function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
+  function snap() { var r = clone(room); return { val: function () { return r; } }; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function isBot(pid) { return !!(room && room.players[pid] && room.players[pid].isBot); }
+  function ended() { return !!(room && (room.winner || room.status === 'ended' || room.status === 'finished')); }
+
+  // ── Accès par chemin sur l'objet `room` en mémoire ──────────────────────────
+  function getPath(parts) { var o = room; for (var i = 0; i < parts.length; i++) { if (o == null) return undefined; o = o[parts[i]]; } return o; }
+  function setPath(parts, v) { var o = room; for (var i = 0; i < parts.length - 1; i++) { var k = parts[i]; if (o[k] == null || typeof o[k] !== 'object') o[k] = {}; o = o[k]; } o[parts[parts.length - 1]] = v; }
+  function delPath(parts) { var o = room; for (var i = 0; i < parts.length - 1; i++) { if (o == null) return; o = o[parts[i]]; } if (o) delete o[parts[parts.length - 1]]; }
+  var noDisc = { set: function () {}, remove: function () {}, cancel: function () {} };
+
+  // ── ref enfant (set/update/remove/transaction/once) sur un chemin ───────────
+  function childRef(parts) {
+    return {
+      set: function (v, cb) { setPath(parts, clone(v)); window.room = room; if (cb) cb(null); afterChange(); },
+      update: function (obj, cb) { for (var k in obj) if (obj.hasOwnProperty(k)) setPath(parts.concat(String(k).split('/')), clone(obj[k])); window.room = room; if (cb) cb(null); afterChange(); },
+      remove: function (cb) { delPath(parts); window.room = room; if (cb) cb(null); afterChange(); },
+      transaction: function (fn, cb) { var res = fn(clone(getPath(parts))); if (res === undefined || res === null) { if (cb) cb(null, false); return; } setPath(parts, res); window.room = room; if (cb) cb(null, true); afterChange(); },
+      child: function (sub) { return childRef(parts.concat(String(sub).split('/'))); },
+      onDisconnect: function () { return noDisc; },
+      on: function () {}, off: function () {},
+      once: function (cb) { if (typeof cb === 'function') cb({ val: function () { return clone(getPath(parts)); } }); return Promise.resolve({ val: function () { return clone(getPath(parts)); } }); }
+    };
+  }
+
+  // ── roomRef factice (transaction + child) ────────────────────────────────────
+  window.roomRef = window.gameRef = {
+    transaction: function (fn, cb) {
+      var res = fn(clone(room));
+      if (res === undefined || res === null) { if (cb) cb(null, false, snap()); return; }
+      room = res; window.room = room;
+      if (cb) cb(null, true, snap());
+      afterChange();
+    },
+    child: function (path) { return childRef(String(path).split('/')); },
+    onDisconnect: function () { return noDisc; },
+    on: function () {}, off: function () {},
+    once: function (cb) { if (typeof cb === 'function') cb(snap()); return Promise.resolve(snap()); }
+  };
+
+  // ── Lobby factice ────────────────────────────────────────────────────────────
+  window.Lobby = window.Lobby || {};
+  window.Lobby.resetToLobby = function (keep) { replay(keep || []); };
+  window.Lobby.createRoom = function () {};
+  window.Lobby.joinFromInput = function () {};
+
+  // ── GameRoom : on intercepte l'enregistrement du jeu ─────────────────────────
+  window.GameRoom = function (c) {
+    cfg = c || {};
+    window.myPid = null;
+    injectStyles();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderSetup, { once: true });
+    else renderSetup();
+  };
+
+  // ── Écran de configuration hors-ligne ───────────────────────────────────────
+  function renderSetup() {
+    var host = document.getElementById('s-home');
+    if (!host) return;
+    var min = cfg.minPlayers || 2, max = cfg.maxPlayers || 8;
+    var off = cfg.offline || {};
+
+    if (mode === 'solo' && (!off.solo || !cfg.bot)) { unsupported(host, 'Le mode solo n\'est pas disponible pour ce jeu.'); return; }
+    if (mode === 'local' && !off.local) { unsupported(host, 'Le mode local n\'est pas disponible pour ce jeu.'); return; }
+
+    var controls = '';
+    if (mode === 'solo') {
+      if (max > 2) controls = counterRow('Adversaires (ordi)', 1, max - 1, 1);
+    } else {
+      controls = counterRow('Nombre de joueurs', min, max, min);
+    }
+    var sub = mode === 'solo' ? 'Tu joues contre l\'ordi' : 'Chacun son tour, on se passe l\'appareil';
+    host.innerHTML =
+      '<div class="lb-wrap">' +
+        (cfg.emoji ? '<div class="lb-emoji-big">' + cfg.emoji + '</div>' : '') +
+        '<h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
+        '<p class="lb-sub">' + (mode === 'solo' ? '🤖 Solo' : '📱 Local') + ' · ' + sub + '</p>' +
+        controls +
+        '<button class="lb-btn" id="off-start">Commencer</button>' +
+        '<a class="lb-link" href="' + location.pathname + '">↺ Passer en mode en ligne</a>' +
+        '<a class="lb-link" href="index.html">← Tous les jeux</a>' +
+      '</div>';
+    document.getElementById('off-start').onclick = startFromSetup;
+    var row = host.querySelector('.off-set-row');
+    if (row) row.addEventListener('click', function (e) {
+      var b = e.target.closest('.off-num'); if (!b) return;
+      row.querySelectorAll('.off-num').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+    });
+    showScreen('s-home');
+  }
+  function unsupported(host, msg) {
+    host.innerHTML = '<div class="lb-wrap"><div class="lb-emoji-big">🚫</div><h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
+      '<p class="lb-sub">' + esc(msg) + '</p>' +
+      '<a class="lb-btn" href="' + location.pathname + '">Jouer en ligne</a>' +
+      '<a class="lb-link" href="index.html">← Tous les jeux</a></div>';
+    showScreen('s-home');
+  }
+  function counterRow(label, lo, hi, initial) {
+    var btns = '';
+    for (var v = lo; v <= hi; v++) btns += '<button type="button" class="off-num' + (v === initial ? ' active' : '') + '" data-val="' + v + '">' + v + '</button>';
+    return '<div class="off-set"><div class="off-set-label">' + label + '</div><div class="off-set-row">' + btns + '</div></div>';
+  }
+  function startFromSetup() {
+    var min = cfg.minPlayers || 2, max = cfg.maxPlayers || 8;
+    var active = document.querySelector('.off-num.active');
+    var val = active ? +active.dataset.val : min;
+    if (mode === 'solo') totalPlayers = (max > 2) ? (1 + val) : 2;
+    else totalPlayers = (max > 2) ? val : min;
+    totalPlayers = Math.max(min, Math.min(max, totalPlayers));
+    startGame(null);
+  }
+
+  // ── Démarrage / relance d'une partie ─────────────────────────────────────────
+  function readIdentity() { try { var r = localStorage.getItem('games.identity.v1'); if (r) return JSON.parse(r); } catch (e) {} return null; }
+  var BOT_EMOJI = ['🤖', '👾', '🐲', '🦾'];
+
+  function startGame(savedKeep) {
+    var id0 = readIdentity();
+    var pmap = {}, ids = [];
+    players = [];
+    for (var i = 0; i < totalPlayers; i++) {
+      var pid = 'p' + i;
+      var bot = (mode === 'solo' && i > 0);
+      var name, emoji;
+      if (bot) { name = totalPlayers > 2 ? ('Ordi ' + i) : 'Ordi'; emoji = BOT_EMOJI[(i - 1) % BOT_EMOJI.length]; }
+      else if (i === 0 && id0 && id0.name) { name = id0.name; emoji = id0.emoji || (window.Avatars ? Avatars.firstFreeEmoji(pmap) : '🦊'); }
+      else { name = 'Joueur ' + (i + 1); emoji = window.Avatars ? Avatars.firstFreeEmoji(pmap) : '🦊'; }
+      var color = window.Avatars ? Avatars.pickColor(pmap) : 'var(--gold)';
+      pmap[pid] = { name: name, emoji: emoji, color: color, seat: i, online: true, ready: false, isBot: bot };
+      if (savedKeep && savedKeep[pid]) for (var k in savedKeep[pid]) pmap[pid][k] = savedKeep[pid][k];
+      players.push({ pid: pid, name: name, emoji: emoji, color: color, seat: i, isBot: bot });
+      ids.push(pid);
+    }
+    humanPids = players.filter(function (p) { return !p.isBot; }).map(function (p) { return p.pid; });
+    humanPid = humanPids[0];
+
+    room = { game: cfg.gameKey, status: 'playing', host: ids[0], players: pmap, order: ids };
+    window.room = room; window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
+
+    var onList = players.map(function (p) { return { pid: p.pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat }; });
+    var extra = cfg.onStart ? cfg.onStart(onList, room) : null;
+    if (extra) for (var kk in extra) if (extra.hasOwnProperty(kk)) room[kk] = extra[kk];
+
+    lastTurnShown = null;
+    hidePass();
+    afterChange();
+  }
+
+  function replay(keep) {
+    var saved = {};
+    (players || []).forEach(function (p) {
+      var src = room && room.players && room.players[p.pid];
+      if (!src) return;
+      saved[p.pid] = {};
+      (keep || []).forEach(function (k) { if (src[k] !== undefined) saved[p.pid][k] = src[k]; });
+    });
+    startGame(saved);
+  }
+
+  // ── Après chaque changement d'état : router l'écran / faire jouer l'ordi ──────
+  function safeOnState() { try { if (cfg.onState) cfg.onState(snap()); } catch (e) { console.error(e); } }
+
+  // Joueur censé agir maintenant. Par défaut room.turn ; un jeu à phases (placement,
+  // distribution, tours par couleur…) fournit cfg.offlineTurn(room).
+  function activePidOf() {
+    if (!room) return null;
+    if (cfg && cfg.offlineTurn) { try { return cfg.offlineTurn(room); } catch (e) { return room.turn; } }
+    return room.turn;
+  }
+
+  function afterChange() {
+    if (!room) return;
+    var active = activePidOf();
+    if (mode === 'solo') {
+      window.myPid = humanPid;
+      safeOnState();
+      if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
+    } else {
+      if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); return; }
+      window.myPid = active || room.turn || (room.order || [])[0];
+      var changed = (active !== lastTurnShown);
+      safeOnState();
+      // À chaque changement de joueur actif : réinit éventuelle de l'état local du jeu.
+      if (changed && cfg.offlineEnter) { try { cfg.offlineEnter(room, window.myPid); } catch (e) {} }
+      if (changed && active) { showPass(active); lastTurnShown = active; }
+    }
+  }
+
+  function botStep() {
+    if (mode !== 'solo' || !room || ended()) return;
+    var active = activePidOf();
+    if (!isBot(active)) return;
+    window.myPid = active;
+    try { cfg.bot(clone(room), active); } catch (e) { console.error('bot', e); }
+    // L'action du bot déclenche une transaction → afterChange (remet myPid, relance si besoin).
+  }
+
+  // ── Écran « passe l'appareil » (mode local) ──────────────────────────────────
+  function passEl() {
+    var el = document.getElementById('off-pass');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'off-pass';
+      el.innerHTML = '<div class="off-pass-card"><div class="off-pass-av" id="off-pass-av"></div>' +
+        '<div class="off-pass-title" id="off-pass-title"></div>' +
+        '<div class="off-pass-sub">Passe l\'appareil à ce joueur, puis touche le bouton.</div>' +
+        '<button class="lb-btn" id="off-pass-btn">C\'est à moi — jouer</button></div>';
+      document.body.appendChild(el);
+      el.querySelector('#off-pass-btn').onclick = hidePass;
+    }
+    return el;
+  }
+  function showPass(pid) {
+    if (mode !== 'local' || totalPlayers < 2) return;
+    var p = (room.players && room.players[pid]) || {};
+    var el = passEl();
+    var av = el.querySelector('#off-pass-av');
+    av.textContent = p.emoji || '🎲'; av.style.background = p.color || 'var(--gold)';
+    el.querySelector('#off-pass-title').textContent = 'Au tour de ' + (p.name || '?');
+    el.classList.add('show');
+  }
+  function hidePass() { var el = document.getElementById('off-pass'); if (el) el.classList.remove('show'); }
+
+  // ── Styles injectés (indépendants des CSS de chaque jeu) ─────────────────────
+  function injectStyles() {
+    if (document.getElementById('off-styles')) return;
+    var css =
+      '.off-set{margin:6px 0 10px;}' +
+      '.off-set-label{font-size:.8rem;color:var(--ink-light);margin-bottom:6px;}' +
+      '.off-set-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;}' +
+      '.off-num{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
+      '.off-num.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
+      '#off-pass{position:fixed;inset:0;z-index:9000;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,16,28,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}' +
+      '#off-pass.show{display:flex;}' +
+      '.off-pass-card{background:var(--white);border-radius:22px;padding:32px 26px;text-align:center;max-width:340px;width:100%;box-shadow:var(--shadow-hover);}' +
+      '.off-pass-av{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto 12px;border:3px solid #fff;box-shadow:0 0 0 3px var(--gold-light);}' +
+      '.off-pass-title{font-family:"Playfair Display",serif;font-weight:900;font-size:1.4rem;margin-bottom:4px;}' +
+      '.off-pass-sub{color:var(--ink-light);font-size:.9rem;margin-bottom:18px;}';
+    var s = document.createElement('style'); s.id = 'off-styles'; s.textContent = css;
+    document.head.appendChild(s);
+  }
+})();

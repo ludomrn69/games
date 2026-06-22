@@ -1,0 +1,30 @@
+/*
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Robots-Tag: noindex, nofollow
+
+# Pages HTML : jamais servies depuis le cache sans revérifier (évite un vieux
+# HTML qui ferait beuguer Firebase/lobby).
+/*.html
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
+
+# Scripts partagés : toujours revérifiés (toutes les pages en dépendent).
+/firebase-init.js
+  Cache-Control: no-cache
+/lobby.js
+  Cache-Control: no-cache
+/presence.js
+  Cache-Control: no-cache
+/avatars.js
+  Cache-Control: no-cache
+/nav.js
+  Cache-Control: no-cache
+/offline.js
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+/theme.css
+  Cache-Control: no-cache

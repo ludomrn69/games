@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="stylesheet" href="/theme.css">
+  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+  <title>Morpion ⭕</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⭕</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .app { margin-top: 52px; min-height: calc(100vh - 52px); }
+    .screen { display: none; animation: fadeUp 0.32s ease both; }
+    .screen.active { display: flex; flex-direction: column; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(14px);} to { opacity: 1; transform: translateY(0);} }
+
+    .btn-primary { display: block; width: 100%; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+    .btn-link { background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--ink-light); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
+    .btn-link:hover { color: var(--terracotta); }
+    .mt-4 { margin-top: 18px; }
+
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    .mp-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    html[data-theme="dark"] .mp-header { background: rgba(20,16,28,0.97); }
+    .mp-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .mp-turn-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .mp-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; }
+    .mp-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
+    .mp-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+
+    .mp-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; width: 100%; }
+    .mp-frame { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(6px, 2vw, 12px); width: min(86vw, 360px); aspect-ratio: 1; background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; padding: clamp(8px, 2.6vw, 14px); box-shadow: var(--shadow); }
+    .mp-cell { aspect-ratio: 1; border-radius: 16px; background: var(--cream); box-shadow: inset 0 2px 6px rgba(44,37,32,0.12); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, transform 0.12s; }
+    .mp-cell:hover { background: rgba(198,152,90,0.14); }
+    .mp-cell.sel { background: rgba(198,152,90,0.28); box-shadow: inset 0 0 0 3px var(--gold); }
+    .mp-disc { width: 64%; height: 64%; border-radius: 50%; background-image: radial-gradient(circle at 33% 28%, rgba(255,255,255,0.5), rgba(255,255,255,0) 58%); box-shadow: inset -2px -3px 6px rgba(0,0,0,0.22), inset 2px 2px 5px rgba(255,255,255,0.35); animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
+    @keyframes pop { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .mp-disc.mine-movable { cursor: pointer; }
+    .mp-cell.win .mp-disc { box-shadow: 0 0 0 3px var(--gold), 0 0 16px rgba(198,152,90,0.7); animation: mppulse 0.9s ease-in-out infinite alternate; }
+    @keyframes mppulse { from { transform: scale(1);} to { transform: scale(1.08);} }
+    .mp-hint { margin-top: 18px; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--ink-light); text-align: center; min-height: 26px; }
+
+    .mp-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .mp-overlay.active { display: flex; animation: fadeUp 0.3s ease both; }
+    .mp-overlay-card { background: var(--white); border-radius: 22px; padding: 30px 26px; box-shadow: var(--shadow-hover); text-align: center; max-width: 340px; width: 100%; }
+    .mp-ov-emoji { font-size: 3rem; line-height: 1; margin-bottom: 8px; }
+    .mp-ov-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; margin-bottom: 6px; }
+    .mp-ov-scores { font-size: 1.1rem; font-weight: 700; margin: 10px 0 20px; }
+    .mp-ov-scores .sep { color: var(--ink-light); margin: 0 8px; font-weight: 400; }
+
+    .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .modal.active { display: flex; animation: fadeUp 0.25s ease both; }
+    .modal-card { background: var(--white); border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script>
+  <script src="/presence.js"></script>
+  <script src="/avatars.js"></script>
+  <script src="/lobby.js"></script>
+  <script src="/offline.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="mp-header">
+        <span class="mp-turn" id="mp-turn"></span>
+        <span class="mp-scores" id="mp-scores"></span>
+        <div class="mp-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="mp-stage">
+        <div class="mp-frame" id="mp-board"></div>
+        <div class="mp-hint" id="mp-hint"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RESULT OVERLAY ══ -->
+  <div class="mp-overlay" id="mp-overlay">
+    <div class="mp-overlay-card">
+      <div class="mp-ov-emoji" id="mp-ov-emoji">🏆</div>
+      <div class="mp-ov-title" id="mp-ov-title">—</div>
+      <div class="mp-ov-scores" id="mp-ov-scores"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ RESTART MODAL ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">Les scores repartent de 0.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RULES MODAL ══ -->
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Morpion (à 3 pions)</div>
+      <div class="modal-body">
+        <p>Chacun a <b>3 pions</b>. Au début, on les pose à tour de rôle sur la grille.</p>
+        <p style="margin-top:10px">Une fois tes 3 pions posés, à ton tour tu en <b>déplaces un</b> sur n'importe quelle case libre.</p>
+        <p style="margin-top:10px">Le but : aligner tes <b>3 pions</b> (ligne, colonne ou diagonale). Le premier qui aligne gagne la manche · le score est gardé.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ State ━━ */
+    var prevStatus = null;
+    var selectedCell = -1; // pion sélectionné (phase déplacement), local
+
+    function rref() { return window.roomRef; }
+    function emptyBoard() { return '.........'; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function countMark(b, m) { var n = 0; for (var i = 0; i < 9; i++) if (b[i] === m) n++; return n; }
+
+    var LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    function winLineFor(b, m) {
+      for (var i = 0; i < LINES.length; i++) { var l = LINES[i]; if (b[l[0]] === m && b[l[1]] === m && b[l[2]] === m) return l; }
+      return null;
+    }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'morpion',
+      name: 'Morpion',
+      emoji: '⭕',
+      tagline: '3 pions, puis on déplace',
+      minPlayers: 2,
+      maxPlayers: 2,
+      rules: [
+        'Chacun a 3 pions, on les pose à tour de rôle',
+        'Une fois tes 3 pions posés, déplace-en un sur une case libre',
+        'Aligne tes 3 pions (ligne, colonne ou diagonale)',
+        'Le premier à aligner gagne la manche · le score est gardé'
+      ],
+      offline: { solo: true, local: true },
+      bot: morpionBot,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* ━━ IA (mode solo hors-ligne) ━━ */
+    function morpionBot(state, pid) {
+      var order = state.order, b = state.board || emptyBoard(), mark = String(order.indexOf(pid)), opp = String(1 - (+mark));
+      var phase = state.phase;
+      function empties(bb) { var a = []; for (var i = 0; i < 9; i++) if (bb[i] === '.') a.push(i); return a; }
+      function pP(bb, m, i) { var a = bb.split(''); a[i] = m; return a.join(''); }
+      function pM(bb, m, f, t) { var a = bb.split(''); a[f] = '.'; a[t] = m; return a.join(''); }
+      function score(bb) { var s = 0; for (var x = 0; x < LINES.length; x++) { var l = LINES[x], mine = 0, th = 0; for (var y = 0; y < 3; y++) { if (bb[l[y]] === mark) mine++; else if (bb[l[y]] === opp) th++; } if (th === 0) s += mine * mine; if (mine === 0) s -= th * th; } return s; }
+
+      // 1) coup gagnant immédiat
+      if (phase === 'placing') {
+        if (countMark(b, mark) < 3) { var es = empties(b); for (var i = 0; i < es.length; i++) if (winLineFor(pP(b, mark, es[i]), mark)) return doPlace(es[i]); }
+      } else {
+        for (var f = 0; f < 9; f++) if (b[f] === mark) { var e2 = empties(b); for (var j = 0; j < e2.length; j++) if (winLineFor(pM(b, mark, f, e2[j]), mark)) return doMove(f, e2[j]); }
+      }
+      // 2) bloquer une menace adverse immédiate
+      var oppPhase = (countMark(b, '0') >= 3 && countMark(b, '1') >= 3) ? 'moving' : 'placing';
+      var threat = -1;
+      if (oppPhase === 'placing') {
+        if (countMark(b, opp) < 3) { var oe = empties(b); for (var k = 0; k < oe.length; k++) if (winLineFor(pP(b, opp, oe[k]), opp)) { threat = oe[k]; break; } }
+      } else {
+        for (var of2 = 0; of2 < 9 && threat < 0; of2++) { if (b[of2] !== opp) continue; var oe2 = empties(b); for (var m2 = 0; m2 < oe2.length; m2++) if (winLineFor(pM(b, opp, of2, oe2[m2]), opp)) { threat = oe2[m2]; break; } }
+      }
+      if (threat >= 0) {
+        if (phase === 'placing') { if (countMark(b, mark) < 3) return doPlace(threat); }
+        else { for (var bf = 0; bf < 9; bf++) if (b[bf] === mark) return doMove(bf, threat); }
+      }
+      // 3) coup positionnel
+      if (phase === 'placing') {
+        if (countMark(b, mark) < 3) { var pref = [4, 0, 2, 6, 8, 1, 3, 5, 7]; for (var p = 0; p < pref.length; p++) if (b[pref[p]] === '.') return doPlace(pref[p]); }
+      } else {
+        var best = null, bestSc = -1e9;
+        for (var sf = 0; sf < 9; sf++) { if (b[sf] !== mark) continue; var se = empties(b); for (var st = 0; st < se.length; st++) { var sc = score(pM(b, mark, sf, se[st])); if (sc > bestSc) { bestSc = sc; best = [sf, se[st]]; } } }
+        if (best) return doMove(best[0], best[1]);
+      }
+      // 4) repli
+      var em = empties(b);
+      if (phase === 'placing') { if (em.length && countMark(b, mark) < 3) return doPlace(em[0]); }
+      else { for (var ff = 0; ff < 9; ff++) if (b[ff] === mark && em.length) return doMove(ff, em[0]); }
+    }
+
+    function onStart(players) {
+      var starter = players[Math.random() < 0.5 ? 0 : 1].pid;
+      return { board: emptyBoard(), turn: starter, starter: starter, phase: 'placing', winner: null, winLine: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'waiting') hideResult();
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { selectedCell = -1; hideResult(); showScreen('s-playing'); }
+        renderPlaying(state);
+      }
+      prevStatus = status;
+    }
+
+    function myMark(state) { return String((state.order || []).indexOf(window.myPid)); }
+
+    /* ━━ Interactions ━━ */
+    function cellTap(i) {
+      var state = window.room || {};
+      if (state.status !== 'playing' || state.winner) return;
+      if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      var b = state.board || emptyBoard();
+      var mark = myMark(state);
+
+      if (state.phase === 'placing') {
+        if (b[i] !== '.') { lbToast('Case occupée'); return; }
+        if (countMark(b, mark) >= 3) { lbToast('Tu as déjà posé tes 3 pions'); return; }
+        doPlace(i);
+      } else { // moving
+        if (b[i] === mark) { selectedCell = (selectedCell === i ? -1 : i); renderPlaying(state); return; }
+        if (b[i] !== '.') { lbToast('Case occupée'); return; }
+        if (selectedCell < 0) { lbToast('Choisis d\'abord un de tes pions'); return; }
+        doMove(selectedCell, i);
+      }
+    }
+
+    function applyWinOrTurn(cur, mark) {
+      var line = winLineFor(cur.board, mark);
+      if (line) {
+        cur.winner = window.myPid; cur.winLine = line;
+        if (!cur.players) cur.players = {};
+        if (!cur.players[window.myPid]) cur.players[window.myPid] = {};
+        cur.players[window.myPid].wins = (cur.players[window.myPid].wins || 0) + 1;
+        return;
+      }
+      var order = cur.order || [];
+      var idx = order.indexOf(window.myPid);
+      cur.turn = order[(idx + 1) % order.length];
+    }
+
+    function doPlace(i) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.phase !== 'placing') return cur;
+        var mark = String((cur.order || []).indexOf(window.myPid));
+        var b = (cur.board || emptyBoard()).split('');
+        if (b[i] !== '.' || countMark(b.join(''), mark) >= 3) return cur;
+        b[i] = mark; cur.board = b.join('');
+        // les deux joueurs ont posé leurs 3 pions ? → phase déplacement
+        var order = cur.order || [];
+        var allPlaced = order.every(function (pid) { return countMark(cur.board, String(order.indexOf(pid))) >= 3; });
+        applyWinOrTurn(cur, mark);
+        if (!cur.winner && allPlaced) cur.phase = 'moving';
+        return cur;
+      });
+    }
+
+    function doMove(from, to) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.phase !== 'moving') return cur;
+        var mark = String((cur.order || []).indexOf(window.myPid));
+        var b = (cur.board || emptyBoard()).split('');
+        if (b[from] !== mark || b[to] !== '.') return cur;
+        b[from] = '.'; b[to] = mark; cur.board = b.join('');
+        applyWinOrTurn(cur, mark);
+        return cur;
+      }, function (err, committed) { if (committed) selectedCell = -1; });
+    }
+
+    /* ━━ Rendu ━━ */
+    function scoresHTML(state) {
+      var ord = state.order || [];
+      return ord.map(function (pid) {
+        return '<span style="color:' + Room.color(pid) + '">' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
+      }).join('<span class="sep">—</span>');
+    }
+
+    function renderPlaying(state) {
+      var b = state.board || emptyBoard();
+      var ord = state.order || [];
+      var mark = myMark(state);
+      setHTML('mp-scores', scoresHTML(state));
+
+      var ti = document.getElementById('mp-turn');
+      if (state.winner) { ti.innerHTML = ''; setText('mp-hint', ''); }
+      else {
+        var t = state.turn;
+        ti.innerHTML = '<span class="mp-turn-dot" style="background:' + Room.color(t) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        var hint;
+        if (state.phase === 'placing') {
+          var left = 3 - countMark(b, mark);
+          hint = (t === window.myPid) ? ('Pose un pion (' + left + ' restant' + (left > 1 ? 's' : '') + ')') : ('En attente de ' + Room.name(t) + '…');
+        } else {
+          hint = (t === window.myPid) ? (selectedCell >= 0 ? 'Touche une case libre pour déplacer' : 'Choisis un de tes pions à déplacer') : ('En attente de ' + Room.name(t) + '…');
+        }
+        setText('mp-hint', hint);
+      }
+
+      var win = state.winLine || [];
+      var movable = (state.phase === 'moving' && state.turn === window.myPid && !state.winner);
+      var html = '';
+      for (var i = 0; i < 9; i++) {
+        var ch = b[i];
+        var cls = 'mp-cell' + (selectedCell === i ? ' sel' : '') + (win.indexOf(i) >= 0 ? ' win' : '');
+        var disc = '';
+        if (ch !== '.') {
+          var pid = ord[+ch];
+          var dcls = 'mp-disc' + (movable && ch === mark ? ' mine-movable' : '');
+          disc = '<span class="' + dcls + '" style="background:' + Room.color(pid) + '"></span>';
+        }
+        html += '<div class="' + cls + '" data-i="' + i + '">' + disc + '</div>';
+      }
+      document.getElementById('mp-board').innerHTML = html;
+
+      if (state.winner) showResult(state); else hideResult();
+    }
+
+    function showResult(state) {
+      var emoji = document.getElementById('mp-ov-emoji');
+      var title = document.getElementById('mp-ov-title');
+      if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
+      setHTML('mp-ov-scores', scoresHTML(state));
+      document.getElementById('mp-overlay').classList.add('active');
+    }
+    function hideResult() { var ov = document.getElementById('mp-overlay'); if (ov) ov.classList.remove('active'); }
+
+    function handleReplay() { hideResult(); selectedCell = -1; Lobby.resetToLobby(['wins']); }
+    function doRestart() { closeModal('modal-restart'); hideResult(); selectedCell = -1; Lobby.resetToLobby([]); }
+
+    /* ━━ Clic plateau ━━ */
+    (function () {
+      var board = document.getElementById('mp-board');
+      if (!board) return;
+      board.addEventListener('click', function (e) {
+        var cell = e.target.closest('.mp-cell');
+        if (cell) cellTap(+cell.dataset.i);
+      });
+    })();
+  </script>
+</body>
+</html>

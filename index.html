@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="stylesheet" href="/theme.css">
+  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+  <title>Les jeux 🎲</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 78px 18px 60px; }
+
+    .hero { text-align: center; margin-bottom: 30px; }
+    .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(2.4rem, 9vw, 3.6rem); font-weight: 900;
+      background: linear-gradient(135deg, var(--terracotta), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--ink-light); margin-top: 4px; }
+
+    .join-bar { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; margin: 0 auto 34px; max-width: 460px; }
+    .join-bar input { flex: 1; min-width: 140px; padding: 0.8rem 1rem; border: 1.5px solid var(--gold-light); border-radius: 14px;
+      background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1.1rem; text-align: center;
+      letter-spacing: 0.3em; text-transform: uppercase; font-weight: 700; }
+    .join-bar input:focus { outline: none; border-color: var(--gold); }
+    .join-bar button { padding: 0.8rem 1.4rem; border: none; border-radius: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff;
+      box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .join-bar button:hover { transform: translateY(-2px); }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+    .card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none;
+      background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; padding: 22px 14px 18px; color: var(--ink);
+      box-shadow: var(--shadow); transition: transform .22s cubic-bezier(0.34,1.56,0.64,1), box-shadow .22s; }
+    .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+    .card .emoji { font-size: 2.6rem; line-height: 1; }
+    .card .name { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.05rem; text-align: center; }
+    .card .players { font-size: 0.78rem; color: var(--ink-light); }
+    .card.soon { opacity: 0.5; pointer-events: none; }
+    .card.soon::after { content: 'bientôt'; position: absolute; top: 8px; right: 8px; font-size: 0.6rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px; color: var(--gold); background: var(--cream); padding: 2px 7px; border-radius: 20px; }
+    .card .off-badge { position: absolute; top: 7px; left: 8px; font-size: 0.85rem; line-height: 1; }
+    .offline-note { text-align: center; color: var(--ink-light); font-size: 0.82rem; margin-top: 24px; line-height: 1.5; }
+    .offline-note b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script>
+  <div class="wrap">
+    <div class="hero">
+      <h1>Les jeux</h1>
+      <p>à jouer avec les copains</p>
+    </div>
+
+    <div class="join-bar">
+      <input id="join-code" maxlength="4" placeholder="CODE" autocomplete="off" inputmode="text" aria-label="Code du salon">
+      <button onclick="joinByCode()">Rejoindre une partie</button>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <p class="offline-note">✈️ = jouable <b>hors-ligne</b> (solo contre l'ordi ou en local sur un seul appareil).<br>Ouvre le site une fois avec connexion, puis il fonctionne <b>sans réseau</b> (idéal en avion).</p>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var GAMES = [
+      { key: 'tu-preferes',     name: 'Tu préfères',     emoji: '🤔', players: '2–12', on: true },
+      { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true },
+      { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true },
+      { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true },
+      { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true },
+      { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true },
+      { key: 'pictionary',      name: 'Pictionary',      emoji: '🎨', players: '2–12', on: true },
+      { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true },
+      { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true },
+      { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true },
+      { key: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', players: '2',    on: true, offline: true },
+      { key: 'codenames',       name: 'Codenames',       emoji: '🕵️', players: '4–8',  on: true },
+      { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true },
+      { key: 'undercover',      name: 'Undercover',      emoji: '🕵️‍♂️', players: '3–12', on: true },
+      { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true },
+      { key: 'ludo',            name: 'Ludo',             emoji: '🐴', players: '2–4',  on: true, offline: true }
+    ];
+    var grid = document.getElementById('grid');
+    grid.innerHTML = GAMES.map(function (g) {
+      var cls = 'card' + (g.on ? '' : ' soon');
+      var inner = (g.offline ? '<span class="off-badge" title="Jouable hors-ligne (solo / local)">✈️</span>' : '') +
+        '<div class="emoji">' + g.emoji + '</div><div class="name">' + g.name + '</div><div class="players">' + g.players + ' joueurs</div>';
+      return g.on ? '<a class="' + cls + '" href="' + g.key + '.html">' + inner + '</a>'
+                  : '<div class="' + cls + '">' + inner + '</div>';
+    }).join('');
+
+    var input = document.getElementById('join-code');
+    input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^A-Z]/g, ''); });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
+
+    function toast(m) { var t = document.getElementById('lb-toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('show'); }, 2200); }
+
+    function joinByCode() {
+      var code = (input.value || '').trim().toUpperCase();
+      if (code.length < 4) { toast('Entre les 4 lettres du code'); return; }
+      firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms/' + code).once('value').then(function (snap) {
+        var room = snap.val();
+        if (!room || !room.game) { toast('Salon introuvable'); return; }
+        location.href = room.game + '.html?room=' + code;
+      }).catch(function () { toast('Connexion impossible'); });
+    }
+  </script>
+</body>
+</html>

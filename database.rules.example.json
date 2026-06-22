@@ -1,0 +1,9 @@
+{
+  "_comment": "Règles à FUSIONNER dans la Realtime Database du projet flechettes-d54b1. Ce site de jeux a besoin que les invités (non connectés) puissent lire/écrire SOUS la branche 'games' uniquement. Le reste de ta base (flechettes, cremaillere) n'est pas concerné. Console Firebase > Realtime Database > Règles, puis ajoute la clé 'games' à côté des autres et publie.",
+  "rules": {
+    "games": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

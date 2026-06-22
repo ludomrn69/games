@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="stylesheet" href="/theme.css">
+  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+  <title>Blokus 🧩</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bk-blue: #2f6fd0; --bk-yellow: #e6b800; --bk-red: #e05a4e; --bk-green: #34a853; }
+    body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    .app { margin-top: 52px; min-height: calc(100vh - 52px); }
+    .screen { display: none; animation: fadeUp 0.3s ease both; }
+    .screen.active { display: flex; flex-direction: column; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: translateY(0);} }
+
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.5; }
+    .btn-link { background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--ink-light); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
+    .mt-4 { margin-top: 18px; }
+
+    .bk-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .bk-header { background: rgba(20,16,28,0.97); }
+    .bk-turn-label { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); }
+    .bk-turn-color { font-weight: 800; padding: 2px 8px; border-radius: 20px; color: #fff; font-size: 0.82rem; }
+    .bk-turn-color.B { background: var(--bk-blue); } .bk-turn-color.Y { background: var(--bk-yellow); color: #2C2520; }
+    .bk-turn-color.R { background: var(--bk-red); } .bk-turn-color.G { background: var(--bk-green); }
+    .bk-head-actions { display: flex; gap: 6px; }
+
+    .bk-summary { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 8px 12px 4px; }
+    .bk-summary-chip { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 600; background: var(--white); border-radius: 20px; padding: 3px 9px; box-shadow: var(--shadow); }
+    .bk-summary-chip.passed { opacity: 0.45; text-decoration: line-through; }
+    .bk-summary-chip .swatch { width: 11px; height: 11px; border-radius: 3px; }
+    .swatch.B, .bk-piece-cell.B { background: var(--bk-blue); } .swatch.Y, .bk-piece-cell.Y { background: var(--bk-yellow); }
+    .swatch.R, .bk-piece-cell.R { background: var(--bk-red); } .swatch.G, .bk-piece-cell.G { background: var(--bk-green); }
+
+    .bk-board-wrap { display: flex; justify-content: center; padding: 6px 8px; }
+    .bk-board { display: grid; grid-template-columns: repeat(20, 1fr); width: min(96vw, 460px); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 8px; overflow: hidden; touch-action: none; }
+    .bk-cell { aspect-ratio: 1; border: 0.5px solid rgba(120,110,100,0.18); }
+    .bk-cell.dot { background: rgba(120,110,100,0.12); }
+    .bk-cell.B { background: var(--bk-blue); } .bk-cell.Y { background: var(--bk-yellow); }
+    .bk-cell.R { background: var(--bk-red); } .bk-cell.G { background: var(--bk-green); }
+    .bk-cell.ghost-B { background: rgba(47,111,208,0.5); } .bk-cell.ghost-Y { background: rgba(230,184,0,0.5); }
+    .bk-cell.ghost-R { background: rgba(224,90,78,0.5); } .bk-cell.ghost-G { background: rgba(52,168,83,0.5); }
+    .bk-cell.ghost-bad { background: rgba(120,120,120,0.4); }
+    .bk-cell.corner-hint { box-shadow: inset 0 0 0 2px currentColor; }
+    .bk-cell.corner-B { color: var(--bk-blue); } .bk-cell.corner-Y { color: var(--bk-yellow); }
+    .bk-cell.corner-R { color: var(--bk-red); } .bk-cell.corner-G { color: var(--bk-green); }
+
+    .bk-controls { display: none; flex-direction: column; align-items: center; gap: 8px; padding: 6px; }
+    .bk-controls.active { display: flex; }
+    .bk-ctrl-row { display: flex; gap: 8px; }
+    .bk-ctrl-btn { width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid var(--gold-light); background: var(--white); font-size: 1.2rem; cursor: pointer; }
+    .bk-ctrl-btn.cancel { color: var(--terracotta); }
+    .bk-place-btn { border: none; border-radius: 30px; padding: 0.5rem 1.6rem; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-weight: 800; cursor: pointer; }
+    .bk-place-btn:disabled { opacity: 0.45; }
+
+    .bk-tray-wrap { padding: 4px 12px 16px; }
+    .bk-tray-status { text-align: center; font-family: 'Caveat', cursive; font-size: 1rem; color: var(--terracotta); margin-bottom: 8px; }
+    .bk-tray-section { margin-bottom: 6px; }
+    .bk-tray-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-light); margin-bottom: 3px; }
+    .bk-tray-row { display: flex; flex-wrap: wrap; gap: 5px; }
+    .bk-piece-btn { background: var(--white); border: 1.5px solid var(--gold-light); border-radius: 8px; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .bk-piece-btn.disabled { opacity: 0.25; pointer-events: none; }
+    .bk-piece-btn.selected { border-color: var(--terracotta); box-shadow: 0 0 0 2px rgba(196,116,90,0.3); }
+    .bk-piece-grid { display: grid; gap: 1px; }
+    .bk-piece-cell { width: 9px; height: 9px; border-radius: 1px; }
+    .bk-piece-cell.empty { background: transparent; }
+    .bk-pass-btn { display: block; margin: 6px auto 0; border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .bk-wait { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--ink-light); padding: 20px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 8px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 9px 12px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 26px; } .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-colors { display: flex; gap: 3px; } .res-rank-colors .sw { width: 12px; height: 12px; border-radius: 3px; }
+    .res-rank-score { font-weight: 800; color: var(--gold); min-width: 60px; text-align: right; }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script>
+  <script src="/presence.js"></script>
+  <script src="/avatars.js"></script>
+  <script src="/lobby.js"></script>
+  <script src="/offline.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="bk-header">
+        <div><span class="bk-turn-label" id="bk-turn-label">À toi :</span> <span class="bk-turn-color" id="bk-turn-color">Bleu</span></div>
+        <div class="bk-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="bk-summary" id="bk-summary"></div>
+      <div class="bk-board-wrap"><div class="bk-board" id="bk-board"></div></div>
+      <div class="bk-controls" id="bk-controls">
+        <div class="bk-ctrl-row">
+          <button class="bk-ctrl-btn" title="Tourner à gauche" onclick="rotatePiece(-1)">↺</button>
+          <button class="bk-ctrl-btn" title="Tourner à droite" onclick="rotatePiece(1)">↻</button>
+          <button class="bk-ctrl-btn" title="Miroir" onclick="flipPiece()">⇄</button>
+          <button class="bk-ctrl-btn cancel" title="Annuler" onclick="cancelSelection()">✕</button>
+        </div>
+        <button class="bk-place-btn" id="btn-place" disabled onclick="placePiece()">Placer ✓</button>
+      </div>
+      <div class="bk-tray-wrap" id="bk-tray-wrap">
+        <div class="bk-tray-status" id="bk-tray-status">Choisis une pièce</div>
+        <div id="bk-tray"></div>
+        <button class="bk-pass-btn" id="btn-pass" onclick="confirmPass()">Passer cette couleur</button>
+      </div>
+      <div class="bk-wait" id="bk-wait" style="display:none">En attente de <span id="bk-wait-who">…</span></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-pass">
+    <div class="modal-card">
+      <div class="modal-title">Passer cette couleur ?</div>
+      <div class="modal-sub">Cette couleur ne pourra plus jouer pour le reste de la partie.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-pass')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doPass()">Oui, passer</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Blokus</div>
+      <div class="modal-body">
+        <p>Pose tes pièces en commençant par <b>ton coin</b>. Ensuite, chaque nouvelle pièce doit toucher une de tes pièces <b>par un coin</b> — jamais par un côté.</p>
+        <p style="margin-top:10px">Tourne / retourne la pièce avec les boutons, glisse-la sur le plateau, puis « Placer ».</p>
+        <p style="margin-top:10px">Quand tu ne peux plus jouer, passe. À la fin, celui à qui il reste le <b>moins de cases</b> gagne.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Constantes ━━ */
+    var BOARD_SIZE = 20;
+    var COLOR_NAME = { B: 'Bleu', Y: 'Jaune', R: 'Rouge', G: 'Vert' };
+    var COLOR_CORNER = { B: [0, 0], Y: [0, 19], R: [19, 19], G: [19, 0] };
+    var PIECES = {
+      '1': [[0,0]], '2': [[0,0],[0,1]], '3I': [[0,0],[0,1],[0,2]], '3V': [[0,0],[0,1],[1,0]],
+      '4I': [[0,0],[0,1],[0,2],[0,3]], '4O': [[0,0],[0,1],[1,0],[1,1]], '4L': [[0,0],[0,1],[0,2],[1,0]], '4T': [[0,0],[0,1],[0,2],[1,1]], '4S': [[0,1],[0,2],[1,0],[1,1]],
+      '5F': [[0,1],[0,2],[1,0],[1,1],[2,1]], '5I': [[0,0],[0,1],[0,2],[0,3],[0,4]], '5L': [[0,0],[1,0],[2,0],[3,0],[3,1]], '5N': [[0,1],[1,1],[2,0],[2,1],[3,0]], '5P': [[0,0],[0,1],[1,0],[1,1],[2,0]],
+      '5T': [[0,0],[0,1],[0,2],[1,1],[2,1]], '5U': [[0,0],[0,2],[1,0],[1,1],[1,2]], '5V': [[0,0],[1,0],[2,0],[2,1],[2,2]], '5W': [[0,0],[1,0],[1,1],[2,1],[2,2]], '5X': [[0,1],[1,0],[1,1],[1,2],[2,1]], '5Y': [[0,1],[1,0],[1,1],[2,1],[3,1]], '5Z': [[0,0],[0,1],[1,1],[2,1],[2,2]]
+    };
+    var PIECE_IDS_BY_SIZE = { 5: ['5I','5L','5N','5P','5T','5U','5V','5W','5X','5Y','5Z','5F'], 4: ['4I','4L','4T','4S','4O'], 3: ['3I','3V'], 2: ['2'], 1: ['1'] };
+    var ALL_PIECE_IDS = ['1','2','3I','3V','4I','4O','4L','4T','4S','5F','5I','5L','5N','5P','5T','5U','5V','5W','5X','5Y','5Z'];
+
+    function normalizeCells(cells) {
+      var minR = 1e9, minC = 1e9;
+      cells.forEach(function (c) { if (c[0] < minR) minR = c[0]; if (c[1] < minC) minC = c[1]; });
+      return cells.map(function (c) { return [c[0] - minR, c[1] - minC]; }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    }
+    function rotateCellsCW(cells) { return normalizeCells(cells.map(function (c) { return [c[1], -c[0]]; })); }
+    function flipCells(cells) { return normalizeCells(cells.map(function (c) { return [c[0], -c[1]]; })); }
+    function emptyBoard() { var s = ''; for (var i = 0; i < 400; i++) s += '.'; return s; }
+    function getCell(board, r, c) { if (r < 0 || r >= 20 || c < 0 || c >= 20) return null; var v = board.charAt(r * 20 + c); return v === '.' ? null : v; }
+    function setBoardCells(board, cells, color) { var a = board.split(''); cells.forEach(function (c) { a[c[0] * 20 + c[1]] = color; }); return a.join(''); }
+    function isValidPlacement(board, color, abs, isFirst) {
+      for (var i = 0; i < abs.length; i++) { var r = abs[i][0], c = abs[i][1]; if (r < 0 || r >= 20 || c < 0 || c >= 20) return false; if (getCell(board, r, c) !== null) return false; }
+      if (isFirst) { var corner = COLOR_CORNER[color]; return abs.some(function (a) { return a[0] === corner[0] && a[1] === corner[1]; }); }
+      var cornerOk = false;
+      for (var k = 0; k < abs.length; k++) {
+        var rr = abs[k][0], cc = abs[k][1];
+        var edges = [[rr-1,cc],[rr+1,cc],[rr,cc-1],[rr,cc+1]];
+        for (var e = 0; e < 4; e++) if (getCell(board, edges[e][0], edges[e][1]) === color) return false;
+        var corners = [[rr-1,cc-1],[rr-1,cc+1],[rr+1,cc-1],[rr+1,cc+1]];
+        for (var d = 0; d < 4; d++) if (getCell(board, corners[d][0], corners[d][1]) === color) cornerOk = true;
+      }
+      return cornerOk;
+    }
+    function colorIsFirst(state, color) { var b = state.board || emptyBoard(); for (var i = 0; i < b.length; i++) if (b.charAt(i) === color) return false; return true; }
+
+    /* ━━ State (sélection locale) ━━ */
+    var prevStatus = null, selectedPiece = null, selectedColor = null, selectedCells = null, ghostAnchor = null, ghostValid = false, boardBuilt = false;
+    function rref() { return window.roomRef; }
+    function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function ownerOf(state, color) { return (state.colorOwner || {})[color]; }
+    function colorsOf(state, pid) { return (state.turnOrder || []).filter(function (c) { return ownerOf(state, c) === pid; }); }
+    function squaresLeft(state, color) { var arr = (state.pieces && state.pieces[color]) || []; var s = 0; arr.forEach(function (p) { s += (PIECES[p] || []).length; }); return s; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'blokus', name: 'Blokus', emoji: '🧩', tagline: 'Pose tes pièces dans les coins',
+      minPlayers: 2, maxPlayers: 4,
+      rules: [
+        'Commence par ton coin, puis touche tes pièces par les coins (jamais les côtés)',
+        'Tourne / retourne la pièce, glisse-la, puis « Placer »',
+        'Quand tu ne peux plus jouer, passe',
+        'Le moins de cases restantes gagne'
+      ],
+      offline: { local: true },
+      offlineTurn: function (r) { return (r.status === 'playing') ? ownerOf(r, r.turn) : null; },
+      offlineEnter: function () { clearSelection(); if (window.room) renderPlaying(window.room); },
+      onState: onState, onStart: onStart, beforeJoin: clearSelection
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var n = order.length, colorOwner = {}, turnOrder;
+      if (n === 2) { colorOwner = { B: order[0], R: order[0], Y: order[1], G: order[1] }; turnOrder = ['B', 'Y', 'R', 'G']; }
+      else if (n === 3) { colorOwner = { B: order[0], Y: order[1], R: order[2] }; turnOrder = ['B', 'Y', 'R']; }
+      else { colorOwner = { B: order[0], Y: order[1], R: order[2], G: order[3] }; turnOrder = ['B', 'Y', 'R', 'G']; }
+      var pieces = {}, passed = {};
+      turnOrder.forEach(function (c) { pieces[c] = ALL_PIECE_IDS.slice(); passed[c] = false; });
+      return { board: emptyBoard(), turn: turnOrder[0], colorOwner: colorOwner, turnOrder: turnOrder, pieces: pieces, passed: passed, lastMove: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { clearSelection(); showScreen('s-playing'); buildBoardCells(); }
+        renderPlaying(state);
+      } else if (status === 'ended') {
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Plateau ━━ */
+    function buildBoardCells() {
+      var board = document.getElementById('bk-board');
+      if (boardBuilt && board.children.length === 400) return;
+      board.innerHTML = '';
+      for (var r = 0; r < 20; r++) for (var c = 0; c < 20; c++) {
+        var d = document.createElement('div');
+        d.className = 'bk-cell'; d.id = 'cell-' + r + '-' + c; d.dataset.r = r; d.dataset.c = c;
+        if ((r === 4 || r === 14) && (c === 4 || c === 14)) d.classList.add('dot');
+        board.appendChild(d);
+      }
+      board.addEventListener('pointerdown', onPointerDown);
+      board.addEventListener('pointermove', onPointerMove);
+      board.addEventListener('pointerup', onPointerUp);
+      board.addEventListener('pointercancel', onPointerUp);
+      boardBuilt = true;
+    }
+    var dragging = false;
+    function anchorFrom(x, y) {
+      var el = document.elementFromPoint(x, y); var cell = el && el.closest && el.closest('.bk-cell'); if (!cell) return;
+      var r = +cell.dataset.r, c = +cell.dataset.c;
+      if (ghostAnchor && ghostAnchor[0] === r && ghostAnchor[1] === c) return;
+      ghostAnchor = [r, c]; updateGhost();
+    }
+    function onPointerDown(e) { if (!selectedPiece) return; if (!e.target.closest('.bk-cell')) return; e.preventDefault(); dragging = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} anchorFrom(e.clientX, e.clientY); }
+    function onPointerMove(e) { if (!dragging || !selectedPiece) return; e.preventDefault(); anchorFrom(e.clientX, e.clientY); }
+    function onPointerUp(e) { dragging = false; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {} }
+
+    function renderPlaying(state) {
+      var turn = state.turn, owner = ownerOf(state, turn), isMyTurn = owner === window.myPid;
+      document.getElementById('bk-turn-label').textContent = isMyTurn ? 'À toi :' : ('À ' + Room.name(owner) + ' :');
+      var ct = document.getElementById('bk-turn-color'); ct.textContent = COLOR_NAME[turn]; ct.className = 'bk-turn-color ' + turn;
+
+      // Résumé par couleur
+      var passed = state.passed || {};
+      document.getElementById('bk-summary').innerHTML = (state.turnOrder || []).map(function (col) {
+        var lp = ((state.pieces && state.pieces[col]) || []).length;
+        return '<span class="bk-summary-chip' + (passed[col] ? ' passed' : '') + '"><span class="swatch ' + col + '"></span>' + COLOR_NAME[col] + ' · ' + lp + ' (' + squaresLeft(state, col) + ')</span>';
+      }).join('');
+
+      renderBoard(state);
+
+      if (isMyTurn) {
+        document.getElementById('bk-tray-wrap').style.display = '';
+        document.getElementById('bk-wait').style.display = 'none';
+        renderTray(state, turn);
+        document.getElementById('btn-pass').disabled = false;
+      } else {
+        document.getElementById('bk-tray-wrap').style.display = 'none';
+        document.getElementById('bk-wait').style.display = '';
+        document.getElementById('bk-wait-who').textContent = Room.name(owner) + ' (' + COLOR_NAME[turn] + ')';
+        clearSelection();
+      }
+      updateGhost();
+    }
+
+    function renderBoard(state) {
+      var board = state.board || emptyBoard();
+      var cells = document.getElementById('bk-board').children;
+      for (var i = 0; i < cells.length; i++) {
+        cells[i].classList.remove('B', 'Y', 'R', 'G', 'corner-hint', 'corner-B', 'corner-Y', 'corner-R', 'corner-G', 'ghost-B', 'ghost-Y', 'ghost-R', 'ghost-G', 'ghost-bad');
+      }
+      for (var k = 0; k < board.length; k++) { var ch = board.charAt(k); if (ch === '.') continue; var el = document.getElementById('cell-' + Math.floor(k / 20) + '-' + (k % 20)); if (el) el.classList.add(ch); }
+      var turn = state.turn;
+      if (turn && colorIsFirst(state, turn)) { var corn = COLOR_CORNER[turn]; var cc = document.getElementById('cell-' + corn[0] + '-' + corn[1]); if (cc && !cc.classList.contains(turn)) cc.classList.add('corner-hint', 'corner-' + turn); }
+    }
+
+    function renderTray(state, color) {
+      var tray = document.getElementById('bk-tray'); tray.innerHTML = '';
+      var have = {}; ((state.pieces && state.pieces[color]) || []).forEach(function (p) { have[p] = true; });
+      [5, 4, 3, 2, 1].forEach(function (size) {
+        var section = document.createElement('div'); section.className = 'bk-tray-section';
+        var label = document.createElement('div'); label.className = 'bk-tray-label'; label.textContent = size + ' case' + (size > 1 ? 's' : ''); section.appendChild(label);
+        var row = document.createElement('div'); row.className = 'bk-tray-row';
+        PIECE_IDS_BY_SIZE[size].forEach(function (pid) {
+          var btn = document.createElement('button'); btn.className = 'bk-piece-btn' + (have[pid] ? '' : ' disabled') + (pid === selectedPiece ? ' selected' : '');
+          btn.appendChild(buildPieceIcon(PIECES[pid], color));
+          btn.onclick = function () { if (have[pid]) selectPiece(color, pid); };
+          row.appendChild(btn);
+        });
+        section.appendChild(row); tray.appendChild(section);
+      });
+      var status = document.getElementById('bk-tray-status');
+      status.textContent = selectedPiece ? (ghostAnchor ? (ghostValid ? 'Tape « Placer » pour confirmer' : 'Pose invalide — glisse, tourne ou retourne') : 'Glisse la pièce sur le plateau')
+        : (colorIsFirst(state, color) ? 'Première pièce — pose-la sur ton coin' : 'Choisis une pièce');
+      document.getElementById('bk-controls').classList.toggle('active', !!selectedPiece);
+    }
+
+    function buildPieceIcon(cells, color) {
+      var maxR = 0, maxC = 0; cells.forEach(function (c) { if (c[0] > maxR) maxR = c[0]; if (c[1] > maxC) maxC = c[1]; });
+      var grid = document.createElement('div'); grid.className = 'bk-piece-grid';
+      grid.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', 9px)';
+      var set = {}; cells.forEach(function (c) { set[c[0] + ',' + c[1]] = true; });
+      for (var r = 0; r <= maxR; r++) for (var c = 0; c <= maxC; c++) { var d = document.createElement('div'); d.className = 'bk-piece-cell ' + (set[r + ',' + c] ? color : 'empty'); grid.appendChild(d); }
+      return grid;
+    }
+
+    /* ━━ Sélection / ghost ━━ */
+    function selectPiece(color, pid) { selectedColor = color; selectedPiece = pid; selectedCells = normalizeCells(PIECES[pid].slice()); ghostAnchor = null; ghostValid = false; renderTray(window.room, color); updateGhost(); }
+    function clearSelection() {
+      selectedPiece = null; selectedColor = null; selectedCells = null; ghostAnchor = null; ghostValid = false;
+      document.querySelectorAll('.bk-cell.ghost-B, .bk-cell.ghost-Y, .bk-cell.ghost-R, .bk-cell.ghost-G, .bk-cell.ghost-bad').forEach(function (el) { el.classList.remove('ghost-B', 'ghost-Y', 'ghost-R', 'ghost-G', 'ghost-bad'); });
+      var ctrls = document.getElementById('bk-controls'); if (ctrls) ctrls.classList.remove('active');
+      var pb = document.getElementById('btn-place'); if (pb) pb.disabled = true;
+    }
+    function cancelSelection() { clearSelection(); if (window.room) renderTray(window.room, window.room.turn); }
+    function rotatePiece(dir) { if (!selectedCells) return; selectedCells = dir > 0 ? rotateCellsCW(selectedCells) : rotateCellsCW(rotateCellsCW(rotateCellsCW(selectedCells))); updateGhost(); }
+    function flipPiece() { if (!selectedCells) return; selectedCells = flipCells(selectedCells); updateGhost(); }
+    function getAbsCells() {
+      if (!selectedCells || !ghostAnchor) return null;
+      var ref = selectedCells[0];
+      return selectedCells.map(function (c) { return [ghostAnchor[0] + (c[0] - ref[0]), ghostAnchor[1] + (c[1] - ref[1])]; });
+    }
+    function updateGhost() {
+      document.querySelectorAll('.bk-cell.ghost-B, .bk-cell.ghost-Y, .bk-cell.ghost-R, .bk-cell.ghost-G, .bk-cell.ghost-bad').forEach(function (el) { el.classList.remove('ghost-B', 'ghost-Y', 'ghost-R', 'ghost-G', 'ghost-bad'); });
+      ghostValid = false; var pb = document.getElementById('btn-place'); if (pb) pb.disabled = true;
+      var state = window.room;
+      if (!selectedColor || !selectedCells || !ghostAnchor || !state) return;
+      var abs = getAbsCells();
+      var valid = isValidPlacement(state.board || emptyBoard(), selectedColor, abs, colorIsFirst(state, selectedColor));
+      ghostValid = valid;
+      abs.forEach(function (cell) { var el = document.getElementById('cell-' + cell[0] + '-' + cell[1]); if (el) el.classList.add(valid ? ('ghost-' + selectedColor) : 'ghost-bad'); });
+      if (pb) pb.disabled = !valid;
+      var status = document.getElementById('bk-tray-status'); if (status) status.textContent = valid ? 'Tape « Placer » pour confirmer' : 'Pose invalide — glisse, tourne ou retourne';
+    }
+
+    /* ━━ Actions ━━ */
+    function nextTurn(currentColor, passed, pieces, turnOrder) {
+      var idx = turnOrder.indexOf(currentColor);
+      for (var i = 1; i <= turnOrder.length; i++) {
+        var nx = turnOrder[(idx + i) % turnOrder.length];
+        if (passed[nx]) continue;
+        if (!pieces[nx] || pieces[nx].length === 0) continue;
+        return nx;
+      }
+      return null;
+    }
+    function placePiece() {
+      if (!selectedPiece || !selectedColor || !ghostAnchor || !ghostValid) return;
+      var color = selectedColor, pid = selectedPiece, abs = getAbsCells();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== color) return cur;
+        if (ownerOf(cur, color) !== window.myPid) return cur;
+        var pcs = (cur.pieces && cur.pieces[color]) || [];
+        if (pcs.indexOf(pid) < 0) return cur;
+        if (!isValidPlacement(cur.board || emptyBoard(), color, abs, colorIsFirst(cur, color))) return cur;
+        cur.board = setBoardCells(cur.board || emptyBoard(), abs, color);
+        cur.pieces[color] = pcs.filter(function (p) { return p !== pid; });
+        cur.lastMove = { color: color, cells: abs };
+        cur.turn = nextTurn(color, cur.passed || {}, cur.pieces, cur.turnOrder || []);
+        if (!cur.turn) cur.status = 'ended';
+        return cur;
+      }, function (err, committed) { if (committed) clearSelection(); });
+    }
+    function confirmPass() { var st = window.room || {}; if (st.status !== 'playing' || ownerOf(st, st.turn) !== window.myPid) return; openModal('modal-pass'); }
+    function doPass() {
+      closeModal('modal-pass');
+      var color = window.room && window.room.turn; if (!color) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== color) return cur;
+        cur.passed = cur.passed || {}; cur.passed[color] = true;
+        cur.turn = nextTurn(color, cur.passed, cur.pieces || {}, cur.turnOrder || []);
+        if (!cur.turn) cur.status = 'ended';
+        return cur;
+      });
+      clearSelection();
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      clearSelection(); showScreen('s-results');
+      var ord = (state.order || []).slice();
+      function remaining(pid) { var s = 0; colorsOf(state, pid).forEach(function (c) { s += squaresLeft(state, c); }); return s; }
+      ord.sort(function (a, b) { return remaining(a) - remaining(b); }); // moins de cases = gagnant
+      var low = remaining(ord[0]);
+      var winners = ord.filter(function (p) { return remaining(p) === low; });
+      var iWon = winners.indexOf(window.myPid) >= 0;
+      document.getElementById('res-emoji').textContent = winners.length > 1 ? '🤝' : '🏆';
+      document.getElementById('res-title').textContent = winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !');
+      var medals = ['🥇', '🥈', '🥉'];
+      document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
+        var sw = colorsOf(state, pid).map(function (c) { return '<span class="sw ' + c + '"></span>'; }).join('');
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-colors">' + sw + '</span>' +
+          '<span class="res-rank-score">' + remaining(pid) + ' cases</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { clearSelection(); Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); clearSelection(); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>
