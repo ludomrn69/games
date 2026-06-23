@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/game.css">
+  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+  <title>Le juste prix 💰</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 340px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    .jp-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    html[data-theme="dark"] .jp-header { background: rgba(20,16,28,0.97); }
+    .jp-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .jp-turn-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .jp-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+    .jp-scores .sep { color: var(--ink-light); margin: 0 5px; font-weight: 400; }
+    .jp-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+
+    .jp-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 26px 16px 40px; width: 100%; max-width: 460px; gap: 18px; }
+
+    .jp-range { background: var(--white); border: 1px solid var(--gold-light); border-radius: 22px; box-shadow: var(--shadow); padding: 22px 20px; text-align: center; width: 100%; }
+    .jp-range-label { font-family: 'Caveat', cursive; font-size: 1.25rem; color: var(--ink-light); margin-bottom: 6px; }
+    .jp-range-nums { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2rem; color: var(--ink); display: flex; align-items: center; justify-content: center; gap: 14px; }
+    .jp-range-nums .lo, .jp-range-nums .hi { background: linear-gradient(135deg, var(--terracotta), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .jp-range-nums .arrow { color: var(--gold-light); font-size: 1.4rem; }
+
+    .jp-input-row { display: flex; gap: 8px; width: 100%; max-width: 340px; }
+    .jp-input { flex: 1; min-width: 0; padding: 0.85rem 1rem; border: 1.5px solid var(--gold-light); border-radius: 14px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1.3rem; text-align: center; font-weight: 700; }
+    .jp-input:focus { outline: none; border-color: var(--gold); }
+    .jp-input-row .btn-primary { width: auto; margin: 0; padding: 0 1.3rem; white-space: nowrap; }
+
+    .jp-wait { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--ink-light); text-align: center; min-height: 26px; }
+
+    .jp-log { width: 100%; display: flex; flex-direction: column; gap: 7px; }
+    .jp-log-row { display: flex; align-items: center; gap: 10px; background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); animation: fadeUp .25s ease both; }
+    .jp-log-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; border: 2px solid #fff; }
+    .jp-log-name { font-weight: 700; font-size: 0.9rem; }
+    .jp-log-val { margin-left: auto; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.15rem; }
+    .jp-log-dir { font-size: 0.85rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+    .jp-log-dir.up { color: #fff; background: var(--terracotta); }
+    .jp-log-dir.down { color: var(--ink); background: var(--gold-light); }
+    .jp-log-dir.hit { color: #fff; background: var(--sage); }
+
+    /* Result overlay */
+    .jp-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .jp-overlay.active { display: flex; animation: fadeUp 0.3s ease both; }
+    .jp-overlay-card { background: var(--white); border-radius: 22px; padding: 30px 26px; box-shadow: var(--shadow-hover); text-align: center; max-width: 340px; width: 100%; }
+    .jp-ov-emoji { font-size: 3rem; line-height: 1; margin-bottom: 8px; }
+    .jp-ov-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; margin-bottom: 6px; }
+    .jp-ov-secret { font-size: 1rem; color: var(--ink-light); margin-bottom: 6px; }
+    .jp-ov-secret b { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--terracotta); }
+    .jp-ov-scores { font-size: 1.05rem; font-weight: 700; margin: 10px 0 20px; }
+    .jp-ov-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
+
+    /* Modal */
+    .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .modal.active { display: flex; animation: fadeUp 0.25s ease both; }
+    .modal-card { background: var(--white); border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script>
+  <script src="/presence.js"></script>
+  <script src="/avatars.js"></script>
+  <script src="/lobby.js"></script>
+  <script src="/offline.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="jp-header">
+        <span class="jp-turn" id="jp-turn"></span>
+        <span class="jp-scores" id="jp-scores"></span>
+        <div class="jp-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="jp-stage">
+        <div class="jp-range">
+          <div class="jp-range-label">Le nombre mystère est entre</div>
+          <div class="jp-range-nums"><span class="lo" id="jp-lo">1</span><span class="arrow">↔</span><span class="hi" id="jp-hi">1000</span></div>
+        </div>
+        <div id="jp-action"></div>
+        <div class="jp-log" id="jp-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="jp-overlay" id="jp-overlay">
+    <div class="jp-overlay-card">
+      <div class="jp-ov-emoji" id="jp-ov-emoji">🏆</div>
+      <div class="jp-ov-title" id="jp-ov-title">—</div>
+      <div class="jp-ov-secret" id="jp-ov-secret"></div>
+      <div class="jp-ov-scores" id="jp-ov-scores"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">Les scores repartent de 0.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Le juste prix</div>
+      <div class="modal-body">
+        <p>Un nombre mystère est tiré au sort entre <b>1 et 1000</b>.</p>
+        <p style="margin-top:10px">Chacun son tour, propose un nombre. Le jeu répond <b>« c'est plus ! »</b> ⬆️ ou <b>« c'est moins ! »</b> ⬇️ et la fourchette se resserre pour tout le monde.</p>
+        <p style="margin-top:10px">Le premier à <b>tomber pile</b> sur le nombre gagne la manche. Le score est gardé entre les manches.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var MAXN = 1000;
+    var prevStatus = null, lastLogLen = -1;
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+
+    function rref() { return window.roomRef; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
+
+    GameRoom({
+      gameKey: 'juste-prix',
+      name: 'Le juste prix',
+      emoji: '💰',
+      tagline: 'Plus ou moins ?',
+      minPlayers: 2,
+      maxPlayers: 8,
+      rules: [
+        'Un nombre mystère entre 1 et 1000 est tiré au sort',
+        'Chacun son tour, propose un nombre',
+        'Le jeu répond « c\'est plus ! » ou « c\'est moins ! »',
+        'Le premier à tomber pile gagne la manche'
+      ],
+      offline: { solo: true, local: true },
+      bot: jpBot,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* État initial d'une manche. */
+    function onStart(players) {
+      var secret = 1 + Math.floor(Math.random() * MAXN);
+      var starter = players[Math.floor(Math.random() * players.length)].pid;
+      return { secret: secret, lo: 1, hi: MAXN, max: MAXN, turn: starter, log: null, winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'waiting') hideResult();
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { lastLogLen = -1; showScreen('s-playing'); hideResult(); }
+        renderPlaying(state);
+      }
+      prevStatus = status;
+    }
+
+    /* Proposer un nombre. */
+    function doGuess(value) {
+      var state = window.room || {};
+      if (state.status !== 'playing' || state.winner) return;
+      if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      var v = Math.round(value);
+      if (!isFinite(v) || v < 1 || v > (state.max || MAXN)) { lbToast('Entre un nombre entre 1 et ' + (state.max || MAXN)); return; }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        if (cur.turn !== window.myPid) return cur;
+        var order = cur.order || [];
+        var dir;
+        if (v === cur.secret) dir = 'hit';
+        else if (v < cur.secret) { dir = 'up'; cur.lo = Math.max(cur.lo || 1, v + 1); }
+        else { dir = 'down'; cur.hi = Math.min(cur.hi || cur.max, v - 1); }
+        var log = cur.log || [];
+        log.push({ pid: window.myPid, v: v, dir: dir });
+        if (log.length > 10) log = log.slice(log.length - 10);
+        cur.log = log;
+        if (dir === 'hit') {
+          cur.winner = window.myPid;
+          if (!cur.players) cur.players = {};
+          if (!cur.players[window.myPid]) cur.players[window.myPid] = {};
+          cur.players[window.myPid].wins = (cur.players[window.myPid].wins || 0) + 1;
+        } else {
+          var i = order.indexOf(window.myPid);
+          cur.turn = order[(i + 1) % order.length];
+        }
+        return cur;
+      });
+    }
+
+    /* IA (mode solo) : recherche dichotomique dans la fourchette connue. */
+    function jpBot(state) {
+      var lo = state.lo || 1, hi = state.hi || (state.max || MAXN);
+      if (hi < lo) hi = lo;
+      var guess = Math.floor((lo + hi) / 2);
+      doGuess(guess);
+    }
+
+    /* ━━ Rendu ━━ */
+    function scoresHTML(state) {
+      var ord = state.order || [];
+      return ord.map(function (pid) {
+        return '<span style="color:' + Room.color(pid) + '">' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
+      }).join('<span class="sep">·</span>');
+    }
+
+    function renderPlaying(state) {
+      setHTML('jp-scores', scoresHTML(state));
+      setText('jp-lo', state.lo || 1);
+      setText('jp-hi', state.hi != null ? state.hi : (state.max || MAXN));
+
+      var ti = document.getElementById('jp-turn');
+      var t = state.turn;
+      if (state.winner) { ti.innerHTML = ''; }
+      else {
+        ti.innerHTML = '<span class="jp-turn-dot" style="background:' + Room.color(t) + '"></span>' +
+          (t === window.myPid ? 'À toi !' : ('Au tour de ' + escapeHtml(Room.name(t))));
+      }
+
+      // Zone d'action : champ de saisie seulement à mon tour.
+      var action = document.getElementById('jp-action');
+      var myTurn = (t === window.myPid) && !state.winner;
+      var key = myTurn ? 'input' : (state.winner ? 'none' : 'wait');
+      if (action._key !== key) {
+        action._key = key;
+        if (myTurn) {
+          action.innerHTML =
+            '<div class="jp-input-row">' +
+              '<input class="jp-input" id="jp-guess" type="number" inputmode="numeric" min="1" max="' + (state.max || MAXN) + '" placeholder="?" autocomplete="off">' +
+              '<button class="btn-primary" onclick="submitGuess()">Proposer</button>' +
+            '</div>';
+          var inp = document.getElementById('jp-guess');
+          inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitGuess(); });
+          setTimeout(function () { inp.focus(); }, 60);
+        } else if (state.winner) {
+          action.innerHTML = '';
+        } else {
+          action.innerHTML = '<div class="jp-wait">En attente de ' + escapeHtml(Room.name(t)) + '…</div>';
+        }
+      } else if (!myTurn && !state.winner) {
+        action.innerHTML = '<div class="jp-wait">En attente de ' + escapeHtml(Room.name(t)) + '…</div>';
+      }
+
+      // Journal des propositions (plus récent en haut).
+      var log = state.log || [];
+      if (log.length !== lastLogLen) {
+        lastLogLen = log.length;
+        var rows = log.slice().reverse().map(function (e) {
+          var dirTxt = e.dir === 'hit' ? '🎯 Pile !' : e.dir === 'up' ? "C'est plus ⬆️" : "C'est moins ⬇️";
+          return '<div class="jp-log-row">' +
+            '<span class="jp-log-av" style="background:' + Room.color(e.pid) + '">' + Room.emoji(e.pid) + '</span>' +
+            '<span class="jp-log-name">' + escapeHtml(Room.name(e.pid)) + '</span>' +
+            '<span class="jp-log-val">' + e.v + '</span>' +
+            '<span class="jp-log-dir ' + e.dir + '">' + dirTxt + '</span></div>';
+        }).join('');
+        setHTML('jp-log', rows);
+      }
+
+      if (state.winner) showResult(state); else hideResult();
+    }
+
+    function submitGuess() {
+      var inp = document.getElementById('jp-guess');
+      if (!inp) return;
+      var v = parseInt(inp.value, 10);
+      if (isNaN(v)) { lbToast('Entre un nombre'); return; }
+      doGuess(v);
+    }
+
+    function showResult(state) {
+      var ov = document.getElementById('jp-overlay');
+      var emoji = document.getElementById('jp-ov-emoji');
+      var title = document.getElementById('jp-ov-title');
+      if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as trouvé !'; }
+      else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a trouvé'; }
+      setHTML('jp-ov-secret', 'Le nombre était <b>' + state.secret + '</b>');
+      setHTML('jp-ov-scores', scoresHTML(state));
+      ov.classList.add('active');
+    }
+    function hideResult() { var ov = document.getElementById('jp-overlay'); if (ov) ov.classList.remove('active'); }
+
+    function handleReplay() { hideResult(); Lobby.resetToLobby(['wins']); }
+    function doRestart() { closeModal('modal-restart'); hideResult(); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>
