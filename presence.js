@@ -79,10 +79,13 @@
       if (!reapTimer) {
         reapTimer = setInterval(function () {
           if (!curRoom) return;
-          curRoom.once('value', function (snap) {
-            var room = snap.val() || {};
+          // Transaction : on traite tous les fantômes d'un coup et on SUPPRIME le
+          // salon s'il ne reste plus personne (évite les coquilles vides en base).
+          curRoom.transaction(function (room) {
+            if (!room) return room;
             var players = room.players || {};
             var waiting = (room.status || 'waiting') === 'waiting';
+            var changed = false;
             Object.keys(players).forEach(function (p) {
               var d = players[p];
               if (!d) return;
@@ -90,11 +93,14 @@
               if (!stale) return;
               if (waiting && p !== curPid) {
                 // Salle d'attente : on retire le fantôme pour garder la liste nette.
-                curRoom.child('players/' + p).remove();
+                delete players[p]; changed = true;
               } else if (d.online === true) {
-                curRoom.child('players/' + p + '/online').set(false);
+                players[p].online = false; changed = true;
               }
             });
+            if (waiting && !Object.keys(players).length) return null; // salon vide → supprimé
+            if (!changed) return; // rien à modifier → on abandonne (pas d'écriture)
+            return room;
           });
         }, REAP_MS);
       }

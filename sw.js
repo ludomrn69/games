@@ -14,14 +14,15 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v1';
+var CACHE = 'jeux-v4';
 var ASSETS = [
-  './', 'index.html', 'theme.css', 'manifest.webmanifest',
+  './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
   'tu-preferes.html', 'petit-bac.html', 'puissance4.html', 'dobble-emoji.html',
   'crack-list.html', 'lynx.html', 'pictionary.html', 'uno.html', 'skyjo.html',
   'blokus.html', 'bataille-navale.html', 'codenames.html', 'morpion.html',
-  'undercover.html', 'president.html', 'ludo.html'
+  'undercover.html', 'president.html', 'ludo.html',
+  'juste-prix.html', 'telephone-dessine.html'
 ];
 
 self.addEventListener('install', function (e) {

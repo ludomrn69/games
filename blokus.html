@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/game.css">
   <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
   <title>Blokus 🧩</title>
   <meta name="robots" content="noindex, nofollow" />
@@ -15,19 +16,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root { --bk-blue: #2f6fd0; --bk-yellow: #e6b800; --bk-red: #e05a4e; --bk-green: #34a853; }
-    body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
-    .app { margin-top: 52px; min-height: calc(100vh - 52px); }
-    .screen { display: none; animation: fadeUp 0.3s ease both; }
-    .screen.active { display: flex; flex-direction: column; }
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: translateY(0);} }
 
     .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
     .btn-primary:hover { transform: translateY(-2px); }
     .btn-primary:disabled { opacity: 0.5; }
-    .btn-link { background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--ink-light); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
-    .mt-4 { margin-top: 18px; }
 
     .bk-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     html[data-theme="dark"] .bk-header { background: rgba(20,16,28,0.97); }
@@ -221,7 +214,7 @@
     /* ━━ State (sélection locale) ━━ */
     var prevStatus = null, selectedPiece = null, selectedColor = null, selectedCells = null, ghostAnchor = null, ghostValid = false, boardBuilt = false;
     function rref() { return window.roomRef; }
-    function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function ownerOf(state, color) { return (state.colorOwner || {})[color]; }
     function colorsOf(state, pid) { return (state.turnOrder || []).filter(function (c) { return ownerOf(state, c) === pid; }); }
     function squaresLeft(state, color) { var arr = (state.pieces && state.pieces[color]) || []; var s = 0; arr.forEach(function (p) { s += (PIECES[p] || []).length; }); return s; }

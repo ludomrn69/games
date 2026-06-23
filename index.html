@@ -87,7 +87,9 @@
       { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true },
       { key: 'undercover',      name: 'Undercover',      emoji: '🕵️‍♂️', players: '3–12', on: true },
       { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true },
-      { key: 'ludo',            name: 'Ludo',             emoji: '🐴', players: '2–4',  on: true, offline: true }
+      { key: 'ludo',            name: 'Ludo',             emoji: '🐴', players: '2–4',  on: true, offline: true },
+      { key: 'juste-prix',      name: 'Le juste prix',   emoji: '💰', players: '2–8',  on: true, offline: true },
+      { key: 'telephone-dessine', name: 'Télé-dessiné',  emoji: '🖍️', players: '3–10', on: true }
     ];
     var grid = document.getElementById('grid');
     grid.innerHTML = GAMES.map(function (g) {
@@ -113,6 +115,19 @@
         location.href = room.game + '.html?room=' + code;
       }).catch(function () { toast('Connexion impossible'); });
     }
+
+    // Nettoyage best-effort des vieux salons abandonnés (> 12 h). Borné à 20
+    // suppressions par visite. Nécessite l'index « createdAt » côté règles.
+    (function sweepOldRooms() {
+      try {
+        var maxAge = 12 * 60 * 60 * 1000;
+        firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms')
+          .orderByChild('createdAt').endAt(Date.now() - maxAge).limitToFirst(20)
+          .once('value', function (snap) {
+            snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
+          });
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>

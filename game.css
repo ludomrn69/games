@@ -1,0 +1,35 @@
+/*
+  game.css — Styles de COQUILLE partagés par toutes les pages de jeu.
+
+  Avant, chaque <jeu>.html recopiait ce même bloc (reset, body, écrans, boutons
+  liens…). On le centralise ici : une seule source de vérité, un seul endroit à
+  corriger. Les styles SPÉCIFIQUES à un jeu restent dans le <style> de sa page.
+
+  À charger après theme.css (qui fournit les variables --cream, --ink, …) :
+      <link rel="stylesheet" href="/theme.css">
+      <link rel="stylesheet" href="/game.css">
+*/
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Conteneur sous la barre de nav (52px). */
+.app { margin-top: 52px; min-height: calc(100vh - 52px); }
+
+/* Écrans : un seul visible à la fois (lobby.js bascule la classe .active). */
+.screen { display: none; animation: fadeUp 0.32s ease both; }
+.screen.active { display: flex; flex-direction: column; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Bouton « lien » discret (changer de nom, quitter, rejouer…). */
+.btn-link { background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--ink-light); text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
+.btn-link:hover { color: var(--terracotta); }
+
+.mt-4 { margin-top: 18px; }
