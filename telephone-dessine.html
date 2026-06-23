@@ -36,6 +36,10 @@
     .td-textarea { width: 100%; min-height: 90px; resize: vertical; padding: 0.9rem 1rem; border: 1.5px solid var(--gold-light); border-radius: 14px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1.1rem; }
     .td-textarea:focus { outline: none; border-color: var(--gold); }
 
+    .td-timer { align-self: center; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 1rem; color: var(--ink-light); background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; padding: 4px 16px; min-width: 84px; text-align: center; }
+    .td-timer.low { color: #fff; background: var(--terracotta); border-color: transparent; animation: tdPulse 1s ease-in-out infinite; }
+    @keyframes tdPulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+
     /* Canvas + toolbar */
     .td-canvas-wrap { background: #fff; border: 2px solid var(--gold-light); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); width: 100%; }
     html[data-theme="dark"] .td-canvas-wrap { background: #fff; }
@@ -131,6 +135,7 @@
         <p style="margin-top:6px">2. On passe au voisin, qui doit la <b>dessiner</b>.</p>
         <p style="margin-top:6px">3. On passe encore : le suivant <b>devine</b> en mots ce qu'il voit… et ainsi de suite.</p>
         <p style="margin-top:10px">À la fin, on déroule chaque album et on rigole des dérapages 😄</p>
+        <p style="margin-top:10px">⏱ Un <b>minuteur</b> par manche : à zéro, ton dessin / ta phrase part automatiquement.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -143,6 +148,9 @@
     var COLORS_PALETTE = ['#2C2520', '#C4745A', '#C6985A', '#8B9E7E', '#5B7EC7', '#B0689B', '#CC6677'];
     var SIZES = [{ label: '·', w: 3 }, { label: '•', w: 7 }, { label: '⬤', w: 14 }];
     var SEED_MAX = 80, TEXT_MAX = 80;
+    // Durées (secondes) du minuteur par manche. À 0, ce qui est en cours est
+    // envoyé automatiquement (canvas tel quel, ou phrase tapée / placeholder).
+    var SEED_SECS = 50, DRAW_SECS = 75, GUESS_SECS = 50;
 
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     var prevStatus = null;
@@ -173,7 +181,7 @@
 
     /* État initial : N albums, manche 0 (tout le monde écrit sa phrase). */
     function onStart(players) {
-      return { n: players.length, round: 0, reveal: null };
+      return { n: players.length, round: 0, reveal: null, roundStart: Date.now() };
     }
 
     /* Type de contenu attendu à la manche r. */
@@ -203,6 +211,7 @@
       setText('td-progress', 'Manche ' + (r + 1) + '/' + n);
 
       if (myIndex < 0) { // spectateur (ne participe pas à cette partie)
+        clearRoundTimer();
         setText('td-step', 'Spectateur');
         renderOnce('spectator', '<div class="td-wait"><div class="td-wait-emoji">👀</div><div class="td-wait-title">Partie en cours</div><div class="td-wait-sub">Tu pourras jouer à la prochaine manche.</div></div>');
         return;
@@ -222,6 +231,7 @@
       var a = albumFor(myIndex, r, n);
       var prev = (state.pages && state.pages[a] && state.pages[a][r - 1]) || null;
       var stage = document.getElementById('td-stage');
+      var timerHTML = '<div class="td-timer" id="td-timer"></div>';
 
       if (type === 'text') {
         var promptHTML;
@@ -232,14 +242,14 @@
           promptHTML = '<div class="td-prompt"><div class="td-prompt-label">Que représente ce dessin ?</div></div>' +
             '<div class="td-canvas-wrap"><canvas id="td-view" width="' + CANVAS_W + '" height="' + CANVAS_H + '"></canvas></div>';
         }
-        stage.innerHTML = promptHTML +
+        stage.innerHTML = timerHTML + promptHTML +
           '<textarea class="td-textarea" id="td-text" maxlength="' + (r === 0 ? SEED_MAX : TEXT_MAX) + '" placeholder="' + (r === 0 ? 'Ta phrase secrète…' : 'Ta proposition…') + '"></textarea>' +
           '<button class="btn-primary" id="td-submit" onclick="submitText()">Valider</button>';
         if (r !== 0 && prev) drawStrokesOn(document.getElementById('td-view'), prev.draw);
         setTimeout(function () { var t = document.getElementById('td-text'); if (t) t.focus(); }, 60);
       } else {
         // tâche de dessin : on montre la phrase à illustrer
-        stage.innerHTML =
+        stage.innerHTML = timerHTML +
           '<div class="td-prompt"><div class="td-prompt-label">Dessine cette phrase</div>' +
             '<div class="td-prompt-text">' + escapeHtml(prev ? (prev.text || '…') : '…') + '</div></div>' +
           '<div class="td-tools" id="td-tools"></div>' +
@@ -247,9 +257,11 @@
           '<button class="btn-primary" id="td-submit" onclick="submitDraw()">Valider mon dessin</button>';
         setupCanvas();
       }
+      startRoundTimer();
     }
 
     function renderWaiting(state, r) {
+      clearRoundTimer();
       var on = onlineOrder(state);
       var subs = (state.subs && state.subs[r]) || {};
       var done = on.filter(function (pid) { return subs[pid]; }).length;
@@ -342,7 +354,7 @@
         }
         var r2 = r + 1;
         if (r2 >= n) { cur.status = 'reveal'; cur.reveal = 0; }
-        else cur.round = r2;
+        else { cur.round = r2; cur.roundStart = Date.now(); }
         return cur;
       });
     }
@@ -416,8 +428,37 @@
       arr.forEach(function (s) { drawSeg(c2, s.x0, s.y0, s.x1, s.y1, s.c, s.w); });
     }
 
+    /* ━━━━━━━━━━ MINUTEUR ━━━━━━━━━━ */
+    var tdTimerInt = null;
+    function clearRoundTimer() { if (tdTimerInt) { clearInterval(tdTimerInt); tdTimerInt = null; } }
+    function roundDuration(r) { return r === 0 ? SEED_SECS : (typeOfRound(r) === 'draw' ? DRAW_SECS : GUESS_SECS); }
+    function startRoundTimer() { clearRoundTimer(); tickTimer(); tdTimerInt = setInterval(tickTimer, 250); }
+    function tickTimer() {
+      var st = window.room || {};
+      if (st.status !== 'playing') { clearRoundTimer(); return; }
+      var r = st.round || 0, ord = st.order || [];
+      if (ord.indexOf(window.myPid) < 0) { clearRoundTimer(); return; }
+      var subs = (st.subs && st.subs[r]) || {};
+      if (subs[window.myPid]) { clearRoundTimer(); return; } // déjà soumis
+      var rem = Math.max(0, roundDuration(r) - Math.floor((Date.now() - (st.roundStart || 0)) / 1000));
+      var el = document.getElementById('td-timer');
+      if (el) { el.textContent = '⏱ ' + rem + ' s'; el.classList.toggle('low', rem <= 10); }
+      if (rem <= 0) { clearRoundTimer(); autoSubmit(r); }
+    }
+    /* Temps écoulé : on envoie ce qui est en cours (sinon un placeholder). */
+    function autoSubmit(r) {
+      if (typeOfRound(r) === 'text') {
+        var t = document.getElementById('td-text');
+        var txt = (t && t.value || '').trim();
+        writePage({ type: 'text', by: window.myPid, text: txt ? txt.slice(0, 80) : '(trop tard !)' });
+      } else {
+        writePage({ type: 'draw', by: window.myPid, draw: JSON.stringify(strokes || []), missing: !strokes.length });
+      }
+    }
+
     /* ━━━━━━━━━━ PHASE DE RÉVÉLATION ━━━━━━━━━━ */
     function renderReveal(state) {
+      clearRoundTimer();
       var ord = state.order || [], n = ord.length;
       var idx = state.reveal || 0;
       var isHost = state.host === window.myPid;

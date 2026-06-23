@@ -98,13 +98,19 @@
     if (mode === 'solo' && (!off.solo || !cfg.bot)) { unsupported(host, 'Le mode solo n\'est pas disponible pour ce jeu.'); return; }
     if (mode === 'local' && !off.local) { unsupported(host, 'Le mode local n\'est pas disponible pour ce jeu.'); return; }
 
+    // Nombre minimum d'adversaires ordi en solo. Par défaut 1 ; un jeu peut
+    // autoriser 0 (vrai solo : le joueur seul, ex. Le juste prix) via
+    // offline:{ soloMinBots: 0 }.
+    var loBots = (off.soloMinBots != null) ? off.soloMinBots : 1;
     var controls = '';
     if (mode === 'solo') {
-      if (max > 2) controls = counterRow('Adversaires (ordi)', 1, max - 1, 1);
+      if (max > 2) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
     }
-    var sub = mode === 'solo' ? 'Tu joues contre l\'ordi' : 'Chacun son tour, on se passe l\'appareil';
+    var sub = mode === 'solo'
+      ? (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi')
+      : 'Chacun son tour, on se passe l\'appareil';
     host.innerHTML =
       '<div class="lb-wrap">' +
         (cfg.emoji ? '<div class="lb-emoji-big">' + cfg.emoji + '</div>' : '') +
@@ -142,7 +148,9 @@
     var val = active ? +active.dataset.val : min;
     if (mode === 'solo') totalPlayers = (max > 2) ? (1 + val) : 2;
     else totalPlayers = (max > 2) ? val : min;
-    totalPlayers = Math.max(min, Math.min(max, totalPlayers));
+    // En solo « 0 adversaire autorisé », le plancher tombe à 1 (joueur seul).
+    var soloPure = (mode === 'solo' && cfg.offline && cfg.offline.soloMinBots === 0);
+    totalPlayers = Math.max(soloPure ? 1 : min, Math.min(max, totalPlayers));
     startGame(null);
   }
 

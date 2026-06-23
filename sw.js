@@ -14,7 +14,7 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v3';
+var CACHE = 'jeux-v4';
 var ASSETS = [
   './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',

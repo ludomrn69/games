@@ -166,7 +166,7 @@
         'Le jeu répond « c\'est plus ! » ou « c\'est moins ! »',
         'Le premier à tomber pile gagne la manche'
       ],
-      offline: { solo: true, local: true },
+      offline: { solo: true, local: true, soloMinBots: 0 },
       bot: jpBot,
       onState: onState,
       onStart: onStart
@@ -305,10 +305,21 @@
       var ov = document.getElementById('jp-overlay');
       var emoji = document.getElementById('jp-ov-emoji');
       var title = document.getElementById('jp-ov-title');
+      var tries = (state.log || []).length;
+      var pure = (window.roomCode === 'SOLO') && ((state.order || []).length === 1);
       if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as trouvé !'; }
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a trouvé'; }
-      setHTML('jp-ov-secret', 'Le nombre était <b>' + state.secret + '</b>');
-      setHTML('jp-ov-scores', scoresHTML(state));
+      setHTML('jp-ov-secret', 'Le nombre était <b>' + state.secret + '</b><br>' +
+        '<span style="font-size:.92rem">en ' + tries + ' coup' + (tries > 1 ? 's' : '') + '</span>');
+      if (pure) {
+        var rec = 0; try { rec = +(localStorage.getItem('juste-prix.record') || 0); } catch (e) {}
+        var isNew = (!rec || tries < rec);
+        var best = isNew ? tries : rec;
+        if (isNew) { try { localStorage.setItem('juste-prix.record', best); } catch (e) {} }
+        setHTML('jp-ov-scores', (isNew ? '🥇 Nouveau record : ' : 'Ton record : ') + best + ' coup' + (best > 1 ? 's' : ''));
+      } else {
+        setHTML('jp-ov-scores', scoresHTML(state));
+      }
       ov.classList.add('active');
     }
     function hideResult() { var ov = document.getElementById('jp-overlay'); if (ov) ov.classList.remove('active'); }
