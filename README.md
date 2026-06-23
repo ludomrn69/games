@@ -43,6 +43,7 @@ Glisser le dossier sur Netlify (ou `netlify deploy`). Aucun build.
 | `avatars.js` | Palette de couleurs + liste d'émojis |
 | `nav.js` | Barre du haut (accueil + thème clair/sombre) |
 | `theme.css` | Palette + mode sombre + styles de lobby |
+| `game.css` | Coquille commune des pages de jeu (reset, écrans, boutons) — mutualisée |
 | `<jeu>.html` | Une page par jeu (logique du jeu) |
 
 Chaque jeu s'enregistre via `GameRoom({ gameKey, name, minPlayers, maxPlayers, onState, onStart, … })`

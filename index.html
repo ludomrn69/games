@@ -113,6 +113,19 @@
         location.href = room.game + '.html?room=' + code;
       }).catch(function () { toast('Connexion impossible'); });
     }
+
+    // Nettoyage best-effort des vieux salons abandonnés (> 12 h). Borné à 20
+    // suppressions par visite. Nécessite l'index « createdAt » côté règles.
+    (function sweepOldRooms() {
+      try {
+        var maxAge = 12 * 60 * 60 * 1000;
+        firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms')
+          .orderByChild('createdAt').endAt(Date.now() - maxAge).limitToFirst(20)
+          .once('value', function (snap) {
+            snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
+          });
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>

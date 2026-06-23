@@ -72,6 +72,9 @@
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  // Échappement HTML PARTAGÉ : les jeux font « var escapeHtml = window.esc; »
+  // au lieu de redéfinir la même fonction dans chaque page.
+  window.esc = esc;
 
   // ── Helpers de lecture du salon (utilisés par les jeux) ───────────────────
   window.Room = {
@@ -303,6 +306,8 @@
     window.room = room;
     var status = room.status || 'waiting';
 
+    maybeMigrateHost(room);
+
     if (status === 'waiting') {
       // En attente : la salle d'attente est gérée ici. On y revient si on était
       // sur l'écran de jeu (fin de partie) ou encore sur l'accueil (auto-join).
@@ -314,6 +319,27 @@
     if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
   }
   function isActive(id) { var el = document.getElementById(id); return el && el.classList.contains('active'); }
+
+  // ── Migration d'hôte ──────────────────────────────────────────────────────
+  // Le champ `host` est figé à la création du salon. Si l'hôte se déconnecte, on
+  // le réattribue au premier joueur encore en ligne (plus petit siège). Un seul
+  // client — l'héritier désigné — réécrit, pour éviter les courses.
+  function maybeMigrateHost(room) {
+    var players = room.players || {};
+    var host = room.host;
+    if (host && players[host] && players[host].online) return; // hôte valide → rien à faire
+    var online = Object.keys(players).map(function (k) { return Object.assign({ pid: k }, players[k]); })
+      .filter(function (p) { return p.online; })
+      .sort(function (a, b) { return (a.seat || 0) - (b.seat || 0); });
+    if (!online.length) return;
+    var heir = online[0].pid;
+    if (heir !== window.myPid || !window.roomRef) return; // seul l'héritier écrit
+    window.roomRef.child('host').transaction(function (cur) {
+      var ps = (window.room && window.room.players) || {};
+      if (cur && ps[cur] && ps[cur].online) return; // déjà repris/valide → on abandonne
+      return heir;
+    });
+  }
 
   // ── Rendu de la salle d'attente ───────────────────────────────────────────
   function renderLobby(room) {
@@ -433,11 +459,33 @@
   // Bascule vers un mode hors-ligne (solo / local) — voir offline.js.
   function goOffline(m) { location.href = location.pathname + '?mode=' + m; }
 
+  // ── Nettoyage TTL des vieux salons (best-effort, appelé depuis l'accueil) ──
+  // Supprime les salons abandonnés (créés il y a plus de maxAgeMs). Borné à
+  // quelques suppressions par passage pour rester léger. Nécessite l'index
+  // « createdAt » côté règles Firebase (voir database.rules.example.json).
+  function sweepOldRooms(maxAgeMs) {
+    maxAgeMs = maxAgeMs || 12 * 60 * 60 * 1000; // 12 h par défaut
+    if (typeof firebase === 'undefined' || !firebase.database) return;
+    try {
+      db().ref(ROOT + '/rooms').orderByChild('createdAt').endAt(Date.now() - maxAgeMs).limitToFirst(20)
+        .once('value', function (snap) {
+          snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
+        });
+    } catch (e) {}
+  }
+
   function leaveRoom() {
     var c = cfg();
     if (window.roomRef && window.myPid) {
       try { window.roomRef.child('players/' + window.myPid).onDisconnect().cancel(); } catch (e) {}
-      window.roomRef.child('players/' + window.myPid).remove();
+      // On se retire ; si on était le dernier, le salon est supprimé (pas de
+      // coquille vide qui traîne dans la base).
+      window.roomRef.transaction(function (cur) {
+        if (!cur) return cur;
+        if (cur.players) delete cur.players[window.myPid];
+        if (!cur.players || !Object.keys(cur.players).length) return null; // salon vide → supprimé
+        return cur;
+      });
     }
     if (window.listenersOn) { window.roomRef.off('value', masterOnState); window.listenersOn = false; }
     if (window.GamePresence) GamePresence.stop();
@@ -457,6 +505,7 @@
     cancelChange: cancelChange,
     leaveRoom: leaveRoom,
     resetToLobby: resetToLobby,
-    goOffline: goOffline
+    goOffline: goOffline,
+    sweepOldRooms: sweepOldRooms
   };
 })();

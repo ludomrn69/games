@@ -3,7 +3,10 @@
   "rules": {
     "games": {
       ".read": true,
-      ".write": true
+      ".write": true,
+      "rooms": {
+        ".indexOn": ["createdAt"]
+      }
     }
   }
 }
