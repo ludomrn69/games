@@ -52,7 +52,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="morpion-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -153,35 +153,29 @@
       onStart: onStart
     });
 
-    /* ━━ IA (mode solo) : minimax α-β complet (placing + moving). Jeu parfait :
-       gagne si l'adversaire fait une erreur, ne perd jamais. ~30 ms/coup. ━━ */
+    /* ━━ IA (mode solo / ordis en ligne) ━━ Recherche pure dans morpion-ai.js
+       (négamax α-β bornée + détection de répétition + table de transposition).
+       Profondeur selon la difficulté : facile 2 (+ coups au hasard), moyen 6,
+       difficile 10. Voir morpion-ai.js pour pourquoi ce n'est pas « parfait ». ━━ */
     function morpionBot(state, pid) {
       var order = state.order, b = state.board || emptyBoard();
-      var meN = order.indexOf(pid), me = String(meN), opp = String(1 - meN), MAXD = 5;
-      function cntM(bb, mk) { var n = 0; for (var i = 0; i < 9; i++) if (bb[i] === mk) n++; return n; }
-      function emp(bb) { var a = []; for (var i = 0; i < 9; i++) if (bb[i] === '.') a.push(i); return a; }
-      function gen(bb, mk) { var mv = []; if (cntM(bb, mk) < 3) { emp(bb).forEach(function (i) { mv.push({ i: i }); }); } else { for (var f = 0; f < 9; f++) { if (bb[f] !== mk) continue; emp(bb).forEach(function (t) { mv.push({ f: f, t: t }); }); } } return mv; }
-      function app(bb, mk, m) { var a = bb.split(''); if (m.f != null) { a[m.f] = '.'; a[m.t] = mk; } else a[m.i] = mk; return a.join(''); }
-      function evalH(bb) { var s = 0; for (var x = 0; x < LINES.length; x++) { var l = LINES[x], a = 0, d = 0; for (var y = 0; y < 3; y++) { if (bb[l[y]] === me) a++; else if (bb[l[y]] === opp) d++; } if (d === 0) s += a * a; if (a === 0) s -= d * d; } return s; }
-      function nega(bb, mk, depth, alpha, beta) {
-        var omk = mk === me ? opp : me, mv = gen(bb, mk); if (!mv.length) return 0; var best = -1e9;
-        for (var k = 0; k < mv.length; k++) {
-          var nb = app(bb, mk, mv[k]), v;
-          if (winLineFor(nb, mk)) v = 10000 - (MAXD - depth);
-          else if (depth <= 0) v = (mk === me ? evalH(nb) : -evalH(nb));
-          else v = -nega(nb, omk, depth - 1, -beta, -alpha);
-          if (v > best) best = v; if (best > alpha) alpha = best; if (alpha >= beta) break;
-        }
-        return best;
+      var meN = order.indexOf(pid), me = String(meN), opp = String(1 - meN);
+      // Facile : joue parfois un coup légal au hasard → battable.
+      if (window.Bots && window.Bots.shouldBlunder(state)) {
+        var rnd = randomMove(b, me); if (rnd) { if (rnd.f != null) doMove(rnd.f, rnd.t); else doPlace(rnd.i); } return;
       }
-      var moves = gen(b, me); if (!moves.length) return;
-      var best = moves[0], bestV = -1e18;
-      for (var i = 0; i < moves.length; i++) {
-        var nb = app(b, me, moves[i]), v;
-        if (winLineFor(nb, me)) v = 1e9; else v = -nega(nb, opp, MAXD - 1, -1e18, 1e18);
-        if (v > bestV) { bestV = v; best = moves[i]; }
-      }
+      var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 10 }) : 6);
+      var best = window.MorpionAI.bestMove(b, me, opp, depth);
+      if (!best) return;
       if (best.f != null) doMove(best.f, best.t); else doPlace(best.i);
+    }
+    // Coup légal aléatoire (pour le niveau facile).
+    function randomMove(b, mk) {
+      var emp = [], i; for (i = 0; i < 9; i++) if (b[i] === '.') emp.push(i);
+      if (countMark(b, mk) < 3) { return emp.length ? { i: emp[Math.floor(Math.random() * emp.length)] } : null; }
+      var own = []; for (i = 0; i < 9; i++) if (b[i] === mk) own.push(i);
+      if (!own.length || !emp.length) return null;
+      return { f: own[Math.floor(Math.random() * own.length)], t: emp[Math.floor(Math.random() * emp.length)] };
     }
 
     function onStart(players) {

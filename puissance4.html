@@ -56,7 +56,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="p4-ai.js"></script>
 
   <div class="app">
     <!-- Écrans gérés par lobby.js -->
@@ -151,46 +151,20 @@
       onStart: onStart
     });
 
-    /* ━━ IA (mode solo hors-ligne) : minimax alpha-bêta ━━ */
+    /* ━━ IA (mode solo / ordis en ligne) ━━ Recherche pure dans p4-ai.js (négamax
+       α-β + table de transposition + approfondissement itératif). Profondeur selon
+       la difficulté (Bots.level) : facile ≈ 2 (+ coups aléatoires), moyen 6,
+       difficile 9 → quasi parfait (Puissance 4 est un jeu résolu). ━━ */
     function p4Bot(state, pid) {
       var order = state.order, me = String(order.indexOf(pid)), opp = String(1 - (+me));
       var b = state.board || emptyBoard();
-      function cols(bb) { var r = []; for (var c = 0; c < 7; c++) if (bb[c] === '.') r.push(c); return r; }
-      function drop(bb, c, m) { var a = bb.split(''); for (var r = 5; r >= 0; r--) if (a[r * 7 + c] === '.') { a[r * 7 + c] = m; return { b: a.join(''), idx: r * 7 + c }; } return null; }
-      function winAt(bb, idx, m) { return !!lineFrom(bb, idx, m); }
-      function evalB(bb) {
-        var sc = 0, r, c;
-        for (r = 0; r < 6; r++) { if (bb[r * 7 + 3] === me) sc += 3; else if (bb[r * 7 + 3] === opp) sc -= 3; }
-        function w(cells) { var cm = 0, co = 0; for (var i = 0; i < 4; i++) { var v = bb[cells[i]]; if (v === me) cm++; else if (v === opp) co++; } if (cm && co) return 0; if (cm) return cm === 3 ? 100 : cm === 2 ? 10 : 1; if (co) return co === 3 ? -120 : co === 2 ? -10 : -1; return 0; }
-        for (r = 0; r < 6; r++) for (c = 0; c < 4; c++) sc += w([r * 7 + c, r * 7 + c + 1, r * 7 + c + 2, r * 7 + c + 3]);
-        for (c = 0; c < 7; c++) for (r = 0; r < 3; r++) sc += w([r * 7 + c, (r + 1) * 7 + c, (r + 2) * 7 + c, (r + 3) * 7 + c]);
-        for (r = 0; r < 3; r++) for (c = 0; c < 4; c++) sc += w([r * 7 + c, (r + 1) * 7 + c + 1, (r + 2) * 7 + c + 2, (r + 3) * 7 + c + 3]);
-        for (r = 0; r < 3; r++) for (c = 3; c < 7; c++) sc += w([r * 7 + c, (r + 1) * 7 + c - 1, (r + 2) * 7 + c - 2, (r + 3) * 7 + c - 3]);
-        return sc;
-      }
-      var ORD = [3, 2, 4, 1, 5, 0, 6];
-      function nega(bb, depth, alpha, beta, cur) {
-        var other = cur === me ? opp : me;
-        var vc = cols(bb); if (!vc.length) return 0;
-        var best = -1e9;
-        var oc = ORD.filter(function (c) { return vc.indexOf(c) >= 0; });
-        for (var i = 0; i < oc.length; i++) {
-          var d = drop(bb, oc[i], cur), val;
-          if (winAt(d.b, d.idx, cur)) val = 100000 + depth;
-          else if (depth <= 1) val = (cur === me ? evalB(d.b) : -evalB(d.b));
-          else val = -nega(d.b, depth - 1, -beta, -alpha, other);
-          if (val > best) best = val;
-          if (best > alpha) alpha = best;
-          if (alpha >= beta) break;
-        }
-        return best;
-      }
-      var vc = cols(b); if (!vc.length) return;
-      for (var i = 0; i < vc.length; i++) { var d1 = drop(b, vc[i], me); if (winAt(d1.b, d1.idx, me)) return dropInColumn(vc[i]); }
-      for (var j = 0; j < vc.length; j++) { var d2 = drop(b, vc[j], opp); if (winAt(d2.b, d2.idx, opp)) return dropInColumn(vc[j]); }
-      var best = vc[0], bestV = -1e18, oc = ORD.filter(function (c) { return vc.indexOf(c) >= 0; });
-      for (var k = 0; k < oc.length; k++) { var dd = drop(b, oc[k], me); var v = winAt(dd.b, dd.idx, me) ? 1e9 : -nega(dd.b, 4, -1e18, 1e18, opp); if (v > bestV) { bestV = v; best = oc[k]; } }
-      dropInColumn(best);
+      var vc = []; for (var c = 0; c < 7; c++) if (b[c] === '.') vc.push(c);
+      if (!vc.length) return;
+      // Facile : joue parfois au hasard → réellement battable.
+      if (window.Bots && window.Bots.shouldBlunder(state)) return dropInColumn(vc[Math.floor(Math.random() * vc.length)]);
+      var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 9 }) : 6);
+      var col = window.P4AI.bestColumn(b, me, opp, depth);
+      dropInColumn(col >= 0 ? col : vc[0]);
     }
 
     /* ━━ État initial d'une manche (fourni au lancement) ━━ */
