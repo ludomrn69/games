@@ -50,6 +50,9 @@
     .pa-hand .card { cursor: pointer; transition: transform 0.15s; }
     .pa-hand .card.playable:hover { transform: translateY(-10px); }
     .pa-hand .card.dim { opacity: 0.34; cursor: not-allowed; }
+    .pa-hand .card.sel-pass { outline: 3px solid var(--terracotta); transform: translateY(-10px); box-shadow: 0 8px 18px rgba(196,116,90,0.4); }
+    .pa-pass-info { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); text-align: center; padding: 18px 12px; }
+    .pa-pass-confirm { width: 100%; text-align: center; margin-top: 12px; }
 
     #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
     .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
@@ -168,7 +171,7 @@
     }
 
     /* ━━ State ━━ */
-    var prevStatus = null;
+    var prevStatus = null, passLocal = [];
     function rref() { return window.roomRef; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
@@ -205,17 +208,68 @@
     }
     function setTarget(n) { if (window.roomRef) window.roomRef.child('target').set(n); }
 
-    /* ━━ Distribution d'une donne ━━ */
+    // Nombre de cartes passées au début d'une donne, selon le nombre de joueurs.
+    function passCount(n) { return ({ 3: 5, 4: 4, 5: 3, 6: 3 })[n] || 3; }
+    function nextPid(order, pid) { var i = order.indexOf(pid); return order[(i + 1) % order.length]; }
+
+    /* ━━ Distribution d'une donne ━━ Dé de couleur (Papayoo) puis phase de PASSE :
+       chacun passe `passCount` cartes au joueur suivant. ━━ */
     function dealRound(order, cur) {
       var deck = shuffle(buildDeck());
       var per = Math.floor(deck.length / order.length); // 60/n entier pour 3..6
       order.forEach(function (pid, i) { cur.players[pid].hand = sortHand(deck.slice(i * per, (i + 1) * per)); });
-      cur.papSuit = SUITS[Math.floor(Math.random() * SUITS.length)];
+      cur.papSuit = SUITS[Math.floor(Math.random() * SUITS.length)]; // « dé » de couleur
       cur.trick = []; cur.ledSuit = null;
-      // Le meneur de la 1re donne est aléatoire ; ensuite c'est le ramasseur précédent.
-      var starter = cur.firstLeader || order[Math.floor(Math.random() * order.length)];
-      cur.turn = starter; cur.firstLeader = null;
-      cur.banner = SUIT_EMOJI[cur.papSuit] + ' Papayoo = le 7 ' + SUIT_NAME[cur.papSuit] + ' (40 pts) — ' + Room.name(starter) + ' commence';
+      // Meneur du 1er pli (après la passe) : aléatoire la 1re donne, sinon le ramasseur précédent.
+      cur.playLeader = cur.firstLeader || order[Math.floor(Math.random() * order.length)];
+      cur.firstLeader = null;
+      cur.phase = 'passing'; cur.passSel = {};
+      cur.turn = order[0]; // ordre de soumission de la passe (sans incidence : chacun choisit dans sa main)
+      cur.banner = SUIT_EMOJI[cur.papSuit] + ' Papayoo = le 7 ' + SUIT_NAME[cur.papSuit] + ' (40 pts) · passe ' + passCount(order.length) + ' cartes à droite';
+    }
+
+    // Avance la soumission de la passe ; quand tout le monde a choisi, on échange.
+    function advancePass(cur) {
+      var order = cur.order || [];
+      if (order.every(function (p) { return cur.passSel && cur.passSel[p]; })) { resolvePassing(cur); return; }
+      var i = order.indexOf(cur.turn);
+      for (var k = 1; k <= order.length; k++) { var c = order[(i + k) % order.length]; if (!(cur.passSel && cur.passSel[c])) { cur.turn = c; return; } }
+    }
+    // Échange effectif : chacun donne ses cartes choisies au joueur suivant.
+    function resolvePassing(cur) {
+      var order = cur.order || [], incoming = {};
+      order.forEach(function (p) { incoming[p] = []; });
+      order.forEach(function (p) {
+        var sel = (cur.passSel[p] || []).slice(), hand = handOf(cur, p).slice();
+        sel.forEach(function (c) { var idx = hand.indexOf(c); if (idx >= 0) hand.splice(idx, 1); });
+        cur.players[p].hand = hand;
+        incoming[nextPid(order, p)] = incoming[nextPid(order, p)].concat(sel);
+      });
+      order.forEach(function (p) { cur.players[p].hand = sortHand(handOf(cur, p).concat(incoming[p])); });
+      cur.phase = 'play'; cur.passSel = null; cur.turn = cur.playLeader;
+      cur.banner = SUIT_EMOJI[cur.papSuit] + ' Papayoo = 7 ' + SUIT_NAME[cur.papSuit] + ' — ' + Room.name(cur.playLeader) + ' commence';
+    }
+
+    // Soumettre ma passe (humain).
+    function submitPass() {
+      var need = passCount((window.room.order || []).length);
+      if (passLocal.length !== need) { lbToast('Choisis ' + need + ' cartes'); return; }
+      var cards = passLocal.slice();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'passing' || cur.turn !== window.myPid) return cur;
+        var hand = handOf(cur, window.myPid);
+        for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
+        cur.passSel = cur.passSel || {}; cur.passSel[window.myPid] = cards;
+        advancePass(cur);
+        return cur;
+      }, function () { passLocal = []; });
+    }
+    function togglePass(card) {
+      var need = passCount((window.room.order || []).length);
+      var i = passLocal.indexOf(card);
+      if (i >= 0) passLocal.splice(i, 1);
+      else { if (passLocal.length >= need) return; passLocal.push(card); }
+      render(window.room);
     }
 
     function onStart(players, cur) {
@@ -227,6 +281,7 @@
       dealRound(order, tmp);
       players.forEach(function (p) { cur.players[p.pid].hand = tmp.players[p.pid].hand; });
       base.papSuit = tmp.papSuit; base.trick = []; base.ledSuit = null; base.turn = tmp.turn; base.banner = tmp.banner;
+      base.phase = 'passing'; base.passSel = {}; base.playLeader = tmp.playLeader;
       return base;
     }
 
@@ -259,7 +314,7 @@
     /* ━━ Jouer une carte ━━ */
     function playCard(card) {
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== window.myPid) return cur;
         var hand = handOf(cur, window.myPid).slice();
         if (hand.indexOf(card) < 0) return cur;
         var led = cur.ledSuit;
@@ -309,6 +364,17 @@
        points quand elle est défaussante ; mène petit. Facile = coups au hasard. ━━ */
     function papaBot(state, pid) {
       if (state.status !== 'playing' || state.turn !== pid) return;
+      // Phase de passe : se débarrasser des cartes les plus dangereuses (gros points puis hautes).
+      if (state.phase === 'passing') {
+        var need = passCount((state.order || []).length);
+        var sel = handOf(state, pid).slice().sort(function (a, b) { return (cardPoints(b, state.papSuit) - cardPoints(a, state.papSuit)) || (valOf(b) - valOf(a)); }).slice(0, need);
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || cur.phase !== 'passing' || cur.turn !== pid) return cur;
+          var h = handOf(cur, pid); for (var i = 0; i < sel.length; i++) if (h.indexOf(sel[i]) < 0) return cur;
+          cur.passSel = cur.passSel || {}; cur.passSel[pid] = sel; advancePass(cur); return cur;
+        });
+        return;
+      }
       var hand = handOf(state, pid);
       if (!hand.length) return;
       var legal = legalCards(hand, state.ledSuit);
@@ -320,7 +386,7 @@
       }
       // Jouer via la même transaction que l'humain (avec l'identité du bot).
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== pid) return cur;
         var h = handOf(cur, pid).slice();
         if (h.indexOf(card) < 0) return cur;
         if (legalCards(h, cur.ledSuit).indexOf(card) < 0) return cur;
@@ -390,27 +456,45 @@
       setHTML('pa-opps', opps);
       setText('pa-banner', state.banner || '');
 
-      // Pli
-      var trick = state.trick || [];
-      var winNow = trick.length ? trickWinner(trick, state.ledSuit) : null;
-      var tHTML = trick.length ? trick.map(function (t) {
-        var isWin = (t.by === winNow);
-        return '<div class="pa-trick-card">' + cardHTML(t.card, state.papSuit, isWin ? ' win' : '') +
-          '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
-      }).join('') : '<span class="pa-trick-empty">— en attente —</span>';
-      setHTML('pa-trick', tHTML);
+      var passing = (state.phase === 'passing');
+      var need = passCount(order.length);
+      var myHand = sortHand(handOf(state, me));
+
+      // Zone centrale : consigne de passe, ou pli en cours.
+      if (passing) {
+        var nxt = nextPid(order, me), submitted = state.passSel && state.passSel[me];
+        var info = (state.turn === me && !submitted)
+          ? 'Passe ' + need + ' cartes à ' + escapeHtml(Room.name(nxt))
+          : (submitted ? 'Cartes passées — en attente des autres…' : 'En attente de ' + escapeHtml(Room.name(state.turn)) + '…');
+        setHTML('pa-trick', '<div class="pa-pass-info">🔄 ' + info + '</div>');
+      } else {
+        var trick = state.trick || [];
+        var winNow = trick.length ? trickWinner(trick, state.ledSuit) : null;
+        setHTML('pa-trick', trick.length ? trick.map(function (t) {
+          return '<div class="pa-trick-card">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
+            '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
+        }).join('') : '<span class="pa-trick-empty">— en attente —</span>');
+      }
 
       // Ma main
-      var myHand = sortHand(handOf(state, me));
-      var myTurn = (state.turn === me) && !state.winner;
-      var legal = myTurn ? legalCards(myHand, state.ledSuit) : [];
-      setText('pa-my-count', '(' + myHand.length + ')' + (myTurn ? ' — à toi !' : ''));
-      setHTML('pa-hand', myHand.map(function (c) {
-        var ok = myTurn && legal.indexOf(c) >= 0;
-        var click = ok ? ' onclick="playCard(\'' + c + '\')"' : '';
-        // On injecte le onclick directement sur la carte (cardHTML commence par <div class="card…).
-        return cardHTML(c, state.papSuit, (ok ? ' playable' : (myTurn ? ' dim' : ''))).replace('<div class="card', '<div' + click + ' class="card');
-      }).join(''));
+      if (passing) {
+        var canSel = (state.turn === me) && !(state.passSel && state.passSel[me]);
+        setText('pa-my-count', '(' + myHand.length + ')' + (canSel ? ' — choisis-en ' + need : ''));
+        setHTML('pa-hand', myHand.map(function (c) {
+          var sel = passLocal.indexOf(c) >= 0;
+          var click = canSel ? ' onclick="togglePass(\'' + c + '\')"' : '';
+          return cardHTML(c, state.papSuit, (sel ? ' sel-pass' : (canSel ? ' playable' : ' dim'))).replace('<div class="card', '<div' + click + ' class="card');
+        }).join('') + (canSel ? '<div class="pa-pass-confirm"><button class="btn-primary" onclick="submitPass()"' + (passLocal.length === need ? '' : ' disabled') + '>Passer ces ' + need + ' cartes →</button></div>' : ''));
+      } else {
+        var myTurn = (state.turn === me) && !state.winner;
+        var legal = myTurn ? legalCards(myHand, state.ledSuit) : [];
+        setText('pa-my-count', '(' + myHand.length + ')' + (myTurn ? ' — à toi !' : ''));
+        setHTML('pa-hand', myHand.map(function (c) {
+          var ok = myTurn && legal.indexOf(c) >= 0;
+          var click = ok ? ' onclick="playCard(\'' + c + '\')"' : '';
+          return cardHTML(c, state.papSuit, (ok ? ' playable' : (myTurn ? ' dim' : ''))).replace('<div class="card', '<div' + click + ' class="card');
+        }).join(''));
+      }
 
       maybeAbsent(state);
     }
@@ -421,6 +505,13 @@
       Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
         rref().transaction(function (cur) {
           if (!cur || cur.status !== 'playing' || !Lobby.isOffline(cur, cur.turn)) return cur;
+          // En phase de passe : l'absent passe ses cartes les plus dangereuses.
+          if (cur.phase === 'passing') {
+            var ap = cur.turn, need = passCount((cur.order || []).length);
+            var sel = handOf(cur, ap).slice().sort(function (a, b) { return (cardPoints(b, cur.papSuit) - cardPoints(a, cur.papSuit)) || (valOf(b) - valOf(a)); }).slice(0, need);
+            cur.passSel = cur.passSel || {}; cur.passSel[ap] = sel; advancePass(cur);
+            return cur;
+          }
           // L'absent joue automatiquement une carte légale (la plus sûre).
           var pid = cur.turn, hand = handOf(cur, pid).slice();
           if (!hand.length) return cur;
