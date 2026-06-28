@@ -308,7 +308,10 @@
       }
       var playable = hand.filter(function (c) { return canPlay(c, top, cc); });
       if (!playable.length) { if (state.drewThisTurn) passTurn(); else drawCard(); return; }
-      var choice = unoChoose(hand, playable, state, pid);
+      // Facile : joue une carte jouable au hasard (couleur de relance au hasard si joker).
+      var choice = (window.Bots && window.Bots.shouldBlunder(state))
+        ? playable[Math.floor(Math.random() * playable.length)]
+        : unoChoose(hand, playable, state, pid);
       var color = (parseCard(choice) || {}).wild ? unoBestColor(hand) : parseCard(choice).color;
       unoBotPlay(hand, choice, color);
     }

@@ -235,6 +235,8 @@
       var legal = legalMap(state, color, state.die);
       var keys = Object.keys(legal);
       if (!keys.length) return; // rollDice() aura déjà passé le tour
+      // Facile : déplace un pion au hasard parmi les coups légaux.
+      if (window.Bots && window.Bots.shouldBlunder(state)) { moveToken(color, +keys[Math.floor(Math.random() * keys.length)]); return; }
       var best = keys[0], bestSc = -1e9;
       keys.forEach(function (tk) {
         var t = +tk, sc = ludoScoreMove(state, color, state.tokens[color][t], legal[tk]);

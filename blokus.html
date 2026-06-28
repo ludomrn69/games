@@ -272,6 +272,22 @@
       if (!pieces.length) return null;
       var anchors = blokusAnchors(board, color, first);
       if (!anchors.length) return null;
+      // Facile : un placement valide au hasard (sans préférer les grosses pièces).
+      if (window.Bots && window.Bots.shouldBlunder(state)) {
+        var cands = [];
+        pieces.forEach(function (pid) {
+          ORIENT[pid].forEach(function (cells) {
+            anchors.forEach(function (ac) {
+              for (var pv = 0; pv < cells.length; pv++) {
+                var dr = ac[0] - cells[pv][0], dc = ac[1] - cells[pv][1];
+                var abs = cells.map(function (c) { return [c[0] + dr, c[1] + dc]; });
+                if (isValidPlacement(board, color, abs, first)) cands.push({ pid: pid, abs: abs });
+              }
+            });
+          });
+        });
+        return cands.length ? cands[Math.floor(Math.random() * cands.length)] : null;
+      }
       var bySize = {}; pieces.forEach(function (pid) { var sz = PIECES[pid].length; (bySize[sz] = bySize[sz] || []).push(pid); });
       var sizes = Object.keys(bySize).map(Number).sort(function (a, b) { return b - a; });
       var best = null, bestSc = -1e18;

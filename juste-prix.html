@@ -224,7 +224,11 @@
     function jpBot(state) {
       var lo = state.lo || 1, hi = state.hi || (state.max || MAXN);
       if (hi < lo) hi = lo;
-      var guess = Math.floor((lo + hi) / 2);
+      // Difficile/moyen : dichotomie (optimal). Facile : propose au hasard dans
+      // l'intervalle connu → met plus de coups à trouver.
+      var guess;
+      if (window.Bots && window.Bots.level(state) === 'easy') guess = lo + Math.floor(Math.random() * (hi - lo + 1));
+      else guess = Math.floor((lo + hi) / 2);
       doGuess(guess);
     }
 

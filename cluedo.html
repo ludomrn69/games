@@ -171,7 +171,14 @@
       for (var i = 0; i < 9; i++) if (!m.holds[CE.ROOMS[i]] && m.env.piece !== CE.ROOMS[i]) return i;
       return 0;
     }
-    function pickTest(cards, m) { var rem = cards.filter(function (c) { return !m.holds[c]; }); return rem.length ? rem[0] : cards[0]; }
+    // Choisit une carte à « tester » dans une suggestion. Normalement la première
+    // dont on ignore le détenteur (maximise l'info). Facile : une au hasard.
+    function pickTest(cards, m, lvl) {
+      var rem = cards.filter(function (c) { return !m.holds[c]; });
+      if (!rem.length) rem = cards.slice();
+      if (lvl === 'easy') return rem[Math.floor(Math.random() * rem.length)];
+      return rem[0];
+    }
     function closestTowardRoom(s, reach, targetIdx) {
       var doors = CE.doorLanes(targetIdx), best = null, bd = 1e9;
       Object.keys(reach).forEach(function (n) {
@@ -206,7 +213,7 @@
         CE.stay(s); return;
       }
       if (s.phase === 'action') {
-        if (CE.isRoomNode(s.pos[pid])) { CE.suggest(s, pickTest(CE.SUSPECTS, m), pickTest(CE.WEAPONS, m)); return; }
+        if (CE.isRoomNode(s.pos[pid])) { var lvl = window.Bots ? window.Bots.level(s) : 'normal'; CE.suggest(s, pickTest(CE.SUSPECTS, m, lvl), pickTest(CE.WEAPONS, m, lvl)); return; }
         CE.endTurn(s); return;
       }
       if (s.phase === 'postsuggest') {
