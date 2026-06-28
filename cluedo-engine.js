@@ -48,8 +48,12 @@
   };
   function inRect(r, c, R) { return r >= R[0] && r <= R[1] && c >= R[2] && c <= R[3]; }
   function roomOfCell(r, c) { for (var k = 0; k < 9; k++) { if (inRect(r, c, ROOM_RECT[k])) return k; } return -1; }
-  function isCellar(r, c) { return inRect(r, c, CELLAR); }
-  function isCorr(r, c) { return r >= 0 && r < GRID_H && c >= 0 && c < GRID_W && roomOfCell(r, c) < 0 && !isCellar(r, c); }
+  // Le centre est la PISCINE (« Cluedo ») : case spéciale, FRANCHISSABLE, où l'on
+  // doit se rendre pour porter une accusation.
+  function isPoolCell(r, c) { return inRect(r, c, CELLAR); }
+  function isPoolNode(node) { if (isRoomNode(node)) return false; var p = String(node).split(','); return isPoolCell(+p[0], +p[1]); }
+  function isCorr(r, c) { return r >= 0 && r < GRID_H && c >= 0 && c < GRID_W && roomOfCell(r, c) < 0; }
+  function poolCells() { var a = []; for (var r = CELLAR[0]; r <= CELLAR[1]; r++) for (var c = CELLAR[2]; c <= CELLAR[3]; c++) a.push([r, c]); return a; }
   function doorLanes(idx) { return DOORS[idx] || []; }
   function roomCells(idx) { var R = ROOM_RECT[idx], a = []; for (var r = R[0]; r <= R[1]; r++) for (var c = R[2]; c <= R[3]; c++) a.push([r, c]); return a; }
   function isRoomNode(n) { return typeof n === 'string' && n[0] === 'R'; }
@@ -274,7 +278,9 @@
 
   // Accusation : termine la partie (gagne) ou élimine le joueur.
   function accuse(s, suspect, arme, piece) {
-    if (s.phase !== 'action' && s.phase !== 'postsuggest' && s.phase !== 'roll') return false;
+    if (s.phase !== 'action' && s.phase !== 'postsuggest' && s.phase !== 'roll' && s.phase !== 'move') return false;
+    // On ne peut accuser qu'au centre (la piscine « Cluedo »).
+    if (!isPoolNode(s.pos[s.turn])) return false;
     var ok = (suspect === s.solution.suspect && arme === s.solution.arme && piece === s.solution.piece);
     if (ok) { s.winner = s.turn; s.phase = 'over'; log(s, '🏆 ' + nm(s.turn) + ' accuse juste : ' + suspect + ' · ' + arme + ' · ' + piece + ' !'); return true; }
     s.eliminated[s.turn] = true;
@@ -303,7 +309,8 @@
     SUSPECTS: SUSPECTS, WEAPONS: WEAPONS, ROOMS: ROOMS, ALLCARDS: ALLCARDS, SECRET: SECRET,
     catOf: catOf, cardsOfCat: cardsOfCat,
     isCorr: isCorr, doorLanes: doorLanes, roomCells: roomCells, roomOfCell: roomOfCell,
-    isCellar: isCellar, GRID_W: GRID_W, GRID_H: GRID_H, ROOM_RECT: ROOM_RECT, CELLAR: CELLAR, DOORS: DOORS,
+    isPoolCell: isPoolCell, isPoolNode: isPoolNode, poolCells: poolCells,
+    GRID_W: GRID_W, GRID_H: GRID_H, ROOM_RECT: ROOM_RECT, CELLAR: CELLAR, DOORS: DOORS,
     isRoomNode: isRoomNode, roomIdx: roomIdx, reachable: reachable, neighbors: neighbors,
     initGame: initGame, roll: roll, moveTo: moveTo, useSecret: useSecret, stay: stay,
     suggest: suggest, disprove: disprove, botDisproveChoice: botDisproveChoice, accuse: accuse,
