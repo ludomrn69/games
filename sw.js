@@ -25,7 +25,8 @@ var ASSETS = [
   'undercover.html', 'president.html', 'ludo.html',
   'juste-prix.html', 'telephone-dessine.html',
   'monopoly.html', 'monopoly-engine.js',
-  'cluedo.html', 'cluedo-engine.js'
+  'cluedo.html', 'cluedo-engine.js',
+  'papayoo.html'
 ];
 
 self.addEventListener('install', function (e) {
