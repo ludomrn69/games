@@ -229,11 +229,114 @@
         'Quand tu ne peux plus jouer, passe',
         'Le moins de cases restantes gagne'
       ],
-      offline: { local: true },
+      offline: { solo: true, local: true },
+      bot: blokusBot,
       offlineTurn: function (r) { return (r.status === 'playing') ? ownerOf(r, r.turn) : null; },
       offlineEnter: function () { clearSelection(); if (window.room) renderPlaying(window.room); },
       onState: onState, onStart: onStart, beforeJoin: clearSelection
     });
+
+    /* ━━ IA solo : pose la plus grosse pièce possible, en maximisant ses futurs
+       coins (mobilité) et sa portée vers le centre. Énumération ancrée sur les
+       coins disponibles → rapide. ━━ */
+    var ORIENT = {};
+    ALL_PIECE_IDS.forEach(function (pid) {
+      var base = normalizeCells(PIECES[pid]), variants = [], cur = base, i;
+      for (i = 0; i < 4; i++) { variants.push(cur); cur = rotateCellsCW(cur); }
+      cur = flipCells(base);
+      for (i = 0; i < 4; i++) { variants.push(cur); cur = rotateCellsCW(cur); }
+      var seen = {}, list = [];
+      variants.forEach(function (v) { var k = v.map(function (c) { return c[0] + ',' + c[1]; }).join(';'); if (!seen[k]) { seen[k] = true; list.push(v); } });
+      ORIENT[pid] = list;
+    });
+
+    function blokusAnchors(board, color, first) {
+      if (first) return [COLOR_CORNER[color]];
+      var seen = {}, res = [];
+      for (var r = 0; r < 20; r++) for (var c = 0; c < 20; c++) {
+        if (getCell(board, r, c) !== color) continue;
+        [[r - 1, c - 1], [r - 1, c + 1], [r + 1, c - 1], [r + 1, c + 1]].forEach(function (d) {
+          if (d[0] < 0 || d[0] > 19 || d[1] < 0 || d[1] > 19) return;
+          if (getCell(board, d[0], d[1]) !== null) return;
+          var key = d[0] * 20 + d[1]; if (!seen[key]) { seen[key] = true; res.push([d[0], d[1]]); }
+        });
+      }
+      return res;
+    }
+    function blokusScore(board, color, abs) {
+      var occ = {}; abs.forEach(function (c) { occ[c[0] * 20 + c[1]] = true; });
+      function mine(r, c) { if (r < 0 || r > 19 || c < 0 || c > 19) return false; return occ[r * 20 + c] || getCell(board, r, c) === color; }
+      var cornerSeen = {}, corners = 0;
+      abs.forEach(function (c) {
+        [[c[0] - 1, c[1] - 1], [c[0] - 1, c[1] + 1], [c[0] + 1, c[1] - 1], [c[0] + 1, c[1] + 1]].forEach(function (d) {
+          var r = d[0], cc = d[1]; if (r < 0 || r > 19 || cc < 0 || cc > 19) return;
+          if (occ[r * 20 + cc] || getCell(board, r, cc) !== null) return;
+          if (mine(r - 1, cc) || mine(r + 1, cc) || mine(r, cc - 1) || mine(r, cc + 1)) return; // pas un vrai coin
+          var k = r * 20 + cc; if (!cornerSeen[k]) { cornerSeen[k] = true; corners++; }
+        });
+      });
+      var minDist = 1e9; abs.forEach(function (c) { var d = Math.abs(c[0] - 9.5) + Math.abs(c[1] - 9.5); if (d < minDist) minDist = d; });
+      return abs.length * 1000 + corners * 8 + (40 - minDist) * 2;
+    }
+    function blokusChooseMove(state, color) {
+      var board = state.board || emptyBoard(), first = colorIsFirst(state, color);
+      var pieces = (state.pieces && state.pieces[color]) || [];
+      if (!pieces.length) return null;
+      var anchors = blokusAnchors(board, color, first);
+      if (!anchors.length) return null;
+      var bySize = {}; pieces.forEach(function (pid) { var sz = PIECES[pid].length; (bySize[sz] = bySize[sz] || []).push(pid); });
+      var sizes = Object.keys(bySize).map(Number).sort(function (a, b) { return b - a; });
+      var best = null, bestSc = -1e18;
+      for (var si = 0; si < sizes.length; si++) {
+        bySize[sizes[si]].forEach(function (pid) {
+          ORIENT[pid].forEach(function (cells) {
+            anchors.forEach(function (ac) {
+              for (var pv = 0; pv < cells.length; pv++) {
+                var dr = ac[0] - cells[pv][0], dc = ac[1] - cells[pv][1];
+                var abs = cells.map(function (c) { return [c[0] + dr, c[1] + dc]; });
+                if (!isValidPlacement(board, color, abs, first)) continue;
+                var sc = blokusScore(board, color, abs);
+                if (sc > bestSc) { bestSc = sc; best = { pid: pid, abs: abs }; }
+              }
+            });
+          });
+        });
+        if (best) break; // on s'arrête au plus gros calibre jouable
+      }
+      return best;
+    }
+    function blokusBot(state, pid) {
+      if (state.status !== 'playing') return;
+      var color = state.turn;
+      if (ownerOf(state, color) !== pid) return;
+      var move = blokusChooseMove(state, color);
+      if (move) blokusBotPlace(color, move.pid, move.abs); else blokusBotPass(color);
+    }
+    function blokusBotPlace(color, pieceId, abs) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== color) return cur;
+        if (ownerOf(cur, color) !== window.myPid) return cur;
+        var pcs = (cur.pieces && cur.pieces[color]) || [];
+        if (pcs.indexOf(pieceId) < 0) return cur;
+        if (!isValidPlacement(cur.board || emptyBoard(), color, abs, colorIsFirst(cur, color))) return cur;
+        cur.board = setBoardCells(cur.board || emptyBoard(), abs, color);
+        cur.pieces[color] = pcs.filter(function (p) { return p !== pieceId; });
+        cur.lastMove = { color: color, cells: abs };
+        cur.turn = nextTurn(color, cur.passed || {}, cur.pieces, cur.turnOrder || []);
+        if (!cur.turn) cur.status = 'ended';
+        return cur;
+      });
+    }
+    function blokusBotPass(color) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== color) return cur;
+        if (ownerOf(cur, color) !== window.myPid) return cur;
+        cur.passed = cur.passed || {}; cur.passed[color] = true;
+        cur.turn = nextTurn(color, cur.passed, cur.pieces || {}, cur.turnOrder || []);
+        if (!cur.turn) cur.status = 'ended';
+        return cur;
+      });
+    }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
