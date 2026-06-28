@@ -60,6 +60,9 @@
     document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
     var el = document.getElementById(id);
     if (el) el.classList.add('active');
+    // Le bouton flottant « revoir le plateau » ne survit pas à un changement d'écran
+    // (sauf quand c'est lui qui affiche le plateau de jeu).
+    if (id !== 's-playing') { var pb = document.getElementById('lb-peek'); if (pb) pb.style.display = 'none'; }
   };
   window.openModal = function (id) { var m = document.getElementById(id); if (m) m.classList.add('active'); };
   window.closeModal = function (id) { var m = document.getElementById(id); if (m) m.classList.remove('active'); };
@@ -595,6 +598,23 @@
   // Bascule vers un mode hors-ligne (solo / local) — voir offline.js.
   function goOffline(m) { location.href = location.pathname + '?mode=' + m; }
 
+  // ── « Revoir le plateau » (après une fin de partie) ───────────────────────
+  // Affiche l'écran de jeu (le plateau/la main reste rendu derrière) et propose un
+  // bouton flottant pour revenir à l'écran de résultats. Partagé par tous les jeux :
+  //   Lobby.peekBoard(function () { showScreen('s-results'); render(...); })
+  function peekBoard(restore) {
+    window.showScreen('s-playing');
+    var b = document.getElementById('lb-peek');
+    if (!b) {
+      b = document.createElement('button'); b.id = 'lb-peek'; b.className = 'lb-peek-btn';
+      document.body.appendChild(b);
+    }
+    b.textContent = '↩ Revenir aux résultats';
+    b.onclick = function () { b.style.display = 'none'; try { restore && restore(); } catch (e) {} };
+    b.style.display = 'block';
+  }
+  function hidePeek() { var b = document.getElementById('lb-peek'); if (b) b.style.display = 'none'; }
+
   // ── Nettoyage TTL des vieux salons (best-effort, appelé depuis l'accueil) ──
   // Supprime les salons abandonnés (créés il y a plus de maxAgeMs). Borné à
   // quelques suppressions par passage pour rester léger. Nécessite l'index
@@ -672,6 +692,8 @@
     leaveRoom: leaveRoom,
     resetToLobby: resetToLobby,
     goOffline: goOffline,
+    peekBoard: peekBoard,
+    hidePeek: hidePeek,
     sweepOldRooms: sweepOldRooms,
     isOffline: isOffline,
     absentBanner: absentBanner

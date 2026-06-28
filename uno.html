@@ -146,6 +146,7 @@
       <h2 class="res-title" id="res-title">—</h2>
       <div class="res-rank" id="res-rank"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="document.getElementById('uno-overlay').classList.remove('active');Lobby.peekBoard(function(){document.getElementById('uno-overlay').classList.add('active');})">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>

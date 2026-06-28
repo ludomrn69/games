@@ -451,6 +451,7 @@
           '<div class="modal-title">' + (s.winner === window.myPid ? 'Bravo, tu as résolu l\'affaire !' : escapeHtml(Room.name(s.winner)) + ' a résolu l\'affaire') + '</div>' +
           '<div style="font-size:.95rem;color:var(--ink-light);margin-bottom:14px">C\'était <b>' + escapeHtml(sol.suspect) + '</b>, avec <b>' + escapeHtml(sol.arme) + '</b>, dans <b>' + escapeHtml(sol.piece) + '</b>.</div>' +
           '<button class="btn-primary" onclick="handleReplay()">Rejouer</button>' +
+          '<button class="btn-link mt-4" onclick="document.getElementById(\'cl-ov\').classList.remove(\'active\');Lobby.peekBoard(function(){document.getElementById(\'cl-ov\').classList.add(\'active\');})">🔍 Revoir le plateau</button>' +
           '<button class="btn-link mt-4" onclick="window.location.href=\'index.html\'">Accueil</button>';
         ov.classList.add('active');
       } else ov.classList.remove('active');

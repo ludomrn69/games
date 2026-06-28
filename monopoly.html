@@ -536,6 +536,7 @@
           (s.winner === window.myPid ? 'Tu as gagné !' : escapeHtml(Room.name(s.winner)) + ' gagne !') + '</div>' +
           '<div class="modal-sub">Dernier joueur non ruiné.</div>' +
           '<button class="btn-primary" onclick="handleReplay()">Rejouer</button>' +
+          '<button class="btn-link mt-4" onclick="document.getElementById(\'mo-ov\').classList.remove(\'active\');Lobby.peekBoard(function(){document.getElementById(\'mo-ov\').classList.add(\'active\');})">🔍 Revoir le plateau</button>' +
           '<button class="btn-link mt-4" onclick="window.location.href=\'index.html\'">Accueil</button>';
         ov.classList.add('active');
       } else ov.classList.remove('active');
