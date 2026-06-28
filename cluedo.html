@@ -237,6 +237,12 @@
       showScreen('s-playing');
       autoNote(s);
       renderBoard(s); renderTop(s); renderHand(s); renderLog(s); renderAction(s); maybeOverlay(s);
+      if (window.Lobby && Lobby.absentBanner) {
+        var h = (!s.winner && s.phase !== 'disprove' && s.phase !== 'over') ? s.turn : null;
+        Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(s, h)) ? h : null, function () {
+          tx(function (cur) { if (!cur.winner && Lobby.isOffline(cur, cur.turn)) CE.endTurn(cur); });
+        });
+      }
     }
 
     function gridPosCSS(i) { var p = i.split(','); return { r: +p[0] + 1, c: +p[1] + 1 }; }

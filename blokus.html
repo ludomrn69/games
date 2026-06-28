@@ -359,6 +359,19 @@
         showResults(state);
       }
       prevStatus = status;
+      if (window.Lobby && Lobby.absentBanner) {
+        var h = (status === 'playing') ? ownerOf(state, state.turn) : null;
+        Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
+          rref().transaction(function (cur) {
+            if (!cur || cur.status !== 'playing' || !Lobby.isOffline(cur, ownerOf(cur, cur.turn))) return cur;
+            var color = cur.turn;
+            cur.passed = cur.passed || {}; cur.passed[color] = true; // l'absent passe cette couleur
+            cur.turn = nextTurn(color, cur.passed, cur.pieces || {}, cur.turnOrder || []);
+            if (!cur.turn) cur.status = 'ended';
+            return cur;
+          });
+        });
+      }
     }
 
     /* ━━ Plateau ━━ */

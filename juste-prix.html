@@ -188,6 +188,16 @@
         renderPlaying(state);
       }
       prevStatus = status;
+      if (window.Lobby && Lobby.absentBanner) {
+        var h = (status === 'playing' && !state.winner) ? state.turn : null;
+        Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
+          rref().transaction(function (cur) {
+            if (!cur || cur.status !== 'playing' || cur.winner || !Lobby.isOffline(cur, cur.turn)) return cur;
+            var ord = cur.order || [], i = ord.indexOf(cur.turn); cur.turn = ord[(i + 1) % ord.length];
+            return cur;
+          });
+        });
+      }
     }
 
     /* Proposer un nombre. */

@@ -312,6 +312,17 @@
         showResults(state);
       }
       prevStatus = status;
+      if (window.Lobby && Lobby.absentBanner) {
+        var h = (status === 'playing' && (state.phase === 'main' || state.phase === 'lastTurn')) ? state.turn : null;
+        Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
+          rref().transaction(function (cur) {
+            if (!cur || cur.status !== 'playing' || !(cur.phase === 'main' || cur.phase === 'lastTurn') || !Lobby.isOffline(cur, cur.turn)) return cur;
+            cur.drawnCard = null; cur.drawnFrom = null; cur.drewThisTurn = false;
+            finalizeTurn(cur, cur.turn); // fait avancer le tour (gère lastTurn/fin de manche)
+            return cur;
+          });
+        });
+      }
     }
 
     /* ━━ Helpers ━━ */
