@@ -202,7 +202,8 @@
         '3 cartes identiques en colonne = colonne retirée',
         'Le moins de points à la fin gagne (seuil = fin de partie)'
       ],
-      offline: { local: true },
+      offline: { solo: true, local: true },
+      bot: skyjoBot,
       offlineTurn: function (r) {
         if (r.status === 'ended') return null;
         if (r.status === 'roundEnd') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
@@ -213,6 +214,60 @@
       lobbyExtraHTML: lobbyExtraHTML, onState: onState, onStart: onStart,
       beforeJoin: function () { localMode = 'idle'; }
     });
+
+    /* ━━ IA solo : minimise la valeur visible, vise les éliminations de colonnes ━━ */
+    function skyjoBot(state, pid) {
+      if (state.status === 'roundEnd') { if (!((state.players[pid] || {}).nextReady)) setNextReady(); return; }
+      if (state.status !== 'playing') return;
+      var p = state.players[pid] || {}, grid = p.grid || [], fl = p.flipped || [], rm = p.removed || [], EXP = 5;
+      if (state.phase === 'flip2') {
+        if (flippedCount(p) >= 2) return;
+        for (var i = 0; i < 12; i++) if (!fl[i] && !rm[i]) { initialFlip(i); return; }
+        return;
+      }
+      if (state.turn !== pid) return;
+      function visibles() { var a = []; for (var i = 0; i < 12; i++) if (fl[i] && !rm[i]) a.push(i); return a; }
+      function hiddens() { var a = []; for (var i = 0; i < 12; i++) if (!fl[i] && !rm[i]) a.push(i); return a; }
+      function maxVisible() { var mi = -1, mv = -Infinity; visibles().forEach(function (i) { if (grid[i] > mv) { mv = grid[i]; mi = i; } }); return { idx: mi, val: mv }; }
+      // colonne où 2 cases retournées valent `card` et la 3e est remplaçable → la compléter élimine la colonne
+      function columnTarget(card) {
+        for (var col = 0; col < 4; col++) {
+          var idx = [col, col + 4, col + 8];
+          if (rm[idx[0]] || rm[idx[1]] || rm[idx[2]]) continue;
+          var eq = 0, target = -1;
+          idx.forEach(function (c) { if (fl[c] && grid[c] === card) eq++; else target = c; });
+          if (eq === 2 && target >= 0) return target;
+        }
+        return -1;
+      }
+      var drawn = (state.drawnCard != null);
+      if (!drawn) {
+        var disc = state.discardPile || [], top = disc.length ? disc[disc.length - 1] : null;
+        if (top == null) { onDrawPileTap(); return; }
+        var mv = maxVisible();
+        var gainVis = mv.idx >= 0 ? (mv.val - top) : -Infinity;
+        var gainHid = hiddens().length ? (EXP - top) : -Infinity;
+        var take = Math.max(gainVis, gainHid, columnTarget(top) >= 0 ? 6 : -Infinity);
+        if (take >= 2) takeFromDiscard(); else onDrawPileTap();
+        return;
+      }
+      var card = state.drawnCard, from = state.drawnFrom, mvx = maxVisible();
+      var colT = columnTarget(card);
+      if (colT >= 0) { replaceCell(colT); return; }                     // éliminer une colonne
+      if (from === 'discard') {
+        if (mvx.idx >= 0 && card < mvx.val) replaceCell(mvx.idx);
+        else if (hiddens().length) replaceCell(hiddens()[0]);
+        else replaceCell(mvx.idx >= 0 ? mvx.idx : visibles()[0] || 0);
+        return;
+      }
+      // pioche : échanger (si ça améliore) ou défausser + retourner une cachée
+      var gv = mvx.idx >= 0 ? (mvx.val - card) : -Infinity;
+      var gh = hiddens().length ? (EXP - card) : -Infinity;
+      if (gv >= gh && gv > 0) { replaceCell(mvx.idx); return; }
+      if (card <= 2 && hiddens().length) { replaceCell(hiddens()[0]); return; }
+      if (hiddens().length) { discardAndFlip(hiddens()[0]); return; }
+      replaceCell(mvx.idx >= 0 ? mvx.idx : 0);
+    }
 
     function lobbyExtraHTML(room) {
       var sel = (room && room.maxScore) || 100;
