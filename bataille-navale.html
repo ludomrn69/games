@@ -185,7 +185,8 @@
       gameKey: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', tagline: 'Coule la flotte adverse',
       minPlayers: 2, maxPlayers: 2,
       rules: ['Place tes 5 bateaux en secret', 'Chacun son tour, tu tires sur une case adverse', 'Touché : tu rejoues · Manqué : à l\'autre', 'Coule toute la flotte ennemie pour gagner'],
-      offline: { local: true },
+      offline: { solo: true, local: true },
+      bot: bnBot,
       offlineTurn: function (r) {
         if (r.status === 'ended') return null;
         if (r.status === 'placing') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].placed)) return o[i]; return o[0]; }
@@ -194,6 +195,78 @@
       offlineEnter: function (r) { placedDone = false; if (r.status === 'placing') initPlacement(r); else if (r.status === 'playing') renderCombat(r); },
       onState: onState, onStart: onStart
     });
+
+    /* ━━ IA solo : placement aléatoire + tir par densité de probabilité ━━ */
+    function bnBot(state, pid) {
+      if (state.status === 'placing') {
+        if (state.players[pid] && state.players[pid].placed) return;
+        bnBotPlace(pid); return;
+      }
+      if (state.status !== 'playing' || state.winner || state.turn !== pid) return;
+      var s = (((state.players[pid] || {}).shots) || emptyShots()).split('');
+      while (s.length < 100) s.push('.');
+      var t = bnChooseShot(s);
+      if (t >= 0) fire(t);
+    }
+    function bnBotPlace(pid) {
+      var occ = {}, ships = [];
+      FLEET.forEach(function (sh) {
+        var ok = false, tr = 0;
+        while (!ok && tr++ < 2000) {
+          var dir = Math.random() < 0.5 ? 'h' : 'v', idx = Math.floor(Math.random() * 100);
+          var cells = cellsFor(sh.size, idx, dir);
+          if (!cells) continue;
+          var clash = false; for (var k = 0; k < cells.length; k++) if (occ[cells[k]]) { clash = true; break; }
+          if (clash) continue;
+          cells.forEach(function (c) { occ[c] = true; }); ships.push({ n: sh.name, cells: cells }); ok = true;
+        }
+      });
+      rref().child('players/' + pid).update({ ships: ships, placed: true }, function () {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'placing') return cur;
+          var order = cur.order || [];
+          if (!order.every(function (p) { return cur.players[p] && cur.players[p].placed; })) return cur;
+          cur.status = 'playing'; cur.turn = order[Math.floor(Math.random() * order.length)]; cur.winner = null; cur.lastShot = null;
+          order.forEach(function (p) { cur.players[p].shots = emptyShots(); });
+          return cur;
+        });
+      });
+    }
+    // Cible : prolonger les touches. Chasse : densité (placements 100% sur cases vierges).
+    function bnChooseShot(s) {
+      function tried(i) { return s[i] !== '.'; }
+      function nbrs(i) { var r = Math.floor(i / 10), c = i % 10, a = []; if (r > 0) a.push(i - 10); if (r < 9) a.push(i + 10); if (c > 0) a.push(i - 1); if (c < 9) a.push(i + 1); return a; }
+      var best = -1, bestSc = -1;
+      for (var i = 0; i < 100; i++) {
+        if (s[i] !== 'h') continue;
+        var ri = Math.floor(i / 10), ns = nbrs(i);
+        for (var x = 0; x < ns.length; x++) {
+          var nb = ns[x]; if (tried(nb)) continue;
+          var di = nb - i, opp = i - di, sc = 2;
+          if (Math.abs(di) === 1) { if (opp >= 0 && Math.floor(opp / 10) === ri && s[opp] === 'h') sc = 18; }
+          else { if (opp >= 0 && opp < 100 && s[opp] === 'h') sc = 18; }
+          if (sc > bestSc || (sc === bestSc && Math.random() < 0.4)) { bestSc = sc; best = nb; }
+        }
+      }
+      if (best >= 0) return best;
+      var W = []; for (var z = 0; z < 100; z++) W.push(0);
+      for (var si = 0; si < FLEET.length; si++) {
+        var L = FLEET[si].size;
+        for (var dir = 0; dir < 2; dir++) {
+          for (var p = 0; p < 100; p++) {
+            var cells = cellsFor(L, p, dir ? 'v' : 'h'); if (!cells) continue;
+            var clean = true; for (var k = 0; k < cells.length; k++) if (tried(cells[k])) { clean = false; break; }
+            if (!clean) continue;
+            for (var b = 0; b < cells.length; b++) W[cells[b]] += 1;
+          }
+        }
+      }
+      var bc = -1, bw = -1;
+      for (var c = 0; c < 100; c++) { if (tried(c)) continue; if (W[c] > bw) { bw = W[c]; bc = c; } }
+      if (bc >= 0) return bc;
+      for (var d = 0; d < 100; d++) if (!tried(d)) return d;
+      return -1;
+    }
 
     function onStart(players, cur) {
       players.forEach(function (p) { cur.players[p.pid].placed = false; cur.players[p.pid].ships = null; cur.players[p.pid].shots = emptyShots(); });
