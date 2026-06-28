@@ -22,10 +22,11 @@
 
     .cl-wrap { width: 100%; max-width: 620px; padding: 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
-    .cl-board { width: min(96vw, 500px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(13, 1fr); grid-template-rows: repeat(13, 1fr); gap: 1px; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 8px; }
+    .cl-board { width: min(97vw, 520px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(18, 1fr); grid-template-rows: repeat(18, 1fr); gap: 1px; background: #b9a988; border: 2px solid #b9a988; border-radius: 8px; }
     .cl-corr { background: var(--cream); }
     html[data-theme="dark"] .cl-corr { background: #221a2e; }
-    .cl-corr.door { box-shadow: inset 0 0 0 2px var(--gold); }
+    .cl-corr.door { box-shadow: inset 0 0 0 2px var(--gold); background: rgba(198,152,90,0.28); }
+    .cl-cellar { background: repeating-linear-gradient(45deg, #3a2f28, #3a2f28 6px, #463a31 6px, #463a31 12px); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #e8dcc8; font-size: 9px; font-weight: 700; text-align: center; line-height: 1.2; }
     .cl-corr.reach { background: rgba(139,158,126,.5); cursor: pointer; }
     .cl-corr.reach:hover { background: var(--sage); }
     .cl-room { border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; }
@@ -247,21 +248,24 @@
       var toks = {}; s.order.forEach(function (p) { var n = s.pos[p]; (toks[n] = toks[n] || []).push(Room.emoji(p)); });
       var wtoks = {}; var wp = s.weaponPos || {}; Object.keys(wp).forEach(function (w) { (wtoks[wp[w]] = wtoks[wp[w]] || []).push(WEP_EMOJI[w] || '🔪'); });
       var html = '';
-      // pièces
+      // pièces (rectangles fidèles au plateau)
       for (var k = 0; k < 9; k++) {
-        var br = Math.floor(k / 3), bc = k % 3;
+        var R = CE.ROOM_RECT[k];
         var reach = canMove && s.reach['R' + k] != null;
         var tk = (toks['R' + k] || []).map(function (e) { return '<span class="cl-tok">' + e + '</span>'; }).join('');
         var wk = (wtoks[k] || []).map(function (e) { return '<span>' + e + '</span>'; }).join('');
-        html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (4 * br + 2) + '/span 3;grid-column:' + (4 * bc + 2) + '/span 3;background:' + ROOM_BG[k] + '"' +
+        html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (R[0] + 1) + '/' + (R[1] + 2) + ';grid-column:' + (R[2] + 1) + '/' + (R[3] + 2) + ';background:' + ROOM_BG[k] + '"' +
           (reach ? ' onclick="tryMove(\'R' + k + '\')"' : '') + '>' +
           '<div class="rname">' + CE.ROOMS[k] + '</div>' +
-          (CE.SECRET[k] != null ? '<div class="cl-secret">🚪 passage → ' + CE.ROOMS[CE.SECRET[k]] + '</div>' : '') +
+          (CE.SECRET[k] != null ? '<div class="cl-secret">🚪→ ' + CE.ROOMS[CE.SECRET[k]] + '</div>' : '') +
           '<div class="rtok">' + wk + tk + '</div></div>';
       }
-      // couloirs
+      // cellier central (bloqué, décoratif)
+      var CC = CE.CELLAR;
+      html += '<div class="cl-cellar" style="grid-row:' + (CC[0] + 1) + '/' + (CC[1] + 2) + ';grid-column:' + (CC[2] + 1) + '/' + (CC[3] + 2) + '">🔒<span>Cellier</span></div>';
+      // couloirs + portes
       var doorSet = {}; for (var rk = 0; rk < 9; rk++) CE.doorLanes(rk).forEach(function (d) { doorSet[d[0] + ',' + d[1]] = true; });
-      for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+      for (var r = 0; r < CE.GRID_H; r++) for (var c = 0; c < CE.GRID_W; c++) {
         if (!CE.isCorr(r, c)) continue;
         var id = r + ',' + c;
         var reach2 = canMove && s.reach[id] != null;

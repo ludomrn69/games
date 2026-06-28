@@ -19,16 +19,39 @@
   //   Cuisine (0) ↔ Bureau (8)  et  Véranda (2) ↔ Salon (6).
   var SECRET = { 0: 8, 8: 0, 2: 6, 6: 2 };
   var ALLCARDS = SUSPECTS.concat(WEAPONS).concat(ROOMS);
-  var START_CELLS = ['0,2', '12,10', '0,10', '12,2', '6,0', '6,12']; // jusqu'à 6 joueurs
+  var START_CELLS = ['0,8', '17,9', '8,0', '9,17', '0,2', '17,15']; // sur l'anneau de couloirs (≤ 6 joueurs)
 
   function catOf(card) { return SUSPECTS.indexOf(card) >= 0 ? 'suspect' : WEAPONS.indexOf(card) >= 0 ? 'arme' : 'piece'; }
   function cardsOfCat(cat) { return cat === 'suspect' ? SUSPECTS : cat === 'arme' ? WEAPONS : ROOMS; }
 
-  // ── Plateau ────────────────────────────────────────────────────────────────
-  function isCorr(r, c) { return r >= 0 && r <= 12 && c >= 0 && c <= 12 && (r % 4 === 0 || c % 4 === 0); }
-  function doorLanes(idx) { var br = Math.floor(idx / 3), bc = idx % 3; return [[4 * br, 4 * bc + 2], [4 * br + 4, 4 * bc + 2], [4 * br + 2, 4 * bc], [4 * br + 2, 4 * bc + 4]]; }
-  function roomCells(idx) { var br = Math.floor(idx / 3), bc = idx % 3, a = []; for (var r = 4 * br + 1; r <= 4 * br + 3; r++) for (var c = 4 * bc + 1; c <= 4 * bc + 3; c++) a.push([r, c]); return a; }
-  function roomOfCell(r, c) { if (r % 4 === 0 || c % 4 === 0) return -1; return Math.floor((r - 1) / 4) * 3 + Math.floor((c - 1) / 4); }
+  // ── Plateau (disposition fidèle au Cluedo) ───────────────────────────────────
+  // Grille 18×18. Chaque pièce est un RECTANGLE [r0,r1,c0,c1] (inclus), placé comme
+  // sur le vrai plateau ; le CELLIER central est bloqué ; tout le reste est couloir.
+  // Les PORTES sont des cases couloir adjacentes par lesquelles on entre/sort.
+  var GRID_W = 18, GRID_H = 18;
+  var ROOM_RECT = {
+    0: [1, 4, 1, 4],    // Cuisine        (haut-gauche)
+    1: [1, 4, 7, 10],   // Salle de bal   (haut-centre)
+    2: [1, 4, 13, 16],  // Véranda        (haut-droite)
+    3: [7, 9, 1, 4],    // Salle à manger (milieu-gauche)
+    5: [6, 8, 13, 16],  // Billard        (milieu-droite haut)
+    4: [10, 11, 13, 16],// Bibliothèque   (milieu-droite bas)
+    6: [13, 16, 1, 4],  // Salon          (bas-gauche)
+    7: [13, 16, 7, 10], // Vestibule      (bas-centre)
+    8: [13, 16, 13, 16] // Bureau         (bas-droite)
+  };
+  var CELLAR = [7, 10, 7, 10]; // cellier central (zone de l'enveloppe) — non franchissable
+  var DOORS = {
+    0: [[5, 2], [2, 5]], 1: [[5, 8], [2, 6], [2, 11]], 2: [[5, 14], [2, 12]],
+    3: [[6, 2], [8, 5]], 5: [[7, 12], [9, 14]], 4: [[11, 12], [12, 14]],
+    6: [[12, 2], [14, 5]], 7: [[12, 8], [14, 6], [14, 11]], 8: [[12, 15], [14, 12]]
+  };
+  function inRect(r, c, R) { return r >= R[0] && r <= R[1] && c >= R[2] && c <= R[3]; }
+  function roomOfCell(r, c) { for (var k = 0; k < 9; k++) { if (inRect(r, c, ROOM_RECT[k])) return k; } return -1; }
+  function isCellar(r, c) { return inRect(r, c, CELLAR); }
+  function isCorr(r, c) { return r >= 0 && r < GRID_H && c >= 0 && c < GRID_W && roomOfCell(r, c) < 0 && !isCellar(r, c); }
+  function doorLanes(idx) { return DOORS[idx] || []; }
+  function roomCells(idx) { var R = ROOM_RECT[idx], a = []; for (var r = R[0]; r <= R[1]; r++) for (var c = R[2]; c <= R[3]; c++) a.push([r, c]); return a; }
   function isRoomNode(n) { return typeof n === 'string' && n[0] === 'R'; }
   function roomIdx(n) { return +n.slice(1); }
 
@@ -280,6 +303,7 @@
     SUSPECTS: SUSPECTS, WEAPONS: WEAPONS, ROOMS: ROOMS, ALLCARDS: ALLCARDS, SECRET: SECRET,
     catOf: catOf, cardsOfCat: cardsOfCat,
     isCorr: isCorr, doorLanes: doorLanes, roomCells: roomCells, roomOfCell: roomOfCell,
+    isCellar: isCellar, GRID_W: GRID_W, GRID_H: GRID_H, ROOM_RECT: ROOM_RECT, CELLAR: CELLAR, DOORS: DOORS,
     isRoomNode: isRoomNode, roomIdx: roomIdx, reachable: reachable, neighbors: neighbors,
     initGame: initGame, roll: roll, moveTo: moveTo, useSecret: useSecret, stay: stay,
     suggest: suggest, disprove: disprove, botDisproveChoice: botDisproveChoice, accuse: accuse,
