@@ -41,6 +41,8 @@
     html[data-theme="dark"] .mo-center { background: #1b1626; }
     .mo-center .logo { font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(1rem,4vw,1.6rem); background: linear-gradient(135deg,var(--terracotta),var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .mo-center .evt { font-size: 0.8rem; color: var(--ink-light); max-width: 90%; min-height: 2.4em; }
+    .mo-center-turn { font-size: 0.8rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+    .mo-center-av { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; box-shadow: 0 0 0 2px #fff inset; }
     .mo-bigdice { display: flex; gap: 8px; }
     .mo-bigdie { width: 38px; height: 38px; border-radius: 8px; background: #fff; color: #2C2520; font-weight: 800; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
 
@@ -271,8 +273,13 @@
       // centre
       var evt = (s.log && s.log.length) ? s.log[s.log.length - 1] : '';
       var d = s.dice || [0, 0];
+      var a = ENG.actor(s);
+      var turnLine = s.winner
+        ? '<div class="mo-center-turn">🏆 ' + escapeHtml(Room.name(s.winner)) + '</div>'
+        : '<div class="mo-center-turn"><span class="mo-center-av" style="background:' + Room.color(a) + '">' + Room.emoji(a) + '</span> Au tour de ' + escapeHtml(Room.name(a)) + '</div>';
+      var dice = (d[0] || d[1]) ? '<div class="mo-bigdice"><div class="mo-bigdie">' + (d[0] || '–') + '</div><div class="mo-bigdie">' + (d[1] || '–') + '</div></div>' : '';
       html += '<div class="mo-center"><div class="logo">MONOPOLY</div>' +
-        '<div class="mo-bigdice"><div class="mo-bigdie">' + (d[0] || '–') + '</div><div class="mo-bigdie">' + (d[1] || '–') + '</div></div>' +
+        turnLine + dice +
         '<div class="evt">' + escapeHtml(evt) + '</div></div>';
       document.getElementById('mo-board').innerHTML = html;
     }

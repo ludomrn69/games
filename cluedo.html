@@ -31,6 +31,7 @@
     .cl-room { border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; }
     .cl-room.reach { outline: 3px solid var(--sage); cursor: pointer; }
     .cl-room .rname { line-height: 1.05; }
+    .cl-room .cl-secret { font-size: 7px; font-weight: 700; color: #8a5a2b; line-height: 1.1; margin-top: 1px; opacity: 0.95; }
     .cl-room .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 0; }
     .cl-room .rtok span { font-size: 13px; }
     .cl-tok { font-size: 14px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
@@ -254,7 +255,9 @@
         var wk = (wtoks[k] || []).map(function (e) { return '<span>' + e + '</span>'; }).join('');
         html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (4 * br + 2) + '/span 3;grid-column:' + (4 * bc + 2) + '/span 3;background:' + ROOM_BG[k] + '"' +
           (reach ? ' onclick="tryMove(\'R' + k + '\')"' : '') + '>' +
-          '<div class="rname">' + CE.ROOMS[k] + (CE.SECRET[k] != null ? ' 🚪' : '') + '</div><div class="rtok">' + wk + tk + '</div></div>';
+          '<div class="rname">' + CE.ROOMS[k] + '</div>' +
+          (CE.SECRET[k] != null ? '<div class="cl-secret">🚪 passage → ' + CE.ROOMS[CE.SECRET[k]] + '</div>' : '') +
+          '<div class="rtok">' + wk + tk + '</div></div>';
       }
       // couloirs
       var doorSet = {}; for (var rk = 0; rk < 9; rk++) CE.doorLanes(rk).forEach(function (d) { doorSet[d[0] + ',' + d[1]] = true; });

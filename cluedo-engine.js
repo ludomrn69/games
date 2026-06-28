@@ -9,9 +9,15 @@
 
   var SUSPECTS = ['Moutarde', 'Rose', 'Violet', 'Leblanc', 'Olive', 'Pervenche'];
   var WEAPONS = ['Poignard', 'Chandelier', 'Revolver', 'Corde', 'Clé', 'Matraque'];
-  // 9 pièces, index = br*3+bc (br,bc ∈ 0..2)
-  var ROOMS = ['Cuisine', 'Salle de bal', 'Véranda', 'Salle à manger', 'Salon', 'Bibliothèque', 'Bureau', 'Vestibule', 'Billard'];
-  var SECRET = { 0: 8, 8: 0, 2: 6, 6: 2 }; // passages secrets (coins opposés)
+  // 9 pièces, index = br*3+bc (br,bc ∈ 0..2). Disposition fidèle au Cluedo : les 4
+  // COINS sont les pièces à passage secret, comme sur le plateau Hasbro :
+  //   Cuisine (HG) · Salle de bal (HC) · Véranda (HD)
+  //   Salle à manger (MG) · Bibliothèque (M) · Billard (MD)
+  //   Salon (BG) · Vestibule (BC) · Bureau (BD)
+  var ROOMS = ['Cuisine', 'Salle de bal', 'Véranda', 'Salle à manger', 'Bibliothèque', 'Billard', 'Salon', 'Vestibule', 'Bureau'];
+  // Passages secrets entre coins OPPOSÉS, comme dans le vrai jeu :
+  //   Cuisine (0) ↔ Bureau (8)  et  Véranda (2) ↔ Salon (6).
+  var SECRET = { 0: 8, 8: 0, 2: 6, 6: 2 };
   var ALLCARDS = SUSPECTS.concat(WEAPONS).concat(ROOMS);
   var START_CELLS = ['0,2', '12,10', '0,10', '12,2', '6,0', '6,12']; // jusqu'à 6 joueurs
 
