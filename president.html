@@ -3,15 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <link rel="stylesheet" href="/theme.css">
-  <link rel="stylesheet" href="/game.css">
-  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
-  <title>Président 🃏</title>
-  <meta name="robots" content="noindex, nofollow" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤵</text></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="/head.js" data-title="Président 🃏" data-emoji="🤵"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
@@ -78,11 +70,7 @@
   </style>
 </head>
 <body>
-  <script src="/nav.js"></script>
-  <script src="/presence.js"></script>
-  <script src="/avatars.js"></script>
-  <script src="/lobby.js"></script>
-  <script src="/offline.js"></script>
+  <script src="/boot.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -196,12 +184,63 @@
         'Ordre : 3 < 4 < … < As < 2 (la plus forte)',
         'Premier à vider sa main = Président 👑, dernier = Trou du cul 💩'
       ],
-      offline: { local: true },
+      offline: { solo: true, local: true },
+      bot: presBot,
       offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
       offlineEnter: function () { selected = []; if (window.room) render(window.room); },
       onState: onState,
       onStart: onStart
     });
+
+    /* ━━ IA solo : mener bas, battre au moins cher en gardant les fortes, finir vite ━━ */
+    function presBot(state, pid) {
+      if (state.status !== 'playing' || state.turn !== pid) return;
+      var hand = sortHand(((state.players[pid] || {}).hand) || []);
+      if (!hand.length) return;
+      var move = presChooseMove(state, hand);
+      if (move && move.length) presBotPlay(pid, move);
+      else passTurn(); // passTurn utilise window.myPid (= pid) ; n'est appelé que si un pli existe
+    }
+    function presChooseMove(state, hand) {
+      var groups = {};
+      hand.forEach(function (c) { var r = rankOf(c); if (!groups[r]) groups[r] = { r: r, val: rankVal(c), cards: [] }; groups[r].cards.push(c); });
+      var list = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return a.val - b.val; });
+      if (!state.pile) {
+        // mener : on se débarrasse du plus petit rang (toutes ses copies)
+        return list[0].cards.slice();
+      }
+      var need = state.pile.count, pr = state.pile.rank;
+      var cand = list.filter(function (g) { return g.val > pr && g.cards.length >= need; });
+      if (!cand.length) return null; // passer
+      // finir si possible (jouer exactement notre dernier paquet)
+      for (var i = 0; i < cand.length; i++) if (cand[i].cards.length === need && hand.length === need) return cand[i].cards.slice(0, need);
+      var pick = cand[0]; // le plus petit rang qui bat
+      // garder les très fortes (2 / As) si la main est encore grande
+      if ((pick.r === '2' || pick.r === 'A') && hand.length > 6) {
+        var cheaper = cand.filter(function (g) { return g.r !== '2' && g.r !== 'A'; });
+        if (!cheaper.length) return null; // seules nos fortes battent → on passe pour les garder
+        pick = cheaper[0];
+      }
+      return pick.cards.slice(0, need);
+    }
+    function presBotPlay(pid, cards) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
+        var hand = (cur.players[pid].hand || []).slice();
+        for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
+        var rk = rankOf(cards[0]);
+        if (!cards.every(function (c) { return rankOf(c) === rk; })) return cur;
+        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) <= cur.pile.rank) return cur; }
+        cards.forEach(function (c) { hand.splice(hand.indexOf(c), 1); });
+        cur.players[pid].hand = hand;
+        cur.pile = { by: pid, rank: rankVal(cards[0]), count: cards.length, cards: cards };
+        cur.lastPlayer = pid;
+        cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards);
+        if (hand.length === 0) { cur.finishOrder = (cur.finishOrder || []).concat([pid]); cur.banner += ' et a fini !'; }
+        resolveAfterPlay(cur, pid);
+        return cur;
+      });
+    }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });

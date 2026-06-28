@@ -3,15 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <link rel="stylesheet" href="/theme.css">
-  <link rel="stylesheet" href="/game.css">
-  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
-  <title>Blokus 🧩</title>
-  <meta name="robots" content="noindex, nofollow" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="/head.js" data-title="Blokus 🧩" data-emoji="🧩"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
@@ -92,11 +84,7 @@
   </style>
 </head>
 <body>
-  <script src="/nav.js"></script>
-  <script src="/presence.js"></script>
-  <script src="/avatars.js"></script>
-  <script src="/lobby.js"></script>
-  <script src="/offline.js"></script>
+  <script src="/boot.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -229,11 +217,114 @@
         'Quand tu ne peux plus jouer, passe',
         'Le moins de cases restantes gagne'
       ],
-      offline: { local: true },
+      offline: { solo: true, local: true },
+      bot: blokusBot,
       offlineTurn: function (r) { return (r.status === 'playing') ? ownerOf(r, r.turn) : null; },
       offlineEnter: function () { clearSelection(); if (window.room) renderPlaying(window.room); },
       onState: onState, onStart: onStart, beforeJoin: clearSelection
     });
+
+    /* ━━ IA solo : pose la plus grosse pièce possible, en maximisant ses futurs
+       coins (mobilité) et sa portée vers le centre. Énumération ancrée sur les
+       coins disponibles → rapide. ━━ */
+    var ORIENT = {};
+    ALL_PIECE_IDS.forEach(function (pid) {
+      var base = normalizeCells(PIECES[pid]), variants = [], cur = base, i;
+      for (i = 0; i < 4; i++) { variants.push(cur); cur = rotateCellsCW(cur); }
+      cur = flipCells(base);
+      for (i = 0; i < 4; i++) { variants.push(cur); cur = rotateCellsCW(cur); }
+      var seen = {}, list = [];
+      variants.forEach(function (v) { var k = v.map(function (c) { return c[0] + ',' + c[1]; }).join(';'); if (!seen[k]) { seen[k] = true; list.push(v); } });
+      ORIENT[pid] = list;
+    });
+
+    function blokusAnchors(board, color, first) {
+      if (first) return [COLOR_CORNER[color]];
+      var seen = {}, res = [];
+      for (var r = 0; r < 20; r++) for (var c = 0; c < 20; c++) {
+        if (getCell(board, r, c) !== color) continue;
+        [[r - 1, c - 1], [r - 1, c + 1], [r + 1, c - 1], [r + 1, c + 1]].forEach(function (d) {
+          if (d[0] < 0 || d[0] > 19 || d[1] < 0 || d[1] > 19) return;
+          if (getCell(board, d[0], d[1]) !== null) return;
+          var key = d[0] * 20 + d[1]; if (!seen[key]) { seen[key] = true; res.push([d[0], d[1]]); }
+        });
+      }
+      return res;
+    }
+    function blokusScore(board, color, abs) {
+      var occ = {}; abs.forEach(function (c) { occ[c[0] * 20 + c[1]] = true; });
+      function mine(r, c) { if (r < 0 || r > 19 || c < 0 || c > 19) return false; return occ[r * 20 + c] || getCell(board, r, c) === color; }
+      var cornerSeen = {}, corners = 0;
+      abs.forEach(function (c) {
+        [[c[0] - 1, c[1] - 1], [c[0] - 1, c[1] + 1], [c[0] + 1, c[1] - 1], [c[0] + 1, c[1] + 1]].forEach(function (d) {
+          var r = d[0], cc = d[1]; if (r < 0 || r > 19 || cc < 0 || cc > 19) return;
+          if (occ[r * 20 + cc] || getCell(board, r, cc) !== null) return;
+          if (mine(r - 1, cc) || mine(r + 1, cc) || mine(r, cc - 1) || mine(r, cc + 1)) return; // pas un vrai coin
+          var k = r * 20 + cc; if (!cornerSeen[k]) { cornerSeen[k] = true; corners++; }
+        });
+      });
+      var minDist = 1e9; abs.forEach(function (c) { var d = Math.abs(c[0] - 9.5) + Math.abs(c[1] - 9.5); if (d < minDist) minDist = d; });
+      return abs.length * 1000 + corners * 8 + (40 - minDist) * 2;
+    }
+    function blokusChooseMove(state, color) {
+      var board = state.board || emptyBoard(), first = colorIsFirst(state, color);
+      var pieces = (state.pieces && state.pieces[color]) || [];
+      if (!pieces.length) return null;
+      var anchors = blokusAnchors(board, color, first);
+      if (!anchors.length) return null;
+      var bySize = {}; pieces.forEach(function (pid) { var sz = PIECES[pid].length; (bySize[sz] = bySize[sz] || []).push(pid); });
+      var sizes = Object.keys(bySize).map(Number).sort(function (a, b) { return b - a; });
+      var best = null, bestSc = -1e18;
+      for (var si = 0; si < sizes.length; si++) {
+        bySize[sizes[si]].forEach(function (pid) {
+          ORIENT[pid].forEach(function (cells) {
+            anchors.forEach(function (ac) {
+              for (var pv = 0; pv < cells.length; pv++) {
+                var dr = ac[0] - cells[pv][0], dc = ac[1] - cells[pv][1];
+                var abs = cells.map(function (c) { return [c[0] + dr, c[1] + dc]; });
+                if (!isValidPlacement(board, color, abs, first)) continue;
+                var sc = blokusScore(board, color, abs);
+                if (sc > bestSc) { bestSc = sc; best = { pid: pid, abs: abs }; }
+              }
+            });
+          });
+        });
+        if (best) break; // on s'arrête au plus gros calibre jouable
+      }
+      return best;
+    }
+    function blokusBot(state, pid) {
+      if (state.status !== 'playing') return;
+      var color = state.turn;
+      if (ownerOf(state, color) !== pid) return;
+      var move = blokusChooseMove(state, color);
+      if (move) blokusBotPlace(color, move.pid, move.abs); else blokusBotPass(color);
+    }
+    function blokusBotPlace(color, pieceId, abs) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== color) return cur;
+        if (ownerOf(cur, color) !== window.myPid) return cur;
+        var pcs = (cur.pieces && cur.pieces[color]) || [];
+        if (pcs.indexOf(pieceId) < 0) return cur;
+        if (!isValidPlacement(cur.board || emptyBoard(), color, abs, colorIsFirst(cur, color))) return cur;
+        cur.board = setBoardCells(cur.board || emptyBoard(), abs, color);
+        cur.pieces[color] = pcs.filter(function (p) { return p !== pieceId; });
+        cur.lastMove = { color: color, cells: abs };
+        cur.turn = nextTurn(color, cur.passed || {}, cur.pieces, cur.turnOrder || []);
+        if (!cur.turn) cur.status = 'ended';
+        return cur;
+      });
+    }
+    function blokusBotPass(color) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== color) return cur;
+        if (ownerOf(cur, color) !== window.myPid) return cur;
+        cur.passed = cur.passed || {}; cur.passed[color] = true;
+        cur.turn = nextTurn(color, cur.passed, cur.pieces || {}, cur.turnOrder || []);
+        if (!cur.turn) cur.status = 'ended';
+        return cur;
+      });
+    }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
@@ -256,6 +347,19 @@
         showResults(state);
       }
       prevStatus = status;
+      if (window.Lobby && Lobby.absentBanner) {
+        var h = (status === 'playing') ? ownerOf(state, state.turn) : null;
+        Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
+          rref().transaction(function (cur) {
+            if (!cur || cur.status !== 'playing' || !Lobby.isOffline(cur, ownerOf(cur, cur.turn))) return cur;
+            var color = cur.turn;
+            cur.passed = cur.passed || {}; cur.passed[color] = true; // l'absent passe cette couleur
+            cur.turn = nextTurn(color, cur.passed, cur.pieces || {}, cur.turnOrder || []);
+            if (!cur.turn) cur.status = 'ended';
+            return cur;
+          });
+        });
+      }
     }
 
     /* ━━ Plateau ━━ */

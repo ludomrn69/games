@@ -197,3 +197,18 @@ html[data-theme="dark"] .game-restart-btn {
   transition: all 0.3s; z-index: 9000; box-shadow: 0 6px 20px rgba(0,0,0,0.25);
 }
 .lb-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Bandeau « joueur absent » (jeux au tour par tour, en ligne) */
+.lb-absent {
+  position: fixed; left: 50%; bottom: 78px; transform: translateX(-50%) translateY(20px);
+  display: flex; align-items: center; gap: 10px; max-width: 92vw;
+  background: var(--ink); color: var(--cream); padding: 8px 10px 8px 16px; border-radius: 30px;
+  font-size: 0.86rem; font-weight: 600; opacity: 0; pointer-events: none;
+  transition: all 0.3s; z-index: 8500; box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+}
+.lb-absent.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.lb-absent-btn {
+  border: none; border-radius: 30px; padding: 6px 14px; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.82rem; white-space: nowrap;
+  background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff;
+}

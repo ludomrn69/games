@@ -3,15 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <link rel="stylesheet" href="/theme.css">
-  <link rel="stylesheet" href="/game.css">
-  <script>(function(){try{var t=localStorage.getItem('games-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
-  <title>Uno 🃏</title>
-  <meta name="robots" content="noindex, nofollow" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <script src="/head.js" data-title="Uno 🃏" data-emoji="🃏"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
@@ -106,11 +98,7 @@
   </style>
 </head>
 <body>
-  <script src="/nav.js"></script>
-  <script src="/presence.js"></script>
-  <script src="/avatars.js"></script>
-  <script src="/lobby.js"></script>
-  <script src="/offline.js"></script>
+  <script src="/boot.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -293,7 +281,8 @@
         'Quand il te reste 1 carte, clique « UNO ! »',
         'Premier à vider sa main gagne la manche'
       ],
-      offline: { local: true },
+      offline: { solo: true, local: true },
+      bot: unoBot,
       offlineTurn: function (r) {
         if (r.status === 'ended') return null;
         if (r.status === 'roundEnd') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
@@ -302,6 +291,60 @@
       offlineEnter: function () { pendingWildCard = null; closeModal('modal-color'); if (window.room) renderPlaying(window.room); },
       lobbyExtraHTML: lobbyExtraHTML, onState: onState, onStart: onStart
     });
+
+    /* ━━ IA solo : empile les +2, garde les jokers, joue sa couleur dominante,
+       perturbe l'adversaire proche de gagner, et dit UNO ━━ */
+    function unoBot(state, pid) {
+      if (state.status === 'roundEnd') { if (!((state.players[pid] || {}).nextReady)) setNextReady(); return; }
+      if (state.status !== 'playing' || state.turn !== pid) return;
+      var hand = (((state.players[pid] || {}).hand) || []).slice();
+      if (!hand.length) return;
+      if (hand.length === 1 && !((state.players[pid] || {}).unoCalled)) { callUno(); return; }
+      var top = (state.discardPile || []).slice(-1)[0], cc = state.currentColor, pend = state.pendingDraw || 0;
+      if (pend > 0) {
+        var twos = hand.filter(function (c) { return (parseCard(c) || {}).action === 'D'; });
+        if (twos.length) { unoBotPlay(hand, twos[0], parseCard(twos[0]).color); return; }
+        drawCard(); return; // subir le cumul
+      }
+      var playable = hand.filter(function (c) { return canPlay(c, top, cc); });
+      if (!playable.length) { if (state.drewThisTurn) passTurn(); else drawCard(); return; }
+      var choice = unoChoose(hand, playable, state, pid);
+      var color = (parseCard(choice) || {}).wild ? unoBestColor(hand) : parseCard(choice).color;
+      unoBotPlay(hand, choice, color);
+    }
+    function unoBotPlay(hand, card, color) {
+      var willBeOne = (hand.length - 1 === 1);
+      playCard(card, color);
+      if (willBeOne) callUno();
+    }
+    function unoBestColor(hand) {
+      var best = 'R', bc = -1;
+      COLORS.forEach(function (col) { var n = hand.filter(function (c) { var p = parseCard(c); return p && !p.wild && p.color === col; }).length; if (n > bc) { bc = n; best = col; } });
+      return best;
+    }
+    function unoChoose(hand, playable, state, pid) {
+      var order = state.order || [], dir = state.dir || 1;
+      var nextP = step(order, pid, dir, 1);
+      var nextCount = (((state.players[nextP] || {}).hand) || []).length;
+      function colorCount(col) { return hand.filter(function (c) { var p = parseCard(c); return p && !p.wild && p.color === col; }).length; }
+      var nonWild = playable.filter(function (c) { return !(parseCard(c) || {}).wild; });
+      if (nonWild.length) {
+        if (nextCount <= 2) {
+          var disrupt = nonWild.filter(function (c) { var a = parseCard(c).action; return a === 'D' || a === 'S'; });
+          if (disrupt.length) { disrupt.sort(function (a, b) { return (parseCard(b).action === 'D' ? 1 : 0) - (parseCard(a).action === 'D' ? 1 : 0); }); return disrupt[0]; }
+        }
+        nonWild.sort(function (a, b) {
+          var pa = parseCard(a), pb = parseCard(b);
+          var ca = colorCount(pa.color), cb = colorCount(pb.color);
+          if (ca !== cb) return cb - ca;                 // couleur dominante d'abord
+          var aAct = pa.action ? 1 : 0, bAct = pb.action ? 1 : 0;
+          return aAct - bAct;                            // chiffres avant actions (on garde les actions)
+        });
+        return nonWild[0];
+      }
+      var w = playable.filter(function (c) { return c === 'W'; });   // garder le +4 si possible
+      return w.length ? 'W' : playable[0];
+    }
 
     function lobbyExtraHTML(room) {
       var sel = (room && room.maxWins) || 2;
@@ -476,8 +519,9 @@
         if (hand.length === 0) {
           cur.scores = cur.scores || {};
           cur.scores[me] = (cur.scores[me] || 0) + 1;
-          cur.winner = me;
+          cur.roundWinner = me; // gagnant de la MANCHE (≠ winner, qui = fin de partie pour le moteur hors-ligne)
           cur.status = (cur.scores[me] >= (cur.maxWins || 2)) ? 'ended' : 'roundEnd';
+          if (cur.status === 'ended') cur.winner = me;
           order.forEach(function (pid) { if (cur.players[pid]) cur.players[pid].nextReady = false; });
           logEntry(cur, me, 'vide sa main et gagne la manche !');
           return cur;
@@ -587,7 +631,7 @@
     function showRoundEnd(state) {
       if (!document.getElementById('s-playing').classList.contains('active')) showScreen('s-playing');
       renderPlaying(state);
-      var winner = state.winner, iWon = winner === window.myPid;
+      var winner = state.roundWinner, iWon = winner === window.myPid;
       setText('uno-ov-emoji', iWon ? '🎉' : '👏');
       setText('uno-ov-title', iWon ? 'Tu gagnes la manche !' : Room.name(winner) + ' gagne la manche !');
       setText('uno-ov-sub', iWon ? 'Main vidée — bien joué.' : Room.name(winner) + ' a vidé sa main.');
@@ -615,7 +659,7 @@
         if (!o.length || !o.every(function (p) { return cur.players[p].nextReady; })) return cur;
         var firstPid = order[Math.floor(Math.random() * order.length)];
         var setup = newRoundSetup(order, firstPid);
-        cur.round = (cur.round || 1) + 1; cur.winner = null; cur.status = 'playing';
+        cur.round = (cur.round || 1) + 1; cur.winner = null; cur.roundWinner = null; cur.status = 'playing';
         cur.turn = setup.turn; cur.dir = 1; cur.drawPile = setup.drawPile; cur.discardPile = setup.discardPile;
         cur.currentColor = setup.currentColor; cur.pendingDraw = 0; cur.drewThisTurn = false;
         order.forEach(function (pid) { if (cur.players[pid]) { cur.players[pid].hand = setup.hands[pid]; cur.players[pid].nextReady = false; cur.players[pid].unoCalled = false; } });

@@ -493,6 +493,32 @@
     location.href = 'index.html';
   }
 
+  // ── Gestion d'un joueur absent en cours de partie (helpers d'UI partagés) ──
+  // Un jeu au tour par tour appelle, depuis son onState :
+  //   Lobby.absentBanner(holderOuNull, onSkip)
+  // où holder = le joueur dont c'est le tour s'il est absent (sinon null), et
+  // onSkip = la transaction (propre au jeu) qui fait avancer le tour.
+  function isOffline(state, pid) {
+    var p = (state && state.players && state.players[pid]);
+    if (!p) return false;
+    if (p.online === false) return true;            // déconnexion propre (onDisconnect)
+    if (p.online && p.ts) return (Date.now() - p.ts) > 20000; // en ligne mais ts périmé (perte réseau)
+    return false; // en ligne sans ts (mode hors-ligne : pas de heartbeat) → présent
+  }
+  function absentBanner(holder, onSkip) {
+    var el = document.getElementById('lb-absent');
+    if (!holder) { if (el) el.classList.remove('show'); return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'lb-absent'; el.className = 'lb-absent';
+      el.innerHTML = '<span class="lb-absent-txt"></span><button class="lb-absent-btn" type="button">Passer son tour</button>';
+      document.body.appendChild(el);
+    }
+    var name = (window.Room && Room.name) ? Room.name(holder) : holder;
+    el.querySelector('.lb-absent-txt').textContent = '⏳ ' + name + ' semble absent·e';
+    el.querySelector('.lb-absent-btn').onclick = function () { el.classList.remove('show'); try { onSkip && onSkip(); } catch (e) {} };
+    el.classList.add('show');
+  }
+
   // ── API publique appelée par les onclick injectés et par les jeux ─────────
   window.Lobby = {
     createRoom: createRoom,
@@ -506,6 +532,8 @@
     leaveRoom: leaveRoom,
     resetToLobby: resetToLobby,
     goOffline: goOffline,
-    sweepOldRooms: sweepOldRooms
+    sweepOldRooms: sweepOldRooms,
+    isOffline: isOffline,
+    absentBanner: absentBanner
   };
 })();

@@ -58,3 +58,28 @@ games/rooms/<CODE> = {
   …état du jeu (board, turn, deck…)
 }
 ```
+
+## Sécurité (modèle & limites)
+Le site est **sans authentification** par choix (on partage un code, on joue). La
+sécurité repose donc entièrement sur les **règles de la base** (voir
+[`database.rules.example.json`](database.rules.example.json)).
+
+**Ce que les règles protègent :**
+- écriture limitée à `games/rooms/*` (aucune donnée parasite ailleurs sous `games`) ;
+- longueurs bornées des codes de salon, pseudos, émojis et couleurs (anti-spam / anti-gonflement de la base) ;
+- index `createdAt` pour le nettoyage des vieux salons.
+
+**Limites assumées (inhérentes au « sans login ») :**
+- un joueur **déjà dans un salon** peut lire l'état complet du salon — donc, pour les
+  jeux à information cachée (Cluedo : solution + mains ; Uno/Skyjo/Président : mains ;
+  Codenames : clé), un joueur curieux peut techniquement **tricher** en lisant la base ;
+- quelqu'un qui **devine un code** à 4 lettres peut écrire dans ce salon (pas d'anti-grief).
+
+**Vrai durcissement (optionnel) — auth anonyme Firebase :**
+Activer l'**authentification anonyme** (Console Firebase → Authentication → Sign-in
+method → Anonyme) garde l'UX « sans login » (connexion automatique et invisible) mais
+donne à chaque appareil un `auth.uid`. On peut alors exiger `auth != null` pour écrire,
+et lier `players/<pid>` à son `auth.uid` pour empêcher d'écrire à la place des autres.
+Cela ne masque pas les mains aux co-joueurs (il faudrait des chemins privés par joueur),
+mais bloque le vandalisme par script et l'usurpation. Non activé par défaut pour rester
+zéro-config.
