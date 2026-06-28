@@ -25,9 +25,13 @@
     .p4-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
 
     .p4-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; width: 100%; }
-    .p4-frame { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: clamp(4px, 1.6vw, 9px); width: min(92vw, 430px); aspect-ratio: 7 / 6; background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; padding: clamp(7px, 2.2vw, 12px); box-shadow: var(--shadow); }
-    .p4-cell { aspect-ratio: 1; border-radius: 50%; background: var(--cream); box-shadow: inset 0 2px 6px rgba(44,37,32,0.16); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
-    .p4-cell.colhover { background: rgba(198,152,90,0.18); }
+    /* Look classique « Connect 4 » : plateau BLEU, trous crème, jetons rouge/jaune
+       (identité visuelle nette, distincte du Morpion en ✕/◯). */
+    .p4-frame { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: clamp(4px, 1.6vw, 9px); width: min(92vw, 430px); aspect-ratio: 7 / 6; background: linear-gradient(160deg, #2a6fd6, #1c4fa8); border: 3px solid #14397c; border-radius: 20px; padding: clamp(7px, 2.2vw, 12px); box-shadow: var(--shadow); }
+    .p4-cell { aspect-ratio: 1; border-radius: 50%; background: var(--cream); box-shadow: inset 0 3px 7px rgba(20,30,60,0.45); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+    html[data-theme="dark"] .p4-cell { background: #2a2433; }
+    .p4-cell.colhover { background: rgba(255,255,255,0.55); }
+    html[data-theme="dark"] .p4-cell.colhover { background: rgba(255,255,255,0.18); }
     .p4-disc { width: 86%; height: 86%; border-radius: 50%; background-image: radial-gradient(circle at 33% 28%, rgba(255,255,255,0.5), rgba(255,255,255,0) 58%); box-shadow: inset -2px -3px 6px rgba(0,0,0,0.22), inset 2px 2px 5px rgba(255,255,255,0.35); }
     .p4-cell.win .p4-disc { box-shadow: 0 0 0 3px var(--gold), 0 0 16px rgba(198,152,90,0.7); animation: p4pulse 0.9s ease-in-out infinite alternate; }
     @keyframes p4pulse { from { transform: scale(1);} to { transform: scale(1.08);} }
@@ -88,6 +92,7 @@
       <div class="p4-ov-title" id="p4-ov-title">—</div>
       <div class="p4-ov-scores" id="p4-ov-scores"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="peekBoard()">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>
@@ -130,6 +135,8 @@
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
     function discStyle(color) { return 'background:' + color + ';'; }
+    // Couleurs FIXES du Puissance 4 par siège : joueur 1 = rouge, joueur 2 = jaune.
+    function p4Color(seat) { return seat === 0 ? '#e23b3b' : '#f2c200'; }
 
     /* ━━ Enregistrement du salon ━━ */
     GameRoom({
@@ -245,8 +252,8 @@
 
     function scoresHTML(state) {
       var ord = state.order || [];
-      return ord.map(function (pid) {
-        return '<span style="color:' + Room.color(pid) + '">' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
+      return ord.map(function (pid, seat) {
+        return '<span style="color:' + p4Color(seat) + '">⬤ ' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
       }).join('<span class="sep">—</span>');
     }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
@@ -262,7 +269,7 @@
         setText('p4-hint', '');
       } else {
         var t = state.turn;
-        ti.innerHTML = '<span class="p4-turn-dot" style="background:' + Room.color(t) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        ti.innerHTML = '<span class="p4-turn-dot" style="background:' + p4Color((state.order || []).indexOf(t)) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
         setText('p4-hint', (t === window.myPid) ? 'Touche une colonne pour lâcher ton jeton' : 'En attente de ' + Room.name(t) + '…');
       }
 
@@ -274,8 +281,7 @@
         var cls = 'p4-cell';
         var disc = '';
         if (ch !== '.' && ch !== undefined) {
-          var pid = ord[+ch];
-          disc = '<span class="p4-disc" style="' + discStyle(Room.color(pid)) + '"></span>';
+          disc = '<span class="p4-disc" style="' + discStyle(p4Color(+ch)) + '"></span>';
         }
         if (win.indexOf(i) >= 0) cls += ' win';
         html += '<div class="' + cls + '" data-col="' + (i % 7) + '" data-i="' + i + '">' + disc + '</div>';
@@ -302,8 +308,22 @@
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
       setHTML('p4-ov-scores', scoresHTML(state));
       ov.classList.add('active');
+      hidePeekBtn();
     }
-    function hideP4Result() { var ov = document.getElementById('p4-overlay'); if (ov) ov.classList.remove('active'); }
+    // « Revoir le plateau » : masque l'overlay pour voir l'alignement gagnant (surligné).
+    function peekBoard() {
+      document.getElementById('p4-overlay').classList.remove('active');
+      var b = document.getElementById('p4-peek');
+      if (!b) {
+        b = document.createElement('button'); b.id = 'p4-peek'; b.className = 'p4-peek-btn';
+        b.textContent = '↩ Voir le résultat';
+        b.onclick = function () { document.getElementById('p4-overlay').classList.add('active'); hidePeekBtn(); };
+        document.body.appendChild(b);
+      }
+      b.style.display = 'block';
+    }
+    function hidePeekBtn() { var b = document.getElementById('p4-peek'); if (b) b.style.display = 'none'; }
+    function hideP4Result() { var ov = document.getElementById('p4-overlay'); if (ov) ov.classList.remove('active'); hidePeekBtn(); }
 
     /* « Rejouer » garde les scores ; « Nouvelle partie » (↻) repart de 0. */
     function handleReplay() { hideP4Result(); Lobby.resetToLobby(['wins']); }

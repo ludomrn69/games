@@ -22,15 +22,21 @@
     .mp-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
 
     .mp-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; width: 100%; }
-    .mp-frame { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(6px, 2vw, 12px); width: min(86vw, 360px); aspect-ratio: 1; background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; padding: clamp(8px, 2.6vw, 14px); box-shadow: var(--shadow); }
-    .mp-cell { aspect-ratio: 1; border-radius: 16px; background: var(--cream); box-shadow: inset 0 2px 6px rgba(44,37,32,0.12); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, transform 0.12s; }
-    .mp-cell:hover { background: rgba(198,152,90,0.14); }
-    .mp-cell.sel { background: rgba(198,152,90,0.28); box-shadow: inset 0 0 0 3px var(--gold); }
-    .mp-disc { width: 64%; height: 64%; border-radius: 50%; background-image: radial-gradient(circle at 33% 28%, rgba(255,255,255,0.5), rgba(255,255,255,0) 58%); box-shadow: inset -2px -3px 6px rgba(0,0,0,0.22), inset 2px 2px 5px rgba(255,255,255,0.35); animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
+    /* Look « ardoise » : grille au trait, symboles ✕ / ◯ (volontairement très
+       différent du Puissance 4 qui empile des pastilles rouges/jaunes). */
+    .mp-frame { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 2.4vw, 14px); width: min(86vw, 360px); aspect-ratio: 1; background: #1f2a37; border: 3px solid #2c3a4a; border-radius: 18px; padding: clamp(10px, 3vw, 16px); box-shadow: var(--shadow); }
+    html[data-theme="dark"] .mp-frame { background: #161f29; }
+    .mp-cell { aspect-ratio: 1; border-radius: 12px; background: rgba(255,255,255,0.04); border: 2px dashed rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .mp-cell:hover { background: rgba(255,255,255,0.09); }
+    .mp-cell.sel { background: rgba(255,255,255,0.12); border-style: solid; border-color: #f2c200; }
+    .mp-mark { font-size: clamp(2.2rem, 11vw, 3.4rem); font-weight: 900; line-height: 1; font-family: 'DM Sans', sans-serif; animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both; text-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+    .mp-mark.mp-x { color: #ff6b5e; }   /* joueur 1 : croix corail */
+    .mp-mark.mp-o { color: #38c7d6; }   /* joueur 2 : rond cyan */
     @keyframes pop { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-    .mp-disc.mine-movable { cursor: pointer; }
-    .mp-cell.win .mp-disc { box-shadow: 0 0 0 3px var(--gold), 0 0 16px rgba(198,152,90,0.7); animation: mppulse 0.9s ease-in-out infinite alternate; }
-    @keyframes mppulse { from { transform: scale(1);} to { transform: scale(1.08);} }
+    .mp-mark.mine-movable { cursor: pointer; }
+    .mp-cell.win { background: rgba(242,194,0,0.18); border-color: #f2c200; }
+    .mp-cell.win .mp-mark { animation: mppulse 0.9s ease-in-out infinite alternate; }
+    @keyframes mppulse { from { transform: scale(1);} to { transform: scale(1.12);} }
     .mp-hint { margin-top: 18px; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--ink-light); text-align: center; min-height: 26px; }
 
     .mp-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
@@ -83,6 +89,7 @@
       <div class="mp-ov-title" id="mp-ov-title">—</div>
       <div class="mp-ov-scores" id="mp-ov-scores"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="peekBoard()">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>
@@ -127,6 +134,10 @@
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function countMark(b, m) { var n = 0; for (var i = 0; i < 9; i++) if (b[i] === m) n++; return n; }
 
+    // Couleurs/symboles FIXES du Morpion (par siège) — identité visuelle propre,
+    // distincte du Puissance 4. Joueur 1 = ✕ corail, joueur 2 = ◯ cyan.
+    function mpColor(seat) { return seat === 0 ? '#ff6b5e' : '#38c7d6'; }
+    function mpGlyph(seat) { return seat === 0 ? '✕' : '◯'; }
     var LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
     function winLineFor(b, m) {
       for (var i = 0; i < LINES.length; i++) { var l = LINES[i]; if (b[l[0]] === m && b[l[1]] === m && b[l[2]] === m) return l; }
@@ -261,8 +272,8 @@
     /* ━━ Rendu ━━ */
     function scoresHTML(state) {
       var ord = state.order || [];
-      return ord.map(function (pid) {
-        return '<span style="color:' + Room.color(pid) + '">' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
+      return ord.map(function (pid, seat) {
+        return '<span style="color:' + mpColor(seat) + '">' + mpGlyph(seat) + ' ' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
       }).join('<span class="sep">—</span>');
     }
 
@@ -276,7 +287,7 @@
       if (state.winner) { ti.innerHTML = ''; setText('mp-hint', ''); }
       else {
         var t = state.turn;
-        ti.innerHTML = '<span class="mp-turn-dot" style="background:' + Room.color(t) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        ti.innerHTML = '<span class="mp-turn-dot" style="background:' + mpColor(ord.indexOf(t)) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
         var hint;
         if (state.phase === 'placing') {
           var left = 3 - countMark(b, mark);
@@ -295,9 +306,9 @@
         var cls = 'mp-cell' + (selectedCell === i ? ' sel' : '') + (win.indexOf(i) >= 0 ? ' win' : '');
         var disc = '';
         if (ch !== '.') {
-          var pid = ord[+ch];
-          var dcls = 'mp-disc' + (movable && ch === mark ? ' mine-movable' : '');
-          disc = '<span class="' + dcls + '" style="background:' + Room.color(pid) + '"></span>';
+          var seat = +ch;
+          var dcls = 'mp-mark ' + (seat === 0 ? 'mp-x' : 'mp-o') + (movable && ch === mark ? ' mine-movable' : '');
+          disc = '<span class="' + dcls + '">' + (seat === 0 ? '✕' : '◯') + '</span>';
         }
         html += '<div class="' + cls + '" data-i="' + i + '">' + disc + '</div>';
       }
@@ -313,8 +324,23 @@
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
       setHTML('mp-ov-scores', scoresHTML(state));
       document.getElementById('mp-overlay').classList.add('active');
+      hidePeekBtn();
     }
-    function hideResult() { var ov = document.getElementById('mp-overlay'); if (ov) ov.classList.remove('active'); }
+    // « Revoir le plateau » : masque l'overlay pour voir la ligne gagnante (surlignée),
+    // avec un bouton flottant pour rouvrir le résultat.
+    function peekBoard() {
+      document.getElementById('mp-overlay').classList.remove('active');
+      var b = document.getElementById('mp-peek');
+      if (!b) {
+        b = document.createElement('button'); b.id = 'mp-peek'; b.className = 'mp-peek-btn';
+        b.textContent = '↩ Voir le résultat';
+        b.onclick = function () { document.getElementById('mp-overlay').classList.add('active'); hidePeekBtn(); };
+        document.body.appendChild(b);
+      }
+      b.style.display = 'block';
+    }
+    function hidePeekBtn() { var b = document.getElementById('mp-peek'); if (b) b.style.display = 'none'; }
+    function hideResult() { var ov = document.getElementById('mp-overlay'); if (ov) ov.classList.remove('active'); hidePeekBtn(); }
 
     function handleReplay() { hideResult(); selectedCell = -1; Lobby.resetToLobby(['wins']); }
     function doRestart() { closeModal('modal-restart'); hideResult(); selectedCell = -1; Lobby.resetToLobby([]); }
