@@ -264,8 +264,14 @@
       var gv = mvx.idx >= 0 ? (mvx.val - card) : -Infinity;
       var gh = hiddens().length ? (EXP - card) : -Infinity;
       if (gv >= gh && gv > 0) { replaceCell(mvx.idx); return; }
-      if (card <= 2 && hiddens().length) { replaceCell(hiddens()[0]); return; }
-      if (hiddens().length) { discardAndFlip(hiddens()[0]); return; }
+      // Anti-pénalité : éviter de retourner sa DERNIÈRE carte cachée (= finir la
+      // manche) si on n'est pas compétitif (le finisseur non plus bas double son
+      // score). Dans ce cas on échange une carte visible à la place.
+      var myVis = sumVisible(p), oppMin = Infinity;
+      (state.order || []).forEach(function (q) { if (q !== pid) { var sv = sumVisible(state.players[q] || {}); if (sv < oppMin) oppMin = sv; } });
+      var avoidFinish = (hiddens().length === 1) && (myVis > oppMin + 3) && mvx.idx >= 0;
+      if (card <= 2 && hiddens().length) { replaceCell(avoidFinish ? mvx.idx : hiddens()[0]); return; }
+      if (hiddens().length) { if (avoidFinish) { replaceCell(mvx.idx); return; } discardAndFlip(hiddens()[0]); return; }
       replaceCell(mvx.idx >= 0 ? mvx.idx : 0);
     }
 
