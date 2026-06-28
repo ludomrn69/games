@@ -106,6 +106,27 @@
     }
   };
 
+  // ── Difficulté des ordis (partagée par tous les jeux) ─────────────────────
+  // Niveau stocké dans le salon (room.difficulty) : 'easy' | 'normal' | 'hard'.
+  // Les bots de chaque jeu lisent window.Bots.level(state) et adaptent soit leur
+  // profondeur de recherche (Puissance 4, Morpion), soit leur taux d'« erreur »
+  // (jeux à heuristique : ils jouent parfois un coup au hasard en facile).
+  window.Bots = {
+    LEVELS: ['easy', 'normal', 'hard'],
+    LABELS: { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' },
+    level: function (state) {
+      var d = (state && state.difficulty) || (window.room && window.room.difficulty) || 'normal';
+      return (d === 'easy' || d === 'hard') ? d : 'normal';
+    },
+    // Choisit une valeur selon le niveau : pick(state, {easy:.., normal:.., hard:..}).
+    pick: function (state, m) { var l = window.Bots.level(state); return (m[l] !== undefined) ? m[l] : m.normal; },
+    // Probabilité, par niveau, de jouer un coup volontairement sous-optimal (au
+    // hasard parmi les coups légaux). 0 en difficile, faible en moyen, élevé en facile.
+    blunderP: function (state) { return window.Bots.pick(state, { easy: 0.5, normal: 0.12, hard: 0 }); },
+    // true s'il faut jouer un coup au hasard ce tour-ci (selon le niveau).
+    shouldBlunder: function (state) { return Math.random() < window.Bots.blunderP(state); }
+  };
+
   // ── Firebase / salon ──────────────────────────────────────────────────────
   function setRoom(code) {
     window.roomCode = code;
@@ -317,6 +338,8 @@
     }
     // Dans tous les cas on laisse le jeu réagir (il gère son écran 's-playing').
     if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
+    // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
+    try { driveBots(room); } catch (e) { console.error(e); }
   }
   function isActive(id) { var el = document.getElementById(id); return el && el.classList.contains('active'); }
 
@@ -369,6 +392,8 @@
     // Réglages spécifiques au jeu (ex. nombre de manches), insérés dans le salon.
     var extra = '';
     if (c.lobbyExtraHTML) { try { extra = c.lobbyExtraHTML(room) || ''; } catch (e) {} }
+    // Réglages « ordis » (ajouter des bots + difficulté), pour les jeux qui les supportent.
+    var botCtl = botControlsHTML(room);
 
     host.innerHTML =
       '<div class="lb-wrap">' +
@@ -377,6 +402,7 @@
         '<div class="lb-code-card"><div class="lb-code-label">Code du salon</div><div class="lb-code">' + esc(window.roomCode || '') + '</div>' +
           '<div class="lb-code-actions"><button class="lb-btn small ghost" onclick="Lobby.shareRoom()">Partager le lien</button></div></div>' +
         '<div class="lb-players">' + rows + '</div>' +
+        botCtl +
         extra +
         '<div class="lb-wait-msg">' + esc(waitMsg) + '</div>' +
         '<button class="lb-btn" id="lb-ready-btn" onclick="Lobby.toggleReady()"' + (onlineCount < min ? ' disabled' : '') + '>' +
@@ -390,6 +416,114 @@
     var me = window.Room.me();
     if (!me) return;
     window.roomRef.child('players/' + window.myPid + '/ready').set(!me.ready);
+  }
+
+  // ── Ordis dans un salon EN LIGNE (ajout/retrait + difficulté) ─────────────
+  // Visible seulement pour les jeux au tour par tour (cfg.bot). L'hôte ajoute des
+  // ordis (joueurs synthétiques isBot) ; ils sont « prêts » d'office et c'est
+  // l'hôte qui jouera leurs tours (voir driveBots). Aucun impact si on n'en ajoute pas.
+  var BOT_EMOJIS = ['🤖', '👾', '🐲', '🦾', '🛸', '⚙️'];
+  function splitPlayers(room) {
+    var ps = (room && room.players) || {}, humans = [], bots = [];
+    Object.keys(ps).forEach(function (k) { (ps[k].isBot ? bots : humans).push(Object.assign({ pid: k }, ps[k])); });
+    return { humans: humans, bots: bots };
+  }
+  function botControlsHTML(room) {
+    var c = cfg();
+    if (!c.bot) return ''; // jeu sans ordi
+    var max = c.maxPlayers || 8;
+    var sp = splitPlayers(room);
+    var maxBots = Math.max(0, max - sp.humans.length);
+    var isHost = room.host === window.myPid;
+    var curBots = sp.bots.length;
+    var level = window.Bots.level(room);
+
+    var countBtns = '';
+    for (var n = 0; n <= maxBots; n++) {
+      countBtns += '<button type="button" class="lb-set-btn' + (n === curBots ? ' active' : '') + '"' +
+        (isHost ? ' onclick="Lobby.setBotCount(' + n + ')"' : ' disabled') + '>' + n + '</button>';
+    }
+    var diffBtns = window.Bots.LEVELS.map(function (lv) {
+      return '<button type="button" class="lb-set-btn' + (lv === level ? ' active' : '') + '"' +
+        (isHost ? ' onclick="Lobby.setDifficulty(\'' + lv + '\')"' : ' disabled') + '>' + window.Bots.LABELS[lv] + '</button>';
+    }).join('');
+
+    var hint = isHost ? '' : '<div class="lb-set-hint">Réglé par l’hôte</div>';
+    return '<div class="lb-botset">' +
+      '<div class="lb-set"><div class="lb-set-label">🤖 Ordis</div><div class="lb-set-row">' + countBtns + '</div></div>' +
+      (curBots > 0 || !isHost ? '<div class="lb-set"><div class="lb-set-label">Niveau</div><div class="lb-set-row">' + diffBtns + '</div></div>' : '') +
+      hint + '</div>';
+  }
+  function setDifficulty(level) {
+    if (window.Bots.LEVELS.indexOf(level) < 0) return;
+    if (window.roomRef) window.roomRef.child('difficulty').set(level);
+  }
+  function setBotCount(n) {
+    var c = cfg(), max = c.maxPlayers || 8;
+    window.roomRef.transaction(function (cur) {
+      if (!cur || cur.status !== 'waiting') return cur;
+      if (cur.host !== window.myPid) return cur; // seul l'hôte gère les ordis
+      cur.players = cur.players || {};
+      var humans = [], bots = [];
+      Object.keys(cur.players).forEach(function (k) { (cur.players[k].isBot ? bots : humans).push(k); });
+      var want = Math.max(0, Math.min(n, max - humans.length));
+      bots.sort(function (a, b) { return (cur.players[a].seat || 0) - (cur.players[b].seat || 0); });
+      // Retirer le surplus (sièges les plus hauts d'abord).
+      while (bots.length > want) { delete cur.players[bots.pop()]; }
+      // Ajouter ce qu'il manque.
+      var seat = Object.keys(cur.players).reduce(function (m, k) { return Math.max(m, cur.players[k].seat || 0); }, -1);
+      var idx = 1;
+      while (bots.length < want) {
+        while (cur.players['bot_' + idx]) idx++;
+        var pid = 'bot_' + idx;
+        seat += 1;
+        var color = (window.Avatars ? Avatars.pickColor(cur.players) : 'var(--gold)');
+        cur.players[pid] = {
+          name: 'Ordi ' + idx, emoji: BOT_EMOJIS[(idx - 1) % BOT_EMOJIS.length], color: color,
+          seat: seat, online: true, ready: true, isBot: true, joinedAt: Date.now()
+        };
+        bots.push(pid); idx++;
+      }
+      if (cur.difficulty == null && want > 0) cur.difficulty = 'normal';
+      return cur;
+    });
+  }
+
+  // ── Pilote des ordis (salon EN LIGNE) ─────────────────────────────────────
+  // Seul l'hôte exécute les tours des ordis : il appelle cfg.bot() avec l'identité
+  // de l'ordi le temps de l'action (les fonctions de jeu lisent window.myPid).
+  // Idempotent et sans risque : un coup avorté (re-run de transaction) est un
+  // no-op rejoué au tour suivant ; aucun bot ajouté ⇒ ce code ne fait rien.
+  var BOT_DRIVE_DELAY = 700;
+  var botDrive = { sig: null, t: 0 };
+  function botActivePid(room) {
+    var c = cfg();
+    if (c.offlineTurn) { try { return c.offlineTurn(room); } catch (e) { return room.turn; } }
+    return room.turn;
+  }
+  function driveBots(room) {
+    var c = cfg();
+    if (!c.bot || !room || room.status !== 'playing') return;
+    if (room.winner || room.status === 'ended' || room.status === 'finished') return;
+    if (room.host !== window.myPid) return; // seul l'hôte pilote
+    var pid = botActivePid(room);
+    var p = pid && room.players && room.players[pid];
+    if (!p || !p.isBot) return;
+    var sig = pid + '|' + (room.turn || '') + '|' + (room.phase || '') + '|' + (room.status || '');
+    var now = Date.now();
+    if (sig === botDrive.sig && (now - botDrive.t) < 4000) return; // anti-rafale / déjà programmé
+    botDrive = { sig: sig, t: now };
+    setTimeout(function () {
+      var r = window.room;
+      if (!r || r.host !== window.myPid || r.status !== 'playing' || r.winner) return;
+      var a = botActivePid(r), pp = a && r.players && r.players[a];
+      if (!pp || !pp.isBot) return;
+      var saved = window.myPid;
+      window.myPid = a;
+      try { c.bot(JSON.parse(JSON.stringify(r)), a); }
+      catch (e) { console.error('bot', e); }
+      finally { window.myPid = saved; }
+    }, BOT_DRIVE_DELAY);
   }
 
   // ── Démarrage automatique quand tout le monde est prêt ────────────────────
@@ -432,10 +566,12 @@
       cur.order = null;
       var ps = cur.players || {};
       Object.keys(ps).forEach(function (k) {
-        ps[k].ready = false;
-        // on ne garde de l'ancien que name/emoji/color/seat/online/ts + les clés demandées
+        var isBot = !!ps[k].isBot;
+        // on ne garde de l'ancien que name/emoji/color/seat/online/ts + les clés demandées.
+        // Les ordis restent « prêts » (l'hôte les pilote) pour ne pas bloquer le redémarrage.
         var base = { name: ps[k].name, emoji: ps[k].emoji, color: ps[k].color, seat: ps[k].seat,
-          online: ps[k].online, ts: ps[k].ts, ready: false, joinedAt: ps[k].joinedAt };
+          online: isBot ? true : ps[k].online, ts: ps[k].ts, ready: isBot, joinedAt: ps[k].joinedAt };
+        if (isBot) base.isBot = true;
         keep.forEach(function (kk) { if (ps[k][kk] !== undefined) base[kk] = ps[k][kk]; });
         ps[k] = base;
       });
@@ -483,7 +619,9 @@
       window.roomRef.transaction(function (cur) {
         if (!cur) return cur;
         if (cur.players) delete cur.players[window.myPid];
-        if (!cur.players || !Object.keys(cur.players).length) return null; // salon vide → supprimé
+        var rest = cur.players ? Object.keys(cur.players) : [];
+        // salon vide, ou ne contenant plus que des ordis → supprimé (pas de coquille).
+        if (!rest.length || rest.every(function (k) { return cur.players[k].isBot; })) return null;
         return cur;
       });
     }
@@ -526,6 +664,8 @@
     joinFromInput: joinFromInput,
     submitIdentity: submitIdentity,
     toggleReady: toggleReady,
+    setBotCount: setBotCount,
+    setDifficulty: setDifficulty,
     shareRoom: shareRoom,
     changeIdentity: changeIdentity,
     cancelChange: cancelChange,

@@ -30,6 +30,7 @@
   // ── état du moteur ──────────────────────────────────────────────────────────
   var cfg = null, room = null, players = [], totalPlayers = 2;
   var humanPids = [], humanPid = null, lastTurnShown = null;
+  var offlineDifficulty = 'normal';
   var BOT_DELAY = 650;
 
   function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
@@ -105,6 +106,8 @@
     var controls = '';
     if (mode === 'solo') {
       if (max > 2) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
+      // Difficulté des ordis (présente dès qu'il peut y avoir au moins un ordi).
+      if (max - 1 >= 1) controls += diffRow();
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
     }
@@ -122,11 +125,13 @@
         '<a class="lb-link" href="index.html">← Tous les jeux</a>' +
       '</div>';
     document.getElementById('off-start').onclick = startFromSetup;
-    var row = host.querySelector('.off-set-row');
-    if (row) row.addEventListener('click', function (e) {
-      var b = e.target.closest('.off-num'); if (!b) return;
-      row.querySelectorAll('.off-num').forEach(function (x) { x.classList.remove('active'); });
-      b.classList.add('active');
+    // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
+    host.querySelectorAll('.off-set-row').forEach(function (row) {
+      row.addEventListener('click', function (e) {
+        var b = e.target.closest('.off-num, .off-diff'); if (!b) return;
+        row.querySelectorAll('.off-num, .off-diff').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+      });
     });
     showScreen('s-home');
   }
@@ -142,6 +147,14 @@
     for (var v = lo; v <= hi; v++) btns += '<button type="button" class="off-num' + (v === initial ? ' active' : '') + '" data-val="' + v + '">' + v + '</button>';
     return '<div class="off-set"><div class="off-set-label">' + label + '</div><div class="off-set-row">' + btns + '</div></div>';
   }
+  function diffRow() {
+    var B = window.Bots || { LEVELS: ['easy', 'normal', 'hard'], LABELS: { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' } };
+    var def = 'normal';
+    var btns = B.LEVELS.map(function (lv) {
+      return '<button type="button" class="off-diff' + (lv === def ? ' active' : '') + '" data-diff="' + lv + '">' + B.LABELS[lv] + '</button>';
+    }).join('');
+    return '<div class="off-set"><div class="off-set-label">Niveau des ordis</div><div class="off-set-row">' + btns + '</div></div>';
+  }
   function startFromSetup() {
     var min = cfg.minPlayers || 2, max = cfg.maxPlayers || 8;
     var active = document.querySelector('.off-num.active');
@@ -151,6 +164,8 @@
     // En solo « 0 adversaire autorisé », le plancher tombe à 1 (joueur seul).
     var soloPure = (mode === 'solo' && cfg.offline && cfg.offline.soloMinBots === 0);
     totalPlayers = Math.max(soloPure ? 1 : min, Math.min(max, totalPlayers));
+    var d = document.querySelector('.off-diff.active');
+    offlineDifficulty = (d && d.dataset.diff) || 'normal';
     startGame(null);
   }
 
@@ -178,7 +193,7 @@
     humanPids = players.filter(function (p) { return !p.isBot; }).map(function (p) { return p.pid; });
     humanPid = humanPids[0];
 
-    room = { game: cfg.gameKey, status: 'playing', host: ids[0], players: pmap, order: ids };
+    room = { game: cfg.gameKey, status: 'playing', host: ids[0], players: pmap, order: ids, difficulty: offlineDifficulty };
     window.room = room; window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
 
     var onList = players.map(function (p) { return { pid: p.pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat }; });
@@ -271,8 +286,8 @@
       '.off-set{margin:6px 0 10px;}' +
       '.off-set-label{font-size:.8rem;color:var(--ink-light);margin-bottom:6px;}' +
       '.off-set-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;}' +
-      '.off-num{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
-      '.off-num.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
+      '.off-num,.off-diff{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
+      '.off-num.active,.off-diff.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
       '#off-pass{position:fixed;inset:0;z-index:9000;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,16,28,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}' +
       '#off-pass.show{display:flex;}' +
       '.off-pass-card{background:var(--white);border-radius:22px;padding:32px 26px;text-align:center;max-width:340px;width:100%;box-shadow:var(--shadow-hover);}' +
