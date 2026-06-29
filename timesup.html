@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Time's Up ⏱️" data-emoji="⏱️"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .tu-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .tu-head { background: rgba(20,16,28,0.97); }
+    .tu-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .tu-head-actions { display: flex; gap: 6px; }
+
+    .tu-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 14px; }
+    .tu-round { font-weight: 800; color: var(--gold); }
+    .tu-scores { display: flex; gap: 10px; }
+    .tu-team { background: var(--white); border-radius: 30px; padding: 4px 12px; box-shadow: var(--shadow); font-weight: 800; font-size: 0.85rem; }
+    .tu-team.t0 { color: #2a6fd6; } .tu-team.t1 { color: #e05a4e; } .tu-team.active { outline: 2px solid currentColor; }
+    .tu-timer { font-weight: 900; font-size: 1.3rem; color: var(--terracotta); }
+
+    .tu-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; text-align: center; }
+    .tu-card { background: var(--white); border-radius: 18px; padding: 28px 22px; box-shadow: var(--shadow-hover); max-width: 360px; width: 100%; }
+    .tu-card-emoji { font-size: 3rem; } .tu-card-name { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; margin: 6px 0; }
+    .tu-card-cat { font-size: 0.82rem; color: var(--ink-light); }
+    .tu-hint { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 28px; }
+    .tu-btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .tu-found { border: none; border-radius: 40px; padding: 0.8rem 1.8rem; font-weight: 800; font-size: 1rem; cursor: pointer; background: linear-gradient(135deg, var(--sage), #6f9e5e); color: #fff; }
+    .tu-pass { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 40px; padding: 0.8rem 1.4rem; font-weight: 700; cursor: pointer; }
+    .tu-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; max-width: 380px; }
+    .tu-choice { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 12px; padding: 0.7rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .tu-choice.good { background: var(--sage); color: #fff; } .tu-choice.bad { background: #e05a4e; color: #fff; }
+    .tu-wait { font-family: 'Caveat', cursive; font-size: 1.3rem; color: var(--ink-light); }
+    .tu-big { font-size: 1.05rem; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-sub { font-size: 1.1rem; color: var(--ink-light); margin-bottom: 20px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; } .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/boot.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="tu-head">
+        <span class="tu-title-mini">Time's Up</span>
+        <div class="tu-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="tu-top" id="tu-top"></div>
+      <div class="tu-stage" id="tu-stage"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">⏱️</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-sub" id="res-sub"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">⏱️ Time's Up</div>
+      <div class="modal-body">
+        <p><b>À plusieurs (2 équipes) :</b></p>
+        <p>• Mêmes cartes sur 3 manches : 1) <b>décris librement</b>, 2) <b>un seul mot</b>, 3) <b>mime</b>.</p>
+        <p style="margin-top:4px">• À ton tour, fais deviner un max de cartes à ton équipe avant la fin du chrono. ✅ trouvé / ⤳ passe.</p>
+        <p style="margin-top:8px"><b>En solo :</b> devine la célébrité à partir des indices avant la fin du temps. La difficulté règle le chrono et les indices.</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+    // Deck : célébrités / personnages, avec emoji-indice et catégorie.
+    var DECK = [
+      { n: 'Albert Einstein', e: '🧠', c: 'Science' }, { n: 'Cléopâtre', e: '👑', c: 'Histoire' },
+      { n: 'Harry Potter', e: '⚡', c: 'Cinéma' }, { n: 'Mona Lisa', e: '🖼️', c: 'Art' },
+      { n: 'Zinedine Zidane', e: '⚽', c: 'Sport' }, { n: 'Napoléon', e: '🎩', c: 'Histoire' },
+      { n: 'Dark Vador', e: '🌌', c: 'Cinéma' }, { n: 'Mozart', e: '🎼', c: 'Musique' },
+      { n: 'Marie Curie', e: '☢️', c: 'Science' }, { n: 'Spider-Man', e: '🕷️', c: 'BD' },
+      { n: 'Beyoncé', e: '🎤', c: 'Musique' }, { n: 'Sherlock Holmes', e: '🔍', c: 'Littérature' },
+      { n: 'Charlie Chaplin', e: '🎬', c: 'Cinéma' }, { n: 'Léonard de Vinci', e: '🎨', c: 'Art' },
+      { n: 'Usain Bolt', e: '🏃', c: 'Sport' }, { n: 'Picasso', e: '🖌️', c: 'Art' },
+      { n: 'James Bond', e: '🕴️', c: 'Cinéma' }, { n: 'Cristiano Ronaldo', e: '⚽', c: 'Sport' },
+      { n: 'Astérix', e: '🛡️', c: 'BD' }, { n: 'Michael Jackson', e: '🕺', c: 'Musique' },
+      { n: 'Jeanne d\'Arc', e: '⚔️', c: 'Histoire' }, { n: 'Mickey Mouse', e: '🐭', c: 'Animation' },
+      { n: 'Gandhi', e: '🕊️', c: 'Histoire' }, { n: 'Lady Gaga', e: '🎙️', c: 'Musique' },
+      { n: 'Tintin', e: '📰', c: 'BD' }, { n: 'Steve Jobs', e: '🍏', c: 'Tech' },
+      { n: 'Frida Kahlo', e: '🌺', c: 'Art' }, { n: 'Batman', e: '🦇', c: 'BD' },
+      { n: 'Shakespeare', e: '🪶', c: 'Littérature' }, { n: 'Serena Williams', e: '🎾', c: 'Sport' },
+      { n: 'Yoda', e: '🟢', c: 'Cinéma' }, { n: 'Coco Chanel', e: '👗', c: 'Mode' },
+      { n: 'Elvis Presley', e: '🎸', c: 'Musique' }, { n: 'Superman', e: '🦸', c: 'BD' },
+      { n: 'Marilyn Monroe', e: '💋', c: 'Cinéma' }, { n: 'Christophe Colomb', e: '⛵', c: 'Histoire' }
+    ];
+    var ROUND_NAME = { 1: 'Décris librement', 2: 'Un seul mot', 3: 'Mime' };
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, soloTimer = null, soloPick = null, choicesCache = { pos: -1, list: null };
+    GameRoom({
+      gameKey: 'timesup',
+      name: "Time's Up",
+      emoji: '⏱️',
+      tagline: 'Fais deviner contre la montre',
+      minPlayers: 1,
+      maxPlayers: 12,
+      rules: [
+        'À plusieurs : 2 équipes, 3 manches (libre / un mot / mime)',
+        'Fais deviner un max de cartes avant la fin du chrono',
+        'En solo : devine la célébrité à partir des indices',
+        'La difficulté règle le chrono et les indices'
+      ],
+      offline: { solo: true, local: true, soloMinBots: 0 },
+      bot: function () {},
+      offlineTurn: function (r) { return (r.status === 'ended' || r.solo) ? null : r.turn; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var idxs = shuffle(DECK.map(function (_, i) { return i; })).slice(0, order.length <= 1 ? 12 : 24);
+      if (order.length <= 1) {
+        // SOLO : course aux indices.
+        return { solo: true, cards: idxs, pos: 0, score: 0, status: 'playing', startedAt: 0, banner: '' };
+      }
+      // ÉQUIPES : pair/impair selon le siège.
+      var teams = {}; order.forEach(function (p, i) { teams[p] = i % 2; });
+      var queue = idxs.slice();
+      return { solo: false, teams: teams, cards: idxs, queue: shuffle(queue.slice()), round: 1, scores: [0, 0], activeTeam: 0, turn: firstOfTeam(order, teams, 0), turnEndsAt: 0, started: false, banner: '' };
+    }
+    function firstOfTeam(order, teams, t) { return order.filter(function (p) { return teams[p] === t; })[0]; }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); render(state); }
+      else if (status === 'ended') { stopSolo(); showResults(state); }
+      prevStatus = status;
+    }
+
+    /* ━━━━━━━━━━ MODE SOLO (course aux indices) ━━━━━━━━━━ */
+    function soloDuration() { var l = window.Bots ? window.Bots.level(window.room || {}) : 'normal'; return l === 'hard' ? 60 : l === 'easy' ? 120 : 90; }
+    function startSolo() {
+      rref().transaction(function (cur) { if (!cur || !cur.solo) return cur; cur.startedAt = Date.now(); cur.endsAt = Date.now() + soloDuration() * 1000; return cur; });
+    }
+    function soloChoices(state) {
+      var card = DECK[state.cards[state.pos]];
+      var others = shuffle(DECK.filter(function (d) { return d.n !== card.n; })).slice(0, 3).map(function (d) { return d.n; });
+      var all = shuffle(others.concat([card.n]));
+      return all;
+    }
+    function soloAnswer(name) {
+      var state = window.room; if (!state || !state.solo) return;
+      var card = DECK[state.cards[state.pos]];
+      soloPick = { name: name, correct: name === card.n };
+      render(state);
+      setTimeout(function () {
+        soloPick = null;
+        rref().transaction(function (cur) {
+          if (!cur || !cur.solo || cur.status !== 'playing') return cur;
+          if (name === DECK[cur.cards[cur.pos]].n) cur.score = (cur.score || 0) + 1;
+          cur.pos = (cur.pos || 0) + 1;
+          if (cur.pos >= cur.cards.length || Date.now() > (cur.endsAt || Infinity)) { cur.status = 'ended'; }
+          return cur;
+        });
+      }, 650);
+    }
+    function stopSolo() { if (soloTimer) { clearInterval(soloTimer); soloTimer = null; } }
+
+    /* ━━━━━━━━━━ MODE ÉQUIPES ━━━━━━━━━━ */
+    function teamOrder(state) { return (state.order || []).filter(function (p) { return state.teams[p] === state.activeTeam; }); }
+    function startTurn() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.solo || cur.turn !== window.myPid) return cur;
+        cur.started = true; cur.turnEndsAt = Date.now() + 40000;
+        if (!cur.queue || !cur.queue.length) cur.queue = shuffle(cur.cards.slice());
+        return cur;
+      });
+    }
+    function found() { resolveCard(true); }
+    function pass() { resolveCard(false); }
+    function resolveCard(ok) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.solo || cur.turn !== window.myPid || !cur.started) return cur;
+        var q = cur.queue || []; if (!q.length) return cur;
+        var card = q.shift();
+        if (ok) { cur.scores[cur.activeTeam] = (cur.scores[cur.activeTeam] || 0) + 1; }
+        else { q.push(card); }                  // passé : remis à la fin
+        cur.queue = q;
+        if (!q.length) endRound(cur);
+        return cur;
+      });
+    }
+    function endTurnTimeUp() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.solo || cur.turn !== window.myPid || !cur.started) return cur;
+        nextDescriber(cur);
+        return cur;
+      });
+    }
+    function nextDescriber(cur) {
+      cur.started = false; cur.turnEndsAt = 0;
+      cur.activeTeam = 1 - cur.activeTeam;
+      // describer suivant dans la nouvelle équipe (rotation)
+      var team = (cur.order || []).filter(function (p) { return cur.teams[p] === cur.activeTeam; });
+      var ri = (cur.rotIdx || {}); ri[cur.activeTeam] = ((ri[cur.activeTeam] || 0)) % team.length;
+      cur.turn = team[ri[cur.activeTeam]];
+      ri[cur.activeTeam] = (ri[cur.activeTeam] + 1) % team.length; cur.rotIdx = ri;
+    }
+    function endRound(cur) {
+      if ((cur.round || 1) >= 3) { cur.status = 'ended'; return; }
+      cur.round = (cur.round || 1) + 1;
+      cur.queue = shuffle(cur.cards.slice());
+      cur.started = false; cur.turnEndsAt = 0;
+      cur.banner = 'Manche ' + cur.round + ' : ' + ROUND_NAME[cur.round];
+      nextDescriber(cur); // alterne l'équipe qui commence
+    }
+
+    /* ━━ Rendu ━━ */
+    var tickTimer = null;
+    function render(state) {
+      if (state.solo) return renderSolo(state);
+      renderTeam(state);
+    }
+
+    function renderSolo(state) {
+      setHTML('tu-top', '<span class="tu-round">Solo</span><span class="tu-scores"><span class="tu-team t0">Score : ' + (state.score || 0) + '</span></span><span class="tu-timer" id="tu-timer"></span>');
+      var stage = document.getElementById('tu-stage');
+      if (!state.startedAt) {
+        stage.innerHTML = '<div class="tu-wait">Devine un max de célébrités avant la fin du chrono !</div><button class="btn-primary" onclick="startSolo()">Commencer ⏱️</button>';
+        return;
+      }
+      var card = DECK[state.cards[state.pos]];
+      var level = window.Bots ? window.Bots.level(state) : 'normal';
+      var hint = level === 'easy' ? ('Indice : ' + card.c + ' · commence par « ' + card.n[0] + ' »') : ('Catégorie : ' + card.c);
+      if (choicesCache.pos !== state.pos || !choicesCache.list) { choicesCache = { pos: state.pos, list: soloChoices(state) }; }
+      var choices = choicesCache.list;
+      stage.innerHTML =
+        '<div class="tu-card"><div class="tu-card-emoji">' + card.e + '</div><div class="tu-card-cat">' + hint + '</div></div>' +
+        '<div class="tu-choices">' + choices.map(function (nm) {
+          var cls = soloPick ? (nm === card.n ? ' good' : (soloPick.name === nm ? ' bad' : '')) : '';
+          return '<button class="tu-choice' + cls + '"' + (soloPick ? '' : ' onclick="soloAnswer(\'' + nm.replace(/'/g, "\\'") + '\')"') + '>' + escapeHtml(nm) + '</button>';
+        }).join('') + '</div>';
+      startTick(state);
+    }
+    // Régénère les choix quand la carte change.
+    function startTick(state) {
+      if (tickTimer) clearInterval(tickTimer);
+      tickTimer = setInterval(function () {
+        var s = window.room; if (!s || !s.solo || s.status !== 'playing') { clearInterval(tickTimer); return; }
+        var left = Math.max(0, Math.ceil(((s.endsAt || 0) - Date.now()) / 1000));
+        var el = document.getElementById('tu-timer'); if (el) el.textContent = left + 's';
+        if (left <= 0) { clearInterval(tickTimer); rref().transaction(function (cur) { if (cur && cur.solo && cur.status === 'playing') cur.status = 'ended'; return cur; }); }
+      }, 250);
+    }
+
+    function renderTeam(state) {
+      var me = window.myPid, isDescriber = state.turn === me;
+      setHTML('tu-top', '<span class="tu-round">Manche ' + (state.round || 1) + ' · ' + ROUND_NAME[state.round || 1] + '</span>' +
+        '<span class="tu-scores"><span class="tu-team t0' + (state.activeTeam === 0 ? ' active' : '') + '">🔵 ' + (state.scores[0] || 0) + '</span>' +
+        '<span class="tu-team t1' + (state.activeTeam === 1 ? ' active' : '') + '">🔴 ' + (state.scores[1] || 0) + '</span></span>' +
+        '<span class="tu-timer" id="tu-timer"></span>');
+      var stage = document.getElementById('tu-stage');
+      var teamLbl = state.activeTeam === 0 ? '🔵 Équipe bleue' : '🔴 Équipe rouge';
+      if (!state.started) {
+        if (isDescriber) stage.innerHTML = '<div class="tu-wait">C\'est à toi de faire deviner pour ' + teamLbl + ' !<br>Manche : <b>' + ROUND_NAME[state.round || 1] + '</b></div><button class="btn-primary" onclick="startTurn()">Démarrer mon tour ⏱️</button>';
+        else stage.innerHTML = '<div class="tu-wait">' + escapeHtml(Room.name(state.turn)) + ' va faire deviner pour ' + teamLbl + '…<br>(' + ROUND_NAME[state.round || 1] + ')</div>';
+        if (tickTimer) clearInterval(tickTimer);
+        return;
+      }
+      var card = DECK[(state.queue || [])[0]];
+      if (isDescriber && card) {
+        stage.innerHTML = '<div class="tu-big">Fais deviner (' + ROUND_NAME[state.round || 1] + ') :</div>' +
+          '<div class="tu-card"><div class="tu-card-emoji">' + card.e + '</div><div class="tu-card-name">' + escapeHtml(card.n) + '</div><div class="tu-card-cat">' + card.c + '</div></div>' +
+          '<div class="tu-btn-row"><button class="tu-found" onclick="found()">✅ Trouvé</button><button class="tu-pass" onclick="pass()">⤳ Passer</button></div>';
+      } else {
+        stage.innerHTML = '<div class="tu-wait">' + escapeHtml(Room.name(state.turn)) + ' fait deviner pour ' + teamLbl + ' !<br>À vous de crier les réponses 📣</div>';
+      }
+      startTeamTick(state, isDescriber);
+    }
+    function startTeamTick(state, isDescriber) {
+      if (tickTimer) clearInterval(tickTimer);
+      tickTimer = setInterval(function () {
+        var s = window.room; if (!s || s.solo || s.status !== 'playing' || !s.started) { clearInterval(tickTimer); return; }
+        var left = Math.max(0, Math.ceil(((s.turnEndsAt || 0) - Date.now()) / 1000));
+        var el = document.getElementById('tu-timer'); if (el) el.textContent = left + 's';
+        if (left <= 0 && s.turn === window.myPid) { clearInterval(tickTimer); endTurnTimeUp(); }
+      }, 250);
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      stopSolo(); if (tickTimer) clearInterval(tickTimer);
+      showScreen('s-results');
+      if (state.solo) {
+        setText('res-emoji', '⏱️'); setText('res-title', 'Temps écoulé !');
+        setText('res-sub', 'Tu as deviné ' + (state.score || 0) + ' célébrité' + ((state.score || 0) > 1 ? 's' : '') + ' sur ' + (state.cards || []).length + '.');
+        return;
+      }
+      var s0 = state.scores[0] || 0, s1 = state.scores[1] || 0;
+      var tie = s0 === s1;
+      setText('res-emoji', tie ? '🤝' : '🏆');
+      setText('res-title', tie ? 'Égalité !' : ((s0 > s1 ? '🔵 Équipe bleue' : '🔴 Équipe rouge') + ' gagne !'));
+      setText('res-sub', '🔵 ' + s0 + '  —  🔴 ' + s1);
+    }
+
+    function handleReplay() { stopSolo(); if (tickTimer) clearInterval(tickTimer); Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

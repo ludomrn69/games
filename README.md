@@ -12,6 +12,59 @@ la synchro temps réel.
 4. Chacun choisit un émoji + un prénom → salle d'attente.
 5. Quand tout le monde clique **Prêt**, la partie démarre toute seule.
 
+## Modes de jeu
+- **En ligne** : plusieurs appareils, un code de salon partagé (défaut).
+- **Solo (contre l'ordi)** ✈️ : un humain + des ordis, 100 % hors-ligne.
+- **Local (même appareil)** ✈️ : on se passe le téléphone, chacun son tour.
+
+### Ordis & difficulté
+- Dans **chaque salon** (en ligne et hors-ligne), on règle le **niveau des
+  ordis** : **Facile / Moyen / Difficile**.
+- En ligne, l'**hôte** peut **ajouter / retirer des ordis** pour compléter une
+  partie (ils sont pilotés par l'hôte ; aucun impact si on n'en ajoute pas).
+- Les IA des jeux de réflexion (Puissance 4, Morpion) utilisent une vraie
+  recherche (négamax α-β + table de transposition + approfondissement itératif) ;
+  en « difficile » elles jouent quasi parfaitement. Les jeux à heuristique
+  (Skyjo, Uno, Président, Ludo, Blokus, Cluedo, Bataille navale, Papayoo, Trio,
+  6 qui prend…) ont une IA dédiée, plus ou moins faillible selon le niveau.
+- Après une partie, **🔍 Revoir le plateau** affiche l'état final (coup gagnant,
+  positions…) avant de revenir aux résultats.
+
+## Les jeux
+
+| Jeu | Joueurs | Hors-ligne | Type |
+|---|---|:---:|---|
+| Tu préfères | 2–12 | | soirée |
+| Petit bac | 2–12 | | mots |
+| Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
+| Dobble | 2–8 | | rapidité |
+| Crack-list | 2–8 | | mots |
+| Lynx | 2–12 | | observation |
+| Pictionary | 2–12 | | dessin |
+| Uno | 2–8 | ✈️ | cartes |
+| Skyjo | 2–8 | ✈️ | cartes |
+| Blokus | 2–4 | ✈️ | placement |
+| Bataille navale | 2 | ✈️ | déduction |
+| Codenames | 4–8 | | mots / équipes |
+| Morpion (3 pions) | 2 | ✈️ | réflexion |
+| Undercover | 3–12 | | déduction sociale |
+| Président | 3–8 | ✈️ | cartes |
+| Ludo | 2–4 | ✈️ | plateau / dés |
+| Le juste prix | 2–8 | ✈️ | déduction |
+| Téléphone dessiné | 3–10 | | dessin |
+| Monopoly | 2–6 | ✈️ | plateau |
+| Cluedo | 2–6 | ✈️ | déduction (plateau Hasbro) |
+| **Papayoo** | 3–6 | ✈️ | plis (passe + Papayoo) |
+| **Trio** | 3–6 | ✈️ | mémoire |
+| **6 qui prend !** | 2–10 | ✈️ | cartes simultanées |
+| **Mastermind** | 1–8 | ✈️ | déduction (IA solveur) |
+| **The Mind** | 2–6 | ✈️ | coopératif / timing |
+| **2048** | 1–6 | ✈️ | puzzle / course (IA expectimax) |
+| **Sudoku** | 1–6 | ✈️ | puzzle / course (IA solveur) |
+| **Mille Bornes** | 2–4 | ✈️ | cartes / course |
+| **Loup-Garou** | 4–12 | ✈️ | déduction sociale (IA) |
+| **Time's Up** | 1–12 | ✈️ | équipes (+ solo chrono) |
+
 ## Mise en route (une seule fois)
 
 ### 1. Ouvrir la branche `games` dans Firebase
@@ -38,26 +91,41 @@ Glisser le dossier sur Netlify (ou `netlify deploy`). Aucun build.
 |---|---|
 | `index.html` | Accueil : grille des jeux + rejoindre par code |
 | `firebase-init.js` | Config Firebase (projet flechettes, branche `games`) |
-| `lobby.js` | Moteur de salon : créer/rejoindre, identité, salle d'attente, démarrage auto |
+| `lobby.js` | Salon : créer/rejoindre, identité, salle d'attente, démarrage auto, **difficulté + ordis en ligne**, **revoir le plateau** |
+| `offline.js` | Moteur HORS-LIGNE (solo vs ordis + local), rejoue la logique de chaque jeu |
 | `presence.js` | Présence temps réel (qui est en ligne) |
 | `avatars.js` | Palette de couleurs + liste d'émojis |
 | `nav.js` | Barre du haut (accueil + thème clair/sombre) |
-| `theme.css` | Palette + mode sombre + styles de lobby |
-| `game.css` | Coquille commune des pages de jeu (reset, écrans, boutons) — mutualisée |
-| `<jeu>.html` | Une page par jeu (logique du jeu) |
+| `head.js` / `boot.js` | En-tête HTML commun + chargement des scripts partagés |
+| `theme.css` / `game.css` | Palette + mode sombre + coquille commune des jeux |
+| `p4-ai.js` / `morpion-ai.js` | Cœurs d'IA purs (réutilisés par la page **et** le benchmark) |
+| `monopoly-engine.js` / `cluedo-engine.js` | Moteurs de règles purs (sans DOM) |
+| `<jeu>.html` | Une page par jeu (logique + rendu) |
+| `tools/check.js` | Vérifs CI : syntaxe JS, cohérence index/sw, JSON |
+| `tools/bench.js` | Banc d'essai des IA (auto-jeu headless, seuils de victoire en CI) |
 
-Chaque jeu s'enregistre via `GameRoom({ gameKey, name, minPlayers, maxPlayers, onState, onStart, … })`
-et lit le salon via les helpers `window.Room.*`.
+Chaque jeu s'enregistre via `GameRoom({ gameKey, name, minPlayers, maxPlayers, onState, onStart, offline, bot, … })`
+et lit le salon via les helpers `window.Room.*`. Les ordis lisent le niveau via
+`window.Bots.level(state)`.
 
 ## Données Firebase
 ```
 games/rooms/<CODE> = {
-  game, status, host, createdAt,
+  game, status, host, createdAt, difficulty,
   order: [pid, …],              // joueurs de la manche, dans l'ordre des tours
-  players: { <pid>: { name, emoji, color, seat, online, ts, ready, … } },
+  players: { <pid>: { name, emoji, color, seat, online, ts, ready, isBot?, … } },
   …état du jeu (board, turn, deck…)
 }
 ```
+
+## Outils / qualité
+```bash
+node tools/check.js          # syntaxe + cohérence (rapide, lancé en CI)
+node tools/bench.js          # banc d'essai des IA (~1 min)
+node tools/bench.js --full   # plus de parties, profondeur de jeu réelle
+```
+Le benchmark vérifie que les bots « difficile » écrasent l'aléatoire/facile et ne
+perdent jamais au morpion — garde-fou contre les régressions d'IA.
 
 ## Sécurité (modèle & limites)
 Le site est **sans authentification** par choix (on partage un code, on joue). La
@@ -71,8 +139,8 @@ sécurité repose donc entièrement sur les **règles de la base** (voir
 
 **Limites assumées (inhérentes au « sans login ») :**
 - un joueur **déjà dans un salon** peut lire l'état complet du salon — donc, pour les
-  jeux à information cachée (Cluedo : solution + mains ; Uno/Skyjo/Président : mains ;
-  Codenames : clé), un joueur curieux peut techniquement **tricher** en lisant la base ;
+  jeux à information cachée (Cluedo, Uno, Skyjo, Président, Papayoo, Trio, 6 qui
+  prend, Codenames…), un joueur curieux peut techniquement **tricher** en lisant la base ;
 - quelqu'un qui **devine un code** à 4 lettres peut écrire dans ce salon (pas d'anti-grief).
 
 **Vrai durcissement (optionnel) — auth anonyme Firebase :**
@@ -83,3 +151,12 @@ et lier `players/<pid>` à son `auth.uid` pour empêcher d'écrire à la place d
 Cela ne masque pas les mains aux co-joueurs (il faudrait des chemins privés par joueur),
 mais bloque le vandalisme par script et l'usurpation. Non activé par défaut pour rester
 zéro-config.
+
+## Idées de jeux à ajouter
+Des jeux qui collent au format (multi sans login, mobile, parties courtes, IA possible) :
+
+**Cartes / familial** : Skull King, Sushi Go!, Rami, Belote / Coinche, Love Letter.
+**Réflexion 2 joueurs (IA forte)** : Othello / Reversi, Awalé (Oware), Quarto, Onitama, Dames.
+**Dés** : Yam's (Yahtzee), 421, Cochon qui rit.
+**Soirée / déduction** : Just One (coopératif d'indices), Concept, Saboteur.
+**Mots / solo** : Motus / Wordle, Le Pendu, Démineur.

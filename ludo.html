@@ -112,6 +112,7 @@
       <h2 class="res-title" id="res-title">—</h2>
       <div class="res-rank" id="res-rank"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>
@@ -235,6 +236,8 @@
       var legal = legalMap(state, color, state.die);
       var keys = Object.keys(legal);
       if (!keys.length) return; // rollDice() aura déjà passé le tour
+      // Facile : déplace un pion au hasard parmi les coups légaux.
+      if (window.Bots && window.Bots.shouldBlunder(state)) { moveToken(color, +keys[Math.floor(Math.random() * keys.length)]); return; }
       var best = keys[0], bestSc = -1e9;
       keys.forEach(function (tk) {
         var t = +tk, sc = ludoScoreMove(state, color, state.tokens[color][t], legal[tk]);

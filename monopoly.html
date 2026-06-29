@@ -41,6 +41,8 @@
     html[data-theme="dark"] .mo-center { background: #1b1626; }
     .mo-center .logo { font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(1rem,4vw,1.6rem); background: linear-gradient(135deg,var(--terracotta),var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .mo-center .evt { font-size: 0.8rem; color: var(--ink-light); max-width: 90%; min-height: 2.4em; }
+    .mo-center-turn { font-size: 0.8rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+    .mo-center-av { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; box-shadow: 0 0 0 2px #fff inset; }
     .mo-bigdice { display: flex; gap: 8px; }
     .mo-bigdie { width: 38px; height: 38px; border-radius: 8px; background: #fff; color: #2C2520; font-weight: 800; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
 
@@ -198,8 +200,11 @@
         }
         ENG.roll(s); return;
       }
+      var easy = window.Bots && window.Bots.level(s) === 'easy';
       if (ph === 'buy') {
         var price = B[s.pending].p;
+        // Facile : laisse parfois filer une propriété abordable (joue moins bien).
+        if (easy && Math.random() < 0.4) { ENG.declineBuy(s); return; }
         if (s.cash[pid] - price >= 50) ENG.buy(s, pid); else ENG.declineBuy(s);
         return;
       }
@@ -212,6 +217,8 @@
         return;
       }
       if (ph === 'manage') {
+        // Facile : ne construit pas (laisse ses monopoles nus) et finit son tour.
+        if (easy) { ENG.endTurn(s); return; }
         for (var i = 0; i < 40; i++) { if (ENG.canBuildOn(s, i, pid) && s.cash[pid] - B[i].h >= 50) { ENG.buildHouse(s, i, pid); return; } }
         var t = ENG.aiProposeTrade(s, pid);
         if (t && isBotPid(s, t.to) && ENG.aiAcceptTrade(s, t)) { ENG.applyTrade(s, t); return; }
@@ -266,8 +273,13 @@
       // centre
       var evt = (s.log && s.log.length) ? s.log[s.log.length - 1] : '';
       var d = s.dice || [0, 0];
+      var a = ENG.actor(s);
+      var turnLine = s.winner
+        ? '<div class="mo-center-turn">🏆 ' + escapeHtml(Room.name(s.winner)) + '</div>'
+        : '<div class="mo-center-turn"><span class="mo-center-av" style="background:' + Room.color(a) + '">' + Room.emoji(a) + '</span> Au tour de ' + escapeHtml(Room.name(a)) + '</div>';
+      var dice = (d[0] || d[1]) ? '<div class="mo-bigdice"><div class="mo-bigdie">' + (d[0] || '–') + '</div><div class="mo-bigdie">' + (d[1] || '–') + '</div></div>' : '';
       html += '<div class="mo-center"><div class="logo">MONOPOLY</div>' +
-        '<div class="mo-bigdice"><div class="mo-bigdie">' + (d[0] || '–') + '</div><div class="mo-bigdie">' + (d[1] || '–') + '</div></div>' +
+        turnLine + dice +
         '<div class="evt">' + escapeHtml(evt) + '</div></div>';
       document.getElementById('mo-board').innerHTML = html;
     }
@@ -333,13 +345,42 @@
           ['10', '50', '100'].map(function (inc) { var amt = au.highBid + (+inc); return '<button class="btn-primary" onclick="act(\'bid\',' + amt + ')"' + (s.cash[me] < amt ? ' disabled' : '') + '>+' + inc + '</button>'; }).join('') +
           '<button class="btn-primary btn-ghost" onclick="act(\'pass\')">Passer</button></div>';
       } else if (s.phase === 'manage') {
+        // On n'affiche un bouton que si l'action est réellement possible :
+        //  • Bâtir : il faut au moins une case constructible (monopole complet, etc.).
+        //  • Échange : seulement une fois toutes les RUES vendues (hors gares/services).
+        var canBuild = canBuildAny(s, me);
+        var canTrade = allStreetsOwned(s) && canProposeAnyTrade(s, me);
         html = '<div class="hint">Gère ton tour, puis termine</div><div class="mo-btn-row">' +
-          '<button class="btn-primary" onclick="openBuild()">🏗 Bâtir</button>' +
+          (canBuild ? '<button class="btn-primary" onclick="openBuild()">🏗 Bâtir</button>' : '') +
           '<button class="btn-primary btn-ghost" onclick="openMortg()">🏦 Hypothèques</button>' +
-          '<button class="btn-primary btn-ghost" onclick="openTrade()">🤝 Échange</button>' +
+          (canTrade ? '<button class="btn-primary btn-ghost" onclick="openTrade()">🤝 Échange</button>' : '') +
           '<button class="btn-primary" onclick="act(\'end\')">✅ Fin du tour</button></div>';
       }
       box.innerHTML = html;
+    }
+
+    /* ── Disponibilité des actions (pour n'afficher les boutons que si utiles) ── */
+    // Au moins une case où l'on peut bâtir (monopole complet, non hypothéqué, < hôtel…).
+    function canBuildAny(s, pid) {
+      for (var i = 0; i < 40; i++) { if (ENG.canBuildOn(s, i, pid) && (s.cash[pid] || 0) >= B[i].h) return true; }
+      return false;
+    }
+    // Toutes les RUES (cases couleur) ont un propriétaire — hors gares et services.
+    function allStreetsOwned(s) {
+      for (var i = 0; i < 40; i++) { if (B[i].t === 'prop' && (s.owners[i] == null)) return false; }
+      return true;
+    }
+    // Existe-t-il un échange sensé que JE pourrais proposer (il me manque 1 rue d'une
+    // couleur, qu'un adversaire possède) ? Évite d'afficher un bouton sans objet.
+    function canProposeAnyTrade(s, pid) {
+      for (var g in GROUPS) {
+        var idxs = GROUPS[g];
+        if (idxs.filter(function (i) { return s.owners[i] === pid; }).length !== idxs.length - 1) continue;
+        var need = idxs.filter(function (i) { return s.owners[i] !== pid; })[0];
+        var o = s.owners[need];
+        if (o != null && !s.bankrupt[o] && o !== pid) return true;
+      }
+      return false;
     }
 
     /* ━━━━━━━━━━ Actions ━━━━━━━━━━ */
@@ -495,6 +536,7 @@
           (s.winner === window.myPid ? 'Tu as gagné !' : escapeHtml(Room.name(s.winner)) + ' gagne !') + '</div>' +
           '<div class="modal-sub">Dernier joueur non ruiné.</div>' +
           '<button class="btn-primary" onclick="handleReplay()">Rejouer</button>' +
+          '<button class="btn-link mt-4" onclick="document.getElementById(\'mo-ov\').classList.remove(\'active\');Lobby.peekBoard(function(){document.getElementById(\'mo-ov\').classList.add(\'active\');})">🔍 Revoir le plateau</button>' +
           '<button class="btn-link mt-4" onclick="window.location.href=\'index.html\'">Accueil</button>';
         ov.classList.add('active');
       } else ov.classList.remove('active');

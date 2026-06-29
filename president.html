@@ -107,6 +107,7 @@
       <h2 class="res-title" id="res-title">—</h2>
       <div class="res-rank" id="res-rank"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>
@@ -205,13 +206,17 @@
       var groups = {};
       hand.forEach(function (c) { var r = rankOf(c); if (!groups[r]) groups[r] = { r: r, val: rankVal(c), cards: [] }; groups[r].cards.push(c); });
       var list = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return a.val - b.val; });
+      var easy = window.Bots && window.Bots.shouldBlunder(state);
       if (!state.pile) {
-        // mener : on se débarrasse du plus petit rang (toutes ses copies)
-        return list[0].cards.slice();
+        // mener : plus petit rang (normal) ; un rang au hasard en facile.
+        var lead = easy ? list[Math.floor(Math.random() * list.length)] : list[0];
+        return lead.cards.slice();
       }
       var need = state.pile.count, pr = state.pile.rank;
       var cand = list.filter(function (g) { return g.val > pr && g.cards.length >= need; });
       if (!cand.length) return null; // passer
+      // Facile : joue une combinaison gagnante au hasard (gaspille parfois ses fortes).
+      if (easy) return cand[Math.floor(Math.random() * cand.length)].cards.slice(0, need);
       // finir si possible (jouer exactement notre dernier paquet)
       for (var i = 0; i < cand.length; i++) if (cand[i].cards.length === need && hand.length === need) return cand[i].cards.slice(0, need);
       var pick = cand[0]; // le plus petit rang qui bat

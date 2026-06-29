@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Trio 🎴" data-emoji="🔢"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .tr-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .tr-head { background: rgba(20,16,28,0.97); }
+    .tr-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .tr-head-actions { display: flex; gap: 6px; }
+
+    .tr-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 6px 12px 2px; }
+    .tr-hint { text-align: center; font-size: 0.84rem; color: var(--ink-light); padding: 0 12px 6px; }
+    .tr-hint b { color: var(--ink); }
+
+    /* Cartes nombres */
+    .tcard { width: 46px; height: 64px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 7px rgba(0,0,0,0.16); display: flex; align-items: center; justify-content: center; font-weight: 900; font-family: 'Playfair Display', serif; font-size: 1.5rem; color: #2C2520; flex-shrink: 0; }
+    html[data-theme="dark"] .tcard { background: #f4efe7; }
+    .tcard.back { background: linear-gradient(135deg, #6a4c93, #4a3270); color: rgba(255,255,255,0.7); font-size: 1.1rem; border-color: #3a2860; }
+    .tcard.seven { color: #d8a200; border-color: #e8c34a; box-shadow: 0 0 0 2px #e8c34a, 0 2px 7px rgba(0,0,0,0.2); }
+    .tcard.pick { cursor: pointer; transition: transform 0.14s; }
+    .tcard.pick:hover { transform: translateY(-6px); }
+    .tcard.flip { animation: trflip 0.3s ease both; }
+    @keyframes trflip { 0% { transform: rotateY(90deg) scale(0.8); opacity: 0; } 100% { transform: rotateY(0) scale(1); opacity: 1; } }
+
+    .tr-reveal-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 12px; }
+    .tr-reveal-label { font-family: 'Caveat', cursive; font-size: 0.9rem; color: var(--ink-light); }
+    .tr-reveal { display: flex; gap: 6px; min-height: 70px; align-items: center; justify-content: center; }
+    .tr-reveal-empty { font-family: 'Caveat', cursive; color: var(--ink-light); }
+
+    .tr-section-label { text-align: center; font-size: 0.78rem; color: var(--ink-light); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tr-center { display: grid; grid-template-columns: repeat(var(--tr-cols, 3), 1fr); gap: 6px; justify-content: center; justify-items: center; max-width: 280px; margin: 0 auto; padding: 0 10px; }
+    .tr-center .tcard { width: 100%; max-width: 56px; }
+
+    .tr-players { display: flex; flex-direction: column; gap: 7px; padding: 6px 12px 10px; max-width: 460px; margin: 0 auto; }
+    .tr-prow { display: flex; align-items: center; gap: 8px; background: var(--white); border-radius: 14px; padding: 6px 10px; box-shadow: var(--shadow); border: 2px solid transparent; }
+    .tr-prow.turn { border-color: var(--terracotta); }
+    .tr-prow.me { background: linear-gradient(135deg, rgba(198,152,90,0.14), rgba(196,116,90,0.10)); }
+    .tr-pav { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; }
+    .tr-pname { flex: 1; font-weight: 700; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr-trios { font-size: 0.78rem; font-weight: 800; color: var(--gold); }
+    .tr-ext { display: flex; gap: 5px; }
+    .tr-ext .tcard { width: 34px; height: 48px; font-size: 1.1rem; }
+    .tr-ext-lbl { font-size: 0.6rem; color: var(--ink-light); text-align: center; }
+    .tr-ext-col { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+
+    .tr-myhand-wrap { padding: 4px 10px calc(14px + env(safe-area-inset-bottom)); }
+    .tr-myhand-label { text-align: center; font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); }
+    .tr-myhand { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+    .tr-myhand .tcard { width: 38px; height: 52px; font-size: 1.15rem; }
+    .tr-myhand .tcard.ext { box-shadow: 0 0 0 2px var(--terracotta), 0 2px 7px rgba(0,0,0,0.16); }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--gold); }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/boot.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="tr-head">
+        <span class="tr-title-mini">Trio</span>
+        <div class="tr-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="tr-banner" id="tr-banner"></div>
+      <div class="tr-hint" id="tr-hint"></div>
+      <div class="tr-reveal-wrap">
+        <div class="tr-reveal-label">Cartes retournées</div>
+        <div class="tr-reveal" id="tr-reveal"></div>
+      </div>
+      <div class="tr-section-label">Centre (à toucher pour retourner)</div>
+      <div class="tr-center" id="tr-center"></div>
+      <div class="tr-players" id="tr-players"></div>
+      <div class="tr-myhand-wrap">
+        <div class="tr-myhand-label">Ta main <span id="tr-my-count"></span></div>
+        <div class="tr-myhand" id="tr-myhand"></div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🎴</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🔢 Trio</div>
+      <div class="modal-body">
+        <p>• 36 cartes : les nombres <b>1 à 12</b>, trois fois chacun. Le but : réunir un <b>Trio</b> (trois cartes identiques).</p>
+        <p style="margin-top:6px">• À ton tour, retourne des cartes en cherchant le même nombre : la carte <b>la plus basse</b> ▽ ou <b>la plus haute</b> △ d'un joueur, ou une carte du <b>centre</b>.</p>
+        <p style="margin-top:6px">• Tant que ça correspond, tu continues. Dès que ça diffère, ton tour s'arrête.</p>
+        <p style="margin-top:6px">• Tu gagnes avec <b>3 Trios</b>… ou immédiatement avec le <b>Trio de 7</b> ! 🍀</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    var HAND_PER = { 3: 9, 4: 7, 5: 6, 6: 5 };
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function handOf(cur, pid) { return (cur.players[pid] && cur.players[pid].hand) || []; }
+    function triosOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].trios) || 0; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null;
+    GameRoom({
+      gameKey: 'trio',
+      name: 'Trio',
+      emoji: '🔢',
+      tagline: 'Réunis trois cartes identiques',
+      minPlayers: 3,
+      maxPlayers: 6,
+      rules: [
+        '36 cartes : les nombres 1–12, trois fois chacun',
+        'Retourne la plus basse ▽ / haute △ d\'un joueur, ou une carte du centre',
+        'Même nombre → tu continues ; sinon ton tour s\'arrête',
+        '3 Trios pour gagner… ou le Trio de 7 instantané !'
+      ],
+      offline: { solo: true, local: true },
+      bot: trioBot,
+      offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var deck = []; for (var v = 1; v <= 12; v++) { deck.push(v, v, v); } shuffle(deck);
+      var per = HAND_PER[order.length] || 5;
+      order.forEach(function (pid, i) {
+        cur.players[pid].hand = deck.slice(i * per, (i + 1) * per).sort(function (a, b) { return a - b; });
+        cur.players[pid].trios = 0;
+      });
+      var center = deck.slice(per * order.length);
+      var starter = order[Math.floor(Math.random() * order.length)];
+      return { center: center, turn: starter, reveal: { picks: [] }, banner: Room.name(starter) + ' commence', winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') showScreen('s-playing');
+        render(state);
+      } else if (status === 'ended') {
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Accessibilité des cartes (plus basse / plus haute non encore retournées) ━━ */
+    function flippedHandIdx(reveal, pid) {
+      return (reveal.picks || []).filter(function (p) { return p.src === 'hand' && p.pid === pid; }).map(function (p) { return p.idx; });
+    }
+    function accessibleIdx(cur, pid, which) {
+      var hand = handOf(cur, pid), flipped = flippedHandIdx(cur.reveal || { picks: [] }, pid);
+      var avail = [];
+      for (var i = 0; i < hand.length; i++) if (flipped.indexOf(i) < 0) avail.push(i);
+      if (!avail.length) return -1;
+      return which === 'low' ? avail[0] : avail[avail.length - 1];
+    }
+
+    /* ━━ Retourner une carte (main d'un joueur, ou centre) ━━ */
+    function revealHand(pid, which) {
+      doReveal(function (cur) {
+        var idx = accessibleIdx(cur, pid, which);
+        if (idx < 0) return null;
+        return { src: 'hand', pid: pid, idx: idx, v: handOf(cur, pid)[idx] };
+      });
+    }
+    function revealCenter(ci) {
+      doReveal(function (cur) {
+        var flipped = (cur.reveal.picks || []).filter(function (p) { return p.src === 'center'; }).map(function (p) { return p.ci; });
+        if (flipped.indexOf(ci) >= 0) return null;
+        if (ci < 0 || ci >= (cur.center || []).length) return null;
+        return { src: 'center', ci: ci, v: cur.center[ci] };
+      });
+    }
+    // Applique un pick (calculé par makePick) au tour du joueur actif courant.
+    function doReveal(makePick) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid) return cur;
+        cur.reveal = cur.reveal || { picks: [] };
+        var pick = makePick(cur);
+        if (!pick) return cur;
+        cur.reveal.picks = (cur.reveal.picks || []).concat([pick]);
+        processReveal(cur);
+        return cur;
+      });
+    }
+
+    // Cœur de la logique : compare au nombre cible, complète/échoue/continue.
+    function processReveal(cur) {
+      var picks = cur.reveal.picks, target = picks[0].v, last = picks[picks.length - 1];
+      var active = cur.turn;
+      if (picks.length === 1) { cur.banner = Room.name(active) + ' cherche des ' + target; return; }
+      if (last.v !== target) {                                  // raté → fin du tour
+        cur.banner = Room.name(active) + ' retourne un ' + last.v + ' ≠ ' + target + ' — tour passé';
+        cur.reveal = { picks: [] };
+        advanceTurn(cur, active);
+        return;
+      }
+      if (picks.length === 3) { collectTrio(cur, active, target); return; }
+      cur.banner = Room.name(active) + ' a deux ' + target + '… encore une !';
+    }
+
+    function collectTrio(cur, active, value) {
+      // Retirer les 3 cartes de leurs sources.
+      var byPid = {}; var centers = [];
+      cur.reveal.picks.forEach(function (p) { if (p.src === 'hand') (byPid[p.pid] = byPid[p.pid] || []).push(p.idx); else centers.push(p.ci); });
+      Object.keys(byPid).forEach(function (pid) {
+        var h = handOf(cur, pid).slice();
+        byPid[pid].sort(function (a, b) { return b - a; }).forEach(function (idx) { h.splice(idx, 1); });
+        cur.players[pid].hand = h;
+      });
+      var c = (cur.center || []).slice();
+      centers.sort(function (a, b) { return b - a; }).forEach(function (ci) { c.splice(ci, 1); });
+      cur.center = c;
+
+      cur.players[active].trios = (cur.players[active].trios || 0) + 1;
+      cur.reveal = { picks: [] };
+      cur.banner = '🎉 ' + Room.name(active) + ' réunit un Trio de ' + value + ' !';
+
+      if (value === 7) { cur.winner = active; cur.banner = '🍀 ' + Room.name(active) + ' réunit le Trio de 7 — victoire !'; cur.status = 'ended'; return; }
+      if (cur.players[active].trios >= 3) { cur.winner = active; cur.banner = '🏆 ' + Room.name(active) + ' a 3 Trios — victoire !'; cur.status = 'ended'; return; }
+      // Plus de cartes en jeu → la partie s'arrête (plus de Trios gagne).
+      var cardsLeft = (cur.center || []).length + (cur.order || []).reduce(function (s, p) { return s + handOf(cur, p).length; }, 0);
+      if (cardsLeft < 3) { endByCount(cur); return; }
+      // Sinon : le même joueur rejoue (nouvelle séquence).
+    }
+
+    function advanceTurn(cur, fromPid) {
+      var order = cur.order || [], i = order.indexOf(fromPid);
+      cur.turn = order[(i + 1) % order.length];
+    }
+    function endByCount(cur) {
+      var order = cur.order || [], best = order[0];
+      order.forEach(function (p) { if ((cur.players[p].trios || 0) > (cur.players[best].trios || 0)) best = p; });
+      cur.winner = best; cur.status = 'ended';
+      cur.banner = '🏁 Plus de cartes — ' + Room.name(best) + ' gagne avec le plus de Trios';
+    }
+
+    /* ━━ IA ━━ Sait ses propres cartes + celles retournées ce tour ; complète quand
+       elle peut, tente sa chance sinon. Facile = retournes au hasard. ━━ */
+    function trioBot(state, pid) {
+      if (state.status !== 'playing' || state.winner || state.turn !== pid) return;
+      var reveal = state.reveal || { picks: [] }, picks = reveal.picks || [];
+      var easy = window.Bots && window.Bots.shouldBlunder(state);
+
+      function myAcc(which) { var idx = accessibleIdx(state, pid, which); return idx < 0 ? null : { idx: idx, v: handOf(state, pid)[idx] }; }
+      function gambleCenter() {
+        var flipped = picks.filter(function (p) { return p.src === 'center'; }).map(function (p) { return p.ci; });
+        var avail = []; for (var ci = 0; ci < (state.center || []).length; ci++) if (flipped.indexOf(ci) < 0) avail.push(ci);
+        return avail.length ? avail[Math.floor(Math.random() * avail.length)] : -1;
+      }
+      function gambleOther() {
+        var others = (state.order || []).filter(function (p) { return p !== pid && handOf(state, p).length; });
+        if (!others.length) return null;
+        var op = others[Math.floor(Math.random() * others.length)];
+        return { pid: op, which: Math.random() < 0.5 ? 'low' : 'high' };
+      }
+
+      if (!picks.length) {
+        // Démarrer : retourner sa plus basse (ou au hasard en facile).
+        var which = (easy || Math.random() < 0.5) ? 'low' : 'high';
+        if (myAcc(which)) return revealHand(pid, which);
+        var g0 = gambleCenter(); if (g0 >= 0) return revealCenter(g0);
+        var go0 = gambleOther(); if (go0) return revealHand(go0.pid, go0.which); return;
+      }
+      var target = picks[0].v;
+      if (!easy) {
+        // Compléter avec une de ses propres cartes accessibles si elle vaut la cible.
+        var lo = myAcc('low'), hi = myAcc('high');
+        if (lo && lo.v === target) return revealHand(pid, 'low');
+        if (hi && hi.v === target) return revealHand(pid, 'high');
+      }
+      // Tenter sa chance : centre d'abord, sinon un autre joueur.
+      var g = gambleCenter(); if (g >= 0) return revealCenter(g);
+      var go = gambleOther(); if (go) return revealHand(go.pid, go.which);
+      // Rien d'accessible : retourner une de ses cartes (terminera sans doute le tour).
+      if (myAcc('low')) return revealHand(pid, 'low'); else if (myAcc('high')) return revealHand(pid, 'high');
+    }
+
+    /* ━━ Rendu ━━ */
+    function cardFace(v, extra) { return '<div class="tcard' + (v === 7 ? ' seven' : '') + (extra || '') + '">' + v + '</div>'; }
+    function cardBack(extra, label) { return '<div class="tcard back' + (extra || '') + '">' + (label || '?') + '</div>'; }
+
+    function render(state) {
+      var me = window.myPid, order = state.order || [], reveal = state.reveal || { picks: [] }, picks = reveal.picks || [];
+      var myTurn = (state.turn === me) && !state.winner && state.status === 'playing';
+      setText('tr-banner', state.banner || '');
+      var target = picks.length ? picks[0].v : null;
+      setHTML('tr-hint', myTurn
+        ? (picks.length ? 'Cherche un autre <b>' + target + '</b> : main ▽/△ d\'un joueur ou carte du centre.' : 'À toi ! Retourne une 1<sup>re</sup> carte (main d\'un joueur ou centre).')
+        : 'Au tour de <b>' + escapeHtml(Room.name(state.turn)) + '</b>.');
+
+      // Cartes retournées cette séquence
+      setHTML('tr-reveal', picks.length
+        ? picks.map(function (p) { return cardFace(p.v, ' flip'); }).join('')
+        : '<span class="tr-reveal-empty">— rien de retourné —</span>');
+
+      // Centre — grille uniforme (style Skyjo) : colonnes selon le nombre de cartes.
+      var flippedC = picks.filter(function (p) { return p.src === 'center'; }).map(function (p) { return p.ci; });
+      var nc = (state.center || []).length, cols = (nc % 4 === 0 && nc > 0) ? 4 : 3;
+      var centerEl = document.getElementById('tr-center'); if (centerEl) centerEl.style.setProperty('--tr-cols', cols);
+      setHTML('tr-center', (state.center || []).map(function (v, ci) {
+        var up = flippedC.indexOf(ci) >= 0;
+        if (up) return cardFace(v, ' flip');
+        return '<div class="tcard back' + (myTurn ? ' pick' : '') + '"' + (myTurn ? ' onclick="revealCenter(' + ci + ')"' : '') + '>🎴</div>';
+      }).join('') || '<span class="tr-reveal-empty">centre vide</span>');
+
+      // Joueurs (avec leurs extrêmes accessibles)
+      setHTML('tr-players', order.map(function (pid) {
+        var isMe = pid === me, isTurn = pid === state.turn;
+        var lowIdx = accessibleIdx(state, pid, 'low'), highIdx = accessibleIdx(state, pid, 'high');
+        var hand = handOf(state, pid);
+        function ext(which, idx) {
+          if (idx < 0) return '<div class="tr-ext-col"><div class="tr-ext-lbl">' + (which === 'low' ? '▽' : '△') + '</div><div class="tcard back" style="opacity:.3">∅</div></div>';
+          // On NE révèle PAS la valeur (face cachée) sauf si déjà retournée cette séquence.
+          var flippedIdx = flippedHandIdx(reveal, pid);
+          var shown = flippedIdx.indexOf(idx) >= 0;
+          var inner = shown ? cardFace(hand[idx]) : ('<div class="tcard back' + (myTurn ? ' pick' : '') + '"' + (myTurn ? ' onclick="revealHand(\'' + pid + '\',\'' + which + '\')"' : '') + '>' + (which === 'low' ? '▽' : '△') + '</div>');
+          return '<div class="tr-ext-col"><div class="tr-ext-lbl">' + (which === 'low' ? 'basse' : 'haute') + '</div>' + inner + '</div>';
+        }
+        return '<div class="tr-prow' + (isTurn ? ' turn' : '') + (isMe ? ' me' : '') + '">' +
+          '<span class="tr-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="tr-pname">' + escapeHtml(Room.name(pid)) + (isMe ? ' (toi)' : '') + ' · ' + hand.length + ' c.</span>' +
+          '<span class="tr-trios">🎴 ' + triosOf(state, pid) + '/3</span>' +
+          '<div class="tr-ext">' + ext('low', lowIdx) + ext('high', highIdx) + '</div></div>';
+      }).join(''));
+
+      // Ma main (je vois mes valeurs ; mes extrêmes accessibles surlignés)
+      var myHand = handOf(state, me);
+      var myLow = accessibleIdx(state, me, 'low'), myHigh = accessibleIdx(state, me, 'high');
+      setText('tr-my-count', '(' + myHand.length + ')');
+      setHTML('tr-myhand', myHand.map(function (v, i) { return cardFace(v, (i === myLow || i === myHigh) ? ' ext' : ''); }).join('') || '—');
+
+      maybeAbsent(state);
+    }
+
+    function maybeAbsent(state) {
+      if (!(window.Lobby && Lobby.absentBanner)) return;
+      var h = (!state.winner && state.status === 'playing') ? state.turn : null;
+      Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || !Lobby.isOffline(cur, cur.turn)) return cur;
+          // L'absent retourne sa plus basse (provoque en général la fin de son tour).
+          var pid = cur.turn, idx = accessibleIdx(cur, pid, 'low');
+          if (idx < 0) { advanceTurn(cur, pid); return cur; }
+          cur.reveal = cur.reveal || { picks: [] };
+          cur.reveal.picks = (cur.reveal.picks || []).concat([{ src: 'hand', pid: pid, idx: idx, v: handOf(cur, pid)[idx] }]);
+          processReveal(cur);
+          return cur;
+        });
+      });
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice().sort(function (a, b) { return triosOf(state, b) - triosOf(state, a); });
+      var winner = state.winner || order[0];
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🎴');
+      setText('res-title', winner === window.myPid ? 'Tu gagnes !' : Room.name(winner) + ' gagne');
+      setHTML('res-rank', order.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + triosOf(state, pid) + ' Trio' + (triosOf(state, pid) > 1 ? 's' : '') + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

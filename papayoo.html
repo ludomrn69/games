@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Papayoo 🐔" data-emoji="🐔"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .pa-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .pa-head { background: rgba(20,16,28,0.97); }
+    .pa-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .pa-head-actions { display: flex; gap: 6px; }
+
+    .pa-info { text-align: center; padding: 8px 12px 2px; font-size: 0.85rem; color: var(--ink-light); }
+    .pa-info b { color: var(--ink); }
+    .pa-pap { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+
+    .pa-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 4px; }
+    .pa-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.82rem; font-weight: 600; border: 2px solid transparent; }
+    .pa-opp.turn { border-color: var(--terracotta); }
+    .pa-opp-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .pa-opp .cnt { background: var(--ink); color: var(--cream); border-radius: 20px; padding: 0 6px; font-weight: 800; font-size: 0.74rem; }
+    .pa-opp .sc { color: var(--terracotta); font-weight: 800; }
+
+    .pa-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
+
+    .pa-trick-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 12px 12px; }
+    .pa-trick-label { font-family: 'Caveat', cursive; font-size: 0.9rem; color: var(--ink-light); }
+    .pa-trick { display: flex; gap: 6px; min-height: 92px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .pa-trick-empty { font-family: 'Caveat', cursive; color: var(--ink-light); font-size: 1.1rem; }
+    .pa-trick-card { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .pa-trick-who { font-size: 0.66rem; color: var(--ink-light); max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .card { width: 50px; height: 72px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0; position: relative; }
+    .card .rk { font-size: 1.25rem; line-height: 1; font-family: 'Playfair Display', serif; }
+    .card .st { font-size: 1.05rem; line-height: 1; margin-top: 2px; }
+    .card.win { outline: 3px solid var(--sage); }
+    .card .pts { position: absolute; top: 2px; right: 3px; font-size: 0.6rem; font-weight: 800; color: #d6584e; }
+    .card.pap { box-shadow: 0 0 0 2px #d6584e, 0 2px 8px rgba(0,0,0,0.2); }
+    html[data-theme="dark"] .card { background: #f4efe7; }
+
+    .pa-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
+    .pa-hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 0 10px 14px; }
+    .pa-hand .card { cursor: pointer; transition: transform 0.15s; }
+    .pa-hand .card.playable:hover { transform: translateY(-10px); }
+    .pa-hand .card.dim { opacity: 0.34; cursor: not-allowed; }
+    .pa-hand .card.sel-pass { outline: 3px solid var(--terracotta); transform: translateY(-10px); box-shadow: 0 8px 18px rgba(196,116,90,0.4); }
+    .pa-pass-info { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); text-align: center; padding: 18px 12px; }
+    .pa-pass-confirm { width: 100%; text-align: center; margin-top: 12px; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--terracotta); }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+
+    .pa-settings { width: 100%; max-width: 340px; margin: 4px auto 0; }
+    .pa-settings-label { font-size: 0.8rem; color: var(--ink-light); margin-bottom: 6px; text-align: center; }
+    .pa-set-row { display: flex; gap: 8px; justify-content: center; }
+    .pa-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .pa-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+  </style>
+</head>
+<body>
+  <script src="/boot.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="pa-head">
+        <span class="pa-title-mini">Papayoo</span>
+        <div class="pa-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="pa-info" id="pa-info"></div>
+      <div class="pa-opps" id="pa-opps"></div>
+      <div class="pa-banner" id="pa-banner"></div>
+      <div class="pa-trick-wrap">
+        <div class="pa-trick-label">Pli en cours</div>
+        <div class="pa-trick" id="pa-trick"></div>
+      </div>
+      <div class="pa-my-label">Tes cartes <span id="pa-my-count"></span></div>
+      <div class="pa-hand" id="pa-hand"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🐔</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🐔 Papayoo</div>
+      <div class="modal-body">
+        <p>• 4 couleurs (1→10) sans valeur + une couleur <b>Payoo</b> (1→20) qui compte des points de <b>pénalité</b> égaux à sa valeur.</p>
+        <p style="margin-top:6px">• Le <b>Papayoo</b> (le 7 d'une couleur tirée au sort) vaut <b>40 points</b> !</p>
+        <p style="margin-top:6px">• On suit la couleur demandée si on peut. Le plus fort de cette couleur <b>ramasse le pli</b> et tous ses points.</p>
+        <p style="margin-top:6px">• On enchaîne les donnes. Quand un joueur dépasse le seuil, la partie s'arrête : le <b>plus petit score gagne</b>.</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    /* ━━ Cartes : 4 couleurs R,B,G,Y (1–10) + Payoo P (1–20). Le « Papayoo » est le
+       7 d'une couleur tirée au sort, qui vaut 40. ━━ */
+    var SUITS = ['R', 'B', 'G', 'Y'];
+    var SUIT_EMOJI = { R: '🟥', B: '🟦', G: '🟩', Y: '🟨', P: '🐔' };
+    var SUIT_NAME = { R: 'Rouge', B: 'Bleu', G: 'Vert', Y: 'Jaune', P: 'Payoo' };
+    var escapeHtml = window.esc;
+
+    function suitOf(c) { return c[0]; }
+    function valOf(c) { return +c.slice(1); }
+    function isPayoo(c) { return c[0] === 'P'; }
+    function buildDeck() {
+      var d = [];
+      SUITS.forEach(function (s) { for (var v = 1; v <= 10; v++) d.push(s + v); });
+      for (var v = 1; v <= 20; v++) d.push('P' + v);
+      return d;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    // Points de pénalité d'une carte (papSuit = couleur du Papayoo).
+    function cardPoints(c, papSuit) {
+      if (isPayoo(c)) return valOf(c);
+      if (c === papSuit + '7') return 40;
+      return 0;
+    }
+    // Ordre d'affichage : couleurs puis Payoo, croissant.
+    function sortHand(h) {
+      var ord = { R: 0, B: 1, G: 2, Y: 3, P: 4 };
+      return h.slice().sort(function (a, b) { return (ord[suitOf(a)] - ord[suitOf(b)]) || (valOf(a) - valOf(b)); });
+    }
+
+    /* ━━ State ━━ */
+    var prevStatus = null, passLocal = [];
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function handOf(cur, pid) { return (cur.players[pid] && cur.players[pid].hand) || []; }
+    function totalOf(state, pid) { return (state.totals && state.totals[pid]) || 0; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'papayoo',
+      name: 'Papayoo',
+      emoji: '🐔',
+      tagline: 'Évite les points, ramasse le moins',
+      minPlayers: 3,
+      maxPlayers: 6,
+      rules: [
+        '4 couleurs (1–10) + une couleur Payoo (1–20) qui compte des points',
+        'Le Papayoo (un 7 tiré au sort) vaut 40 points',
+        'Suis la couleur demandée ; le plus fort ramasse le pli et ses points',
+        'On enchaîne les donnes : le plus petit score gagne'
+      ],
+      offline: { solo: true, local: true },
+      bot: papaBot,
+      offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      lobbyExtraHTML: lobbyExtraHTML,
+      onState: onState,
+      onStart: onStart
+    });
+
+    function lobbyExtraHTML(room) {
+      var sel = (room && room.target) || 250;
+      var btns = [100, 250, 400].map(function (n) { return '<button class="pa-set-btn' + (n === sel ? ' active' : '') + '" onclick="setTarget(' + n + ')">' + n + '</button>'; }).join('');
+      return '<div class="pa-settings"><div class="pa-settings-label">Seuil de fin (points)</div><div class="pa-set-row">' + btns + '</div></div>';
+    }
+    function setTarget(n) { if (window.roomRef) window.roomRef.child('target').set(n); }
+
+    // Nombre de cartes passées au début d'une donne, selon le nombre de joueurs.
+    function passCount(n) { return ({ 3: 5, 4: 4, 5: 3, 6: 3 })[n] || 3; }
+    function nextPid(order, pid) { var i = order.indexOf(pid); return order[(i + 1) % order.length]; }
+
+    /* ━━ Distribution d'une donne ━━ Dé de couleur (Papayoo) puis phase de PASSE :
+       chacun passe `passCount` cartes au joueur suivant. ━━ */
+    function dealRound(order, cur) {
+      var deck = shuffle(buildDeck());
+      var per = Math.floor(deck.length / order.length); // 60/n entier pour 3..6
+      order.forEach(function (pid, i) { cur.players[pid].hand = sortHand(deck.slice(i * per, (i + 1) * per)); });
+      cur.papSuit = SUITS[Math.floor(Math.random() * SUITS.length)]; // « dé » de couleur
+      cur.trick = []; cur.ledSuit = null;
+      // Meneur du 1er pli (après la passe) : aléatoire la 1re donne, sinon le ramasseur précédent.
+      cur.playLeader = cur.firstLeader || order[Math.floor(Math.random() * order.length)];
+      cur.firstLeader = null;
+      cur.phase = 'passing'; cur.passSel = {};
+      cur.turn = order[0]; // ordre de soumission de la passe (sans incidence : chacun choisit dans sa main)
+      cur.banner = SUIT_EMOJI[cur.papSuit] + ' Papayoo = le 7 ' + SUIT_NAME[cur.papSuit] + ' (40 pts) · passe ' + passCount(order.length) + ' cartes à droite';
+    }
+
+    // Avance la soumission de la passe ; quand tout le monde a choisi, on échange.
+    function advancePass(cur) {
+      var order = cur.order || [];
+      if (order.every(function (p) { return cur.passSel && cur.passSel[p]; })) { resolvePassing(cur); return; }
+      var i = order.indexOf(cur.turn);
+      for (var k = 1; k <= order.length; k++) { var c = order[(i + k) % order.length]; if (!(cur.passSel && cur.passSel[c])) { cur.turn = c; return; } }
+    }
+    // Échange effectif : chacun donne ses cartes choisies au joueur suivant.
+    function resolvePassing(cur) {
+      var order = cur.order || [], incoming = {};
+      order.forEach(function (p) { incoming[p] = []; });
+      order.forEach(function (p) {
+        var sel = (cur.passSel[p] || []).slice(), hand = handOf(cur, p).slice();
+        sel.forEach(function (c) { var idx = hand.indexOf(c); if (idx >= 0) hand.splice(idx, 1); });
+        cur.players[p].hand = hand;
+        incoming[nextPid(order, p)] = incoming[nextPid(order, p)].concat(sel);
+      });
+      order.forEach(function (p) { cur.players[p].hand = sortHand(handOf(cur, p).concat(incoming[p])); });
+      cur.phase = 'play'; cur.passSel = null; cur.turn = cur.playLeader;
+      cur.banner = SUIT_EMOJI[cur.papSuit] + ' Papayoo = 7 ' + SUIT_NAME[cur.papSuit] + ' — ' + Room.name(cur.playLeader) + ' commence';
+    }
+
+    // Soumettre ma passe (humain).
+    function submitPass() {
+      var need = passCount((window.room.order || []).length);
+      if (passLocal.length !== need) { lbToast('Choisis ' + need + ' cartes'); return; }
+      var cards = passLocal.slice();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'passing' || cur.turn !== window.myPid) return cur;
+        var hand = handOf(cur, window.myPid);
+        for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
+        cur.passSel = cur.passSel || {}; cur.passSel[window.myPid] = cards;
+        advancePass(cur);
+        return cur;
+      }, function () { passLocal = []; });
+    }
+    function togglePass(card) {
+      var need = passCount((window.room.order || []).length);
+      var i = passLocal.indexOf(card);
+      if (i >= 0) passLocal.splice(i, 1);
+      else { if (passLocal.length >= need) return; passLocal.push(card); }
+      render(window.room);
+    }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var totals = {}; order.forEach(function (p) { totals[p] = 0; });
+      var base = { totals: totals, target: (cur && cur.target) || 250, deal: 1 };
+      // Distribuer dans une copie d'état temporaire puis fusionner.
+      var tmp = { players: {} }; order.forEach(function (p) { tmp.players[p] = {}; });
+      dealRound(order, tmp);
+      players.forEach(function (p) { cur.players[p.pid].hand = tmp.players[p.pid].hand; });
+      base.papSuit = tmp.papSuit; base.trick = []; base.ledSuit = null; base.turn = tmp.turn; base.banner = tmp.banner;
+      base.phase = 'passing'; base.passSel = {}; base.playLeader = tmp.playLeader;
+      return base;
+    }
+
+    /* ━━ Réception d'état ━━ */
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') showScreen('s-playing');
+        render(state);
+      } else if (status === 'ended') {
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Règles de jeu ━━ */
+    function legalCards(hand, ledSuit) {
+      if (!ledSuit) return hand.slice();                       // on mène : tout est permis
+      var follow = hand.filter(function (c) { return suitOf(c) === ledSuit; });
+      return follow.length ? follow : hand.slice();            // suivre si possible, sinon n'importe quoi
+    }
+    function trickWinner(trick, ledSuit) {
+      var best = null, bestV = -1;
+      trick.forEach(function (t) { if (suitOf(t.card) === ledSuit && valOf(t.card) > bestV) { bestV = valOf(t.card); best = t.by; } });
+      return best;
+    }
+    function trickPoints(trick, papSuit) { return trick.reduce(function (s, t) { return s + cardPoints(t.card, papSuit); }, 0); }
+
+    /* ━━ Jouer une carte ━━ */
+    function playCard(card) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== window.myPid) return cur;
+        var hand = handOf(cur, window.myPid).slice();
+        if (hand.indexOf(card) < 0) return cur;
+        var led = cur.ledSuit;
+        var legal = legalCards(hand, led);
+        if (legal.indexOf(card) < 0) return cur;               // doit suivre la couleur
+        hand.splice(hand.indexOf(card), 1);
+        cur.players[window.myPid].hand = hand;
+        cur.trick = (cur.trick || []).concat([{ by: window.myPid, card: card }]);
+        if (cur.trick.length === 1) cur.ledSuit = suitOf(card);
+        resolveTrick(cur);
+        return cur;
+      });
+    }
+
+    // Avance le tour ; si le pli est complet, l'attribue puis prépare la suite.
+    function resolveTrick(cur) {
+      var order = cur.order || [], n = order.length;
+      if (cur.trick.length < n) {
+        var i = order.indexOf(cur.trick[cur.trick.length - 1].by);
+        cur.turn = order[(i + 1) % n];
+        return;
+      }
+      // Pli complet : déterminer le ramasseur.
+      var winner = trickWinner(cur.trick, cur.ledSuit);
+      var pts = trickPoints(cur.trick, cur.papSuit);
+      cur.totals = cur.totals || {};
+      cur.totals[winner] = (cur.totals[winner] || 0) + pts;
+      cur.banner = Room.name(winner) + ' ramasse le pli' + (pts ? ' (+' + pts + ' pts 😬)' : ' (0 pt 😌)');
+      cur.lastTrick = cur.trick; cur.trick = []; cur.ledSuit = null; cur.turn = winner;
+      // Fin de la donne ?
+      var anyLeft = order.some(function (p) { return handOf(cur, p).length > 0; });
+      if (!anyLeft) endDeal(cur);
+    }
+
+    function endDeal(cur) {
+      var order = cur.order || [];
+      var max = -1; order.forEach(function (p) { if ((cur.totals[p] || 0) > max) max = cur.totals[p] || 0; });
+      if (max >= (cur.target || 250)) { cur.status = 'ended'; return; }
+      // Nouvelle donne : le ramasseur du dernier pli mène.
+      cur.firstLeader = cur.turn;
+      cur.deal = (cur.deal || 1) + 1;
+      dealRound(order, cur);
+      cur.banner = 'Donne ' + cur.deal + ' — ' + cur.banner;
+    }
+
+    /* ━━ IA ━━ Évite de ramasser les points ; se défausse de ses grosses cartes à
+       points quand elle est défaussante ; mène petit. Facile = coups au hasard. ━━ */
+    function papaBot(state, pid) {
+      if (state.status !== 'playing' || state.turn !== pid) return;
+      // Phase de passe : se débarrasser des cartes les plus dangereuses (gros points puis hautes).
+      if (state.phase === 'passing') {
+        var need = passCount((state.order || []).length);
+        var sel = handOf(state, pid).slice().sort(function (a, b) { return (cardPoints(b, state.papSuit) - cardPoints(a, state.papSuit)) || (valOf(b) - valOf(a)); }).slice(0, need);
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || cur.phase !== 'passing' || cur.turn !== pid) return cur;
+          var h = handOf(cur, pid); for (var i = 0; i < sel.length; i++) if (h.indexOf(sel[i]) < 0) return cur;
+          cur.passSel = cur.passSel || {}; cur.passSel[pid] = sel; advancePass(cur); return cur;
+        });
+        return;
+      }
+      var hand = handOf(state, pid);
+      if (!hand.length) return;
+      var legal = legalCards(hand, state.ledSuit);
+      var card;
+      if (window.Bots && window.Bots.shouldBlunder(state)) {
+        card = legal[Math.floor(Math.random() * legal.length)];
+      } else {
+        card = papaChoose(state, pid, legal);
+      }
+      // Jouer via la même transaction que l'humain (avec l'identité du bot).
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== pid) return cur;
+        var h = handOf(cur, pid).slice();
+        if (h.indexOf(card) < 0) return cur;
+        if (legalCards(h, cur.ledSuit).indexOf(card) < 0) return cur;
+        h.splice(h.indexOf(card), 1);
+        cur.players[pid].hand = h;
+        cur.trick = (cur.trick || []).concat([{ by: pid, card: card }]);
+        if (cur.trick.length === 1) cur.ledSuit = suitOf(card);
+        resolveTrick(cur);
+        return cur;
+      });
+    }
+    function papaChoose(state, pid, legal) {
+      var pap = state.papSuit, led = state.ledSuit, trick = state.trick || [], order = state.order || [], n = order.length;
+      function pts(c) { return cardPoints(c, pap); }
+      var lastToPlay = (trick.length === n - 1);
+      if (!led) {
+        // On mène : sortir une petite carte d'une couleur normale, garder le Payoo.
+        var normals = legal.filter(function (c) { return !isPayoo(c); });
+        var pool = normals.length ? normals : legal;
+        return pool.slice().sort(function (a, b) { return valOf(a) - valOf(b); })[0];
+      }
+      // Suit-on la couleur demandée ? (legalCards renvoie soit la couleur, soit tout.)
+      var canFollow = legal.some(function (c) { return suitOf(c) === led; });
+      if (canFollow) {
+        var followCards = legal.filter(function (c) { return suitOf(c) === led; });
+        var curBest = -1; trick.forEach(function (t) { if (suitOf(t.card) === led) curBest = Math.max(curBest, valOf(t.card)); });
+        var pot = trickPoints(trick, pap);
+        // Cartes qui passent SOUS le meilleur actuel (on ne ramasse pas) :
+        var under = followCards.filter(function (c) { return valOf(c) < curBest; });
+        if (lastToPlay && pot === 0) {
+          // Pli sans points : on peut « monter » pour gagner la main (mener ensuite).
+          return followCards.slice().sort(function (a, b) { return valOf(b) - valOf(a); })[0];
+        }
+        if (under.length) return under.sort(function (a, b) { return valOf(b) - valOf(a); })[0]; // la plus haute qui passe sous
+        // Forcé de dépasser : jouer la plus basse de la couleur.
+        return followCards.slice().sort(function (a, b) { return valOf(a) - valOf(b); })[0];
+      }
+      // Défausse (on n'a pas la couleur) : se débarrasser de la carte la plus chère
+      // (gros Payoo / le Papayoo) sur le pli d'un autre.
+      var byPts = legal.slice().sort(function (a, b) { return pts(b) - pts(a) || valOf(b) - valOf(a); });
+      if (pts(byPts[0]) > 0) return byPts[0];
+      // Aucune carte à points : balancer la plus haute carte normale (s'en débarrasser).
+      return legal.slice().sort(function (a, b) { return valOf(b) - valOf(a); })[0];
+    }
+
+    /* ━━ Rendu ━━ */
+    function cardHTML(card, papSuit, extra) {
+      var s = suitOf(card), v = valOf(card);
+      var p = cardPoints(card, papSuit);
+      var isPap = (card === papSuit + '7');
+      var ptsBadge = p ? '<span class="pts">' + p + '</span>' : '';
+      return '<div class="card' + (isPap ? ' pap' : '') + (extra || '') + '">' + ptsBadge +
+        '<span class="rk">' + v + '</span><span class="st">' + SUIT_EMOJI[s] + '</span></div>';
+    }
+    function render(state) {
+      var order = state.order || [], me = window.myPid;
+      setHTML('pa-info', 'Donne ' + (state.deal || 1) + ' · seuil ' + (state.target || 250) +
+        ' · <span class="pa-pap">Papayoo : ' + SUIT_EMOJI[state.papSuit] + ' 7 ' + SUIT_NAME[state.papSuit] + ' = 40</span>');
+
+      // Adversaires (tous sauf moi)
+      var opps = order.filter(function (p) { return p !== me; }).map(function (pid) {
+        var on = (state.turn === pid) ? ' turn' : '';
+        return '<div class="pa-opp' + on + '">' +
+          '<span class="pa-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="cnt">' + handOf(state, pid).length + '</span> <span class="sc">' + totalOf(state, pid) + '</span></div>';
+      }).join('');
+      setHTML('pa-opps', opps);
+      setText('pa-banner', state.banner || '');
+
+      var passing = (state.phase === 'passing');
+      var need = passCount(order.length);
+      var myHand = sortHand(handOf(state, me));
+
+      // Zone centrale : consigne de passe, ou pli en cours.
+      if (passing) {
+        var nxt = nextPid(order, me), submitted = state.passSel && state.passSel[me];
+        var info = (state.turn === me && !submitted)
+          ? 'Passe ' + need + ' cartes à ' + escapeHtml(Room.name(nxt))
+          : (submitted ? 'Cartes passées — en attente des autres…' : 'En attente de ' + escapeHtml(Room.name(state.turn)) + '…');
+        setHTML('pa-trick', '<div class="pa-pass-info">🔄 ' + info + '</div>');
+      } else {
+        var trick = state.trick || [];
+        var winNow = trick.length ? trickWinner(trick, state.ledSuit) : null;
+        setHTML('pa-trick', trick.length ? trick.map(function (t) {
+          return '<div class="pa-trick-card">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
+            '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
+        }).join('') : '<span class="pa-trick-empty">— en attente —</span>');
+      }
+
+      // Ma main
+      if (passing) {
+        var canSel = (state.turn === me) && !(state.passSel && state.passSel[me]);
+        setText('pa-my-count', '(' + myHand.length + ')' + (canSel ? ' — choisis-en ' + need : ''));
+        setHTML('pa-hand', myHand.map(function (c) {
+          var sel = passLocal.indexOf(c) >= 0;
+          var click = canSel ? ' onclick="togglePass(\'' + c + '\')"' : '';
+          return cardHTML(c, state.papSuit, (sel ? ' sel-pass' : (canSel ? ' playable' : ' dim'))).replace('<div class="card', '<div' + click + ' class="card');
+        }).join('') + (canSel ? '<div class="pa-pass-confirm"><button class="btn-primary" onclick="submitPass()"' + (passLocal.length === need ? '' : ' disabled') + '>Passer ces ' + need + ' cartes →</button></div>' : ''));
+      } else {
+        var myTurn = (state.turn === me) && !state.winner;
+        var legal = myTurn ? legalCards(myHand, state.ledSuit) : [];
+        setText('pa-my-count', '(' + myHand.length + ')' + (myTurn ? ' — à toi !' : ''));
+        setHTML('pa-hand', myHand.map(function (c) {
+          var ok = myTurn && legal.indexOf(c) >= 0;
+          var click = ok ? ' onclick="playCard(\'' + c + '\')"' : '';
+          return cardHTML(c, state.papSuit, (ok ? ' playable' : (myTurn ? ' dim' : ''))).replace('<div class="card', '<div' + click + ' class="card');
+        }).join(''));
+      }
+
+      maybeAbsent(state);
+    }
+
+    function maybeAbsent(state) {
+      if (!(window.Lobby && Lobby.absentBanner)) return;
+      var h = (!state.winner && state.status === 'playing') ? state.turn : null;
+      Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || !Lobby.isOffline(cur, cur.turn)) return cur;
+          // En phase de passe : l'absent passe ses cartes les plus dangereuses.
+          if (cur.phase === 'passing') {
+            var ap = cur.turn, need = passCount((cur.order || []).length);
+            var sel = handOf(cur, ap).slice().sort(function (a, b) { return (cardPoints(b, cur.papSuit) - cardPoints(a, cur.papSuit)) || (valOf(b) - valOf(a)); }).slice(0, need);
+            cur.passSel = cur.passSel || {}; cur.passSel[ap] = sel; advancePass(cur);
+            return cur;
+          }
+          // L'absent joue automatiquement une carte légale (la plus sûre).
+          var pid = cur.turn, hand = handOf(cur, pid).slice();
+          if (!hand.length) return cur;
+          var legal = legalCards(hand, cur.ledSuit);
+          var c = papaChoose(cur, pid, legal);
+          hand.splice(hand.indexOf(c), 1);
+          cur.players[pid].hand = hand;
+          cur.trick = (cur.trick || []).concat([{ by: pid, card: c }]);
+          if (cur.trick.length === 1) cur.ledSuit = suitOf(c);
+          resolveTrick(cur);
+          return cur;
+        });
+      });
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice().sort(function (a, b) { return totalOf(state, a) - totalOf(state, b); });
+      var winner = order[0];
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🐔');
+      setText('res-title', (winner === window.myPid ? 'Gagné !' : Room.name(winner) + ' gagne') + ' (moins de points)');
+      setHTML('res-rank', order.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + totalOf(state, pid) + ' pts</span></div>';
+      }).join(''));
+    }
+
+    /* ━━ Rejouer / nouvelle partie ━━ */
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

@@ -189,6 +189,24 @@ html[data-theme="dark"] .game-restart-btn {
 
 .lb-wait-msg { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); min-height: 22px; margin: 4px 0 14px; }
 
+/* Réglages « ordis » (ajouter des bots + difficulté) dans la salle d'attente */
+.lb-botset { width: 100%; max-width: 340px; margin: 0 auto 14px; display: flex; flex-direction: column; gap: 10px; }
+.lb-set { text-align: center; }
+.lb-set-label { font-size: 0.8rem; color: var(--ink-light); margin-bottom: 6px; }
+.lb-set-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.lb-set-btn { min-width: 46px; flex: 0 0 auto; padding: 0.5rem 0.8rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+.lb-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+.lb-set-btn:disabled { opacity: 0.55; cursor: default; }
+.lb-set-hint { font-size: 0.78rem; color: var(--ink-light); text-align: center; }
+
+/* Bouton flottant « revoir le résultat » (après « revoir le plateau ») */
+.mp-peek-btn, .p4-peek-btn, .lb-peek-btn {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 510; display: none;
+  padding: 0.7rem 1.4rem; border: none; border-radius: 40px; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.95rem; color: #fff;
+  background: linear-gradient(135deg, var(--terracotta), var(--gold)); box-shadow: var(--shadow-hover);
+}
+
 /* Petit toast partagé */
 .lb-toast {
   position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);

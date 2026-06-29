@@ -14,18 +14,19 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v9';
+var CACHE = 'jeux-v14';
 var ASSETS = [
   './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
-  'head.js', 'boot.js',
+  'head.js', 'boot.js', 'p4-ai.js', 'morpion-ai.js',
   'tu-preferes.html', 'petit-bac.html', 'puissance4.html', 'dobble-emoji.html',
   'crack-list.html', 'lynx.html', 'pictionary.html', 'uno.html', 'skyjo.html',
   'blokus.html', 'bataille-navale.html', 'codenames.html', 'morpion.html',
   'undercover.html', 'president.html', 'ludo.html',
   'juste-prix.html', 'telephone-dessine.html',
   'monopoly.html', 'monopoly-engine.js',
-  'cluedo.html', 'cluedo-engine.js'
+  'cluedo.html', 'cluedo-engine.js',
+  'papayoo.html', 'trio.html', 'sixnimmt.html', 'mastermind.html', 'themind.html', '2048.html', 'sudoku.html', 'millebornes.html', 'loupgarou.html', 'timesup.html'
 ];
 
 self.addEventListener('install', function (e) {

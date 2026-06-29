@@ -118,6 +118,7 @@
       <h2 class="res-title" id="res-title">—</h2>
       <div class="res-rank" id="res-rank"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="document.getElementById('sk-overlay').classList.remove('active');Lobby.peekBoard(function(){document.getElementById('sk-overlay').classList.add('active');})">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>
@@ -228,8 +229,11 @@
         }
         return -1;
       }
+      var easy = window.Bots && window.Bots.level(state) === 'easy';
       var drawn = (state.drawnCard != null);
       if (!drawn) {
+        // Facile : pioche souvent sans calculer le gain de la défausse.
+        if (easy && Math.random() < 0.6) { onDrawPileTap(); return; }
         var disc = state.discardPile || [], top = disc.length ? disc[disc.length - 1] : null;
         if (top == null) { onDrawPileTap(); return; }
         var mv = maxVisible();
@@ -238,6 +242,11 @@
         var take = Math.max(gainVis, gainHid, columnTarget(top) >= 0 ? 6 : -Infinity);
         if (take >= 2) takeFromDiscard(); else onDrawPileTap();
         return;
+      }
+      // Facile : place la carte sur une case au hasard (sans optimiser).
+      if (easy && Math.random() < 0.6) {
+        var slots = []; for (var z = 0; z < 12; z++) if (!rm[z]) slots.push(z);
+        if (slots.length) { replaceCell(slots[Math.floor(Math.random() * slots.length)]); return; }
       }
       var card = state.drawnCard, from = state.drawnFrom, mvx = maxVisible();
       var colT = columnTarget(card);

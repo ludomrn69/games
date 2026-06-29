@@ -22,15 +22,20 @@
 
     .cl-wrap { width: 100%; max-width: 620px; padding: 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
-    .cl-board { width: min(96vw, 500px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(13, 1fr); grid-template-rows: repeat(13, 1fr); gap: 1px; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 8px; }
+    .cl-board { width: min(97vw, 520px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(18, 1fr); grid-template-rows: repeat(18, 1fr); gap: 1px; background: #b9a988; border: 2px solid #b9a988; border-radius: 8px; }
     .cl-corr { background: var(--cream); }
     html[data-theme="dark"] .cl-corr { background: #221a2e; }
-    .cl-corr.door { box-shadow: inset 0 0 0 2px var(--gold); }
+    .cl-corr.door { background: rgba(198,152,90,0.16); } /* porte : repère discret */
+    .cl-pool { background: radial-gradient(circle at 50% 40%, #b71c2b, #7d1420); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; box-shadow: inset 0 0 0 3px rgba(255,255,255,0.18); }
+    .cl-pool.reach { outline: 3px solid var(--sage); cursor: pointer; }
+    .cl-pool-logo { color: #fff; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 11px; letter-spacing: 1px; transform: rotate(-8deg); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+    .cl-pool .rtok { display: flex; flex-wrap: wrap; justify-content: center; }
     .cl-corr.reach { background: rgba(139,158,126,.5); cursor: pointer; }
     .cl-corr.reach:hover { background: var(--sage); }
     .cl-room { border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; }
     .cl-room.reach { outline: 3px solid var(--sage); cursor: pointer; }
     .cl-room .rname { line-height: 1.05; }
+    .cl-room .cl-secret { font-size: 7px; font-weight: 700; color: #8a5a2b; line-height: 1.1; margin-top: 1px; opacity: 0.95; }
     .cl-room .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 0; }
     .cl-room .rtok span { font-size: 13px; }
     .cl-tok { font-size: 14px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
@@ -171,7 +176,14 @@
       for (var i = 0; i < 9; i++) if (!m.holds[CE.ROOMS[i]] && m.env.piece !== CE.ROOMS[i]) return i;
       return 0;
     }
-    function pickTest(cards, m) { var rem = cards.filter(function (c) { return !m.holds[c]; }); return rem.length ? rem[0] : cards[0]; }
+    // Choisit une carte à « tester » dans une suggestion. Normalement la première
+    // dont on ignore le détenteur (maximise l'info). Facile : une au hasard.
+    function pickTest(cards, m, lvl) {
+      var rem = cards.filter(function (c) { return !m.holds[c]; });
+      if (!rem.length) rem = cards.slice();
+      if (lvl === 'easy') return rem[Math.floor(Math.random() * rem.length)];
+      return rem[0];
+    }
     function closestTowardRoom(s, reach, targetIdx) {
       var doors = CE.doorLanes(targetIdx), best = null, bd = 1e9;
       Object.keys(reach).forEach(function (n) {
@@ -181,14 +193,34 @@
       });
       return best;
     }
+    // Case de la piscine la plus proche d'un nœud atteignable (pour aller accuser).
+    function closestTowardPool(s, reach) {
+      var pool = CE.poolCells(), best = null, bd = 1e9;
+      Object.keys(reach).forEach(function (n) {
+        if (CE.isRoomNode(n)) return;
+        var d = Math.min.apply(null, pool.map(function (pc) { return man(n, pc[0], pc[1]); }));
+        if (d < bd) { bd = d; best = n; }
+      });
+      return best;
+    }
     function botStep(s, rnd) {
       if (s.phase === 'disprove') { CE.disprove(s, CE.botDisproveChoice(s)); return; }
       var pid = s.turn, m = CE.mem(s, pid);
+      var solved = CE.solved(m), inPool = CE.isPoolNode(s.pos[pid]);
       if (s.phase === 'roll') {
-        if (CE.solved(m)) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
+        if (solved && inPool) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; } // accuse au centre
         CE.roll(s); return;
       }
       if (s.phase === 'move') {
+        // Affaire résolue : foncer vers la piscine centrale pour accuser.
+        if (solved) {
+          var reachP = s.reach || {};
+          var poolReach = Object.keys(reachP).filter(function (n) { return CE.isPoolNode(n); });
+          if (poolReach.length) { CE.moveTo(s, poolReach[0]); return; }
+          var towardPool = closestTowardPool(s, reachP);
+          if (towardPool) { CE.moveTo(s, towardPool); return; }
+          CE.stay(s); return;
+        }
         var node = s.pos[pid];
         if (CE.isRoomNode(node)) {
           var rn = CE.ROOMS[CE.roomIdx(node)];
@@ -206,11 +238,12 @@
         CE.stay(s); return;
       }
       if (s.phase === 'action') {
-        if (CE.isRoomNode(s.pos[pid])) { CE.suggest(s, pickTest(CE.SUSPECTS, m), pickTest(CE.WEAPONS, m)); return; }
+        if (solved && inPool) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; } // accuse depuis la piscine
+        if (CE.isRoomNode(s.pos[pid])) { var lvl = window.Bots ? window.Bots.level(s) : 'normal'; CE.suggest(s, pickTest(CE.SUSPECTS, m, lvl), pickTest(CE.WEAPONS, m, lvl)); return; }
         CE.endTurn(s); return;
       }
       if (s.phase === 'postsuggest') {
-        if (CE.solved(m)) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
+        if (solved && inPool) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
         CE.endTurn(s); return;
       }
     }
@@ -239,20 +272,29 @@
       var toks = {}; s.order.forEach(function (p) { var n = s.pos[p]; (toks[n] = toks[n] || []).push(Room.emoji(p)); });
       var wtoks = {}; var wp = s.weaponPos || {}; Object.keys(wp).forEach(function (w) { (wtoks[wp[w]] = wtoks[wp[w]] || []).push(WEP_EMOJI[w] || '🔪'); });
       var html = '';
-      // pièces
+      // pièces (rectangles fidèles au plateau)
       for (var k = 0; k < 9; k++) {
-        var br = Math.floor(k / 3), bc = k % 3;
+        var R = CE.ROOM_RECT[k];
         var reach = canMove && s.reach['R' + k] != null;
         var tk = (toks['R' + k] || []).map(function (e) { return '<span class="cl-tok">' + e + '</span>'; }).join('');
         var wk = (wtoks[k] || []).map(function (e) { return '<span>' + e + '</span>'; }).join('');
-        html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (4 * br + 2) + '/span 3;grid-column:' + (4 * bc + 2) + '/span 3;background:' + ROOM_BG[k] + '"' +
+        html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (R[0] + 1) + '/' + (R[1] + 2) + ';grid-column:' + (R[2] + 1) + '/' + (R[3] + 2) + ';background:' + ROOM_BG[k] + '"' +
           (reach ? ' onclick="tryMove(\'R' + k + '\')"' : '') + '>' +
-          '<div class="rname">' + CE.ROOMS[k] + (CE.SECRET[k] != null ? ' 🚪' : '') + '</div><div class="rtok">' + wk + tk + '</div></div>';
+          '<div class="rname">' + CE.ROOMS[k] + '</div>' +
+          (CE.SECRET[k] != null ? '<div class="cl-secret">🚪→ ' + CE.ROOMS[CE.SECRET[k]] + '</div>' : '') +
+          '<div class="rtok">' + wk + tk + '</div></div>';
       }
-      // couloirs
+      // Piscine centrale « CLUEDO » : franchissable, c'est ici qu'on ACCUSE.
+      var CC = CE.CELLAR;
+      var poolReach = canMove ? Object.keys(s.reach).filter(function (n) { return CE.isPoolNode(n); }) : [];
+      var poolTok = '';
+      CE.poolCells().forEach(function (pc) { (toks[pc[0] + ',' + pc[1]] || []).forEach(function (e) { poolTok += '<span class="cl-tok">' + e + '</span>'; }); });
+      html += '<div class="cl-pool' + (poolReach.length ? ' reach' : '') + '" style="grid-row:' + (CC[0] + 1) + '/' + (CC[1] + 2) + ';grid-column:' + (CC[2] + 1) + '/' + (CC[3] + 2) + '"' +
+        (poolReach.length ? ' onclick="tryMove(\'' + poolReach[0] + '\')"' : '') + '><span class="cl-pool-logo">CLUEDO</span><div class="rtok">' + poolTok + '</div></div>';
+      // couloirs + portes (on saute les cases de la piscine, rendues par le bloc ci-dessus)
       var doorSet = {}; for (var rk = 0; rk < 9; rk++) CE.doorLanes(rk).forEach(function (d) { doorSet[d[0] + ',' + d[1]] = true; });
-      for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
-        if (!CE.isCorr(r, c)) continue;
+      for (var r = 0; r < CE.GRID_H; r++) for (var c = 0; c < CE.GRID_W; c++) {
+        if (!CE.isCorr(r, c) || CE.isPoolCell(r, c)) continue;
         var id = r + ',' + c;
         var reach2 = canMove && s.reach[id] != null;
         var t2 = (toks[id] || []).map(function (e) { return '<span class="cl-tok">' + e + '</span>'; }).join('');
@@ -292,12 +334,16 @@
       if (a !== me) { box.innerHTML = '<div class="cl-hint">⏳ ' + escapeHtml(Room.name(a)) + ' réfléchit à une réfutation…</div>'; return; }
 
       var inRoom = CE.isRoomNode(s.pos[me]);
+      var inPool = CE.isPoolNode(s.pos[me]); // au centre → on peut accuser
       var corner = inRoom && CE.SECRET[CE.roomIdx(s.pos[me])] != null;
+      var accuseBtn = inPool
+        ? '<button class="btn-primary btn-ghost" onclick="openAccuse()">🔍 Accuser</button>'
+        : '';
       if (s.phase === 'roll') {
-        box.innerHTML = '<div class="cl-hint">À toi de jouer</div><div class="cl-btn-row">' +
+        box.innerHTML = '<div class="cl-hint">À toi de jouer' + (inPool ? '' : ' · <span style="color:var(--ink-light)">accuse depuis la piscine 🎯 au centre</span>') + '</div><div class="cl-btn-row">' +
           '<button class="btn-primary" onclick="act(\'roll\')">🎲 Lancer le dé</button>' +
           (corner ? '<button class="btn-primary btn-ghost" onclick="act(\'secret\')">🚪 Passage secret</button>' : '') +
-          '<button class="btn-primary btn-ghost" onclick="openAccuse()">🔍 Accuser</button></div>';
+          accuseBtn + '</div>';
       } else if (s.phase === 'move') {
         box.innerHTML = '<div class="cl-hint">Dé : ' + s.dice + ' — touche une case ou une pièce surlignée</div>' +
           '<div class="cl-btn-row"><button class="btn-primary btn-ghost" onclick="act(\'stay\')">Rester ici</button></div>';
@@ -310,7 +356,7 @@
         }
         box.innerHTML = msg + '<div class="cl-btn-row">' +
           (inRoom && s.phase === 'action' ? '<button class="btn-primary" onclick="openSuggest()">💭 Suggérer</button>' : '') +
-          '<button class="btn-primary btn-ghost" onclick="openAccuse()">🔍 Accuser</button>' +
+          accuseBtn +
           '<button class="btn-primary btn-ghost" onclick="act(\'end\')">Fin du tour</button></div>';
       }
     }
@@ -437,6 +483,7 @@
           '<div class="modal-title">' + (s.winner === window.myPid ? 'Bravo, tu as résolu l\'affaire !' : escapeHtml(Room.name(s.winner)) + ' a résolu l\'affaire') + '</div>' +
           '<div style="font-size:.95rem;color:var(--ink-light);margin-bottom:14px">C\'était <b>' + escapeHtml(sol.suspect) + '</b>, avec <b>' + escapeHtml(sol.arme) + '</b>, dans <b>' + escapeHtml(sol.piece) + '</b>.</div>' +
           '<button class="btn-primary" onclick="handleReplay()">Rejouer</button>' +
+          '<button class="btn-link mt-4" onclick="document.getElementById(\'cl-ov\').classList.remove(\'active\');Lobby.peekBoard(function(){document.getElementById(\'cl-ov\').classList.add(\'active\');})">🔍 Revoir le plateau</button>' +
           '<button class="btn-link mt-4" onclick="window.location.href=\'index.html\'">Accueil</button>';
         ov.classList.add('active');
       } else ov.classList.remove('active');

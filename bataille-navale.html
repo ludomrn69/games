@@ -114,6 +114,7 @@
       <div class="bn-ov-title" id="bn-ov-title">—</div>
       <div class="bn-ov-scores" id="bn-ov-scores"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="document.getElementById('bn-overlay').classList.remove('active');Lobby.peekBoard(function(){document.getElementById('bn-overlay').classList.add('active');})">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>
@@ -193,7 +194,8 @@
       if (state.status !== 'playing' || state.winner || state.turn !== pid) return;
       var s = (((state.players[pid] || {}).shots) || emptyShots()).split('');
       while (s.length < 100) s.push('.');
-      var t = bnChooseShot(s);
+      var lvl = window.Bots ? window.Bots.level(state) : 'normal';
+      var t = bnChooseShot(s, lvl);
       if (t >= 0) fire(t);
     }
     function bnBotPlace(pid) {
@@ -221,9 +223,13 @@
       });
     }
     // Cible : prolonger les touches. Chasse : densité (placements 100% sur cases vierges).
-    function bnChooseShot(s) {
+    // lvl : 'easy' = tir au hasard (faible) ; 'hard' = chasse en damier (parité) pour
+    // ne jamais gaspiller de tir (un navire ≥2 occupe forcément une case sur deux).
+    function bnChooseShot(s, lvl) {
       function tried(i) { return s[i] !== '.'; }
       function nbrs(i) { var r = Math.floor(i / 10), c = i % 10, a = []; if (r > 0) a.push(i - 10); if (r < 9) a.push(i + 10); if (c > 0) a.push(i - 1); if (c < 9) a.push(i + 1); return a; }
+      // Facile : tir totalement au hasard sur une case non essayée.
+      if (lvl === 'easy') { var free = []; for (var f = 0; f < 100; f++) if (!tried(f)) free.push(f); return free.length ? free[Math.floor(Math.random() * free.length)] : -1; }
       var best = -1, bestSc = -1;
       for (var i = 0; i < 100; i++) {
         if (s[i] !== 'h') continue;
@@ -249,8 +255,15 @@
           }
         }
       }
+      // Difficile : en phase de chasse, ne considérer que les cases en damier
+      // (parité) — il y a toujours un navire de taille ≥2 à y trouver, donc on
+      // couvre la grille deux fois plus vite.
       var bc = -1, bw = -1;
-      for (var c = 0; c < 100; c++) { if (tried(c)) continue; if (W[c] > bw) { bw = W[c]; bc = c; } }
+      for (var c = 0; c < 100; c++) {
+        if (tried(c)) continue;
+        if (lvl === 'hard' && ((Math.floor(c / 10) + (c % 10)) % 2 !== 0)) continue;
+        if (W[c] > bw) { bw = W[c]; bc = c; }
+      }
       if (bc >= 0) return bc;
       for (var d = 0; d < 100; d++) if (!tried(d)) return d;
       return -1;

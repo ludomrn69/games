@@ -408,8 +408,15 @@
     return true;
   }
 
+  // Toutes les rues (cases couleur, hors gares/services) ont-elles un propriétaire ?
+  function allStreetsOwned(s) {
+    for (var i = 0; i < B.length; i++) { if (B[i].t === 'prop' && s.owners[i] == null) return false; }
+    return true;
+  }
   // ── IA d'échange : compléter un monopole en achetant la dernière case ──────
+  // Seulement une fois TOUTES les rues vendues (règle voulue : pas d'échange avant).
   function aiProposeTrade(s, pid) { norm(s);
+    if (!allStreetsOwned(s)) return null;
     for (var g in GROUPS) {
       var idxs = GROUPS[g];
       if (idxs.filter(function (i) { return s.owners[i] === pid; }).length !== idxs.length - 1) continue;

@@ -146,6 +146,7 @@
       <h2 class="res-title" id="res-title">—</h2>
       <div class="res-rank" id="res-rank"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="document.getElementById('uno-overlay').classList.remove('active');Lobby.peekBoard(function(){document.getElementById('uno-overlay').classList.add('active');})">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
     </div>
   </div>
@@ -308,7 +309,10 @@
       }
       var playable = hand.filter(function (c) { return canPlay(c, top, cc); });
       if (!playable.length) { if (state.drewThisTurn) passTurn(); else drawCard(); return; }
-      var choice = unoChoose(hand, playable, state, pid);
+      // Facile : joue une carte jouable au hasard (couleur de relance au hasard si joker).
+      var choice = (window.Bots && window.Bots.shouldBlunder(state))
+        ? playable[Math.floor(Math.random() * playable.length)]
+        : unoChoose(hand, playable, state, pid);
       var color = (parseCard(choice) || {}).wild ? unoBestColor(hand) : parseCard(choice).color;
       unoBotPlay(hand, choice, color);
     }
