@@ -26,7 +26,7 @@ var ASSETS = [
   'juste-prix.html', 'telephone-dessine.html',
   'monopoly.html', 'monopoly-engine.js',
   'cluedo.html', 'cluedo-engine.js',
-  'papayoo.html', 'trio.html', 'sixnimmt.html', 'mastermind.html', 'themind.html', '2048.html', 'sudoku.html'
+  'papayoo.html', 'trio.html', 'sixnimmt.html', 'mastermind.html', 'themind.html', '2048.html', 'sudoku.html', 'millebornes.html'
 ];
 
 self.addEventListener('install', function (e) {
