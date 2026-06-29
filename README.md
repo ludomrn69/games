@@ -57,6 +57,13 @@ la synchro temps réel.
 | **Papayoo** | 3–6 | ✈️ | plis (passe + Papayoo) |
 | **Trio** | 3–6 | ✈️ | mémoire |
 | **6 qui prend !** | 2–10 | ✈️ | cartes simultanées |
+| **Mastermind** | 1–8 | ✈️ | déduction (IA solveur) |
+| **The Mind** | 2–6 | ✈️ | coopératif / timing |
+| **2048** | 1–6 | ✈️ | puzzle / course (IA expectimax) |
+| **Sudoku** | 1–6 | ✈️ | puzzle / course (IA solveur) |
+| **Mille Bornes** | 2–4 | ✈️ | cartes / course |
+| **Loup-Garou** | 4–12 | ✈️ | déduction sociale (IA) |
+| **Time's Up** | 1–12 | ✈️ | équipes (+ solo chrono) |
 
 ## Mise en route (une seule fois)
 
@@ -148,22 +155,8 @@ zéro-config.
 ## Idées de jeux à ajouter
 Des jeux qui collent au format (multi sans login, mobile, parties courtes, IA possible) :
 
-**Cartes / familial**
-- **The Mind** (coopératif : poser ses cartes dans l'ordre, sans parler)
-- **Skull King** / **Sushi Go!** (plis & draft, parties rapides)
-- **Mille Bornes**, **Rami**, **Bataille corse**, **Belote / Coinche**
-- **Love Letter** (déduction, mains cachées — déjà notre point fort)
-
-**Réflexion 2 joueurs (parfait pour une IA forte, comme P4)**
-- **Othello / Reversi**, **Puissance Awalé (Oware)**, **Quarto**, **Onitama**
-- **Dames**, **Mastermind** (déduction de code), **Nim / allumettes**
-
-**Dés**
-- **Yam's (Yahtzee)**, **421**, **Cochon qui rit**
-
-**Soirée / déduction sociale**
-- **Loup-Garou**, **Just One** (coopératif d'indices), **Concept**, **Time's Up**
-
-**Mots / solo**
-- **Motus / Wordle**, **Le Pendu**, **Mastermind chiffres**
-- En solo pur : **Démineur**, **2048**, **Sudoku**
+**Cartes / familial** : Skull King, Sushi Go!, Rami, Belote / Coinche, Love Letter.
+**Réflexion 2 joueurs (IA forte)** : Othello / Reversi, Awalé (Oware), Quarto, Onitama, Dames.
+**Dés** : Yam's (Yahtzee), 421, Cochon qui rit.
+**Soirée / déduction** : Just One (coopératif d'indices), Concept, Saboteur.
+**Mots / solo** : Motus / Wordle, Le Pendu, Démineur.
