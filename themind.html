@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="The Mind 🧠" data-emoji="🧠"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.95rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); } .btn-primary:disabled { opacity: 0.4; }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .tm-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .tm-head { background: rgba(20,16,28,0.97); }
+    .tm-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .tm-head-actions { display: flex; gap: 6px; }
+
+    .tm-status { display: flex; justify-content: center; gap: 18px; padding: 10px; font-weight: 700; }
+    .tm-status .lvl { color: var(--gold); } .tm-status .lives { color: #e05a4e; }
+    .tm-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 0 12px 4px; }
+    .tm-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 600; }
+    .tm-opp-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .tm-opp .cnt { background: var(--ink); color: var(--cream); border-radius: 20px; padding: 0 6px; font-weight: 800; font-size: 0.74rem; }
+
+    .tm-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; }
+    .tm-pile-label { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); }
+    .tm-pile { width: 120px; height: 150px; border-radius: 18px; background: linear-gradient(135deg, #6a4c93, #4a3270); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 3.4rem; font-family: 'Playfair Display', serif; box-shadow: 0 8px 24px rgba(74,50,112,0.4); }
+    .tm-pile.empty { background: var(--white); color: var(--ink-light); font-size: 1rem; border: 2px dashed var(--gold-light); box-shadow: var(--shadow); }
+    .tm-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.3rem; color: var(--terracotta); min-height: 30px; padding: 4px 12px; }
+
+    .tm-hand-wrap { padding: 8px 12px calc(16px + env(safe-area-inset-bottom)); }
+    .tm-hand-label { text-align: center; font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); margin-bottom: 6px; }
+    .tm-hand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 10px; }
+    .tm-mcard { width: 50px; height: 68px; border-radius: 10px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.4rem; color: #2C2520; font-family: 'Playfair Display', serif; }
+    html[data-theme="dark"] .tm-mcard { background: #f4efe7; }
+    .tm-mcard.next { border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(196,116,90,0.35); transform: translateY(-4px); cursor: pointer; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-sub { font-size: 1rem; color: var(--ink-light); margin-bottom: 18px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/boot.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="tm-head">
+        <span class="tm-title-mini">The Mind</span>
+        <div class="tm-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="tm-status" id="tm-status"></div>
+      <div class="tm-opps" id="tm-opps"></div>
+      <div class="tm-center">
+        <div class="tm-pile-label">Pile (dernière carte jouée)</div>
+        <div class="tm-pile" id="tm-pile"></div>
+        <div class="tm-banner" id="tm-banner"></div>
+      </div>
+      <div class="tm-hand-wrap">
+        <div class="tm-hand-label" id="tm-hand-label"></div>
+        <div class="tm-hand" id="tm-hand"></div>
+        <button class="btn-primary" id="tm-play-btn" onclick="playMine()">Jouer ma plus petite carte</button>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🧠</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-sub" id="res-sub"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🧠 The Mind</div>
+      <div class="modal-body">
+        <p>• Jeu <b>coopératif, sans parler</b> ! Au niveau N, chacun a N cartes (1–100).</p>
+        <p style="margin-top:6px">• Il faut jouer <b>toutes</b> les cartes de l'équipe dans l'<b>ordre croissant</b> sur la pile, en se fiant juste au <b>timing</b>.</p>
+        <p style="margin-top:6px">• Si tu joues une carte alors qu'un coéquipier en a une plus petite → <b>−1 vie</b> (les cartes plus basses sont brûlées).</p>
+        <p style="margin-top:6px">• Finis tous les niveaux ensemble pour gagner. Plus de vies = perdu.</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function handOf(s, pid) { return (s.players && s.players[pid] && s.players[pid].hand) || []; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    function maxLevelFor(n) { return n <= 2 ? 12 : n === 3 ? 10 : n === 4 ? 8 : 6; }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, botTimers = {};
+    GameRoom({
+      gameKey: 'themind',
+      name: 'The Mind',
+      emoji: '🧠',
+      tagline: 'Coopératif, sans parler',
+      minPlayers: 2,
+      maxPlayers: 6,
+      rules: [
+        'Coopératif et sans parler : jouer toutes les cartes dans l\'ordre croissant',
+        'Au niveau N, chacun a N cartes (1–100)',
+        'Jouer trop tôt (un coéquipier a plus petit) = −1 vie',
+        'Finir tous les niveaux pour gagner ensemble'
+      ],
+      offline: { solo: true },
+      bot: function () {},                          // pilotage temps réel via timers (scheduleBots)
+      offlineTurn: function () { return null; },     // pas de tour : tout le monde peut jouer
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    function dealLevel(order, cur, level) {
+      var deck = []; for (var i = 1; i <= 100; i++) deck.push(i); shuffle(deck);
+      var k = 0; order.forEach(function (p) { cur.players[p].hand = deck.slice(k, k + level).sort(function (a, b) { return a - b; }); k += level; });
+      cur.pile = 0; cur.level = level;
+    }
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var tmp = { players: {} }; order.forEach(function (p) { tmp.players[p] = {}; });
+      dealLevel(order, tmp, 1);
+      players.forEach(function (p) { cur.players[p.pid].hand = tmp.players[p.pid].hand; });
+      return { level: 1, lives: order.length, pile: 0, maxLevel: maxLevelFor(order.length), banner: 'Niveau 1 — concentrez-vous 🧘', winner: null, failed: false };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); render(state); scheduleBots(state); }
+      else { clearBots(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+
+    /* ━━ Jouer une carte (logique partagée) ━━ */
+    function doPlay(cur, pid, V) {
+      var hand = handOf(cur, pid).slice(); var idx = hand.indexOf(V); if (idx < 0) return; hand.splice(idx, 1);
+      cur.players[pid].hand = hand;
+      // Y a-t-il des cartes plus basses ailleurs ? → erreur.
+      var lower = [];
+      (cur.order || []).forEach(function (p) { handOf(cur, p).forEach(function (c) { if (c < V) lower.push({ p: p, c: c }); }); });
+      cur.pile = V;
+      if (lower.length) {
+        cur.lives = (cur.lives || 0) - 1;
+        lower.forEach(function (it) { var h = handOf(cur, it.p).slice(); var i = h.indexOf(it.c); if (i >= 0) h.splice(i, 1); cur.players[it.p].hand = h; });
+        cur.banner = '💥 ' + lower.length + ' carte' + (lower.length > 1 ? 's' : '') + ' plus basse' + (lower.length > 1 ? 's' : '') + ' (−1 vie)';
+      } else {
+        cur.banner = '✅ ' + V + ' — continuez…';
+      }
+      if (cur.lives <= 0) { cur.status = 'ended'; cur.failed = true; cur.banner = 'Perdu au niveau ' + cur.level + ' 😵'; return; }
+      var anyLeft = (cur.order || []).some(function (p) { return handOf(cur, p).length > 0; });
+      if (!anyLeft) {
+        if (cur.level >= (cur.maxLevel || 12)) { cur.status = 'ended'; cur.winner = true; cur.banner = '🏆 Niveau max atteint — gagné !'; return; }
+        dealLevel(cur.order, cur, cur.level + 1);
+        cur.banner = '🎉 Niveau ' + cur.level + ' !';
+      }
+    }
+
+    function playMine() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing') return cur;
+        var hand = handOf(cur, window.myPid); if (!hand.length) return cur;
+        doPlay(cur, window.myPid, Math.min.apply(null, hand));
+        return cur;
+      });
+    }
+
+    /* ━━ Ordis temps réel : jouent leur plus petite carte après un délai PROPORTIONNEL
+       à sa valeur (l'intuition du timing). Difficile = minutage précis (peu d'erreurs),
+       facile = erratique. Seul l'hôte pilote les ordis. ━━ */
+    function clearBots() { Object.keys(botTimers).forEach(function (k) { clearTimeout(botTimers[k]); }); botTimers = {}; }
+    function scheduleBots(state) {
+      clearBots();
+      if (state.status !== 'playing' || state.host !== window.myPid) return;
+      var pile = state.pile || 0, level = window.Bots ? window.Bots.level(state) : 'normal';
+      var base = level === 'hard' ? 55 : level === 'easy' ? 62 : 58;
+      var jitter = level === 'hard' ? 0.06 : level === 'easy' ? 0.45 : 0.2;
+      (state.order || []).forEach(function (pid) {
+        var p = state.players[pid]; if (!p || !p.isBot) return;
+        var hand = p.hand || []; if (!hand.length) return;
+        var lowest = Math.min.apply(null, hand);
+        var gap = Math.max(1, lowest - pile);
+        var delay = Math.max(350, gap * base * (1 + (Math.random() * 2 - 1) * jitter));
+        botTimers[pid] = setTimeout(function () { botPlay(pid, lowest); }, delay);
+      });
+    }
+    function botPlay(pid, expected) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing') return cur;
+        var hand = handOf(cur, pid); if (!hand.length) return cur;
+        var low = Math.min.apply(null, hand);
+        if (low !== expected) return cur; // l'état a changé depuis la programmation
+        doPlay(cur, pid, low);
+        return cur;
+      });
+    }
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var me = window.myPid, order = state.order || [];
+      setHTML('tm-status', '<span class="lvl">Niveau ' + (state.level || 1) + ' / ' + (state.maxLevel || 12) + '</span>' +
+        '<span class="lives">' + '❤️'.repeat(Math.max(0, state.lives || 0)) + '</span>');
+      setHTML('tm-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        return '<div class="tm-opp"><span class="tm-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="cnt">' + handOf(state, pid).length + '</span></div>';
+      }).join(''));
+      var pile = state.pile || 0;
+      var pileEl = document.getElementById('tm-pile');
+      pileEl.className = 'tm-pile' + (pile ? '' : ' empty');
+      pileEl.textContent = pile ? pile : 'à vous !';
+      setText('tm-banner', state.banner || '');
+
+      var myHand = handOf(state, me);
+      var lowest = myHand.length ? Math.min.apply(null, myHand) : null;
+      setText('tm-hand-label', myHand.length ? 'Tes cartes (joue la plus petite quand tu le sens)' : 'Tu n\'as plus de cartes — attends l\'équipe');
+      setHTML('tm-hand', myHand.map(function (v) {
+        return '<div class="tm-mcard' + (v === lowest ? ' next' : '') + '"' + (v === lowest ? ' onclick="playMine()"' : '') + '>' + v + '</div>';
+      }).join('') || '—');
+      var btn = document.getElementById('tm-play-btn');
+      btn.disabled = !myHand.length || state.status !== 'playing';
+      btn.textContent = myHand.length ? ('Jouer ' + lowest + ' (ma plus petite)') : 'En attente…';
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      if (state.winner) { setText('res-emoji', '🏆'); setText('res-title', 'Victoire collective !'); setText('res-sub', 'Vous avez terminé tous les niveaux. Belle télépathie 🧠'); }
+      else { setText('res-emoji', '😵'); setText('res-title', 'Perdu au niveau ' + (state.level || 1)); setText('res-sub', 'Plus de vies. Retentez votre chance !'); }
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>
