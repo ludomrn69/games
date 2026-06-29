@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Loup-Garou 🐺" data-emoji="🐺"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .lg-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .lg-head { background: rgba(20,16,28,0.97); }
+    .lg-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .lg-head-actions { display: flex; gap: 6px; }
+
+    .lg-phase { text-align: center; padding: 10px; }
+    .lg-phase-night { background: linear-gradient(135deg, #2c2540, #1a1530); color: #e8dcc8; }
+    .lg-phase-icon { font-size: 2rem; } .lg-phase-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.2rem; }
+    .lg-role { display: inline-flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 4px 14px; box-shadow: var(--shadow); font-weight: 700; margin-top: 6px; }
+    html[data-theme="dark"] .lg-role { background: #2a2333; }
+
+    .lg-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 6px 12px; }
+    .lg-instruct { text-align: center; font-size: 0.9rem; color: var(--ink-light); padding: 0 14px 8px; } .lg-instruct b { color: var(--ink); }
+
+    .lg-players { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 6px 12px 12px; max-width: 480px; margin: 0 auto; }
+    .lg-pcard { width: 92px; background: var(--white); border-radius: 14px; padding: 8px 6px; box-shadow: var(--shadow); text-align: center; border: 2px solid transparent; }
+    .lg-pcard.dead { opacity: 0.45; filter: grayscale(0.6); }
+    .lg-pcard.pick { cursor: pointer; border-color: var(--terracotta); }
+    .lg-pcard.pick:hover { background: rgba(196,116,90,0.08); }
+    .lg-pcard.me { background: linear-gradient(135deg, rgba(198,152,90,0.16), rgba(196,116,90,0.1)); }
+    .lg-pav { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin: 0 auto 4px; }
+    .lg-pname { font-size: 0.78rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lg-ptag { font-size: 0.66rem; color: var(--ink-light); margin-top: 2px; min-height: 14px; }
+    .lg-ptag.wolf { color: #c0392b; font-weight: 700; } .lg-ptag.claim { color: var(--gold); font-weight: 700; }
+    .lg-votes { font-size: 0.7rem; font-weight: 800; color: var(--terracotta); }
+
+    .lg-actions { text-align: center; padding: 0 14px 16px; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-sub { font-size: 1rem; color: var(--ink-light); margin-bottom: 8px; }
+    .lg-reveal { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 6px; margin: 12px auto 22px; }
+    .lg-reveal-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); }
+    .lg-reveal-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .lg-reveal-name { flex: 1; text-align: left; font-weight: 700; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; } .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/boot.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="lg-head">
+        <span class="lg-title-mini">Loup-Garou</span>
+        <div class="lg-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="lg-phase" id="lg-phase"></div>
+      <div class="lg-banner" id="lg-banner"></div>
+      <div class="lg-instruct" id="lg-instruct"></div>
+      <div class="lg-players" id="lg-players"></div>
+      <div class="lg-actions" id="lg-actions"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🐺</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-sub" id="res-sub"></div>
+      <div class="lg-reveal" id="lg-reveal"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🐺 Loup-Garou</div>
+      <div class="modal-body">
+        <p>• Le village cache des <b>loups-garous</b>. La <b>nuit</b>, les loups dévorent un villageois ; la <b>voyante</b> sonde l'identité d'un joueur.</p>
+        <p style="margin-top:6px">• Le <b>jour</b>, tout le monde <b>vote</b> pour éliminer un suspect. On révèle son rôle.</p>
+        <p style="margin-top:6px">• Les <b>villageois</b> gagnent s'ils éliminent tous les loups ; les <b>loups</b> gagnent s'ils égalent les villageois.</p>
+        <p style="margin-top:6px">• La voyante peut <b>accuser publiquement</b> pour rallier les votes !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var ROLE_INFO = { loup: { ic: '🐺', nm: 'Loup-Garou' }, voyante: { ic: '🔮', nm: 'Voyante' }, villageois: { ic: '🧑‍🌾', nm: 'Villageois' } };
+
+    function P(s, pid) { return s.players[pid] || {}; }
+    function isBot(s, pid) { return !!P(s, pid).isBot; }
+    function roleOf(s, pid) { return P(s, pid).role; }
+    function aliveList(s) { return (s.order || []).filter(function (p) { return P(s, p).alive; }); }
+    function aliveWolves(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) === 'loup'; }); }
+    function aliveVillagers(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) !== 'loup'; }); }
+    function aliveSeer(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) === 'voyante'; })[0] || null; }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, pendAction = null;
+    GameRoom({
+      gameKey: 'loupgarou',
+      name: 'Loup-Garou',
+      emoji: '🐺',
+      tagline: 'Démasque les loups',
+      minPlayers: 4,
+      maxPlayers: 12,
+      rules: [
+        'Des loups-garous se cachent dans le village',
+        'La nuit : les loups dévorent, la voyante sonde un joueur',
+        'Le jour : tout le monde vote pour éliminer un suspect',
+        'Villageois : éliminez tous les loups · Loups : égalez les villageois'
+      ],
+      offline: { solo: true, soloMinBots: 3 },
+      bot: lgBot,
+      offlineTurn: offlineTurn,
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var n = order.length, nW = Math.max(1, Math.floor(n / 4));
+      var roles = [];
+      for (var i = 0; i < nW; i++) roles.push('loup');
+      roles.push('voyante');
+      while (roles.length < n) roles.push('villageois');
+      shuffle(roles);
+      order.forEach(function (p, i) { cur.players[p].role = roles[i]; cur.players[p].alive = true; cur.players[p].knows = {}; });
+      return { phase: 'wolves', day: 1, wolfVotes: {}, seerCheck: null, dayVotes: {}, claims: {}, banner: '🌙 La nuit tombe sur le village…', winner: null };
+    }
+
+    function offlineTurn(r) {
+      if (!r || r.status === 'ended') return null;
+      if (r.phase === 'wolves') { var wv = r.wolfVotes || {}; return aliveWolves(r).filter(function (p) { return !(p in wv) && isBot(r, p); })[0] || null; }
+      if (r.phase === 'seer') { var s = aliveSeer(r); return (s && isBot(r, s) && !r.seerCheck) ? s : null; }
+      if (r.phase === 'day') { var dv = r.dayVotes || {}; return aliveList(r).filter(function (p) { return !(p in dv) && isBot(r, p); })[0] || null; }
+      return null;
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); render(state); }
+      else if (status === 'ended') showResults(state);
+      prevStatus = status;
+    }
+
+    /* ━━ Transitions ━━ */
+    function checkWin(cur) {
+      var w = aliveWolves(cur).length, v = aliveVillagers(cur).length;
+      if (w === 0) { cur.winner = 'village'; cur.status = 'ended'; return true; }
+      if (w >= v) { cur.winner = 'loups'; cur.status = 'ended'; return true; }
+      return false;
+    }
+    function resolveWolves(cur) {
+      // victime = cible majoritaire des loups
+      var tally = {}; var wv = cur.wolfVotes || {};
+      Object.keys(wv).forEach(function (p) { tally[wv[p]] = (tally[wv[p]] || 0) + 1; });
+      var victim = null, best = -1; Object.keys(tally).forEach(function (t) { if (tally[t] > best) { best = tally[t]; victim = t; } });
+      cur.nightVictim = victim;
+      cur.phase = 'seer';
+      if (!aliveSeer(cur)) resolveNight(cur);
+    }
+    function resolveNight(cur) {
+      var v = cur.nightVictim;
+      if (v && P(cur, v).alive) { cur.players[v].alive = false; cur.lastNightDead = v; cur.banner = '🌅 ' + Room.name(v) + ' a été dévoré·e cette nuit (' + ROLE_INFO[roleOf(cur, v)].nm + ')'; }
+      else cur.banner = '🌅 Personne n\'est mort cette nuit';
+      cur.nightVictim = null; cur.wolfVotes = {}; cur.seerCheck = null;
+      if (checkWin(cur)) return;
+      cur.phase = 'day'; cur.dayVotes = {};
+    }
+    function resolveDay(cur) {
+      var tally = {}; var dv = cur.dayVotes || {};
+      Object.keys(dv).forEach(function (p) { if (dv[p]) tally[dv[p]] = (tally[dv[p]] || 0) + 1; });
+      var top = null, best = -1; Object.keys(tally).forEach(function (t) { if (tally[t] > best) { best = tally[t]; top = t; } });
+      if (top) { cur.players[top].alive = false; cur.lastDayDead = top; cur.banner = '⚖️ Le village élimine ' + Room.name(top) + ' — c\'était un ' + ROLE_INFO[roleOf(cur, top)].nm + ' !'; }
+      else cur.banner = '⚖️ Aucun vote — personne n\'est éliminé';
+      cur.dayVotes = {}; cur.day = (cur.day || 1) + 1;
+      if (checkWin(cur)) return;
+      cur.phase = 'wolves'; cur.banner = '🌙 Nuit ' + cur.day + ' — le village s\'endort…';
+    }
+
+    /* ━━ Actions (humain & bot via window.myPid) ━━ */
+    function actWolf(target) { submit('wolves', target); }
+    function actSeer(target) { submit('seer', target); }
+    function actVote(target) { submit('day', target); }
+    function submit(phase, target) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== phase) return cur;
+        var me = window.myPid; if (!P(cur, me).alive) return cur;
+        if (phase === 'wolves') {
+          if (roleOf(cur, me) !== 'loup') return cur;
+          cur.wolfVotes = cur.wolfVotes || {}; cur.wolfVotes[me] = target;
+          if (aliveWolves(cur).every(function (p) { return p in cur.wolfVotes; })) resolveWolves(cur);
+        } else if (phase === 'seer') {
+          if (roleOf(cur, me) !== 'voyante' || cur.seerCheck) return cur;
+          var isW = roleOf(cur, target) === 'loup';
+          cur.players[me].knows = cur.players[me].knows || {}; cur.players[me].knows[target] = isW;
+          cur.seerCheck = { by: me, target: target, isWolf: isW };
+          resolveNight(cur);
+        } else if (phase === 'day') {
+          cur.dayVotes = cur.dayVotes || {}; cur.dayVotes[me] = target;
+          if (aliveList(cur).every(function (p) { return p in cur.dayVotes; })) resolveDay(cur);
+        }
+        return cur;
+      });
+    }
+    // La voyante (humaine) accuse publiquement.
+    function claimSeer(target) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || roleOf(cur, window.myPid) !== 'voyante') return cur;
+        cur.claims = cur.claims || {}; cur.claims[target] = window.myPid;
+        cur.banner = '🔮 ' + Room.name(window.myPid) + ' accuse ' + Room.name(target) + ' d\'être un loup !';
+        return cur;
+      });
+    }
+
+    /* ━━ IA ━━ Loups : tuent un villageois (priorité au voyant revendiqué), votent
+       groupés. Voyante : sonde, révèle un loup trouvé. Villageois : suivent une
+       accusation crédible, sinon votent au hasard. Difficile = coordination forte. ━━ */
+    function claimedWolf(s) { var c = s.claims || {}; var k = Object.keys(c).filter(function (t) { return P(s, t).alive; }); return k[0] || null; }
+    function lgBot(state, pid) {
+      if (state.status !== 'playing' || !P(state, pid).alive) return;
+      var level = window.Bots ? window.Bots.level(state) : 'normal';
+      if (state.phase === 'wolves' && roleOf(state, pid) === 'loup' && !((state.wolfVotes || {})[pid])) {
+        var prey = aliveVillagers(state);
+        // cible prioritaire : un joueur qui a "accusé" (sans doute la voyante) ; sinon plus petit siège (coordination)
+        var claimer = Object.keys(state.claims || {})[0];
+        var claimerSeer = claimer ? (state.claims[claimer]) : null;
+        var target = (claimerSeer && P(state, claimerSeer).alive) ? claimerSeer : prey.sort(function (a, b) { return (P(state, a).seat || 0) - (P(state, b).seat || 0); })[0];
+        if (level === 'easy') target = prey[Math.floor(Math.random() * prey.length)];
+        if (target) window.myPid = pid, actWolf(target);
+        return;
+      }
+      if (state.phase === 'seer' && roleOf(state, pid) === 'voyante' && !state.seerCheck) {
+        var knows = P(state, pid).knows || {};
+        var cand = aliveList(state).filter(function (p) { return p !== pid && !(p in knows); });
+        var t = cand[Math.floor(Math.random() * cand.length)] || cand[0];
+        if (t) { window.myPid = pid; actSeer(t); }
+        return;
+      }
+      if (state.phase === 'day' && !((state.dayVotes || {})[pid])) {
+        window.myPid = pid;
+        var role = roleOf(state, pid), me = pid;
+        if (role === 'loup') {
+          // viser un villageois (le voyant revendiqué en priorité), jamais un loup
+          var claimer2 = Object.keys(state.claims || {})[0];
+          var seer = claimer2 ? state.claims[claimer2] : null;
+          var villagers = aliveVillagers(state);
+          var tgt = (seer && P(state, seer).alive) ? seer : villagers.sort(function (a, b) { return (P(state, a).seat || 0) - (P(state, b).seat || 0); })[0];
+          if (level === 'easy') tgt = villagers[Math.floor(Math.random() * villagers.length)];
+          actVote(tgt); return;
+        }
+        if (role === 'voyante') {
+          // révèle un loup trouvé (accusation) puis vote dessus
+          var knownWolf = Object.keys(P(state, me).knows || {}).filter(function (t) { return P(state, me).knows[t] && P(state, t).alive; })[0];
+          if (knownWolf) {
+            if (!(state.claims || {})[knownWolf]) { rref().child('claims/' + knownWolf).set(me); }
+            actVote(knownWolf); return;
+          }
+          actVote(randomOther(state, me)); return;
+        }
+        // villageois : suivre une accusation crédible, sinon au hasard
+        var cw = claimedWolf(state);
+        if (cw && level !== 'easy' && Math.random() < 0.85) { actVote(cw); return; }
+        actVote(randomOther(state, me)); return;
+      }
+    }
+    function randomOther(s, me) { var a = aliveList(s).filter(function (p) { return p !== me; }); return a[Math.floor(Math.random() * a.length)]; }
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var me = window.myPid, myRole = roleOf(state, me), iAmAlive = P(state, me).alive;
+      var night = (state.phase === 'wolves' || state.phase === 'seer');
+      var ph = document.getElementById('lg-phase');
+      ph.className = 'lg-phase' + (night ? ' lg-phase-night' : '');
+      ph.innerHTML = '<div class="lg-phase-icon">' + (night ? '🌙' : '☀️') + '</div>' +
+        '<div class="lg-phase-title">' + (night ? 'Nuit ' + (state.day || 1) : 'Jour ' + (state.day || 1)) + '</div>' +
+        '<div class="lg-role">Ton rôle : ' + ROLE_INFO[myRole].ic + ' ' + ROLE_INFO[myRole].nm + (iAmAlive ? '' : ' (mort)') + '</div>';
+      setText('lg-banner', state.banner || '');
+
+      // Instruction + cibles cliquables selon la phase
+      var instruct = '', pickFn = null, canPick = function () { return false; };
+      if (!iAmAlive) instruct = 'Tu es mort·e — observe la partie.';
+      else if (state.phase === 'wolves') {
+        if (myRole === 'loup') {
+          if ((state.wolfVotes || {})[me]) instruct = 'Choix fait. Les autres loups décident…';
+          else { instruct = '🐺 <b>Choisis ta victime</b> cette nuit.'; pickFn = 'actWolf'; canPick = function (p) { return p !== me && roleOf(state, p) !== 'loup'; }; }
+        } else instruct = '😴 Tu dors… les loups rôdent.';
+      } else if (state.phase === 'seer') {
+        if (myRole === 'voyante') {
+          if (state.seerCheck) instruct = 'Tu as sondé ' + Room.name(state.seerCheck.target) + '…';
+          else { instruct = '🔮 <b>Sonde un joueur</b> pour connaître son camp.'; pickFn = 'actSeer'; canPick = function (p) { return p !== me; }; }
+        } else instruct = '😴 La voyante consulte les astres…';
+      } else if (state.phase === 'day') {
+        if ((state.dayVotes || {})[me]) instruct = 'Vote enregistré. En attente des autres…';
+        else { instruct = '⚖️ <b>Vote</b> pour éliminer un suspect.'; pickFn = 'actVote'; canPick = function (p) { return p !== me; }; }
+      }
+      setHTML('lg-instruct', instruct);
+
+      // Connaissances de la voyante
+      var knows = (myRole === 'voyante') ? (P(state, me).knows || {}) : {};
+      var dayTally = {}; var dv = state.dayVotes || {}; Object.keys(dv).forEach(function (p) { if (dv[p]) dayTally[dv[p]] = (dayTally[dv[p]] || 0) + 1; });
+
+      setHTML('lg-players', (state.order || []).map(function (pid) {
+        var alive = P(state, pid).alive, pickable = iAmAlive && pickFn && alive && canPick(pid);
+        var tag = '';
+        if (!alive) tag = '<span class="lg-ptag">☠️ ' + ROLE_INFO[roleOf(state, pid)].nm + '</span>';
+        else if (myRole === 'loup' && roleOf(state, pid) === 'loup' && pid !== me) tag = '<span class="lg-ptag wolf">🐺 allié</span>';
+        else if (knows[pid] != null) tag = '<span class="lg-ptag ' + (knows[pid] ? 'wolf' : '') + '">' + (knows[pid] ? '🐺 loup !' : '✓ villageois') + '</span>';
+        else if ((state.claims || {})[pid]) tag = '<span class="lg-ptag claim">⚠️ accusé</span>';
+        var votes = (state.phase === 'day' && dayTally[pid]) ? '<div class="lg-votes">' + dayTally[pid] + ' vote' + (dayTally[pid] > 1 ? 's' : '') + '</div>' : '';
+        return '<div class="lg-pcard' + (alive ? '' : ' dead') + (pickable ? ' pick' : '') + (pid === me ? ' me' : '') + '"' + (pickable ? ' onclick="' + pickFn + '(\'' + pid + '\')"' : '') + '>' +
+          '<div class="lg-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</div>' +
+          '<div class="lg-pname">' + escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '</div>' + (tag || '<div class="lg-ptag"></div>') + votes + '</div>';
+      }).join(''));
+
+      // Bouton « accuser » pour la voyante humaine vivante (le jour)
+      var act = '';
+      if (iAmAlive && myRole === 'voyante' && state.phase === 'day') {
+        var kw = Object.keys(knows).filter(function (t) { return knows[t] && P(state, t).alive && !(state.claims || {})[t]; });
+        if (kw.length) act = '<button class="btn-primary" onclick="claimSeer(\'' + kw[0] + '\')">🔮 Accuser ' + escapeHtml(Room.name(kw[0])) + ' (loup !)</button>';
+      }
+      setHTML('lg-actions', act);
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var win = state.winner;
+      var iWon = (win === 'loups' && roleOf(state, window.myPid) === 'loup') || (win === 'village' && roleOf(state, window.myPid) !== 'loup');
+      setText('res-emoji', win === 'loups' ? '🐺' : '🎉');
+      setText('res-title', win === 'loups' ? 'Les loups l\'emportent !' : 'Le village est sauvé !');
+      setText('res-sub', iWon ? 'Bravo, ton camp gagne !' : 'Ton camp a perdu… revanche ?');
+      setHTML('lg-reveal', (state.order || []).map(function (pid) {
+        var r = roleOf(state, pid);
+        return '<div class="lg-reveal-row"><span class="lg-reveal-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="lg-reveal-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span>' + ROLE_INFO[r].ic + ' ' + ROLE_INFO[r].nm + (P(state, pid).alive ? '' : ' ☠️') + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>
