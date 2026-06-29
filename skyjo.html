@@ -229,6 +229,24 @@
         }
         return -1;
       }
+      // Colonne où UNE case visible vaut déjà `card` : y poser `card` crée une paire
+      // (vers l'élimination de la colonne). On remplace de préférence une case visible
+      // PLUS HAUTE (gain de score + construction) ; sinon une cachée si `card` est basse.
+      function columnBuild(card) {
+        var best = -1, bestGain = -Infinity;
+        for (var col = 0; col < 4; col++) {
+          var idx = [col, col + 4, col + 8];
+          if (rm[idx[0]] || rm[idx[1]] || rm[idx[2]]) continue;
+          var match = 0; idx.forEach(function (c) { if (fl[c] && grid[c] === card) match++; });
+          if (match !== 1) continue;
+          idx.forEach(function (c) {
+            if (fl[c] && grid[c] === card) return;            // déjà la bonne carte
+            var gain = fl[c] ? (grid[c] - card) : (EXP - card - 1); // visible: vrai gain ; cachée: gain espéré (légèrement pénalisé)
+            if (gain > bestGain && gain > 0) { bestGain = gain; best = c; }
+          });
+        }
+        return best;
+      }
       var easy = window.Bots && window.Bots.level(state) === 'easy';
       var drawn = (state.drawnCard != null);
       if (!drawn) {
@@ -251,13 +269,17 @@
       var card = state.drawnCard, from = state.drawnFrom, mvx = maxVisible();
       var colT = columnTarget(card);
       if (colT >= 0) { replaceCell(colT); return; }                     // éliminer une colonne
+      var colB = columnBuild(card);                                     // construire une colonne (paire)
       if (from === 'discard') {
-        if (mvx.idx >= 0 && card < mvx.val) replaceCell(mvx.idx);
+        // Prise dans la défausse : on a CHOISI cette carte → la placer au mieux.
+        if (colB >= 0 && (mvx.idx < 0 || card <= mvx.val)) { replaceCell(colB); return; } // construire une colonne
+        if (mvx.idx >= 0 && card < mvx.val) replaceCell(mvx.idx);       // sinon remplacer la plus haute
         else if (hiddens().length) replaceCell(hiddens()[0]);
         else replaceCell(mvx.idx >= 0 ? mvx.idx : visibles()[0] || 0);
         return;
       }
-      // pioche : échanger (si ça améliore) ou défausser + retourner une cachée
+      // pioche : construire une colonne si net, sinon échanger (si ça améliore), sinon défausser
+      if (colB >= 0 && card <= 4) { replaceCell(colB); return; }        // bâtir une paire avec une carte basse
       var gv = mvx.idx >= 0 ? (mvx.val - card) : -Infinity;
       var gh = hiddens().length ? (EXP - card) : -Infinity;
       if (gv >= gh && gv > 0) { replaceCell(mvx.idx); return; }

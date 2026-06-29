@@ -344,9 +344,16 @@
 
       var myTurn = (state.turn === me) && !state.winner;
       var P = P_(state, me) || { hand: [] };
-      setText('mb-status', myTurn ? (targeting ? 'Touche l\'adversaire à attaquer ↑' : 'À toi : joue ou défausse une carte') : '⏳ En attente de ' + escapeHtml(Room.name(state.turn)) + '…');
+      var canMove = myTurn && hasAnyMove(state, me);
+      var statusTxt;
+      if (!myTurn) statusTxt = '⏳ En attente de ' + escapeHtml(Room.name(state.turn)) + '…';
+      else if (targeting) statusTxt = 'Touche l\'adversaire à attaquer ↑';
+      else if (!canMove) statusTxt = '🚫 Aucun coup possible — choisis une carte et défausse-la pour passer ton tour';
+      else statusTxt = 'À toi (carte piochée) : joue une carte… ou défausse-en une';
+      setText('mb-status', statusTxt);
       setHTML('mb-actions', myTurn && !targeting ?
-        '<button class="mb-act play" onclick="play()"' + (sel < 0 ? ' disabled' : '') + '>Jouer</button><button class="mb-act" onclick="discard()"' + (sel < 0 ? ' disabled' : '') + '>Défausser</button>' :
+        '<button class="mb-act play" onclick="play()"' + (sel < 0 || !canMove ? ' disabled' : '') + '>Jouer</button>' +
+        '<button class="mb-act' + (!canMove ? ' play' : '') + '" onclick="discard()"' + (sel < 0 ? ' disabled' : '') + '>Défausser</button>' :
         (targeting ? '<button class="mb-act" onclick="cancelTarget()">Annuler</button>' : ''));
       setHTML('mb-hand', (P.hand || []).map(function (card, i) {
         var c = CARD[card];

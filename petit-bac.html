@@ -20,6 +20,12 @@
     .pb-rounds-row { display: flex; gap: 8px; justify-content: center; }
     .pb-round-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; transition: all 0.18s; }
     .pb-round-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .pb-cats-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .pb-cat-chip { border: 1.5px solid var(--gold-light); background: var(--cream); color: var(--ink-light); border-radius: 20px; padding: 4px 10px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+    .pb-cat-chip.on { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .pb-cat-add { display: flex; gap: 6px; }
+    .pb-cat-input { flex: 1; min-width: 0; padding: 0.45rem 0.7rem; border: 1.5px solid var(--gold-light); border-radius: 10px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; }
+    .pb-cat-addbtn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 10px; padding: 0 0.8rem; font-weight: 700; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
 
     /* Playing */
     .pb-head { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; }
@@ -177,6 +183,9 @@
       { id: 'film_serie',     label: 'Film / Série',     emoji: '🎬' },
       { id: 'animaux',        label: 'Animal',           emoji: '🦁' }
     ];
+    // Catégories ACTIVES : choisies dans le salon (room.cats), figées au lancement
+    // dans state.cats. Par défaut, les 9 ci-dessus.
+    function curCats() { return (window.room && window.room.cats) || CATEGORIES; }
 
     /* ━━ State local ━━ */
     var prevStatus = null;
@@ -196,7 +205,7 @@
     function computeRound(letter, order, answers, invalid) {
       var perCat = {}, totals = {};
       order.forEach(function (p) { totals[p] = 0; });
-      CATEGORIES.forEach(function (cat) {
+      curCats().forEach(function (cat) {
         var entries = order.map(function (pid) {
           var raw = (answers[pid] && answers[pid][cat.id]) || '';
           var contested = invalid[cat.id] && invalid[cat.id][pid];
@@ -239,15 +248,44 @@
       onStart: onStart
     });
 
-    /* Réglage du nombre de manches dans le salon. */
+    /* Réglages du salon : nombre de manches + choix des catégories. */
     function lobbyExtraHTML(room) {
       var sel = (room && room.maxRounds) || 5;
       var btns = [3, 5, 7, 10].map(function (n) {
         return '<button class="pb-round-btn' + (n === sel ? ' active' : '') + '" onclick="setMaxRounds(' + n + ')">' + n + '</button>';
       }).join('');
-      return '<div class="pb-settings"><div class="pb-settings-label">Nombre de manches</div><div class="pb-rounds-row">' + btns + '</div></div>';
+      var active = (room && room.cats) || CATEGORIES;
+      var activeIds = active.map(function (c) { return c.id; });
+      // chips des catégories intégrées (on/off) + les custom déjà ajoutées
+      var chips = curCats().map(function (c) {
+        var on = activeIds.indexOf(c.id) >= 0;
+        return '<button class="pb-cat-chip' + (on ? ' on' : '') + '" onclick="toggleCat(\'' + c.id + '\')">' + c.emoji + ' ' + c.label + (on ? ' ✓' : '') + '</button>';
+      }).join('');
+      var customs = active.filter(function (c) { return c.id.indexOf('custom_') === 0; }).map(function (c) {
+        return '<button class="pb-cat-chip on" onclick="toggleCat(\'' + c.id + '\')">✏️ ' + escapeHtml(c.label) + ' ✕</button>';
+      }).join('');
+      return '<div class="pb-settings"><div class="pb-settings-label">Nombre de manches</div><div class="pb-rounds-row">' + btns + '</div></div>' +
+        '<div class="pb-settings"><div class="pb-settings-label">Catégories (' + active.length + ')</div>' +
+        '<div class="pb-cats-row">' + chips + customs + '</div>' +
+        '<div class="pb-cat-add"><input id="pb-cat-new" class="pb-cat-input" maxlength="20" placeholder="Catégorie perso…"><button class="pb-cat-addbtn" onclick="addCat()">+ Ajouter</button></div></div>';
     }
     function setMaxRounds(n) { if (window.roomRef) window.roomRef.child('maxRounds').set(n); }
+    function lobbyCatsNow() { return (window.room && window.room.cats) ? window.room.cats.slice() : CATEGORIES.slice(); }
+    function toggleCat(id) {
+      var list = lobbyCatsNow(), i = list.map(function (c) { return c.id; }).indexOf(id);
+      if (i >= 0) { if (list.length <= 1) { lbToast('Garde au moins 1 catégorie'); return; } list.splice(i, 1); }
+      else { var def = CATEGORIES.filter(function (c) { return c.id === id; })[0]; if (def) list.push(def); }
+      if (window.roomRef) window.roomRef.child('cats').set(list);
+    }
+    function addCat() {
+      var inp = document.getElementById('pb-cat-new'); var v = (inp && inp.value || '').trim();
+      if (!v) return;
+      var list = lobbyCatsNow();
+      if (list.length >= 14) { lbToast('14 catégories max'); return; }
+      list.push({ id: 'custom_' + Date.now().toString(36), label: v, emoji: '✏️' });
+      if (window.roomRef) window.roomRef.child('cats').set(list);
+      if (inp) inp.value = '';
+    }
 
     /* ━━ État initial d'une partie ━━ */
     function onStart(players, cur) {
@@ -257,6 +295,7 @@
       return {
         round: 1,
         maxRounds: (cur && cur.maxRounds) || 5,
+        cats: (cur && cur.cats) || CATEGORIES,   // catégories figées pour la partie
         currentLetter: letter,
         usedLetters: [letter],
         scores: scores,
@@ -289,7 +328,7 @@
     /* ━━ Jeu ━━ */
     function buildInputs() {
       var list = document.getElementById('input-list');
-      list.innerHTML = CATEGORIES.map(function (cat) {
+      list.innerHTML = curCats().map(function (cat) {
         return '<div class="input-row"><span class="input-emoji">' + cat.emoji + '</span>' +
           '<span class="input-label">' + cat.label + '</span>' +
           '<input type="text" id="input-' + cat.id + '" class="bac-input" autocomplete="off" maxlength="40"></div>';
@@ -312,13 +351,13 @@
       if (!inputsBuilt) buildInputs();
       // reset des champs pour la nouvelle manche
       if (answersSyncTimer) { clearTimeout(answersSyncTimer); answersSyncTimer = null; }
-      CATEGORIES.forEach(function (cat) { var i = document.getElementById('input-' + cat.id); if (i) { i.value = ''; i.disabled = false; } });
+      curCats().forEach(function (cat) { var i = document.getElementById('input-' + cat.id); if (i) { i.value = ''; i.disabled = false; } });
       buzzWrittenFor = null;
       var notif = document.getElementById('buzz-notif'); if (notif) notif.style.display = 'none';
       var btn = document.getElementById('btn-buzz'); if (btn) { btn.disabled = false; btn.textContent = "J'ai fini ! ✋"; }
       updatePlayHeader(state);
       showScreen('s-playing');
-      var first = document.getElementById('input-' + CATEGORIES[0].id);
+      var first = document.getElementById('input-' + curCats()[0].id);
       if (first) setTimeout(function () { first.focus(); }, 150);
     }
     function updatePlayHeader(state) {
@@ -327,7 +366,7 @@
     }
     function collectAnswers() {
       var ans = {};
-      CATEGORIES.forEach(function (cat) {
+      curCats().forEach(function (cat) {
         var i = document.getElementById('input-' + cat.id);
         var v = (i && i.value || '').trim();
         if (v) ans[cat.id] = v;
@@ -335,7 +374,7 @@
       return ans;
     }
     function lockInputs() {
-      CATEGORIES.forEach(function (cat) { var i = document.getElementById('input-' + cat.id); if (i) i.disabled = true; });
+      curCats().forEach(function (cat) { var i = document.getElementById('input-' + cat.id); if (i) i.disabled = true; });
       var btn = document.getElementById('btn-buzz'); if (btn) btn.disabled = true;
     }
     function writeMyAnswers() {
@@ -397,7 +436,7 @@
       }).join('');
 
       // Liste par catégorie
-      document.getElementById('pb-review-list').innerHTML = CATEGORIES.map(function (cat) {
+      document.getElementById('pb-review-list').innerHTML = curCats().map(function (cat) {
         var entries = res.perCat[cat.id] || [];
         var rows = entries.map(function (e) {
           var contested = state.invalid && state.invalid[cat.id] && state.invalid[cat.id][e.pid];
