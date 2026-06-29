@@ -40,6 +40,7 @@ la synchro temps réel.
 | 📝 Petit bac | 2–12 |  | mots |
 | 🔴 Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
 | ⚫ Othello | 2 | ✈️ | réflexion (IA forte) |
+| 🔴 Dames | 2 | ✈️ | réflexion (IA forte) |
 | ✨ Dobble | 2–8 |  | rapidité |
 | ⚡ Crack-list | 2–8 |  | mots |
 | 🔍 Lynx | 2–12 |  | observation |
@@ -104,7 +105,7 @@ Glisser le dossier sur Netlify (ou `netlify deploy`). Aucun build.
 | `nav.js` | Barre du haut (accueil + thème clair/sombre) |
 | `head.js` / `boot.js` | En-tête HTML commun + chargement des scripts partagés |
 | `theme.css` / `game.css` | Palette + mode sombre + coquille commune des jeux |
-| `p4-ai.js` / `morpion-ai.js` / `othello-ai.js` | Cœurs d'IA purs (réutilisés par la page **et** le benchmark) |
+| `p4-ai.js` / `morpion-ai.js` / `othello-ai.js` / `dames-ai.js` | Cœurs d'IA purs (réutilisés par la page **et** le benchmark) |
 | `monopoly-engine.js` / `cluedo-engine.js` | Moteurs de règles purs (sans DOM) |
 | `games/<jeu>.html` | Une page par jeu (logique + rendu) — toutes regroupées dans `games/` |
 | `tools/check.js` | Vérifs CI : syntaxe JS, cohérence index/sw, JSON |

@@ -70,6 +70,7 @@
     var GAMES = [      { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true, type: 'mots' },
       { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
       { key: 'othello',         name: 'Othello',         emoji: '⚫', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'dames',           name: 'Dames',           emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
       { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true, type: 'rapidité' },
       { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true, type: 'mots' },
       { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true, type: 'observation' },
@@ -102,7 +103,7 @@
     // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
     // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
     var CATS = [
-      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'othello', 'morpion', 'mastermind', 'sudoku', '2048'] },
+      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'othello', 'dames', 'morpion', 'mastermind', 'sudoku', '2048'] },
       { title: 'Cartes',              emoji: '🃏', keys: ['uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye'] },
       { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale'] },
       { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'crack-list', 'pictionary', 'telephone-dessine'] },

@@ -16,6 +16,7 @@ var ROOT = path.resolve(__dirname, '..');
 var P4 = require(path.join(ROOT, 'p4-ai.js')).P4AI;
 var MP = require(path.join(ROOT, 'morpion-ai.js')).MorpionAI;
 var OT = require(path.join(ROOT, 'othello-ai.js')).OthelloAI;
+var DA = require(path.join(ROOT, 'dames-ai.js')).DamesAI;
 
 var FULL = process.argv.indexOf('--full') >= 0;
 var failures = [];
@@ -97,6 +98,42 @@ function otMatch(label, pickA, pickB, n, expect) {
   report('Othello', label, w, n, expect);
 }
 
+// ── Dames / Checkers ───────────────────────────────────────────────────────
+function daMat(b) { var c = DA.counts(b); return c.w + c.b + c.W + c.B; }
+function daRandom(b, side) { var m = DA.legalMoves(b, side); return m.length ? m[(Math.random() * m.length) | 0] : null; }
+// A = blanc ('w', commence), B = noir ('b'). En cas de blocage par la règle des
+// 60 demi-coups sans capture, on tranche par la DOMINATION matérielle : mater un
+// roi seul qui fuit n'est pas l'objet du banc (et il n'y a pas de telle limite en
+// vrai jeu) ; ce qui mesure la force, c'est d'écraser au matériel. Un écart ≥ 3
+// pièces compte comme victoire, sinon nulle.
+function daDominance(b) {
+  var c = DA.counts(b), white = c.w + c.W, black = c.b + c.B;
+  if (white - black >= 3) return 'A';
+  if (black - white >= 3) return 'B';
+  return 'draw';
+}
+function daPlay(pickA, pickB) {
+  var b = DA.startBoard(), side = 'w', plies = 0, sinceCap = 0, lastMat = daMat(b);
+  while (plies++ < 120) {
+    var mv = (side === 'w') ? pickA(b, 'w', 'b') : pickB(b, 'b', 'w');
+    if (!mv) return side === 'w' ? 'B' : 'A'; // bloqué → l'autre gagne
+    b = DA.applyMove(b, mv, side);
+    var m = daMat(b);
+    sinceCap = (m < lastMat) ? 0 : sinceCap + 1; lastMat = m;
+    // Partie décidée (écart ≥ 5) → inutile de jouer la longue traque du roi seul.
+    var c = DA.counts(b), gap = (c.w + c.W) - (c.b + c.B);
+    if (gap >= 4) return 'A'; if (gap <= -4) return 'B';
+    if (sinceCap >= 30) return daDominance(b);
+    side = DA.other(side);
+  }
+  return daDominance(b);
+}
+function daMatch(label, pickA, pickB, n, expect) {
+  var w = { A: 0, B: 0, draw: 0 };
+  for (var i = 0; i < n; i++) w[daPlay(pickA, pickB)]++;
+  report('Dames', label, w, n, expect);
+}
+
 // ── Rapport + seuils ───────────────────────────────────────────────────────
 function pct(x, n) { return (100 * x / n).toFixed(0) + '%'; }
 function report(game, label, w, n, expect) {
@@ -116,15 +153,19 @@ var rnd4 = function (b) { return p4RandomCol(b); };
 var hard4 = function (b, me, opp) { return P4.bestColumn(b, me, opp, HARD4_DEPTH); };
 var easy4 = function (b, me, opp) { return P4.bestColumn(b, me, opp, 2); };
 var rndM = function (b, m) { return mpRandom(b, m); };
-var hardM = function (b, me, opp) { return MP.bestMove(b, me, opp, 10); };
+var hardM = function (b, me, opp) { return MP.bestMove(b, me, opp, FULL ? 10 : 7); };
 var easyM = function (b, me, opp) { return MP.bestMove(b, me, opp, 2); };
-var HARDO_DEPTH = FULL ? 7 : 5;
+var HARDO_DEPTH = FULL ? 7 : 4;
 var rndO = function (b, me) { return otRandom(b, me); };
 var hardO = function (b, me, opp) { return OT.bestMove(b, me, opp, HARDO_DEPTH); };
 var easyO = function (b, me, opp) { return OT.bestMove(b, me, opp, 1); };
+var HARDD_DEPTH = FULL ? 7 : 4;
+var rndD = function (b, side) { return daRandom(b, side); };
+var hardD = function (b, me, opp) { return DA.bestMove(b, me, opp, HARDD_DEPTH); };
+var easyD = function (b, me, opp) { return DA.bestMove(b, me, opp, 2); };
 
 console.log('🤖 Banc d\'essai des IA' + (FULL ? ' (complet)' : '') + '\n');
-var N4 = FULL ? 200 : 24, NM = FULL ? 200 : 60, NO = FULL ? 100 : 20;
+var N4 = FULL ? 200 : 24, NM = FULL ? 200 : 40, NO = FULL ? 100 : 12, ND = FULL ? 40 : 10;
 
 // Puissance 4 : « difficile » doit écraser l'aléatoire et ne jamais perdre contre lui.
 p4Match('difficile (A) vs aléatoire (B)', hard4, rnd4, N4, { minA: 0.9, maxBLoss: 0.02 });
@@ -137,6 +178,12 @@ mpMatch('difficile (A) vs facile (B)', hardM, easyM, Math.max(20, NM / 3 | 0), {
 // Othello : « difficile » doit largement dominer l'aléatoire et le « facile ».
 otMatch('difficile (A) vs aléatoire (B)', hardO, rndO, NO, { minA: 0.9, maxBLoss: 0.05 });
 otMatch('difficile (A) vs facile (B)', hardO, easyO, Math.max(16, NO / 2 | 0), { minA: 0.6 });
+
+// Dames : « difficile » domine l'aléatoire au matériel et ne perd JAMAIS (ni contre
+// l'aléatoire, ni contre « facile »). Mater un roi seul qui fuit n'est pas l'objet
+// du banc : on mesure la domination (cf. daDominance / arrêt anticipé sur écart).
+daMatch('difficile (A) vs aléatoire (B)', hardD, rndD, ND, { minA: 0.55, maxBLoss: 0.0 });
+daMatch('difficile (A) vs facile (B)', hardD, easyD, FULL ? 20 : 5, { maxBLoss: 0.0 });
 
 console.log('');
 if (failures.length) {

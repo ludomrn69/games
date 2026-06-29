@@ -14,13 +14,13 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v16';
+var CACHE = 'jeux-v17';
 var ASSETS = [
   './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
-  'head.js', 'boot.js', 'p4-ai.js', 'morpion-ai.js', 'othello-ai.js',
+  'head.js', 'boot.js', 'p4-ai.js', 'morpion-ai.js', 'othello-ai.js', 'dames-ai.js',
   'monopoly-engine.js', 'cluedo-engine.js',
-  'games/petit-bac.html', 'games/puissance4.html', 'games/othello.html', 'games/dobble-emoji.html',
+  'games/petit-bac.html', 'games/puissance4.html', 'games/othello.html', 'games/dames.html', 'games/dobble-emoji.html',
   'games/crack-list.html', 'games/lynx.html', 'games/pictionary.html', 'games/uno.html', 'games/skyjo.html',
   'games/blokus.html', 'games/bataille-navale.html', 'games/codenames.html', 'games/morpion.html',
   'games/undercover.html', 'games/president.html', 'games/ludo.html',
