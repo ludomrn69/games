@@ -109,6 +109,60 @@
     }
   };
 
+  // ── Alerte « c'est ton tour » (son + vibration), partagée ─────────────────
+  // Un jeu n'a rien à faire : masterOnState (en ligne) et offline.js (hors-ligne)
+  // appellent turnAlertFor(room) à chaque changement d'état ; le bip + la vibration
+  // ne se déclenchent qu'au PASSAGE à ton tour. Désactivable (localStorage games.sound).
+  var _lastMine = false, _audioCtx = null;
+  function soundOn() { try { return localStorage.getItem('games.sound') !== '0'; } catch (e) { return true; } }
+  function beep() {
+    if (!soundOn()) return;
+    try {
+      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      var o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(_audioCtx.destination);
+      var t = _audioCtx.currentTime; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32); o.start(t); o.stop(t + 0.34);
+    } catch (e) {}
+  }
+  window.Lobby = window.Lobby || {};
+  window.Lobby.toggleSound = function () { var on = !soundOn(); try { localStorage.setItem('games.sound', on ? '1' : '0'); } catch (e) {} if (on) beep(); return on; };
+  window.Lobby.soundOn = soundOn;
+  window.Lobby.turnAlertFor = function (room) {
+    var mine = !!(room && room.status === 'playing' && !room.winner && room.turn === window.myPid);
+    if (mine && !_lastMine) { beep(); try { if (soundOn() && navigator.vibrate) navigator.vibrate(180); } catch (e) {} }
+    _lastMine = mine;
+    updateTurnClock(room);
+  };
+
+  // ── Chrono de tour (visuel) — pastille flottante, par jeu au tour par tour ────
+  // Compte à rebours local depuis le dernier changement de `turn`. Purement
+  // informatif (urgence) ; ne saute pas le tour automatiquement.
+  var _clockTurn = null, _clockStart = 0, _clockInt = null, TURN_SECONDS = 60;
+  function turnClockEl() {
+    var el = document.getElementById('lb-turnclock');
+    if (!el) { el = document.createElement('div'); el.id = 'lb-turnclock'; el.className = 'lb-turnclock'; document.body.appendChild(el); }
+    return el;
+  }
+  function updateTurnClock(room) {
+    var active = room && room.status === 'playing' && !room.winner && room.turn;
+    // Salon solo/local (un seul humain présent) : pas de chrono utile.
+    var online = room && room.players && Object.keys(room.players).filter(function (k) { return room.players[k].online && !room.players[k].isBot; }).length > 1;
+    if (!active || !online) { if (_clockInt) { clearInterval(_clockInt); _clockInt = null; } var e = document.getElementById('lb-turnclock'); if (e) e.style.display = 'none'; _clockTurn = null; return; }
+    if (room.turn !== _clockTurn) { _clockTurn = room.turn; _clockStart = Date.now(); }
+    if (_clockInt) clearInterval(_clockInt);
+    var render = function () {
+      var left = Math.max(0, TURN_SECONDS - Math.floor((Date.now() - _clockStart) / 1000));
+      var el = turnClockEl(); el.style.display = 'block';
+      var mine = room.turn === window.myPid;
+      el.textContent = '⏱ ' + left + 's' + (mine ? ' — à toi' : '');
+      el.className = 'lb-turnclock' + (left <= 10 ? ' urgent' : '') + (mine ? ' mine' : '');
+      if (left <= 0) { clearInterval(_clockInt); _clockInt = null; }
+    };
+    render(); _clockInt = setInterval(render, 1000);
+  }
+
   // ── Difficulté des ordis (partagée par tous les jeux) ─────────────────────
   // Niveau stocké dans le salon (room.difficulty) : 'easy' | 'normal' | 'hard'.
   // Les bots de chaque jeu lisent window.Bots.level(state) et adaptent soit leur
@@ -343,6 +397,7 @@
     if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
+    try { window.Lobby.turnAlertFor(room); } catch (e) {}
   }
   function isActive(id) { var el = document.getElementById(id); return el && el.classList.contains('active'); }
 

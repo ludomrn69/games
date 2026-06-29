@@ -233,6 +233,7 @@
     if (mode === 'solo') {
       window.myPid = humanPid;
       safeOnState();
+      try { if (window.Lobby && Lobby.turnAlertFor) Lobby.turnAlertFor(room); } catch (e) {}
       if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
     } else {
       if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); return; }

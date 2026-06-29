@@ -199,6 +199,12 @@ html[data-theme="dark"] .game-restart-btn {
 .lb-set-btn:disabled { opacity: 0.55; cursor: default; }
 .lb-set-hint { font-size: 0.78rem; color: var(--ink-light); text-align: center; }
 
+/* Chrono de tour flottant (jeux au tour par tour, en ligne) */
+.lb-turnclock { position: fixed; top: 60px; right: 12px; z-index: 400; display: none; background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); border-radius: 30px; padding: 4px 12px; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.82rem; box-shadow: var(--shadow); }
+.lb-turnclock.mine { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+.lb-turnclock.urgent { animation: lbclockpulse 0.7s ease-in-out infinite alternate; }
+@keyframes lbclockpulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+
 /* Bouton flottant « revoir le résultat » (après « revoir le plateau ») */
 .mp-peek-btn, .p4-peek-btn, .lb-peek-btn {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 510; display: none;
