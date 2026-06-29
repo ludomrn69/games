@@ -324,9 +324,11 @@
   }
   function startAuction(s, prop) {
     var bidders = alive(s).slice();
-    s.auction = { prop: prop, turn: bidders[0], high: null, highBid: 0, passed: {}, bidders: bidders };
+    // Le joueur qui a refusé d'acheter participe AUSSI et commence les enchères.
+    var first = (s.turn && bidders.indexOf(s.turn) >= 0) ? s.turn : bidders[0];
+    s.auction = { prop: prop, turn: first, high: null, highBid: 0, passed: {}, bidders: bidders };
     s.pending = null; s.phase = 'auction';
-    log(s, 'Enchère : ' + B[prop].n);
+    log(s, 'Enchère : ' + B[prop].n + ' (tout le monde peut miser)');
   }
   function auctionAct(s, pid, bid) { norm(s);
     if (s.phase !== 'auction' || !s.auction || s.auction.turn !== pid) return;
@@ -414,7 +416,7 @@
     return true;
   }
   // ── IA d'échange : compléter un monopole en achetant la dernière case ──────
-  // Seulement une fois TOUTES les rues vendues (règle voulue : pas d'échange avant).
+  // Comme pour les humains : pas d'échange tant que toutes les rues ne sont pas vendues.
   function aiProposeTrade(s, pid) { norm(s);
     if (!allStreetsOwned(s)) return null;
     for (var g in GROUPS) {

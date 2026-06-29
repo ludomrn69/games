@@ -31,8 +31,20 @@
     .mo-cell .bar { height: 7px; flex-shrink: 0; }
     .mo-cell .nm { padding: 1px 2px; font-weight: 700; color: var(--ink); overflow: hidden; }
     .mo-cell .pr { padding: 0 2px; color: var(--ink-light); font-size: 6px; margin-top: auto; }
-    .mo-cell .own { position: absolute; top: 1px; right: 1px; width: 7px; height: 7px; border-radius: 50%; border: 1px solid #fff; }
+    .mo-cell .own { position: absolute; top: 0px; right: 0px; min-width: 13px; height: 13px; border-radius: 7px; border: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; line-height: 1; }
     .mo-cell .hh { position: absolute; bottom: 1px; right: 1px; font-size: 7px; }
+    .mo-cell.mo-cell-me { box-shadow: inset 0 0 0 3px var(--terracotta); animation: moMePulse 1s ease-in-out infinite alternate; z-index: 2; }
+    @keyframes moMePulse { from { box-shadow: inset 0 0 0 2px var(--terracotta); } to { box-shadow: inset 0 0 0 3px var(--gold); } }
+    .mo-dice-text { font-weight: 800; font-size: 1.05rem; color: var(--ink); background: var(--cream); border-radius: 10px; padding: 4px 12px; }
+    html[data-theme="dark"] .mo-dice-text { background: #2a2433; color: #e8dcc8; }
+    .mo-remaining { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); }
+    .mo-rem-title { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-light); margin-bottom: 6px; }
+    .mo-rem-groups { display: flex; flex-direction: column; gap: 5px; }
+    .mo-rem-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .mo-rem-bar { width: 6px; height: 18px; border-radius: 3px; flex-shrink: 0; }
+    .mo-rem-chip { font-size: 0.72rem; background: var(--cream); border-radius: 8px; padding: 2px 7px; cursor: pointer; white-space: nowrap; }
+    .mo-rem-chip b { color: var(--terracotta); }
+    html[data-theme="dark"] .mo-rem-chip { background: #2a2433; }
     .mo-cell.corner { font-size: 8px; align-items: center; justify-content: center; text-align: center; padding: 2px; }
     .mo-cell.mortg { opacity: .55; }
     .mo-toks { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0; pointer-events: none; }
@@ -62,7 +74,10 @@
     .mo-pl-nm { font-weight: 700; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mo-pl-cash { font-size: 0.8rem; color: var(--sage); font-weight: 700; }
 
-    .mo-log { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 0.8rem; color: var(--ink-light); max-height: 120px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 3px; }
+    .mo-log { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); font-size: 0.84rem; color: var(--ink); max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 0; }
+    .mo-log .mo-log-line { padding: 4px 6px; border-radius: 7px; line-height: 1.3; border-bottom: 1px solid rgba(120,110,100,0.08); }
+    .mo-log .mo-log-line:first-child { background: rgba(198,152,90,0.16); font-weight: 700; }
+    .mo-log .mo-log-line .mo-log-av { display: inline-flex; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center; font-size: 0.62rem; margin-right: 4px; vertical-align: middle; }
 
     /* Modales */
     .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(20,16,28,0.6); backdrop-filter: blur(4px); }
@@ -114,6 +129,7 @@
         <div class="mo-panel">
           <div class="mo-action" id="mo-action"></div>
           <div class="mo-players" id="mo-players"></div>
+          <div class="mo-remaining" id="mo-remaining"></div>
           <div class="mo-log" id="mo-log"></div>
         </div>
       </div>
@@ -234,7 +250,7 @@
       // normaliser pour les lectures (Firebase enlève les maps vides)
       ['cash', 'pos', 'jail', 'getout', 'owners', 'houses', 'mortg', 'bankrupt'].forEach(function (k) { if (!s[k]) s[k] = {}; });
       showScreen('s-playing');
-      renderBoard(s); renderTop(s); renderPlayers(s); renderLog(s); renderAction(s); maybeOverlay(s);
+      renderBoard(s); renderTop(s); renderPlayers(s); renderRemaining(s); renderLog(s); renderAction(s); maybeOverlay(s);
     }
 
     function gridPos(i) {
@@ -248,11 +264,14 @@
     function renderBoard(s) {
       var toks = {}; // pos -> [emoji]
       s.order.forEach(function (pid) { if (s.bankrupt[pid]) return; var p = s.pos[pid] || 0; (toks[p] = toks[p] || []).push(Room.emoji(pid)); });
+      var me = window.myPid, actor = ENG.actor(s);
+      var myPos = (s.pos && s.pos[me] != null) ? s.pos[me] : -1;
+      var highlightMe = (actor === me) && !s.winner; // surligne ma case quand c'est à moi
       var html = '';
       for (var i = 0; i < 40; i++) {
         var sp = B[i], g = gridPos(i);
         var corner = (i % 10 === 0);
-        var cls = 'mo-cell' + (corner ? ' corner' : '') + (s.mortg[i] ? ' mortg' : '');
+        var cls = 'mo-cell' + (corner ? ' corner' : '') + (s.mortg[i] ? ' mortg' : '') + (highlightMe && i === myPos ? ' mo-cell-me' : '');
         var inner = '';
         if (sp.t === 'prop') inner += '<div class="bar" style="background:' + GC[sp.g] + '"></div>';
         else if (sp.t === 'rail') inner += '<div class="bar" style="background:#2C2520"></div>';
@@ -263,7 +282,8 @@
           inner += '<div class="nm">' + abbr(sp.n) + '</div>';
           var prc = (sp.t === 'prop' || sp.t === 'rail' || sp.t === 'util');
           if (prc && s.owners[i] == null) inner += '<div class="pr">' + sp.p + '</div>';
-          if (s.owners[i] != null) inner += '<div class="own" style="background:' + Room.color(s.owners[i]) + '"></div>';
+          // Propriétaire : pastille à l'émoji du joueur (plus lisible qu'une couleur).
+          if (s.owners[i] != null) inner += '<div class="own" style="background:' + Room.color(s.owners[i]) + '">' + Room.emoji(s.owners[i]) + '</div>';
           var h = s.houses[i] || 0;
           if (h === 5) inner += '<div class="hh">🏨</div>'; else if (h > 0) inner += '<div class="hh">' + '🏠'.repeat(Math.min(h, 4)) + '</div>';
         }
@@ -273,11 +293,11 @@
       // centre
       var evt = (s.log && s.log.length) ? s.log[s.log.length - 1] : '';
       var d = s.dice || [0, 0];
-      var a = ENG.actor(s);
       var turnLine = s.winner
         ? '<div class="mo-center-turn">🏆 ' + escapeHtml(Room.name(s.winner)) + '</div>'
-        : '<div class="mo-center-turn"><span class="mo-center-av" style="background:' + Room.color(a) + '">' + Room.emoji(a) + '</span> Au tour de ' + escapeHtml(Room.name(a)) + '</div>';
-      var dice = (d[0] || d[1]) ? '<div class="mo-bigdice"><div class="mo-bigdie">' + (d[0] || '–') + '</div><div class="mo-bigdie">' + (d[1] || '–') + '</div></div>' : '';
+        : '<div class="mo-center-turn"><span class="mo-center-av" style="background:' + Room.color(actor) + '">' + Room.emoji(actor) + '</span> Au tour de ' + escapeHtml(Room.name(actor)) + '</div>';
+      // Dés : format texte très lisible « 🎲 4 + 3 = 7 ».
+      var dice = (d[0] || d[1]) ? '<div class="mo-dice-text">🎲 ' + (d[0] || '–') + ' + ' + (d[1] || '–') + ' = <b>' + ((d[0] || 0) + (d[1] || 0)) + '</b>' + (d[0] && d[1] && d[0] === d[1] ? ' · double !' : '') + '</div>' : '';
       html += '<div class="mo-center"><div class="logo">MONOPOLY</div>' +
         turnLine + dice +
         '<div class="evt">' + escapeHtml(evt) + '</div></div>';
@@ -306,7 +326,30 @@
     }
 
     function renderLog(s) {
-      document.getElementById('mo-log').innerHTML = (s.log || []).slice().reverse().map(function (l) { return '<div>' + escapeHtml(l) + '</div>'; }).join('');
+      var names = {}; (s.order || []).forEach(function (p) { names[Room.name(p)] = p; });
+      document.getElementById('mo-log').innerHTML = (s.log || []).slice().reverse().map(function (l) {
+        var av = '';
+        Object.keys(names).forEach(function (nm) { if (!av && nm && l.indexOf(nm) === 0) { var p = names[nm]; av = '<span class="mo-log-av" style="background:' + Room.color(p) + '">' + Room.emoji(p) + '</span>'; } });
+        return '<div class="mo-log-line">' + av + escapeHtml(l) + '</div>';
+      }).join('');
+    }
+
+    // Panneau « rues encore à vendre » : groupé par couleur, avec leur prix.
+    function renderRemaining(s) {
+      var el = document.getElementById('mo-remaining'); if (!el) return;
+      var byGroup = {};
+      for (var i = 0; i < 40; i++) { var sp = B[i]; if (sp.t !== 'prop') continue; if (s.owners[i] != null) continue; (byGroup[sp.g] = byGroup[sp.g] || []).push(i); }
+      // gares + services non vendus
+      var rails = []; for (var r = 0; r < 40; r++) if ((B[r].t === 'rail' || B[r].t === 'util') && s.owners[r] == null) rails.push(r);
+      var groups = Object.keys(byGroup);
+      if (!groups.length && !rails.length) { el.innerHTML = '<div class="mo-rem-title">✅ Toutes les rues sont vendues</div>'; return; }
+      var html = '<div class="mo-rem-title">🏷️ À vendre</div><div class="mo-rem-groups">';
+      groups.forEach(function (g) {
+        html += '<div class="mo-rem-group"><span class="mo-rem-bar" style="background:' + GC[g] + '"></span>' +
+          byGroup[g].map(function (i) { return '<span class="mo-rem-chip" onclick="openDeed(' + i + ')">' + abbr(B[i].n) + ' <b>' + B[i].p + '</b></span>'; }).join('') + '</div>';
+      });
+      if (rails.length) html += '<div class="mo-rem-group"><span class="mo-rem-bar" style="background:#2C2520"></span>' + rails.map(function (i) { return '<span class="mo-rem-chip" onclick="openDeed(' + i + ')">' + abbr(B[i].n) + ' <b>' + B[i].p + '</b></span>'; }).join('') + '</div>';
+      el.innerHTML = html + '</div>';
     }
 
     /* ━━━━━━━━━━ Zone d'action contextuelle ━━━━━━━━━━ */
@@ -345,11 +388,12 @@
           ['10', '50', '100'].map(function (inc) { var amt = au.highBid + (+inc); return '<button class="btn-primary" onclick="act(\'bid\',' + amt + ')"' + (s.cash[me] < amt ? ' disabled' : '') + '>+' + inc + '</button>'; }).join('') +
           '<button class="btn-primary btn-ghost" onclick="act(\'pass\')">Passer</button></div>';
       } else if (s.phase === 'manage') {
-        // On n'affiche un bouton que si l'action est réellement possible :
-        //  • Bâtir : il faut au moins une case constructible (monopole complet, etc.).
-        //  • Échange : seulement une fois toutes les RUES vendues (hors gares/services).
+        // Bâtir : visible s'il y a au moins une case constructible (monopole complet).
+        // Échange : seulement une fois TOUTES les rues vendues (règle voulue) ; ensuite
+        // on peut proposer n'importe quel échange (1+ propriétés ± argent, via l'UI).
         var canBuild = canBuildAny(s, me);
-        var canTrade = allStreetsOwned(s) && canProposeAnyTrade(s, me);
+        var partners = (s.order || []).filter(function (p) { return p !== me && !s.bankrupt[p]; });
+        var canTrade = allStreetsOwned(s) && partners.length > 0;
         html = '<div class="hint">Gère ton tour, puis termine</div><div class="mo-btn-row">' +
           (canBuild ? '<button class="btn-primary" onclick="openBuild()">🏗 Bâtir</button>' : '') +
           '<button class="btn-primary btn-ghost" onclick="openMortg()">🏦 Hypothèques</button>' +
