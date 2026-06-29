@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Blackjack 🃏" data-emoji="🂡"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .btn-primary { display: block; width: 100%; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: stretch; }
+    .bj-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    html[data-theme="dark"] .bj-header { background: rgba(20,16,28,0.97); }
+    .bj-phase { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; }
+    .bj-title { justify-self: center; font-family: 'Playfair Display', serif; font-weight: 800; }
+    .bj-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+
+    .bj-felt { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 16px 14px 120px; display: flex; flex-direction: column; gap: 14px; }
+    .bj-dealer, .bj-seat { background: var(--white); border: 1px solid var(--gold-light); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow); }
+    .bj-seat.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-light), var(--shadow); }
+    .bj-seat.me .bj-seat-name::after { content: ' (toi)'; color: var(--ink-light); font-weight: 400; font-size: 0.8rem; }
+    .bj-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .bj-seat-name { font-family: 'Playfair Display', serif; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+    .bj-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
+    .bj-chips { font-weight: 700; color: var(--gold); white-space: nowrap; }
+    .bj-meta { font-size: 0.82rem; color: var(--ink-light); }
+    .bj-cards { display: flex; gap: 6px; flex-wrap: wrap; min-height: 62px; align-items: center; }
+    .bj-card { width: 44px; height: 62px; border-radius: 7px; background: #fff; border: 1px solid #d8cdb8; box-shadow: 0 1px 3px rgba(0,0,0,0.18); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 1.05rem; color: #20232b; position: relative; }
+    .bj-card.red { color: #d63b3b; }
+    .bj-card .suit { font-size: 0.95rem; line-height: 1; }
+    .bj-card.back { background: repeating-linear-gradient(45deg, #b3543f, #b3543f 6px, #9c4634 6px, #9c4634 12px); border-color: #8a3e2d; }
+    .bj-val { font-size: 0.85rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; background: var(--cream); color: var(--ink); }
+    .bj-val.bust { background: #f3d0c8; color: #b3402c; }
+    .bj-val.bj { background: var(--gold); color: #fff; }
+    .bj-res { font-size: 0.82rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; }
+    .bj-res.win { background: #cfe8d2; color: #2c7a42; }
+    .bj-res.lose { background: #f3d0c8; color: #b3402c; }
+    .bj-res.push { background: var(--cream); color: var(--ink-light); }
+
+    /* Barre d'action fixe en bas (mise / hit-stand / nouvelle manche). */
+    .bj-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 200; background: rgba(253,246,236,0.98); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--gold-light); padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
+    html[data-theme="dark"] .bj-bar { background: rgba(20,16,28,0.98); }
+    .bj-bar-inner { max-width: 640px; margin: 0 auto; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; align-items: center; }
+    .bj-btn { padding: 0.7rem 1.1rem; border: 1.5px solid var(--gold-light); border-radius: 14px; background: var(--white); color: var(--ink); font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; font-size: 0.95rem; }
+    .bj-btn:hover:not(:disabled) { border-color: var(--gold); }
+    .bj-btn.primary { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .bj-btn:disabled { opacity: 0.4; cursor: default; }
+    .bj-bar-label { width: 100%; text-align: center; color: var(--ink-light); font-size: 0.85rem; margin-bottom: 2px; }
+
+    .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .modal.active { display: flex; animation: fadeUp 0.25s ease both; }
+    .modal-card { background: var(--white); border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/boot.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="bj-header">
+        <span class="bj-phase" id="bj-phase"></span>
+        <span class="bj-title">Blackjack</span>
+        <div class="bj-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Recommencer (jetons à 100)">↻</button>
+        </div>
+      </div>
+      <div class="bj-felt" id="bj-felt"></div>
+      <div class="bj-bar"><div class="bj-bar-inner" id="bj-bar"></div></div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Recommencer ?</div>
+      <div class="modal-sub">Tous les jetons repartent à 100.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Blackjack</div>
+      <div class="modal-body">
+        <p>Chacun mise, puis reçoit 2 cartes. Le but : s'approcher de <b>21</b> sans dépasser, et battre le croupier.</p>
+        <p style="margin-top:10px">Les figures valent 10, l'As vaut 1 ou 11. <b>Tirer</b> (carte en plus) ou <b>rester</b>. Dépasser 21 = perdu.</p>
+        <p style="margin-top:10px">Le croupier tire jusqu'à 17. Un <b>blackjack</b> (21 en 2 cartes) paie 3:2. Plus près de 21 que le croupier = gagné.</p>
+        <p style="margin-top:10px">On joue manche après manche, les jetons s'accumulent. ↻ remet tout le monde à 100.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Blackjack — multijoueurs contre le croupier (automatisé). En ligne +
+       hors-ligne (solo / local). Le croupier joue de façon déterministe (tire
+       jusqu'à 17) dans la transaction de résolution : pas d'acteur dédié. ━━ */
+    var prevStatus = null;
+    var START_CHIPS = 100;
+    var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    var SUITS = ['♠', '♥', '♦', '♣'];
+
+    function rref() { return window.roomRef; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    var escapeHtml = window.esc;
+
+    function shuffledDeck() {
+      var d = []; for (var i = 0; i < 52; i++) d.push(i);
+      for (var j = d.length - 1; j > 0; j--) { var k = Math.floor(Math.random() * (j + 1)); var t = d[j]; d[j] = d[k]; d[k] = t; }
+      return d;
+    }
+    function cardVal(c) { var r = c % 13; return r === 0 ? 11 : (r >= 9 ? 10 : r + 1); }
+    function handValue(cards) {
+      var total = 0, aces = 0;
+      (cards || []).forEach(function (c) { total += cardVal(c); if (c % 13 === 0) aces++; });
+      while (total > 21 && aces > 0) { total -= 10; aces--; }
+      return { total: total, soft: aces > 0, bj: (cards || []).length === 2 && total === 21 };
+    }
+
+    GameRoom({
+      gameKey: 'blackjack',
+      name: 'Blackjack',
+      emoji: '🂡',
+      tagline: '21 · contre le croupier',
+      minPlayers: 1,
+      maxPlayers: 6,
+      rules: [
+        'Mise, puis reçois 2 cartes ; approche-toi de 21 sans dépasser',
+        'Figures = 10, As = 1 ou 11 · Tirer ou rester',
+        'Le croupier tire jusqu\'à 17 · blackjack (21 en 2 cartes) paie 3:2',
+        'On joue manche après manche, les jetons s\'accumulent'
+      ],
+      offline: { solo: true, local: true, soloMinBots: 0 },
+      bot: bjBot,
+      onState: onState,
+      onStart: onStart,
+      offlineTurn: activePid
+    });
+
+    /* ━━ Qui doit agir maintenant ? (mises puis tour de jeu). Sert au mode hors-ligne
+       ET au pilotage des bots en ligne (lobby.botActivePid). ━━ */
+    function activePid(room) {
+      if (!room || room.phase === 'done') return null;
+      var order = room.order || [], bets = room.bets || {};
+      if (room.phase === 'bet') {
+        for (var i = 0; i < order.length; i++) {
+          var pid = order[i];
+          if (chipsOf(room, pid) > 0 && bets[pid] == null) return pid;
+        }
+        return null;
+      }
+      if (room.phase === 'play') return room.turn || null;
+      return null;
+    }
+
+    function chipsOf(room, pid) { var c = room.chips || {}; return c[pid] == null ? START_CHIPS : c[pid]; }
+
+    /* ━━ Bot : mise à plat + stratégie de base (jouable, pas optimale au 1/10e). ━━ */
+    function bjBot(state, pid) {
+      if (state.phase === 'bet') {
+        var chips = chipsOf(state, pid);
+        var bet = Math.min(chips, Math.max(5, Math.round(chips * 0.1 / 5) * 5));
+        placeBet(bet, pid);
+        return;
+      }
+      if (state.phase === 'play' && state.turn === pid) {
+        var hand = (state.hands && state.hands[pid]) || [];
+        var hv = handValue(hand);
+        var up = cardVal((state.dealer || [])[0] || 0); // carte visible du croupier
+        var hit;
+        if (hv.soft) hit = hv.total <= 17;                       // soft : tire jusqu'à soft 18
+        else if (hv.total <= 11) hit = true;
+        else if (hv.total >= 17) hit = false;
+        else hit = up >= 7;                                      // 12-16 : tire si croupier fort
+        if (hit) doHit(pid); else doStand(pid);
+      }
+    }
+
+    function onStart(players) {
+      var chips = {};
+      players.forEach(function (p) { chips[p.pid] = START_CHIPS; });
+      return freshRound({ chips: chips }, players.map(function (p) { return p.pid; }));
+    }
+
+    // Construit l'état d'une nouvelle manche (garde les jetons fournis dans `base`).
+    function freshRound(base, order) {
+      base.phase = 'bet';
+      base.deck = shuffledDeck();
+      base.pos = 0;
+      base.hands = {};
+      base.bets = {};
+      base.dealer = [];
+      base.dealerDone = false;
+      base.results = {};
+      base.turn = null;
+      base.winner = null;
+      (order || []).forEach(function (pid) { base.hands[pid] = []; });
+      return base;
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') showScreen('s-playing');
+        render(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Mise ━━ */
+    function placeBet(amount, asPid) {
+      var pid = asPid || window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'bet') return cur;
+        if (!cur.bets) cur.bets = {};
+        if (cur.bets[pid] != null) return cur;
+        var chips = chipsOf(cur, pid);
+        var bet = Math.max(0, Math.min(chips, amount));
+        if (bet <= 0) return cur;
+        if (!cur.chips) cur.chips = {};
+        cur.chips[pid] = chips - bet;
+        cur.bets[pid] = bet;
+        // Tous les joueurs solvables ont misé ? → distribuer.
+        if (activePid(cur) == null) dealRound(cur);
+        return cur;
+      });
+    }
+
+    function draw(cur) { return cur.deck[cur.pos++]; }
+
+    function dealRound(cur) {
+      var order = (cur.order || []).filter(function (pid) { return cur.bets[pid] != null && cur.bets[pid] > 0; });
+      cur.hands = {};
+      order.forEach(function (pid) { cur.hands[pid] = [draw(cur), draw(cur)]; });
+      cur.dealer = [draw(cur), draw(cur)]; // [0] visible, [1] cachée
+      cur.phase = 'play';
+      // Premier joueur ; on saute ceux qui ont un blackjack naturel (ils restent).
+      cur.turn = null;
+      for (var i = 0; i < order.length; i++) {
+        if (!handValue(cur.hands[order[i]]).bj) { cur.turn = order[i]; break; }
+      }
+      if (cur.turn == null) finishRound(cur); // tout le monde a un blackjack
+    }
+
+    /* ━━ Tour de jeu ━━ */
+    function doHit(asPid) {
+      var pid = asPid || window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.phase !== 'play' || cur.turn !== pid) return cur;
+        cur.hands[pid].push(draw(cur));
+        if (handValue(cur.hands[pid]).total >= 21) advanceTurn(cur); // bust ou 21 → joueur suivant
+        return cur;
+      });
+    }
+    function doStand(asPid) {
+      var pid = asPid || window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.phase !== 'play' || cur.turn !== pid) return cur;
+        advanceTurn(cur);
+        return cur;
+      });
+    }
+
+    function advanceTurn(cur) {
+      var order = (cur.order || []).filter(function (pid) { return cur.bets[pid] != null && cur.bets[pid] > 0; });
+      var idx = order.indexOf(cur.turn);
+      for (var i = idx + 1; i < order.length; i++) {
+        if (!handValue(cur.hands[order[i]]).bj) { cur.turn = order[i]; return; }
+      }
+      finishRound(cur); // plus de joueur → le croupier joue
+    }
+
+    // Croupier déterministe (tire jusqu'à 17, y compris soft 17) puis résolution.
+    function finishRound(cur) {
+      while (handValue(cur.dealer).total < 17) cur.dealer.push(draw(cur));
+      cur.dealerDone = true;
+      var dv = handValue(cur.dealer), dealerBust = dv.total > 21;
+      var order = (cur.order || []).filter(function (pid) { return cur.bets[pid] != null && cur.bets[pid] > 0; });
+      cur.results = {};
+      order.forEach(function (pid) {
+        var hv = handValue(cur.hands[pid]), bet = cur.bets[pid], gain = 0, res;
+        if (hv.total > 21) { res = 'lose'; }
+        else if (hv.bj && !dv.bj) { res = 'bj'; gain = Math.floor(bet * 2.5); }
+        else if (dealerBust || hv.total > dv.total) { res = 'win'; gain = bet * 2; }
+        else if (hv.total === dv.total && hv.bj === dv.bj) { res = 'push'; gain = bet; }
+        else { res = 'lose'; }
+        cur.results[pid] = res;
+        if (gain) cur.chips[pid] = chipsOf(cur, pid) + gain;
+      });
+      cur.phase = 'done';
+      cur.turn = null;
+    }
+
+    /* ━━ Nouvelle manche (garde les jetons) ━━ */
+    function newRound() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'done') return cur;
+        return freshRound({ chips: cur.chips, order: cur.order, players: cur.players, status: 'playing', game: cur.game, host: cur.host, difficulty: cur.difficulty }, cur.order);
+      });
+    }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+
+    /* ━━ Rendu ━━ */
+    function cardHTML(c, hidden) {
+      if (hidden) return '<div class="bj-card back"></div>';
+      var r = c % 13, s = Math.floor(c / 13), red = (s === 1 || s === 2);
+      return '<div class="bj-card' + (red ? ' red' : '') + '"><span>' + RANKS[r] + '</span><span class="suit">' + SUITS[s] + '</span></div>';
+    }
+    function valBadge(cards, revealAll) {
+      var hv = handValue(cards);
+      var cls = 'bj-val' + (hv.total > 21 ? ' bust' : (hv.bj ? ' bj' : ''));
+      var txt = hv.bj ? 'Blackjack' : (hv.total > 21 ? hv.total + ' 💥' : (hv.soft ? hv.total : hv.total));
+      return '<span class="' + cls + '">' + txt + '</span>';
+    }
+
+    function render(state) {
+      var phase = state.phase, order = state.order || [], me = window.myPid;
+      var phEl = document.getElementById('bj-phase');
+      phEl.textContent = phase === 'bet' ? '🎲 Mises' : phase === 'play' ? '🃏 En jeu' : '✅ Manche finie';
+
+      // ── Croupier ──
+      var dealer = state.dealer || [];
+      var dealerHTML = '';
+      if (dealer.length) {
+        var hideHole = (phase === 'play'); // 2e carte cachée tant que les joueurs jouent
+        dealerHTML = dealer.map(function (c, i) { return cardHTML(c, hideHole && i === 1); }).join('');
+      }
+      var dealerVal = (dealer.length && phase !== 'play') ? valBadge(dealer) : (dealer.length ? '<span class="bj-val">' + cardVal(dealer[0]) + ' + ?</span>' : '');
+      var felt = '<div class="bj-dealer"><div class="bj-row"><div class="bj-seat-name">🎩 Croupier</div>' + dealerVal + '</div><div class="bj-cards">' + (dealerHTML || '<span class="bj-meta">en attente des mises…</span>') + '</div></div>';
+
+      // ── Joueurs ──
+      order.forEach(function (pid) {
+        var p = (state.players && state.players[pid]) || {};
+        var hand = (state.hands && state.hands[pid]) || [];
+        var bet = (state.bets && state.bets[pid]);
+        var isActive = (activePid(state) === pid);
+        var cls = 'bj-seat' + (isActive ? ' active' : '') + (pid === me ? ' me' : '');
+        var right = '<span class="bj-chips">🪙 ' + chipsOf(state, pid) + '</span>';
+        var meta = '';
+        if (phase === 'bet') meta = (bet != null) ? ('Mise : ' + bet) : 'mise…';
+        else meta = 'Mise : ' + (bet || 0);
+        var resBadge = '';
+        if (phase === 'done' && state.results && state.results[pid]) {
+          var r = state.results[pid];
+          var lbl = r === 'bj' ? 'Blackjack +' : r === 'win' ? 'Gagné' : r === 'push' ? 'Égalité' : 'Perdu';
+          var rc = (r === 'win' || r === 'bj') ? 'win' : (r === 'push' ? 'push' : 'lose');
+          resBadge = '<span class="bj-res ' + rc + '">' + lbl + '</span>';
+        }
+        var valB = hand.length ? valBadge(hand) : '';
+        felt += '<div class="' + cls + '">' +
+          '<div class="bj-row"><div class="bj-seat-name"><span class="bj-av" style="background:' + (p.color || 'var(--gold)') + '">' + (p.emoji || '🙂') + '</span>' + escapeHtml(p.name || 'Joueur') + '</div>' + right + '</div>' +
+          '<div class="bj-cards">' + (hand.map(function (c) { return cardHTML(c, false); }).join('') || '<span class="bj-meta">' + meta + '</span>') + ' ' + valB + ' ' + resBadge + '</div>' +
+          (hand.length ? '<div class="bj-meta">' + meta + '</div>' : '') +
+          '</div>';
+      });
+      setHTML('bj-felt', felt);
+
+      renderBar(state);
+    }
+
+    function renderBar(state) {
+      var bar = document.getElementById('bj-bar'), me = window.myPid;
+      var phase = state.phase, isMyTurn = (activePid(state) === me);
+      var html = '';
+      if (phase === 'done') {
+        html = '<div class="bj-bar-label">Manche terminée</div>' +
+          '<button class="bj-btn primary" onclick="newRound()">Nouvelle manche</button>' +
+          '<button class="bj-btn" onclick="window.location.href=\'/index.html\'">Accueil</button>';
+      } else if (phase === 'bet') {
+        if (isMyTurn) {
+          var chips = chipsOf(state, me);
+          html = '<div class="bj-bar-label">À toi de miser (tu as ' + chips + ' 🪙)</div>';
+          [5, 10, 25, 50].forEach(function (a) { html += '<button class="bj-btn" onclick="placeBet(' + a + ')"' + (a > chips ? ' disabled' : '') + '>' + a + '</button>'; });
+          html += '<button class="bj-btn primary" onclick="placeBet(' + chips + ')"' + (chips <= 0 ? ' disabled' : '') + '>Tapis (' + chips + ')</button>';
+        } else {
+          html = '<div class="bj-bar-label">En attente des mises…</div>';
+        }
+      } else if (phase === 'play') {
+        if (isMyTurn) {
+          html = '<div class="bj-bar-label">À toi de jouer</div>' +
+            '<button class="bj-btn primary" onclick="doHit()">Tirer</button>' +
+            '<button class="bj-btn" onclick="doStand()">Rester</button>';
+        } else {
+          var who = state.players && state.players[state.turn];
+          html = '<div class="bj-bar-label">Au tour de ' + escapeHtml((who && who.name) || '…') + '</div>';
+        }
+      }
+      bar.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

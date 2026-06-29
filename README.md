@@ -45,6 +45,7 @@ la synchro temps réel.
 | ⚡ Crack-list | 2–8 |  | mots |
 | 🔍 Lynx | 2–12 |  | observation |
 | 🎨 Pictionary | 2–12 |  | dessin |
+| 🂡 Blackjack | 1–6 | ✈️ | cartes / 21 |
 | 🃏 Uno | 2–8 | ✈️ | cartes |
 | 🎴 Skyjo | 2–8 | ✈️ | cartes |
 | 🧩 Blokus | 2–4 | ✈️ | placement |

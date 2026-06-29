@@ -75,6 +75,7 @@
       { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true, type: 'mots' },
       { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true, type: 'observation' },
       { key: 'pictionary',      name: 'Pictionary',      emoji: '🎨', players: '2–12', on: true, type: 'dessin' },
+      { key: 'blackjack',       name: 'Blackjack',       emoji: '🂡', players: '1–6',  on: true, offline: true, type: 'cartes / 21' },
       { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true, type: 'cartes' },
       { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true, type: 'cartes' },
       { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true, type: 'placement' },
@@ -104,7 +105,7 @@
     // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
     var CATS = [
       { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'othello', 'dames', 'morpion', 'mastermind', 'sudoku', '2048'] },
-      { title: 'Cartes',              emoji: '🃏', keys: ['uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye'] },
+      { title: 'Cartes',              emoji: '🃏', keys: ['blackjack', 'uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye'] },
       { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale'] },
       { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'crack-list', 'pictionary', 'telephone-dessine'] },
       { title: 'Observation & ambiance', emoji: '⚡', keys: ['dobble-emoji', 'lynx', 'timesup', 'themind'] },
