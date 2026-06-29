@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <script src="/head.js" data-title="Ludo 🐴" data-emoji="🐴"></script>
+  <script src="/head.js" data-title="Petits chevaux 🐴" data-emoji="🐴"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
@@ -41,7 +41,11 @@
     .lu-cell.center { background: linear-gradient(135deg, var(--gold-light), var(--gold)); }
     .lu-cell.center-mark { font-size: clamp(0.7rem, 3vw, 1.1rem); }
 
-    .lu-token { width: 64%; height: 64%; min-width: 9px; min-height: 9px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.85); box-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+    .lu-token { width: 70%; height: 70%; min-width: 10px; min-height: 10px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.9);
+      background-image: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.55), rgba(255,255,255,0) 55%);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset -1px -2px 4px rgba(0,0,0,0.25);
+      display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.96);
+      font-size: clamp(7px, 2.4vw, 14px); line-height: 1; text-shadow: 0 1px 1px rgba(0,0,0,0.4); }
     .lu-token.movable { cursor: pointer; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--terracotta); animation: luPulse 0.9s infinite; }
     @keyframes luPulse { 50% { transform: scale(1.12); } }
     .lu-token.done { opacity: 0.85; }
@@ -87,7 +91,7 @@
     <!-- ══ PLAYING ══ -->
     <div id="s-playing" class="screen">
       <div class="lu-head">
-        <span class="lu-title-mini">Ludo</span>
+        <span class="lu-title-mini">Petits chevaux</span>
         <div class="lu-head-actions">
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
@@ -128,11 +132,11 @@
   </div>
   <div class="modal" id="modal-rules">
     <div class="modal-card">
-      <div class="modal-title">Ludo</div>
+      <div class="modal-title">Petits chevaux</div>
       <div class="modal-body">
-        <p>Chacun a <b>4 pions</b> dans son écurie. Lance le dé : il faut un <b>6</b> pour sortir un pion sur la piste.</p>
-        <p style="margin-top:8px">Avance tes pions dans le sens des aiguilles d'une montre. Tomber sur un pion adverse le <b>renvoie à l'écurie</b> (sauf sur les cases de départ colorées, qui sont sûres).</p>
-        <p style="margin-top:8px">Un <b>6</b> te fait <b>rejouer</b>. Ramène tes 4 pions au centre par ta ligne colorée. Le premier à rentrer ses 4 pions gagne !</p>
+        <p>Chacun a <b>4 chevaux</b> dans son écurie. Lance le dé : il faut un <b>6</b> pour sortir un cheval sur la piste.</p>
+        <p style="margin-top:8px">Avance tes chevaux dans le sens des aiguilles d'une montre. Tomber sur un cheval adverse le <b>renvoie à l'écurie</b> (sauf sur les cases de départ colorées, qui sont sûres).</p>
+        <p style="margin-top:8px">Un <b>6</b> te fait <b>rejouer</b>. Ramène tes 4 chevaux au centre par ta ligne colorée. Le premier à rentrer ses 4 chevaux gagne !</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -194,16 +198,16 @@
     /* ━━ Enregistrement du salon ━━ */
     GameRoom({
       gameKey: 'ludo',
-      name: 'Ludo',
+      name: 'Petits chevaux',
       emoji: '🐴',
-      tagline: 'Sors tes pions et fonce',
+      tagline: 'Sors tes chevaux et fonce',
       minPlayers: 2,
       maxPlayers: 4,
       rules: [
-        'Il faut un 6 pour sortir un pion de l\'écurie',
-        'Avance tes 4 pions dans le sens horaire',
+        'Il faut un 6 pour sortir un cheval de l\'écurie',
+        'Avance tes 4 chevaux dans le sens horaire',
         'Tomber sur un adversaire le renvoie à l\'écurie (cases colorées = sûres)',
-        'Un 6 fait rejouer · ramène tes 4 pions au centre pour gagner'
+        'Un 6 fait rejouer · ramène tes 4 chevaux au centre pour gagner'
       ],
       offline: { solo: true, local: true },
       bot: ludoBot,
@@ -329,7 +333,8 @@
           var movable = (color === myCol && legal[t] != null);
           var el = document.createElement('div');
           el.className = 'lu-token' + (movable ? ' movable' : '') + (p === GOAL ? ' done' : '');
-          el.style.background = COLOR_INFO[color].hex;
+          el.style.backgroundColor = COLOR_INFO[color].hex;
+          el.textContent = '♞';
           if (movable) { el.dataset.color = color; el.dataset.tok = String(t); }
           cell.appendChild(el);
         });
