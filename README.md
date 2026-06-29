@@ -22,9 +22,9 @@ la synchro temps réel.
   ordis** : **Facile / Moyen / Difficile**.
 - En ligne, l'**hôte** peut **ajouter / retirer des ordis** pour compléter une
   partie (ils sont pilotés par l'hôte ; aucun impact si on n'en ajoute pas).
-- Les IA des jeux de réflexion (Puissance 4, Morpion) utilisent une vraie
+- Les IA des jeux de réflexion (Puissance 4, Morpion, Othello) utilisent une vraie
   recherche (négamax α-β + table de transposition + approfondissement itératif) ;
-  en « difficile » elles jouent quasi parfaitement. Les jeux à heuristique
+  en « difficile » elles jouent très fort. Les jeux à heuristique
   (Skyjo, Uno, Président, Ludo, Blokus, Cluedo, Bataille navale, Papayoo, Trio,
   6 qui prend…) ont une IA dédiée, plus ou moins faillible selon le niveau.
 - Après une partie, **🔍 Revoir le plateau** affiche l'état final (coup gagnant,
@@ -32,38 +32,44 @@ la synchro temps réel.
 
 ## Les jeux
 
+
+<!-- GAMES:START (généré par tools/gen-readme.js — ne pas éditer à la main) -->
+
 | Jeu | Joueurs | Hors-ligne | Type |
 |---|---|:---:|---|
-| Tu préfères | 2–12 | | soirée |
-| Petit bac | 2–12 | | mots |
-| Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
-| Dobble | 2–8 | | rapidité |
-| Crack-list | 2–8 | | mots |
-| Lynx | 2–12 | | observation |
-| Pictionary | 2–12 | | dessin |
-| Uno | 2–8 | ✈️ | cartes |
-| Skyjo | 2–8 | ✈️ | cartes |
-| Blokus | 2–4 | ✈️ | placement |
-| Bataille navale | 2 | ✈️ | déduction |
-| Codenames | 4–8 | | mots / équipes |
-| Morpion (3 pions) | 2 | ✈️ | réflexion |
-| Undercover | 3–12 | | déduction sociale |
-| Président | 3–8 | ✈️ | cartes |
-| Ludo | 2–4 | ✈️ | plateau / dés |
-| Le juste prix | 2–8 | ✈️ | déduction |
-| Téléphone dessiné | 3–10 | | dessin |
-| Monopoly | 2–6 | ✈️ | plateau |
-| Cluedo | 2–6 | ✈️ | déduction (plateau Hasbro) |
-| **Papayoo** | 3–6 | ✈️ | plis (passe + Papayoo) |
-| **Trio** | 3–6 | ✈️ | mémoire |
-| **6 qui prend !** | 2–10 | ✈️ | cartes simultanées |
-| **Mastermind** | 1–8 | ✈️ | déduction (IA solveur) |
-| **The Mind** | 2–6 | ✈️ | coopératif / timing |
-| **2048** | 1–6 | ✈️ | puzzle / course (IA expectimax) |
-| **Sudoku** | 1–6 | ✈️ | puzzle / course (IA solveur) |
-| **Mille Bornes** | 2–4 | ✈️ | cartes / course |
-| **Loup-Garou** | 4–12 | ✈️ | déduction sociale (IA) |
-| **Time's Up** | 1–12 | ✈️ | équipes (+ solo chrono) |
+| 📝 Petit bac | 2–12 |  | mots |
+| 🔴 Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
+| ⚫ Othello | 2 | ✈️ | réflexion (IA forte) |
+| ✨ Dobble | 2–8 |  | rapidité |
+| ⚡ Crack-list | 2–8 |  | mots |
+| 🔍 Lynx | 2–12 |  | observation |
+| 🎨 Pictionary | 2–12 |  | dessin |
+| 🃏 Uno | 2–8 | ✈️ | cartes |
+| 🎴 Skyjo | 2–8 | ✈️ | cartes |
+| 🧩 Blokus | 2–4 | ✈️ | placement |
+| 🚢 Bataille navale | 2 | ✈️ | déduction |
+| 🕵️ Codenames | 4–8 |  | mots / équipes |
+| ⭕ Morpion | 2 | ✈️ | réflexion |
+| 🕵️‍♂️ Undercover | 3–12 |  | déduction sociale |
+| 🤵 Président | 3–8 | ✈️ | cartes |
+| 🐴 Petits chevaux | 2–4 | ✈️ | plateau / dés |
+| 💰 Le juste prix | 2–8 | ✈️ | déduction |
+| 🖍️ Télé-dessiné | 3–10 |  | dessin |
+| 🏠 Monopoly | 2–6 | ✈️ | plateau |
+| 🔎 Cluedo | 2–6 | ✈️ | déduction (plateau) |
+| 🐔 Papayoo | 3–6 | ✈️ | plis |
+| 🔢 Trio | 3–6 | ✈️ | mémoire |
+| 🐮 6 qui prend ! | 2–10 | ✈️ | cartes simultanées |
+| 🎯 Mastermind | 1–8 | ✈️ | déduction (IA solveur) |
+| 🧠 The Mind | 2–6 | ✈️ | coopératif / timing |
+| 🔢 2048 | 1–6 | ✈️ | puzzle / course (IA) |
+| 9️⃣ Sudoku | 1–6 | ✈️ | puzzle / course (IA) |
+| 🚗 Mille Bornes | 2–4 | ✈️ | cartes / course |
+| 🐺 Loup-Garou | 4–12 | ✈️ | déduction sociale (IA) |
+| ⏱️ Time's Up | 1–12 | ✈️ | équipes (+ solo chrono) |
+| 💰 La Bonne Paye | 2–6 | ✈️ | gestion / cartes |
+
+<!-- GAMES:END -->
 
 ## Mise en route (une seule fois)
 
@@ -98,7 +104,7 @@ Glisser le dossier sur Netlify (ou `netlify deploy`). Aucun build.
 | `nav.js` | Barre du haut (accueil + thème clair/sombre) |
 | `head.js` / `boot.js` | En-tête HTML commun + chargement des scripts partagés |
 | `theme.css` / `game.css` | Palette + mode sombre + coquille commune des jeux |
-| `p4-ai.js` / `morpion-ai.js` | Cœurs d'IA purs (réutilisés par la page **et** le benchmark) |
+| `p4-ai.js` / `morpion-ai.js` / `othello-ai.js` | Cœurs d'IA purs (réutilisés par la page **et** le benchmark) |
 | `monopoly-engine.js` / `cluedo-engine.js` | Moteurs de règles purs (sans DOM) |
 | `games/<jeu>.html` | Une page par jeu (logique + rendu) — toutes regroupées dans `games/` |
 | `tools/check.js` | Vérifs CI : syntaxe JS, cohérence index/sw, JSON |
@@ -121,9 +127,13 @@ games/rooms/<CODE> = {
 ## Outils / qualité
 ```bash
 node tools/check.js          # syntaxe + cohérence (rapide, lancé en CI)
+node tools/gen-readme.js     # régénère le tableau des jeux depuis index.html
 node tools/bench.js          # banc d'essai des IA (~1 min)
 node tools/bench.js --full   # plus de parties, profondeur de jeu réelle
 ```
+Le tableau « Les jeux » ci-dessus est **généré** depuis le catalogue `GAMES` de
+`index.html` (source unique). Ne l'édite pas à la main : modifie `index.html` puis
+lance `node tools/gen-readme.js`. La CI échoue si le README n'est pas à jour.
 Le benchmark vérifie que les bots « difficile » écrasent l'aléatoire/facile et ne
 perdent jamais au morpion — garde-fou contre les régressions d'IA.
 
@@ -156,7 +166,7 @@ zéro-config.
 Des jeux qui collent au format (multi sans login, mobile, parties courtes, IA possible) :
 
 **Cartes / familial** : Skull King, Sushi Go!, Rami, Belote / Coinche, Love Letter.
-**Réflexion 2 joueurs (IA forte)** : Othello / Reversi, Awalé (Oware), Quarto, Onitama, Dames.
+**Réflexion 2 joueurs (IA forte)** : Awalé (Oware), Quarto, Onitama. ✅ _Othello et Dames déjà ajoutés._
 **Dés** : Yam's (Yahtzee), 421, Cochon qui rit.
 **Soirée / déduction** : Just One (coopératif d'indices), Concept, Saboteur.
 **Mots / solo** : Motus / Wordle, Le Pendu, Démineur.

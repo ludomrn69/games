@@ -15,5 +15,7 @@ jobs:
           node-version: '20'
       - name: Vérifs (syntaxe JS + cohérence index/sw + JSON)
         run: node tools/check.js
+      - name: README à jour avec le catalogue index.html
+        run: node tools/gen-readme.js --check
       - name: Banc d'essai des IA (taux de victoire attendus)
         run: node tools/bench.js

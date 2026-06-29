@@ -15,6 +15,7 @@ var path = require('path');
 var ROOT = path.resolve(__dirname, '..');
 var P4 = require(path.join(ROOT, 'p4-ai.js')).P4AI;
 var MP = require(path.join(ROOT, 'morpion-ai.js')).MorpionAI;
+var OT = require(path.join(ROOT, 'othello-ai.js')).OthelloAI;
 
 var FULL = process.argv.indexOf('--full') >= 0;
 var failures = [];
@@ -70,6 +71,32 @@ function mpMatch(label, pickA, pickB, n, expect) {
   report('Morpion', label, w, n, expect);
 }
 
+// ── Othello / Reversi ──────────────────────────────────────────────────────
+function otStart() { var a = '.'.repeat(64).split(''); a[27] = '1'; a[28] = '0'; a[35] = '0'; a[36] = '1'; return a.join(''); }
+function otCount(b, m) { var n = 0; for (var i = 0; i < 64; i++) if (b[i] === m) n++; return n; }
+function otRandom(b, me) { var lm = OT.legalMoves(b, me); return lm.length ? lm[(Math.random() * lm.length) | 0] : -1; }
+// pickX(board, me, opp) → index (ou -1 = passe). A = '0' (noir, commence), B = '1'.
+function otPlay(pickA, pickB) {
+  var b = otStart(), marks = ['0', '1'], turn = 0, passes = 0, guard = 0;
+  while (guard++ < 80) {
+    var me = marks[turn], opp = marks[1 - turn];
+    var lm = OT.legalMoves(b, me);
+    if (!lm.length) { if (++passes >= 2) break; turn = 1 - turn; continue; }
+    passes = 0;
+    var mv = (turn === 0 ? pickA : pickB)(b, me, opp);
+    if (mv < 0 || OT.wouldFlip(b, mv, me).length === 0) mv = lm[0];
+    b = OT.applyMove(b, mv, me);
+    turn = 1 - turn;
+  }
+  var n0 = otCount(b, '0'), n1 = otCount(b, '1');
+  return n0 === n1 ? 'draw' : (n0 > n1 ? 'A' : 'B');
+}
+function otMatch(label, pickA, pickB, n, expect) {
+  var w = { A: 0, B: 0, draw: 0 };
+  for (var i = 0; i < n; i++) w[otPlay(pickA, pickB)]++;
+  report('Othello', label, w, n, expect);
+}
+
 // ── Rapport + seuils ───────────────────────────────────────────────────────
 function pct(x, n) { return (100 * x / n).toFixed(0) + '%'; }
 function report(game, label, w, n, expect) {
@@ -91,9 +118,13 @@ var easy4 = function (b, me, opp) { return P4.bestColumn(b, me, opp, 2); };
 var rndM = function (b, m) { return mpRandom(b, m); };
 var hardM = function (b, me, opp) { return MP.bestMove(b, me, opp, 10); };
 var easyM = function (b, me, opp) { return MP.bestMove(b, me, opp, 2); };
+var HARDO_DEPTH = FULL ? 7 : 5;
+var rndO = function (b, me) { return otRandom(b, me); };
+var hardO = function (b, me, opp) { return OT.bestMove(b, me, opp, HARDO_DEPTH); };
+var easyO = function (b, me, opp) { return OT.bestMove(b, me, opp, 1); };
 
 console.log('🤖 Banc d\'essai des IA' + (FULL ? ' (complet)' : '') + '\n');
-var N4 = FULL ? 200 : 24, NM = FULL ? 200 : 60;
+var N4 = FULL ? 200 : 24, NM = FULL ? 200 : 60, NO = FULL ? 100 : 20;
 
 // Puissance 4 : « difficile » doit écraser l'aléatoire et ne jamais perdre contre lui.
 p4Match('difficile (A) vs aléatoire (B)', hard4, rnd4, N4, { minA: 0.9, maxBLoss: 0.02 });
@@ -102,6 +133,10 @@ p4Match('difficile (A) vs facile (B)', hard4, easy4, FULL ? 60 : 10, { minA: 0.6
 // Morpion : « difficile » ne doit jamais perdre contre l'aléatoire.
 mpMatch('difficile (A) vs aléatoire (B)', hardM, rndM, NM, { maxBLoss: 0.0 });
 mpMatch('difficile (A) vs facile (B)', hardM, easyM, Math.max(20, NM / 3 | 0), { maxBLoss: 0.05 });
+
+// Othello : « difficile » doit largement dominer l'aléatoire et le « facile ».
+otMatch('difficile (A) vs aléatoire (B)', hardO, rndO, NO, { minA: 0.9, maxBLoss: 0.05 });
+otMatch('difficile (A) vs facile (B)', hardO, easyO, Math.max(16, NO / 2 | 0), { minA: 0.6 });
 
 console.log('');
 if (failures.length) {

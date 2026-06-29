@@ -28,6 +28,9 @@
     .join-bar button:hover { transform: translateY(-2px); }
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+    .cat-title { grid-column: 1 / -1; font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; color: var(--ink);
+      margin: 18px 2px 2px; padding-bottom: 6px; border-bottom: 1.5px solid var(--gold-light); display: flex; align-items: center; gap: 8px; }
+    .cat-title:first-child { margin-top: 0; }
     .card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none;
       background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; padding: 22px 14px 18px; color: var(--ink);
       box-shadow: var(--shadow); transition: transform .22s cubic-bezier(0.34,1.56,0.64,1), box-shadow .22s; }
@@ -64,45 +67,70 @@
   <div class="lb-toast" id="lb-toast"></div>
 
   <script>
-    var GAMES = [      { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true },
-      { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true },
-      { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true },
-      { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true },
-      { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true },
-      { key: 'pictionary',      name: 'Pictionary',      emoji: '🎨', players: '2–12', on: true },
-      { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true },
-      { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true },
-      { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true },
-      { key: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', players: '2',    on: true, offline: true },
-      { key: 'codenames',       name: 'Codenames',       emoji: '🕵️', players: '4–8',  on: true },
-      { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true },
-      { key: 'undercover',      name: 'Undercover',      emoji: '🕵️‍♂️', players: '3–12', on: true },
-      { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true },
-      { key: 'ludo',            name: 'Ludo',             emoji: '🐴', players: '2–4',  on: true, offline: true },
-      { key: 'juste-prix',      name: 'Le juste prix',   emoji: '💰', players: '2–8',  on: true, offline: true },
-      { key: 'telephone-dessine', name: 'Télé-dessiné',  emoji: '🖍️', players: '3–10', on: true },
-      { key: 'monopoly',        name: 'Monopoly',        emoji: '🏠', players: '2–6',  on: true, offline: true },
-      { key: 'cluedo',          name: 'Cluedo',          emoji: '🔎', players: '2–6',  on: true, offline: true },
-      { key: 'papayoo',         name: 'Papayoo',         emoji: '🐔', players: '3–6',  on: true, offline: true },
-      { key: 'trio',            name: 'Trio',            emoji: '🔢', players: '3–6',  on: true, offline: true },
-      { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true },
-      { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true },
-      { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true },
-      { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true },
-      { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true },
-      { key: 'millebornes',     name: 'Mille Bornes',    emoji: '🚗', players: '2–4',  on: true, offline: true },
-      { key: 'loupgarou',       name: 'Loup-Garou',      emoji: '🐺', players: '4–12', on: true, offline: true },
-      { key: 'timesup',         name: "Time's Up",       emoji: '⏱️', players: '1–12', on: true, offline: true },
-      { key: 'lapaye',          name: 'La Bonne Paye',   emoji: '💰', players: '2–6',  on: true, offline: true }
+    var GAMES = [      { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true, type: 'mots' },
+      { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'othello',         name: 'Othello',         emoji: '⚫', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true, type: 'rapidité' },
+      { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true, type: 'mots' },
+      { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true, type: 'observation' },
+      { key: 'pictionary',      name: 'Pictionary',      emoji: '🎨', players: '2–12', on: true, type: 'dessin' },
+      { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true, type: 'cartes' },
+      { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true, type: 'cartes' },
+      { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true, type: 'placement' },
+      { key: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', players: '2',    on: true, offline: true, type: 'déduction' },
+      { key: 'codenames',       name: 'Codenames',       emoji: '🕵️', players: '4–8',  on: true, type: 'mots / équipes' },
+      { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true, type: 'réflexion' },
+      { key: 'undercover',      name: 'Undercover',      emoji: '🕵️‍♂️', players: '3–12', on: true, type: 'déduction sociale' },
+      { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true, type: 'cartes' },
+      { key: 'ludo',            name: 'Petits chevaux',   emoji: '🐴', players: '2–4',  on: true, offline: true, type: 'plateau / dés' },
+      { key: 'juste-prix',      name: 'Le juste prix',   emoji: '💰', players: '2–8',  on: true, offline: true, type: 'déduction' },
+      { key: 'telephone-dessine', name: 'Télé-dessiné',  emoji: '🖍️', players: '3–10', on: true, type: 'dessin' },
+      { key: 'monopoly',        name: 'Monopoly',        emoji: '🏠', players: '2–6',  on: true, offline: true, type: 'plateau' },
+      { key: 'cluedo',          name: 'Cluedo',          emoji: '🔎', players: '2–6',  on: true, offline: true, type: 'déduction (plateau)' },
+      { key: 'papayoo',         name: 'Papayoo',         emoji: '🐔', players: '3–6',  on: true, offline: true, type: 'plis' },
+      { key: 'trio',            name: 'Trio',            emoji: '🔢', players: '3–6',  on: true, offline: true, type: 'mémoire' },
+      { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true, type: 'cartes simultanées' },
+      { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true, type: 'déduction (IA solveur)' },
+      { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true, type: 'coopératif / timing' },
+      { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true, type: 'puzzle / course (IA)' },
+      { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true, type: 'puzzle / course (IA)' },
+      { key: 'millebornes',     name: 'Mille Bornes',    emoji: '🚗', players: '2–4',  on: true, offline: true, type: 'cartes / course' },
+      { key: 'loupgarou',       name: 'Loup-Garou',      emoji: '🐺', players: '4–12', on: true, offline: true, type: 'déduction sociale (IA)' },
+      { key: 'timesup',         name: "Time's Up",       emoji: '⏱️', players: '1–12', on: true, offline: true, type: 'équipes (+ solo chrono)' },
+      { key: 'lapaye',          name: 'La Bonne Paye',   emoji: '💰', players: '2–6',  on: true, offline: true, type: 'gestion / cartes' }
     ];
-    var grid = document.getElementById('grid');
-    grid.innerHTML = GAMES.map(function (g) {
+    // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
+    // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
+    var CATS = [
+      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'othello', 'morpion', 'mastermind', 'sudoku', '2048'] },
+      { title: 'Cartes',              emoji: '🃏', keys: ['uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye'] },
+      { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale'] },
+      { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'crack-list', 'pictionary', 'telephone-dessine'] },
+      { title: 'Observation & ambiance', emoji: '⚡', keys: ['dobble-emoji', 'lynx', 'timesup', 'themind'] },
+      { title: 'Plateau',             emoji: '🎲', keys: ['monopoly', 'ludo', 'blokus'] }
+    ];
+    var byKey = {}; GAMES.forEach(function (g) { byKey[g.key] = g; });
+    var placed = {};
+    function cardHTML(g) {
       var cls = 'card' + (g.on ? '' : ' soon');
       var inner = (g.offline ? '<span class="off-badge" title="Jouable hors-ligne (solo / local)">✈️</span>' : '') +
         '<div class="emoji">' + g.emoji + '</div><div class="name">' + g.name + '</div><div class="players">' + g.players + ' joueurs</div>';
       return g.on ? '<a class="' + cls + '" href="games/' + g.key + '.html">' + inner + '</a>'
                   : '<div class="' + cls + '">' + inner + '</div>';
-    }).join('');
+    }
+    function sectionHTML(title, emoji, list) {
+      if (!list.length) return '';
+      return '<h2 class="cat-title">' + emoji + ' ' + title + '</h2>' + list.map(cardHTML).join('');
+    }
+    var grid = document.getElementById('grid');
+    var html = '';
+    CATS.forEach(function (cat) {
+      var list = cat.keys.map(function (k) { placed[k] = true; return byKey[k]; }).filter(Boolean);
+      html += sectionHTML(cat.title, cat.emoji, list);
+    });
+    var others = GAMES.filter(function (g) { return !placed[g.key]; });
+    html += sectionHTML('Autres', '🎯', others);
+    grid.innerHTML = html;
 
     var input = document.getElementById('join-code');
     input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^A-Z]/g, ''); });
