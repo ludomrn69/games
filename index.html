@@ -100,7 +100,7 @@
       var cls = 'card' + (g.on ? '' : ' soon');
       var inner = (g.offline ? '<span class="off-badge" title="Jouable hors-ligne (solo / local)">✈️</span>' : '') +
         '<div class="emoji">' + g.emoji + '</div><div class="name">' + g.name + '</div><div class="players">' + g.players + ' joueurs</div>';
-      return g.on ? '<a class="' + cls + '" href="' + g.key + '.html">' + inner + '</a>'
+      return g.on ? '<a class="' + cls + '" href="games/' + g.key + '.html">' + inner + '</a>'
                   : '<div class="' + cls + '">' + inner + '</div>';
     }).join('');
 
@@ -116,7 +116,7 @@
       firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms/' + code).once('value').then(function (snap) {
         var room = snap.val();
         if (!room || !room.game) { toast('Salon introuvable'); return; }
-        location.href = room.game + '.html?room=' + code;
+        location.href = '/games/' + room.game + '.html?room=' + code;
       }).catch(function () { toast('Connexion impossible'); });
     }
 

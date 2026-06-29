@@ -234,7 +234,7 @@
           (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">🤖 Solo (contre l\'ordi)</button>' : '') +
           (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">📱 Local (même appareil)</button>' : '')) : '') +
         (rules ? '<div class="lb-code-card" style="text-align:left;margin-top:24px"><div class="lb-code-label">Règles rapides</div><ul style="list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:6px;font-size:0.86rem;color:var(--ink-light)">' + rules + '</ul></div>' : '') +
-        '<a class="lb-link" href="index.html">← Tous les jeux</a>' +
+        '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
       '</div>';
     var inp = document.getElementById('lb-join-code');
     if (inp) {
@@ -279,7 +279,7 @@
       if (!room) { lbToast('Salon introuvable'); if (fromUrl) window.showScreen('s-home'); return; }
       // Mauvais jeu pour cette page → on redirige vers la bonne page de jeu.
       if (room.game && room.game !== cfg().gameKey) {
-        location.href = room.game + '.html?room=' + code; return;
+        location.href = '/games/' + room.game + '.html?room=' + code; return;
       }
       var players = room.players || {};
       var iAmIn = !!players[window.myPid];
@@ -703,7 +703,7 @@
     if (window.listenersOn) { window.roomRef.off('value', masterOnState); window.listenersOn = false; }
     if (window.GamePresence) GamePresence.stop();
     if (c.onLeave) try { c.onLeave(); } catch (e) {}
-    location.href = 'index.html';
+    location.href = '/index.html';
   }
 
   // ── Gestion d'un joueur absent en cours de partie (helpers d'UI partagés) ──

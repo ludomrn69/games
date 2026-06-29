@@ -14,19 +14,19 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v14';
+var CACHE = 'jeux-v15';
 var ASSETS = [
   './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
   'head.js', 'boot.js', 'p4-ai.js', 'morpion-ai.js',
-  'petit-bac.html', 'puissance4.html', 'dobble-emoji.html',
-  'crack-list.html', 'lynx.html', 'pictionary.html', 'uno.html', 'skyjo.html',
-  'blokus.html', 'bataille-navale.html', 'codenames.html', 'morpion.html',
-  'undercover.html', 'president.html', 'ludo.html',
-  'juste-prix.html', 'telephone-dessine.html',
-  'monopoly.html', 'monopoly-engine.js',
-  'cluedo.html', 'cluedo-engine.js',
-  'papayoo.html', 'trio.html', 'sixnimmt.html', 'mastermind.html', 'themind.html', '2048.html', 'sudoku.html', 'millebornes.html', 'loupgarou.html', 'timesup.html', 'lapaye.html'
+  'monopoly-engine.js', 'cluedo-engine.js',
+  'games/petit-bac.html', 'games/puissance4.html', 'games/dobble-emoji.html',
+  'games/crack-list.html', 'games/lynx.html', 'games/pictionary.html', 'games/uno.html', 'games/skyjo.html',
+  'games/blokus.html', 'games/bataille-navale.html', 'games/codenames.html', 'games/morpion.html',
+  'games/undercover.html', 'games/president.html', 'games/ludo.html',
+  'games/juste-prix.html', 'games/telephone-dessine.html',
+  'games/monopoly.html', 'games/cluedo.html',
+  'games/papayoo.html', 'games/trio.html', 'games/sixnimmt.html', 'games/mastermind.html', 'games/themind.html', 'games/2048.html', 'games/sudoku.html', 'games/millebornes.html', 'games/loupgarou.html', 'games/timesup.html', 'games/lapaye.html'
 ];
 
 self.addEventListener('install', function (e) {
@@ -58,7 +58,7 @@ self.addEventListener('fetch', function (e) {
       fetch(req).then(function (res) {
         var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
         return res;
-      }).catch(function () { return caches.match(req).then(function (m) { return m || caches.match('index.html'); }); })
+      }).catch(function () { return caches.match(req).then(function (m) { return m || caches.match('/index.html'); }); })
     );
   } else {
     // cache d'abord, repli réseau (et mise en cache)

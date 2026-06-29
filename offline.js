@@ -122,7 +122,7 @@
         controls +
         '<button class="lb-btn" id="off-start">Commencer</button>' +
         '<a class="lb-link" href="' + location.pathname + '">↺ Passer en mode en ligne</a>' +
-        '<a class="lb-link" href="index.html">← Tous les jeux</a>' +
+        '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
       '</div>';
     document.getElementById('off-start').onclick = startFromSetup;
     // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
@@ -139,7 +139,7 @@
     host.innerHTML = '<div class="lb-wrap"><div class="lb-emoji-big">🚫</div><h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
       '<p class="lb-sub">' + esc(msg) + '</p>' +
       '<a class="lb-btn" href="' + location.pathname + '">Jouer en ligne</a>' +
-      '<a class="lb-link" href="index.html">← Tous les jeux</a></div>';
+      '<a class="lb-link" href="/index.html">← Tous les jeux</a></div>';
     showScreen('s-home');
   }
   function counterRow(label, lo, hi, initial) {

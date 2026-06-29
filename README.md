@@ -100,7 +100,7 @@ Glisser le dossier sur Netlify (ou `netlify deploy`). Aucun build.
 | `theme.css` / `game.css` | Palette + mode sombre + coquille commune des jeux |
 | `p4-ai.js` / `morpion-ai.js` | Cœurs d'IA purs (réutilisés par la page **et** le benchmark) |
 | `monopoly-engine.js` / `cluedo-engine.js` | Moteurs de règles purs (sans DOM) |
-| `<jeu>.html` | Une page par jeu (logique + rendu) |
+| `games/<jeu>.html` | Une page par jeu (logique + rendu) — toutes regroupées dans `games/` |
 | `tools/check.js` | Vérifs CI : syntaxe JS, cohérence index/sw, JSON |
 | `tools/bench.js` | Banc d'essai des IA (auto-jeu headless, seuils de victoire en CI) |
 

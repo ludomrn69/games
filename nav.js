@@ -42,7 +42,7 @@
 
     var home = document.createElement('a');
     home.className = 'nav-home';
-    home.href = 'index.html';
+    home.href = '/index.html';
     home.innerHTML = '<span class="logo">🎲</span><span>Les jeux</span>';
 
     var toggle = document.createElement('button');

@@ -6,6 +6,8 @@
 # HTML qui ferait beuguer Firebase/lobby).
 /*.html
   Cache-Control: no-cache
+/games/*
+  Cache-Control: no-cache
 /
   Cache-Control: no-cache
 

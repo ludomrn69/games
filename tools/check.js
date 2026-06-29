@@ -24,17 +24,22 @@ function checkSyntax(code, label) {
 }
 
 var files = fs.readdirSync(ROOT);
+// Les pages de jeu vivent dans games/ ; index.html reste à la racine.
+var gamesDir = path.join(ROOT, 'games');
+var gameHtmls = fs.existsSync(gamesDir)
+  ? fs.readdirSync(gamesDir).filter(function (f) { return f.endsWith('.html'); })
+  : [];
 
 // 1) .js racine
 files.filter(function (f) { return f.endsWith('.js'); }).forEach(function (f) { checkSyntax(read(f), f); });
 
-// 2) JS inline des .html
-var htmls = files.filter(function (f) { return f.endsWith('.html'); });
-htmls.forEach(function (f) {
-  var s = read(f);
+// 2) JS inline des .html (index racine + pages dans games/)
+function checkInline(code, label) {
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g, m, i = 0;
-  while ((m = re.exec(s))) { if (m[1].trim()) checkSyntax(m[1], f + ' (script inline #' + (++i) + ')'); }
-});
+  while ((m = re.exec(code))) { if (m[1].trim()) checkSyntax(m[1], label + ' (script inline #' + (++i) + ')'); }
+}
+checkInline(read('index.html'), 'index.html');
+gameHtmls.forEach(function (f) { checkInline(read(path.join('games', f)), 'games/' + f); });
 
 // 3) cohérence index.html / sw.js / fichiers
 var index = read('index.html');
@@ -45,14 +50,14 @@ if (gameKeys.length < 5) err('index.html : trop peu de jeux détectés (' + game
 
 var sw = read('sw.js');
 gameKeys.forEach(function (k) {
-  if (!fs.existsSync(path.join(ROOT, k + '.html'))) err('Jeu « ' + k +' » listé dans index.html mais ' + k + '.html absent');
-  if (sw.indexOf("'" + k + ".html'") < 0) err('Jeu « ' + k + ' » absent du cache service worker (sw.js ASSETS)');
+  if (!fs.existsSync(path.join(gamesDir, k + '.html'))) err('Jeu « ' + k +' » listé dans index.html mais games/' + k + '.html absent');
+  if (sw.indexOf("'games/" + k + ".html'") < 0) err('Jeu « ' + k + ' » absent du cache service worker (sw.js ASSETS)');
 });
-// l'inverse : chaque <jeu>.html (hors index) listé dans sw doit être dans index
-htmls.filter(function (f) { return f !== 'index.html'; }).forEach(function (f) {
+// l'inverse : chaque games/<jeu>.html listé dans sw doit être dans index
+gameHtmls.forEach(function (f) {
   var k = f.replace('.html', '');
-  if (sw.indexOf("'" + f + "'") < 0) err('Fichier ' + f + ' absent du cache service worker (sw.js)');
-  if (gameKeys.indexOf(k) < 0) err('Fichier ' + f + ' présent mais pas listé dans index.html (jeu orphelin ?)');
+  if (sw.indexOf("'games/" + f + "'") < 0) err('Fichier games/' + f + ' absent du cache service worker (sw.js)');
+  if (gameKeys.indexOf(k) < 0) err('Fichier games/' + f + ' présent mais pas listé dans index.html (jeu orphelin ?)');
 });
 // moteurs partagés référencés par des pages doivent être en cache
 ['monopoly-engine.js', 'cluedo-engine.js'].forEach(function (eng) {
@@ -65,4 +70,4 @@ htmls.filter(function (f) { return f !== 'index.html'; }).forEach(function (f) {
 });
 
 if (errors.length) { console.error('❌ ' + errors.length + ' problème(s) :\n\n' + errors.join('\n\n')); process.exit(1); }
-console.log('✅ Vérifs OK : ' + files.filter(function (f) { return f.endsWith('.js'); }).length + ' JS, ' + htmls.length + ' HTML, ' + gameKeys.length + ' jeux cohérents (index/sw/fichiers).');
+console.log('✅ Vérifs OK : ' + files.filter(function (f) { return f.endsWith('.js'); }).length + ' JS, ' + (gameHtmls.length + 1) + ' HTML, ' + gameKeys.length + ' jeux cohérents (index/sw/fichiers).');
