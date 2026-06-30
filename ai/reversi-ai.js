@@ -1,15 +1,18 @@
 /*
-  othello-ai.js — Cœur de l'IA Othello / Reversi (PUR, sans DOM). Négamax α-β +
-  table de transposition + approfondissement itératif + borne de nœuds (ne fige
-  jamais le navigateur). Fonction d'évaluation positionnelle classique : table de
-  poids par case (coins forts, cases X/C négatives), mobilité, et bascule en
-  comptage de pions en fin de partie. À profondeur 6–8 elle joue très fort sans
-  aucun apprentissage (Othello se domine très bien à la recherche + heuristique).
+  reversi-ai.js — Cœur de l'IA Reversi / Reversi (PUR, sans DOM). Négamax α-β +
+  table de transposition BORNÉE (drapeau exact/min/max + meilleur coup mémorisé,
+  ré-essayé en premier) + approfondissement itératif + borne de nœuds (ne fige
+  jamais le navigateur). Évaluation positionnelle forte : table de poids par case
+  (coins forts, cases X/C négatives), mobilité, PIONS FRONTIÈRES (le facteur qui
+  fait le plus gagner), coins possédés, et comptage de pions en fin de partie. En
+  prime, RÉSOLUTION EXACTE de la finale : dès qu'il reste ≤ 12 cases vides, elle
+  cherche jusqu'au bout et joue la fin de partie parfaitement. À profondeur 6–8 +
+  finale résolue, elle joue très fort sans aucun apprentissage.
 
-  Utilisé par games/othello.html (solo / ordis en ligne) ET par tools/bench.js
+  Utilisé par games/reversi.html (solo / ordis en ligne) ET par tools/bench.js
   (auto-jeu headless) — une seule logique, pas de divergence.
 
-  API : OthelloAI.bestMove(board, me, opp, maxDepth)
+  API : ReversiAI.bestMove(board, me, opp, maxDepth)
     board   : 64 caractères (8×8, index r*8+c, '.'=vide), me/opp : marques ('0'/'1')
     maxDepth: profondeur max (demi-coups) ; ~1 facile, 4 moyen, 7 difficile
   → index 0..63 du coup à jouer, ou -1 si aucun coup légal (on passe).
@@ -86,17 +89,43 @@
       if (mMe + mOp) sc += 8 * (mMe - mOp);
       // 3) Coins possédés (renforce au-delà de la table).
       for (i = 0; i < 4; i++) { if (bb[CORNERS[i]] === me) sc += 40; else if (bb[CORNERS[i]] === opp) sc -= 40; }
-      // 4) En toute fin de partie, ce qui compte c'est le NOMBRE de pions.
+      // 4) Pions FRONTIÈRES (au contact d'une case vide) : ce sont des passifs — ils
+      // offrent des retournements à l'adversaire. En avoir MOINS que lui est bon.
+      // C'est l'heuristique « pas chère » qui fait le plus gagner en force. (Inutile
+      // en toute fin de partie où le comptage de pions prend le relais.)
+      if (filled < 56) {
+        var fMe = 0, fOp = 0;
+        for (i = 0; i < 64; i++) {
+          var p = bb[i]; if (p === '.') continue;
+          var r = Math.floor(i / N), c = i % N, isF = false;
+          for (var d = 0; d < 8; d++) { var rr = r + DIRS[d][0], cc = c + DIRS[d][1]; if (inB(rr, cc) && bb[rr * N + cc] === '.') { isF = true; break; } }
+          if (isF) { if (p === me) fMe++; else fOp++; }
+        }
+        sc += 5 * (fOp - fMe);
+      }
+      // 5) En toute fin de partie, ce qui compte c'est le NOMBRE de pions.
       if (filled >= 52) sc += (filled >= 60 ? 30 : 6) * (cnt[me] - cnt[opp]);
       return side === me ? sc : -sc;
     }
 
-    var NODE_CAP = 200000, nodes = 0, aborted = false, TT = {};
-    // Négamax α-β. `passed` = le camp précédent a déjà passé (2 passes → fin).
+    var NODE_CAP = 300000, nodes = 0, aborted = false, TT = {};
+    // Négamax α-β à fenêtre + table de transposition BORNÉE : on mémorise le score
+    // AVEC son drapeau (exact / borne min / borne max) et le MEILLEUR coup. Stocker
+    // le drapeau est indispensable — une coupure α-β ne donne qu'une borne, pas le
+    // vrai score ; le meilleur coup mémorisé est ré-essayé en premier (coupures bien
+    // plus tôt → on cherche plus profond dans le même budget). `passed` = le camp
+    // précédent a déjà passé (2 passes → fin de partie).
     function search(bb, side, depth, alpha, beta, passed) {
       if (++nodes > NODE_CAP) { aborted = true; return 0; }
-      var key = bb + side + depth, tt = TT[key];
-      if (tt != null) return tt;
+      var a0 = alpha, key = bb + side, tt = TT[key], ttMove = -1;
+      if (tt) {
+        ttMove = tt.move;
+        if (tt.d >= depth) {
+          if (tt.flag === 0) return tt.val;
+          if (tt.flag < 0) { if (tt.val < beta) beta = tt.val; } else { if (tt.val > alpha) alpha = tt.val; }
+          if (alpha >= beta) return tt.val;
+        }
+      }
       var moves = legalMoves(bb, side);
       if (!moves.length) {
         if (passed) { // deux passes de suite → partie finie : score réel (pions).
@@ -104,28 +133,35 @@
           var term = diff > 0 ? 100000 + diff : diff < 0 ? -100000 + diff : 0;
           return side === me ? term : -term;
         }
-        var vPass = -search(bb, opp === side ? me : opponent(side), depth, -beta, -alpha, true);
-        return vPass;
+        return -search(bb, opponent(side), depth, -beta, -alpha, true);
       }
-      if (depth <= 0) { var e = evaluate(bb, side); return e; }
-      // Tri des coups : coins d'abord, puis poids — meilleures coupures.
+      if (depth <= 0) return evaluate(bb, side);
+      // Tri des coups : coup de la TT d'abord, puis coins/poids — meilleures coupures.
       moves.sort(function (a, z) { return W[z] - W[a]; });
-      var best = -1e9, other = opponent(side);
+      if (ttMove >= 0) { var pos = moves.indexOf(ttMove); if (pos > 0) { moves.splice(pos, 1); moves.unshift(ttMove); } }
+      var best = -1e9, bestMv = moves[0], other = opponent(side);
       for (var i = 0; i < moves.length; i++) {
         var nb = applyMove(bb, moves[i], side);
         var v = -search(nb, other, depth - 1, -beta, -alpha, false);
         if (aborted) return best > -1e9 ? best : v;
-        if (v > best) best = v;
+        if (v > best) { best = v; bestMv = moves[i]; }
         if (best > alpha) alpha = best;
         if (alpha >= beta) break;
       }
-      if (!aborted) TT[key] = best;
+      if (!aborted) TT[key] = { d: depth, val: best, move: bestMv, flag: best <= a0 ? -1 : best >= beta ? 1 : 0 };
       return best;
     }
 
     var rootMoves = legalMoves(b, me);
     if (!rootMoves.length) return -1; // on passe
     if (rootMoves.length === 1) return rootMoves[0];
+    // ── Résolution EXACTE de la finale ────────────────────────────────────────
+    // Quand il ne reste que peu de cases vides, on cherche JUSQU'AU BOUT (le score
+    // terminal = différence de pions) : l'IA joue alors parfaitement la fin de
+    // partie — là où chaque pion compte et où l'heuristique se trompe le plus. On
+    // ne l'active qu'au-delà du niveau « facile » (maxDepth ≥ 4).
+    var empties = 0; for (var e = 0; e < 64; e++) if (b[e] === '.') empties++;
+    if (maxDepth >= 4 && empties <= 12) maxDepth = empties;
     rootMoves.sort(function (a, z) { return W[z] - W[a]; });
 
     var best = rootMoves[0];
@@ -145,7 +181,7 @@
     return best;
   }
 
-  root.OthelloAI = {
+  root.ReversiAI = {
     bestMove: bestMove,
     legalMoves: legalMoves,
     applyMove: applyMove,

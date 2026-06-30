@@ -55,7 +55,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js" data-engine="dames-ai.js"></script>
+  <script src="/boot.js" data-engine="ai/dames-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -160,7 +160,7 @@
       if (window.Bots && window.Bots.shouldBlunder(state)) {
         move = legal[Math.floor(Math.random() * legal.length)];
       } else {
-        var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 5, hard: 8 }) : 5);
+        var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 9 }) : 6);
         move = window.DamesAI.bestMove(b, me, opp, depth) || legal[0];
       }
       commitMove(move);

@@ -14,19 +14,21 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v18';
+var CACHE = 'jeux-v22';
 var ASSETS = [
   './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
-  'head.js', 'boot.js', 'p4-ai.js', 'morpion-ai.js', 'othello-ai.js', 'dames-ai.js',
-  'monopoly-engine.js', 'cluedo-engine.js',
-  'games/petit-bac.html', 'games/puissance4.html', 'games/othello.html', 'games/dames.html', 'games/blackjack.html', 'games/dobble-emoji.html',
+  'head.js', 'boot.js', 'puzzle.js', 'ai/p4-ai.js', 'ai/morpion-ai.js', 'ai/reversi-ai.js', 'ai/dames-ai.js',
+  'ai/monopoly-engine.js', 'ai/cluedo-engine.js',
+  'ai/bataille-navale-ai.js', 'ai/uno-ai.js', 'ai/president-ai.js', 'ai/skyjo-ai.js', 'ai/sixnimmt-ai.js',
+  'ai/papayoo-ai.js', 'ai/trio-ai.js', 'ai/blokus-ai.js', 'ai/mastermind-ai.js', 'ai/millebornes-ai.js',
+  'games/petit-bac.html', 'games/puissance4.html', 'games/reversi.html', 'games/dames.html', 'games/blackjack.html', 'games/dobble-emoji.html',
   'games/crack-list.html', 'games/lynx.html', 'games/pictionary.html', 'games/uno.html', 'games/skyjo.html',
   'games/blokus.html', 'games/bataille-navale.html', 'games/codenames.html', 'games/morpion.html',
   'games/undercover.html', 'games/president.html', 'games/ludo.html',
   'games/juste-prix.html', 'games/telephone-dessine.html',
   'games/monopoly.html', 'games/cluedo.html',
-  'games/papayoo.html', 'games/trio.html', 'games/sixnimmt.html', 'games/mastermind.html', 'games/themind.html', 'games/2048.html', 'games/sudoku.html', 'games/millebornes.html', 'games/loupgarou.html', 'games/timesup.html', 'games/lapaye.html'
+  'games/papayoo.html', 'games/trio.html', 'games/sixnimmt.html', 'games/mastermind.html', 'games/themind.html', 'games/2048.html', 'games/sudoku.html', 'games/queens.html', 'games/tango.html', 'games/zip.html', 'games/sutom.html', 'games/solitaire.html', 'games/millebornes.html', 'games/loupgarou.html', 'games/timesup.html', 'games/lapaye.html'
 ];
 
 self.addEventListener('install', function (e) {

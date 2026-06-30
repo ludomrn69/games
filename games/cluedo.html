@@ -80,7 +80,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js" data-engine="cluedo-engine.js"></script>
+  <script src="/boot.js" data-engine="ai/cluedo-engine.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -169,84 +169,9 @@
     });
 
     /* ━━━━━━━━━━ IA (réacteur, identique au simulateur validé) ━━━━━━━━━━ */
-    function cluedoBot() { tx(function (cur) { botStep(cur); }); }
-    function man(a, dr, dc) { var p = a.split(','); return Math.abs(+p[0] - dr) + Math.abs(+p[1] - dc); }
-    function chooseTargetRoom(s, m) {
-      if (m.env.piece) return CE.ROOMS.indexOf(m.env.piece);
-      for (var i = 0; i < 9; i++) if (!m.holds[CE.ROOMS[i]] && m.env.piece !== CE.ROOMS[i]) return i;
-      return 0;
-    }
-    // Choisit une carte à « tester » dans une suggestion. Normalement la première
-    // dont on ignore le détenteur (maximise l'info). Facile : une au hasard.
-    function pickTest(cards, m, lvl) {
-      var rem = cards.filter(function (c) { return !m.holds[c]; });
-      if (!rem.length) rem = cards.slice();
-      if (lvl === 'easy') return rem[Math.floor(Math.random() * rem.length)];
-      return rem[0];
-    }
-    function closestTowardRoom(s, reach, targetIdx) {
-      var doors = CE.doorLanes(targetIdx), best = null, bd = 1e9;
-      Object.keys(reach).forEach(function (n) {
-        if (CE.isRoomNode(n)) return;
-        var d = Math.min.apply(null, doors.map(function (dl) { return man(n, dl[0], dl[1]); }));
-        if (d < bd) { bd = d; best = n; }
-      });
-      return best;
-    }
-    // Case de la piscine la plus proche d'un nœud atteignable (pour aller accuser).
-    function closestTowardPool(s, reach) {
-      var pool = CE.poolCells(), best = null, bd = 1e9;
-      Object.keys(reach).forEach(function (n) {
-        if (CE.isRoomNode(n)) return;
-        var d = Math.min.apply(null, pool.map(function (pc) { return man(n, pc[0], pc[1]); }));
-        if (d < bd) { bd = d; best = n; }
-      });
-      return best;
-    }
-    function botStep(s, rnd) {
-      if (s.phase === 'disprove') { CE.disprove(s, CE.botDisproveChoice(s)); return; }
-      var pid = s.turn, m = CE.mem(s, pid);
-      var solved = CE.solved(m), inPool = CE.isPoolNode(s.pos[pid]);
-      if (s.phase === 'roll') {
-        if (solved && inPool) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; } // accuse au centre
-        CE.roll(s); return;
-      }
-      if (s.phase === 'move') {
-        // Affaire résolue : foncer vers la piscine centrale pour accuser.
-        if (solved) {
-          var reachP = s.reach || {};
-          var poolReach = Object.keys(reachP).filter(function (n) { return CE.isPoolNode(n); });
-          if (poolReach.length) { CE.moveTo(s, poolReach[0]); return; }
-          var towardPool = closestTowardPool(s, reachP);
-          if (towardPool) { CE.moveTo(s, towardPool); return; }
-          CE.stay(s); return;
-        }
-        var node = s.pos[pid];
-        if (CE.isRoomNode(node)) {
-          var rn = CE.ROOMS[CE.roomIdx(node)];
-          if ((!m.env.piece && !m.holds[rn]) || m.env.piece === rn) { CE.stay(s); return; }
-        }
-        var reach = s.reach || {};
-        var target = chooseTargetRoom(s, m);
-        if (reach['R' + target] != null) { CE.moveTo(s, 'R' + target); return; }
-        var useful = Object.keys(reach).filter(function (n) { return CE.isRoomNode(n) && !m.holds[CE.ROOMS[CE.roomIdx(n)]]; });
-        if (useful.length) { CE.moveTo(s, useful[0]); return; }
-        var cell = closestTowardRoom(s, reach, target);
-        if (cell) { CE.moveTo(s, cell); return; }
-        var corr = Object.keys(reach).filter(function (n) { return !CE.isRoomNode(n); });
-        if (corr.length) { CE.moveTo(s, corr[Math.floor(Math.random() * corr.length)]); return; }
-        CE.stay(s); return;
-      }
-      if (s.phase === 'action') {
-        if (solved && inPool) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; } // accuse depuis la piscine
-        if (CE.isRoomNode(s.pos[pid])) { var lvl = window.Bots ? window.Bots.level(s) : 'normal'; CE.suggest(s, pickTest(CE.SUSPECTS, m, lvl), pickTest(CE.WEAPONS, m, lvl)); return; }
-        CE.endTurn(s); return;
-      }
-      if (s.phase === 'postsuggest') {
-        if (solved && inPool) { CE.accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
-        CE.endTurn(s); return;
-      }
-    }
+    // IA : déduction + déplacement dans cluedo-engine.js (CE.botStep), partagée
+    // avec le banc d'essai. La page ne fait que l'appeler à chaque pas du bot.
+    function cluedoBot() { tx(function (cur) { CE.botStep(cur, window.Bots ? window.Bots.level(cur) : 'normal'); }); }
 
     /* ━━━━━━━━━━ Rendu ━━━━━━━━━━ */
     var lastShown = null;

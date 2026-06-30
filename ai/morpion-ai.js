@@ -39,6 +39,7 @@
     return mv;
   }
   function app(bb, mk, m) { var a = bb.split(''); if (m.f != null) { a[m.f] = '.'; a[m.t] = mk; } else a[m.i] = mk; return a.join(''); }
+  function mvKey(m) { return m.i != null ? 'p' + m.i : 'm' + m.f + '_' + m.t; } // clé d'un coup (pose / déplacement) pour le tri par TT
 
   function bestMove(board, me, opp, maxDepth) {
     var b = board || '.........';
@@ -56,14 +57,16 @@
     function nega(bb, mk, depth, alpha, beta, path) {
       if (++nodes > NODE_CAP) { aborted = true; return 0; }
       if (path[bb + mk]) return 0;                           // répétition sur le chemin → nulle
-      var a0 = alpha, key = bb + mk, tt = TT[key];
+      var a0 = alpha, key = bb + mk, tt = TT[key], ttMv = tt ? tt.mv : null;
       if (tt && tt.d >= depth) {
         if (tt.flag === 0) return tt.val;
         if (tt.flag < 0) { if (tt.val < beta) beta = tt.val; } else { if (tt.val > alpha) alpha = tt.val; }
         if (alpha >= beta) return tt.val;
       }
       var omk = mk === me ? opp : me, mv = gen(bb, mk); if (!mv.length) return 0;
-      var best = -1e9;
+      // Coup de la TT d'abord → coupures α-β plus précoces (recherche plus profonde).
+      if (ttMv) { for (var t = 0; t < mv.length; t++) { if (mvKey(mv[t]) === ttMv) { mv.unshift(mv.splice(t, 1)[0]); break; } } }
+      var best = -1e9, bestMv = mv[0];
       path[key] = true;
       for (var k = 0; k < mv.length; k++) {
         var nb = app(bb, mk, mv[k]), v;
@@ -71,12 +74,12 @@
         else if (depth <= 0) v = (mk === me ? evalH(nb) : -evalH(nb));
         else v = -nega(nb, omk, depth - 1, -beta, -alpha, path);
         if (aborted) { best = best > -1e9 ? best : v; break; }
-        if (v > best) best = v;
+        if (v > best) { best = v; bestMv = mv[k]; }
         if (best > alpha) alpha = best;
         if (alpha >= beta) break;
       }
       delete path[key];
-      if (!aborted) TT[key] = { d: depth, val: best, flag: best <= a0 ? -1 : best >= beta ? 1 : 0 };
+      if (!aborted) TT[key] = { d: depth, val: best, mv: mvKey(bestMv), flag: best <= a0 ? -1 : best >= beta ? 1 : 0 };
       return best;
     }
     var moves = gen(b, me); if (!moves.length) return null;

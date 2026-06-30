@@ -27,7 +27,7 @@
     .lu-chip .home { font-size: 0.72rem; color: var(--ink-light); }
 
     .lu-board-wrap { display: flex; justify-content: center; padding: 6px 8px; }
-    .lu-board { display: grid; grid-template-columns: repeat(15, 1fr); width: min(96vw, 460px); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
+    .lu-board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(15, minmax(0, 1fr)); width: min(96vw, 460px); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
     .lu-cell { aspect-ratio: 1; border: 0.5px solid rgba(120,110,100,0.12); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1px; position: relative; }
     .lu-cell.blank { border-color: transparent; }
     .lu-cell.track { background: #fbf6ec; }

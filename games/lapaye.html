@@ -21,7 +21,10 @@
     .lp-pl { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 700; border: 2px solid transparent; }
     .lp-pl.turn { border-color: var(--terracotta); } .lp-pl.done { opacity: 0.6; }
     .lp-pl-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
-    .lp-pl .cash { color: var(--sage); } .lp-pl .debt { color: #e05a4e; }
+    .lp-pl .cash { color: var(--sage); } .lp-pl .debt { color: #e05a4e; } .lp-pl .save { color: var(--gold); } .lp-pl .bills { color: #e07b29; }
+    .lp-bank-row { display: flex; gap: 6px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+    .lp-bank { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 20px; padding: 0.42rem 0.85rem; font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--ink); }
+    .lp-bank:hover { border-color: var(--terracotta); }
 
     .lp-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 6px 12px; }
 
@@ -105,10 +108,11 @@
     <div class="modal-card">
       <div class="modal-title">💰 La Bonne Paye</div>
       <div class="modal-body">
-        <p>• Avance dans le <b>mois</b> en lançant le dé. Chaque case déclenche un évènement : <b>facture</b> 📬, <b>affaire</b> 🤝, <b>bonus</b> 🎁, <b>dépense</b> 💸…</p>
-        <p style="margin-top:6px">• Au <b>Jour de Paye</b> 💰 (fin de mois), tu touches ton <b>salaire</b>, encaisses tes affaires et paies les <b>intérêts</b> de tes emprunts.</p>
-        <p style="margin-top:6px">• Pas assez de cash ? Tu <b>empruntes</b> automatiquement (dette + intérêts).</p>
-        <p style="margin-top:6px">• Après quelques mois, le plus <b>riche</b> (cash − dettes) gagne !</p>
+        <p>• Avance dans le <b>mois</b> en lançant le dé. <b>Courrier 📬</b> : une <b>facture</b> qui s'accumule (📬 = total à payer), ou un chèque. <b>Affaire 🤝</b> : achète, tu la revends à la paye. <b>Loterie 🎲</b>, coups de chance 😊 / coups durs 😟.</p>
+        <p style="margin-top:6px">• Au <b>Jour de Paye</b> 💰 (fin de mois) : <b>salaire</b> + revente des affaires (au dé) + intérêts d'épargne, <b>moins TOUTES tes factures</b> du mois et les intérêts de dette. Le cœur du jeu : tenir jusqu'à la paie !</p>
+        <p style="margin-top:6px">• À ton tour, avant de lancer : <b>💳 Emprunte</b> (crédit, 10 % d'intérêts/mois) ou <b>🏦 Épargne</b> (de côté, +5 %/mois) — et rembourse quand tu veux.</p>
+        <p style="margin-top:6px">• Pas assez de cash pour une dépense ? Tu <b>empruntes</b> automatiquement.</p>
+        <p style="margin-top:6px">• Après quelques mois, le plus <b>riche</b> (cash + épargne − dettes) gagne !</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
     </div>
@@ -127,13 +131,15 @@
     var DAYS = (function () {
       var d = []; for (var i = 0; i < MONTH; i++) d.push({ t: 'rien', e: '·' });
       function set(day, t, e) { d[day - 1] = { t: t, e: e }; }
-      set(1, 'rien', '🏁'); set(3, 'bill', '📬'); set(5, 'deal', '🤝'); set(7, 'bonus', '🎁');
-      set(9, 'spend', '💸'); set(11, 'bill', '📬'); set(13, 'loto', '🍀'); set(15, 'deal', '🤝');
-      set(17, 'charity', '❤️'); set(19, 'spend', '💸'); set(21, 'bill', '📬'); set(23, 'deal', '🤝');
-      set(25, 'bonus', '🎁'); set(27, 'spend', '💸'); set(29, 'bill', '📬'); set(31, 'pay', '💰');
+      set(1, 'start', '🏁');
+      set(2, 'mail', '📬'); set(4, 'deal', '🤝'); set(5, 'sweet', '😊'); set(6, 'mail', '📬');
+      set(8, 'lottery', '🎲'); set(9, 'deal', '🤝'); set(11, 'mail', '📬'); set(12, 'rough', '😟');
+      set(14, 'sweet', '😊'); set(15, 'deal', '🤝'); set(17, 'mail', '📬'); set(18, 'lottery', '🎲');
+      set(20, 'deal', '🤝'); set(21, 'mail', '📬'); set(23, 'rough', '😟'); set(24, 'sweet', '😊');
+      set(26, 'mail', '📬'); set(27, 'deal', '🤝'); set(29, 'mail', '📬'); set(31, 'pay', '💰');
       return d;
     })();
-    var EV_LABEL = { rien: 'Journée tranquille', bill: 'Courrier : une facture', deal: 'Une affaire à saisir', bonus: 'Bonne surprise', spend: 'Dépense imprévue', loto: 'Loterie !', charity: 'Bonne action', pay: 'Jour de Paye 💰' };
+    var EV_LABEL = { start: 'Début du mois', rien: 'Journée tranquille', mail: 'Courrier 📬', deal: 'Une affaire à saisir', lottery: 'Loterie 🎲', sweet: 'Coup de chance', rough: 'Coup dur', pay: 'Jour de Paye 💰' };
 
     /* ━━ Enregistrement ━━ */
     var prevStatus = null;
@@ -145,10 +151,10 @@
       minPlayers: 2,
       maxPlayers: 6,
       rules: [
-        'Avance dans le mois au dé : factures, affaires, bonus, dépenses…',
-        'Jour de Paye : salaire + encaissement des affaires − intérêts',
-        'Pas assez de cash → emprunt automatique (dette + intérêts)',
-        'Le plus riche (cash − dettes) après quelques mois gagne'
+        'Courrier 📬 : tes factures s\'accumulent · Affaire 🤝 : achète, revends à la paye',
+        'Jour de Paye : salaire + affaires − TOUTES tes factures − intérêts de dette',
+        'À ton tour : 💳 emprunte (crédit) ou 🏦 épargne (+5 %) — comme à la banque',
+        'Le plus riche (cash + épargne − dettes) après quelques mois gagne'
       ],
       offline: { solo: true, local: true },
       bot: lpBot,
@@ -169,7 +175,7 @@
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
       var months = (cur && cur.months) || 2;
-      order.forEach(function (p) { cur.players[p].lp = { pos: 0, cash: START, debt: 0, deals: [], done: false }; });
+      order.forEach(function (p) { cur.players[p].lp = { pos: 0, cash: START, debt: 0, savings: 0, bills: [], deals: [], done: false }; });
       return { months: months, totalDays: months * MONTH, turn: order[0], phase: 'roll', winner: null, banner: 'Lance le dé pour avancer dans le mois !' };
     }
     function L(s, pid) { return s.players[pid].lp; }
@@ -199,31 +205,48 @@
     }
     function payday(cur, pid) {
       var P = L(cur, pid);
-      var deals = (P.deals || []).reduce(function (a, d) { return a + d; }, 0);
-      var interest = Math.round(P.debt * 0.1);
-      P.cash += SALARY + deals; P.deals = [];
-      pay(P, interest);
-      cur.banner = '💰 ' + Room.name(pid) + ' : paye +' + SALARY + (deals ? ' · affaires +' + deals : '') + (interest ? ' · intérêts -' + interest : '');
+      // Revente des affaires : prix au DÉ (de ~1,05× à ~2,3× le coût d'achat).
+      var dealRev = 0; (P.deals || []).forEach(function (cost) { dealRev += Math.round(cost * (0.8 + rnd(1, 6) * 0.25)); }); P.deals = [];
+      var bills = (P.bills || []).reduce(function (a, b) { return a + b; }, 0); P.bills = []; // TOUTES les factures du mois
+      var loanInt = Math.round(P.debt * 0.1);             // 10 % d'intérêts sur la dette
+      var saveInt = Math.round((P.savings || 0) * 0.05);   // l'épargne rapporte 5 %
+      P.cash += SALARY + dealRev + saveInt; P.savings = (P.savings || 0) + saveInt;
+      pay(P, bills + loanInt);                             // régler factures + intérêts (emprunt auto si à court)
+      cur.banner = '💰 ' + Room.name(pid) + ' — Paye : +' + SALARY + (dealRev ? ' · affaires +' + dealRev : '') + (bills ? ' · factures -' + bills : '') + (loanInt ? ' · intérêts -' + loanInt : '');
     }
-    function pay(P, amount) { // paie ; si pas assez, emprunte (dette)
+    function pay(P, amount) { // paie ; si pas assez, emprunte automatiquement (dette)
       if (amount <= 0) return;
       if (P.cash >= amount) P.cash -= amount; else { var short = amount - P.cash; P.cash = 0; P.debt += short; }
     }
+    // ── Banque : emprunt / remboursement / épargne (choix du joueur, en phase 'roll') ──
+    function bankTx(pid, fn) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'roll' || cur.turn !== pid) return cur;
+        fn(L(cur, pid), cur); return cur;
+      });
+    }
+    function borrow(pid) { bankTx(pid, function (P, cur) { P.cash += 1000; P.debt += 1000; cur.banner = '💳 ' + Room.name(pid) + ' emprunte 1000 € (intérêts à la paye)'; }); }
+    function repay(pid) { bankTx(pid, function (P, cur) { var a = Math.min(500, P.cash, P.debt); if (a <= 0) return; P.cash -= a; P.debt -= a; cur.banner = '💳 ' + Room.name(pid) + ' rembourse ' + a + ' € de dette'; }); }
+    function deposit(pid) { bankTx(pid, function (P, cur) { var a = Math.min(500, P.cash); if (a <= 0) return; P.cash -= a; P.savings = (P.savings || 0) + a; cur.banner = '🏦 ' + Room.name(pid) + ' met ' + a + ' € de côté (rapporte 5 % à la paye)'; }); }
+    function withdraw(pid) { bankTx(pid, function (P, cur) { var a = Math.min(500, P.savings || 0); if (a <= 0) return; P.savings -= a; P.cash += a; cur.banner = '🏦 ' + Room.name(pid) + ' retire ' + a + ' € de son épargne'; }); }
     function resolveLanding(cur, pid, dayIdx) {
       var P = L(cur, pid), ev = DAYS[dayIdx];
-      if (ev.t === 'bill') { var b = rnd(150, 450); pay(P, b); cur.banner = '📬 ' + Room.name(pid) + ' paie une facture de ' + b + ' €'; nextTurn(cur, pid); }
-      else if (ev.t === 'bonus') { var g = rnd(150, 550); P.cash += g; cur.banner = '🎁 ' + Room.name(pid) + ' reçoit ' + g + ' €'; nextTurn(cur, pid); }
-      else if (ev.t === 'spend') { var sp = rnd(100, 400); pay(P, sp); cur.banner = '💸 ' + Room.name(pid) + ' dépense ' + sp + ' €'; nextTurn(cur, pid); }
-      else if (ev.t === 'charity') { pay(P, 150); cur.banner = '❤️ ' + Room.name(pid) + ' donne 150 € à une bonne cause'; nextTurn(cur, pid); }
-      else if (ev.t === 'loto') { if (Math.random() < 0.35) { P.cash += 600; cur.banner = '🍀 ' + Room.name(pid) + ' gagne 600 € au loto !'; } else { pay(P, 100); cur.banner = '🍀 ' + Room.name(pid) + ' perd son ticket (-100 €)'; } nextTurn(cur, pid); }
-      else if (ev.t === 'deal') { var cost = rnd(300, 600), ret = Math.round(cost * (1.3 + Math.random() * 0.5)); cur.pendingDeal = { cost: cost, ret: ret }; cur.phase = 'deal'; cur.banner = '🤝 ' + Room.name(pid) + ' : affaire à ' + cost + ' € (rapporte ' + ret + ' € à la paye)'; }
+      if (ev.t === 'mail') {   // Courrier : facture (à régler à la paye) ou chèque surprise
+        if (Math.random() < 0.6) { var b = rnd(200, 700); P.bills = (P.bills || []).concat([b]); cur.banner = '📬 ' + Room.name(pid) + ' reçoit une facture de ' + b + ' € (à régler au Jour de Paye)'; }
+        else { var g = rnd(100, 400); P.cash += g; cur.banner = '📬 ' + Room.name(pid) + ' reçoit un chèque de ' + g + ' €'; }
+        nextTurn(cur, pid);
+      }
+      else if (ev.t === 'deal') { var cost = rnd(300, 800); cur.pendingDeal = { cost: cost }; cur.phase = 'deal'; cur.banner = '🤝 ' + Room.name(pid) + ' : affaire à ' + cost + ' € — revendable au Jour de Paye'; }
+      else if (ev.t === 'lottery') { if (P.cash >= 200) { pay(P, 200); if (rnd(1, 6) === 6) { P.cash += 1000; cur.banner = '🎲 ' + Room.name(pid) + ' GAGNE 1000 € à la loterie !'; } else cur.banner = '🎲 ' + Room.name(pid) + ' joue 200 €… perdu'; } else cur.banner = Room.name(pid) + ' ne peut pas jouer à la loterie'; nextTurn(cur, pid); }
+      else if (ev.t === 'sweet') { var s = rnd(150, 500); P.cash += s; cur.banner = '😊 ' + Room.name(pid) + ' : coup de chance +' + s + ' €'; nextTurn(cur, pid); }
+      else if (ev.t === 'rough') { var rb = rnd(200, 400); P.bills = (P.bills || []).concat([rb]); cur.banner = '😟 ' + Room.name(pid) + ' : coup dur — facture de ' + rb + ' €'; nextTurn(cur, pid); }
       else { cur.banner = '· ' + Room.name(pid) + ' : journée tranquille'; nextTurn(cur, pid); }
     }
     function decideDeal(pid, buy) {
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'deal' || cur.turn !== pid) return cur;
-        var P = L(cur, pid), d = cur.pendingDeal || { cost: 0, ret: 0 };
-        if (buy) { pay(P, d.cost); P.deals = (P.deals || []).concat([d.ret]); cur.banner = '🤝 ' + Room.name(pid) + ' achète l\'affaire (' + d.cost + ' €)'; }
+        var P = L(cur, pid), d = cur.pendingDeal || { cost: 0 };
+        if (buy) { pay(P, d.cost); P.deals = (P.deals || []).concat([d.cost]); cur.banner = '🤝 ' + Room.name(pid) + ' achète l\'affaire (' + d.cost + ' €) — à revendre à la paye'; }
         else cur.banner = Room.name(pid) + ' passe l\'affaire';
         cur.pendingDeal = null; cur.phase = 'roll';
         nextTurn(cur, pid);
@@ -241,7 +264,7 @@
       if (order.every(function (p) { return L(cur, p).done; })) { endGame(cur); return; }
       for (var k = 1; k <= order.length; k++) { var c = order[(i + k) % order.length]; if (!L(cur, c).done) { cur.turn = c; return; } }
     }
-    function worth(s, pid) { var P = L(s, pid); return P.cash - P.debt; }
+    function worth(s, pid) { var P = L(s, pid); return P.cash + (P.savings || 0) - P.debt; }
     function endGame(cur) {
       cur.status = 'ended';
       var best = cur.order[0]; cur.order.forEach(function (p) { if (worth(cur, p) > worth(cur, best)) best = p; });
@@ -255,8 +278,9 @@
       if (state.phase === 'roll') { rollMove(pid); return; }
       if (state.phase === 'deal') {
         var easy = window.Bots && window.Bots.shouldBlunder(state);
-        var P = L(state, pid), d = state.pendingDeal || { cost: 0, ret: 0 };
-        var buy = easy ? (Math.random() < 0.5) : (d.ret >= d.cost * 1.35 && P.cash >= d.cost + 200);
+        var P = L(state, pid), d = state.pendingDeal || { cost: 0 };
+        // Espérance de revente ≈ 1,67× le coût → on achète si on garde une marge de sécurité.
+        var buy = easy ? (Math.random() < 0.5) : (P.cash - d.cost >= 300);
         decideDeal(pid, buy);
       }
     }
@@ -268,7 +292,7 @@
         var P = L(state, pid);
         return '<div class="lp-pl' + (state.turn === pid ? ' turn' : '') + (P.done ? ' done' : '') + '">' +
           '<span class="lp-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + ' <span class="cash">' + P.cash + '€</span>' + (P.debt ? ' <span class="debt">-' + P.debt + '</span>' : '') + '</div>';
+          escapeHtml(Room.name(pid)) + ' <span class="cash">' + P.cash + '€</span>' + ((P.savings || 0) ? ' <span class="save">🏦' + P.savings + '</span>' : '') + ((P.bills && P.bills.length) ? ' <span class="bills">📬' + P.bills.reduce(function (a, b) { return a + b; }, 0) + '</span>' : '') + (P.debt ? ' <span class="debt">-' + P.debt + '</span>' : '') + '</div>';
       }).join(''));
       setText('lp-banner', state.banner || '');
 
@@ -286,10 +310,17 @@
       if (!myTurn) { stage.innerHTML = '<div class="lp-wait">⏳ Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>'; return; }
       if (state.phase === 'deal') {
         var d = state.pendingDeal || {};
-        stage.innerHTML = '<div class="lp-event"><div class="lp-event-title">🤝 Affaire</div><div class="lp-event-sub">Coût : <b>' + d.cost + ' €</b> · rapporte <b>' + d.ret + ' €</b> au prochain Jour de Paye.</div>' +
+        stage.innerHTML = '<div class="lp-event"><div class="lp-event-title">🤝 Affaire</div><div class="lp-event-sub">Coût : <b>' + d.cost + ' €</b> · tu la revends au <b>Jour de Paye</b> (gain au dé, ~1 à 2×).</div>' +
           '<div class="lp-btn-row"><button class="lp-btn go" onclick="decideDeal(\'' + me + '\',true)">Acheter</button><button class="lp-btn" onclick="decideDeal(\'' + me + '\',false)">Passer</button></div></div>';
       } else {
-        stage.innerHTML = '<div class="lp-dice">' + (state.lastDie ? '🎲 ' + state.lastDie : '🎲') + '</div><button class="btn-primary" onclick="rollMove(\'' + me + '\')">Lancer le dé</button>';
+        var P = L(state, me);
+        var bank = '<div class="lp-bank-row">' +
+          '<button class="lp-bank" onclick="borrow(\'' + me + '\')">💳 Emprunter 1000</button>' +
+          (P.debt ? '<button class="lp-bank" onclick="repay(\'' + me + '\')">Rembourser 500</button>' : '') +
+          (P.cash >= 500 ? '<button class="lp-bank" onclick="deposit(\'' + me + '\')">🏦 Épargner 500</button>' : '') +
+          ((P.savings || 0) > 0 ? '<button class="lp-bank" onclick="withdraw(\'' + me + '\')">Retirer 500</button>' : '') +
+          '</div>';
+        stage.innerHTML = '<div class="lp-dice">' + (state.lastDie ? '🎲 ' + state.lastDie : '🎲') + '</div><button class="btn-primary" onclick="rollMove(\'' + me + '\')">Lancer le dé</button>' + bank;
       }
     }
 

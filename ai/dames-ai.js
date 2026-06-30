@@ -7,9 +7,12 @@
      dans les 4 diagonales) ; un pion ne prend QUE vers l'avant ;
    • on gagne en capturant tous les pions adverses ou en le bloquant.
 
-  IA : négamax α-β + table de transposition + approfondissement itératif + borne
-  de nœuds. Évaluation matérielle (dame ≫ pion) + avancement + rangée arrière +
-  mobilité. À profondeur 6–9 elle joue très fort, sans aucun apprentissage.
+  IA : négamax α-β + table de transposition BORNÉE (drapeau + meilleur coup) +
+  approfondissement itératif + QUIESCENCE sur les prises (la prise étant
+  obligatoire, on prolonge les échanges forcés avant d'évaluer → supprime l'effet
+  d'horizon, le plus gros gain de force) + borne de nœuds. Évaluation matérielle
+  (dame ≫ pion) + avancement + rangée arrière + centralisation des dames. À
+  profondeur 7–9 + quiescence, elle joue très fort, sans aucun apprentissage.
 
   Représentation :
    • board : 64 caractères (index r*8+c). '.'=vide/inutilisé. Pions : 'w','b' ;
@@ -170,28 +173,71 @@
       return side === me ? sc : -sc;
     }
 
-    var NODE_CAP = 45000, nodes = 0, aborted = false, TT = {};
-    function search(b, side, depth, alpha, beta) {
+    // Cap de nœuds GÉNÉREUX : aux Dames une recherche profondeur 8–9 s'achève en
+    // quelques dizaines de ms ; un cap trop bas tronquait la profondeur visée (le
+    // niveau « difficile » n'atteignait jamais sa profondeur nominale). Le cap ne
+    // sert plus que de garde-fou pour les positions pathologiques.
+    var NODE_CAP = 600000, nodes = 0, aborted = false, TT = {};
+    // Quiescence seulement à partir de « moyen » (maxDepth ≥ 4) : en « facile »
+    // (profondeur 2) on la coupe pour que le bot reste réellement faible.
+    var useQuiesce = maxDepth >= 4;
+    // legalMoves ne renvoie JAMAIS un mélange : soit uniquement des prises (elles
+    // sont obligatoires), soit uniquement des déplacements simples. Une prise saute
+    // 2 rangées → on teste le 1er coup pour savoir si la liste est faite de prises.
+    function isCaptureList(moves) {
+      return moves.length > 0 && Math.abs(((moves[0][1] / N) | 0) - ((moves[0][0] / N) | 0)) === 2;
+    }
+    // Quiescence : la PRISE étant OBLIGATOIRE, une position où l'on doit prendre
+    // n'est pas « calme ». On prolonge donc la recherche sur les seules prises
+    // (forcées, donc bornées par le matériel restant) AVANT d'évaluer — ce qui
+    // supprime l'effet d'horizon : couper au milieu d'un échange fausse totalement
+    // le bilan matériel. C'est le plus gros gain de force aux Dames.
+    function quiesce(b, side, alpha, beta) {
       if (++nodes > NODE_CAP) { aborted = true; return 0; }
       var moves = legalMoves(b, side);
-      if (!moves.length) { // bloqué / plus de pièces → perdu pour `side`
-        return side === me ? -100000 - depth : 100000 + depth;
-      }
-      if (depth <= 0) return evaluate(b, side);
-      var key = b + side + depth, tt = TT[key];
-      if (tt != null) return tt;
-      // Tri : les rafles longues d'abord (meilleures coupures).
+      if (!moves.length) return side === me ? -100000 : 100000; // bloqué → perdu
+      if (!isCaptureList(moves)) return evaluate(b, side);        // position calme
       moves.sort(function (a, z) { return z.length - a.length; });
       var best = -1e9, nx = other(side);
       for (var i = 0; i < moves.length; i++) {
-        var nb = applyMove(b, moves[i], side);
-        var v = -search(nb, nx, depth - 1, -beta, -alpha);
+        var v = -quiesce(applyMove(b, moves[i], side), nx, -beta, -alpha);
         if (aborted) return best > -1e9 ? best : v;
         if (v > best) best = v;
         if (best > alpha) alpha = best;
         if (alpha >= beta) break;
       }
-      if (!aborted) TT[key] = best;
+      return best;
+    }
+    // Négamax α-β + table de transposition BORNÉE (drapeau exact/min/max + meilleur
+    // coup mémorisé, ré-essayé en premier). Stocker le drapeau est indispensable :
+    // une coupure α-β ne donne qu'une borne, pas le vrai score.
+    function search(b, side, depth, alpha, beta) {
+      if (++nodes > NODE_CAP) { aborted = true; return 0; }
+      var moves = legalMoves(b, side);
+      if (!moves.length) return side === me ? -100000 - depth : 100000 + depth; // bloqué → perdu
+      if (depth <= 0) return useQuiesce ? quiesce(b, side, alpha, beta) : evaluate(b, side);
+      var a0 = alpha, key = b + side, tt = TT[key], ttMove = null;
+      if (tt) {
+        ttMove = tt.move;
+        if (tt.d >= depth) {
+          if (tt.flag === 0) return tt.val;
+          if (tt.flag < 0) { if (tt.val < beta) beta = tt.val; } else { if (tt.val > alpha) alpha = tt.val; }
+          if (alpha >= beta) return tt.val;
+        }
+      }
+      // Tri : coup de la TT d'abord, puis rafles longues — meilleures coupures.
+      moves.sort(function (a, z) { return z.length - a.length; });
+      if (ttMove) { for (var t = 0; t < moves.length; t++) { if (moves[t].join(',') === ttMove) { moves.unshift(moves.splice(t, 1)[0]); break; } } }
+      var best = -1e9, bestMv = moves[0], nx = other(side);
+      for (var i = 0; i < moves.length; i++) {
+        var nb = applyMove(b, moves[i], side);
+        var v = -search(nb, nx, depth - 1, -beta, -alpha);
+        if (aborted) return best > -1e9 ? best : v;
+        if (v > best) { best = v; bestMv = moves[i]; }
+        if (best > alpha) alpha = best;
+        if (alpha >= beta) break;
+      }
+      if (!aborted) TT[key] = { d: depth, val: best, move: bestMv.join(','), flag: best <= a0 ? -1 : best >= beta ? 1 : 0 };
       return best;
     }
 

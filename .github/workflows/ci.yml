@@ -17,5 +17,9 @@ jobs:
         run: node tools/check.js
       - name: README à jour avec le catalogue index.html
         run: node tools/gen-readme.js --check
-      - name: Banc d'essai des IA (taux de victoire attendus)
+      - name: Banc d'essai des IA de recherche (taux de victoire attendus)
         run: node tools/bench.js
+      - name: Banc d'essai des IA des jeux (légalité + force vs aléatoire)
+        run: node tools/bench-games.js
+      - name: Tests de la brique puzzle-course (déterminisme + classement)
+        run: node tools/bench-puzzles.js

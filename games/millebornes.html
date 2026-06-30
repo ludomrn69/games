@@ -63,7 +63,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="ai/millebornes-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -137,20 +137,11 @@
       sAce: { t: 'safe', safe: 'crash', ic: '🏎️', lb: 'As volant' }, sTank: { t: 'safe', safe: 'gas', ic: '🛢️', lb: 'Citerne' },
       sPunc: { t: 'safe', safe: 'flat', ic: '🧤', lb: 'Increvable' }, sRoW: { t: 'safe', safe: 'row', ic: '🚦', lb: 'Prioritaire' }
     };
-    function buildDeck() {
-      var d = [], add = function (id, n) { for (var i = 0; i < n; i++) d.push(id); };
-      add('d25', 10); add('d50', 10); add('d75', 10); add('d100', 12); add('d200', 4);
-      add('hStop', 5); add('hGas', 3); add('hFlat', 3); add('hCrash', 3); add('hLimit', 4);
-      add('rGo', 14); add('rGas', 6); add('rFlat', 6); add('rRepair', 6); add('rLimit', 6);
-      add('sAce', 1); add('sTank', 1); add('sPunc', 1); add('sRoW', 1);
-      return shuffle(d);
-    }
+    // Deck : centralisé dans millebornes-ai.js (partagé avec le banc).
+    var buildDeck = window.MilleBornesAI.buildDeck;
     function hasSafe(P, kind) { return (P.safeties || []).some(function (s) { return CARD[s].safe === kind || (kind !== 'limit' && CARD[s].safe === 'row' && kind === 'stop') ; }); }
-    function immune(P, haz) {
-      var saf = P.safeties || [];
-      if (haz === 'stop' || haz === 'limit') { if (saf.indexOf('sRoW') >= 0) return true; }
-      return saf.some(function (s) { return CARD[s].safe === haz; });
-    }
+    // Immunité (bottes) : centralisé dans millebornes-ai.js.
+    var immune = window.MilleBornesAI.immune;
 
     /* ━━ Enregistrement ━━ */
     var prevStatus = null, sel = -1, targeting = null;
@@ -283,40 +274,21 @@
       }, function (err, committed) { if (committed) { sel = -1; targeting = null; } });
     }
 
-    /* ━━ IA ━━ Priorités : finir, parer, rouler (la plus grande borne), feu vert,
-       attaquer le leader, défausser l'inutile. Facile = parfois au hasard. ━━ */
+    /* ━━ IA ━━ Décision dans millebornes-ai.js (priorités finir/parer/rouler/
+       attaquer/défausser ; partagée avec le banc). On lui passe une vue épurée du
+       jeu et on exécute l'action. ━━ */
     function mbBot(state, pid) {
       if (state.status !== 'playing' || state.turn !== pid) return;
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
-        var P = P_(cur, pid), hand = P.hand;
-        var easy = window.Bots && window.Bots.shouldBlunder(cur);
-        function move(card, target) { applyCard(cur, pid, card, target); }
-        // 1) Bottes utiles (immédiat, gratuit) — si elles parent une attaque en cours
-        for (var b = 0; b < hand.length; b++) { var cb = CARD[hand[b]]; if (cb.t === 'safe' && (cb.safe === P.hazard || (cb.safe === 'row' && (!P.rolling || P.limited)))) { move(hand[b]); return cur; } }
-        // 2) Parade d'un blocage
-        if (P.hazard) { for (var r = 0; r < hand.length; r++) { if (CARD[hand[r]].t === 'rem' && CARD[hand[r]].rem === P.hazard) { move(hand[r]); return cur; } } }
-        if (!P.rolling) { for (var g = 0; g < hand.length; g++) { if (hand[g] === 'rGo') { move('rGo'); return cur; } } }
-        if (P.limited) { for (var fl = 0; fl < hand.length; fl++) { if (hand[fl] === 'rLimit') { move('rLimit'); return cur; } } }
-        // 3) Rouler : la plus grande borne jouable (sans dépasser 1000)
-        if (!easy) {
-          var dists = hand.filter(function (c) { return CARD[c].t === 'dist' && canPlay(cur, pid, c); }).sort(function (a, b) { return CARD[b].km - CARD[a].km; });
-          if (dists.length) { move(dists[0]); return cur; }
-        }
-        // 4) Attaquer le leader
-        var hazs = hand.filter(function (c) { return CARD[c].t === 'haz' && anyTarget(cur, pid, c); });
-        if (hazs.length) {
-          var card = hazs[Math.floor(Math.random() * (easy ? hazs.length : 1))] || hazs[0];
-          var targets = (cur.order || []).filter(function (p) { return p !== pid && canPlay(cur, pid, card, p); }).sort(function (a, b) { return P_(cur, b).dist - P_(cur, a).dist; });
-          move(card, targets[0]); return cur;
-        }
-        // 5) sinon : jouer n'importe quel coup légal, ou défausser l'inutile
-        if (easy) { var legal = hand.filter(function (c) { return CARD[c].t !== 'haz' && canPlay(cur, pid, c); }); if (legal.length) { move(legal[Math.floor(Math.random() * legal.length)]); return cur; } }
-        var dist2 = hand.filter(function (c) { return CARD[c].t === 'dist' && canPlay(cur, pid, c); }).sort(function (a, b) { return CARD[b].km - CARD[a].km; });
-        if (dist2.length) { move(dist2[0]); return cur; }
-        // défausser : priorité aux attaques qu'on garde le moins, sinon la 1re carte
-        var dump = hand.find(function (c) { return CARD[c].t === 'haz' && !anyTarget(cur, pid, c); }) || hand[0];
-        discardCard(cur, pid, dump);
+        var P = P_(cur, pid);
+        var me = { dist: P.dist, rolling: P.rolling, hazard: P.hazard, limited: P.limited, safeties: P.safeties || [], hand: P.hand };
+        var opponents = (cur.order || []).filter(function (p) { return p !== pid; }).map(function (p) {
+          var T = P_(cur, p); return { pid: p, dist: T.dist, rolling: T.rolling, hazard: T.hazard, limited: T.limited, safeties: T.safeties || [] };
+        });
+        var act = window.MilleBornesAI.decide({ me: me, opponents: opponents, easy: window.Bots && window.Bots.shouldBlunder(cur) });
+        if (act.type === 'play') applyCard(cur, pid, act.card, act.target || null);
+        else discardCard(cur, pid, act.card);
         return cur;
       });
     }

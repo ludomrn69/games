@@ -304,6 +304,85 @@
     s.phase = 'over';
   }
 
+  // ── IA (déduction + déplacement) ─────────────────────────────────────────────
+  // Tout passe par la base de connaissances `mem` (solveur par contraintes ci-dessus) :
+  // on va vers une PIÈCE encore non disculpée, on suggère la carte la plus informative,
+  // et dès que l'enveloppe est connue on FONCE au centre accuser. Niveau « facile » =
+  // suggestions au hasard (déduit plus lentement).
+  function man(a, dr, dc) { var p = a.split(','); return Math.abs(+p[0] - dr) + Math.abs(+p[1] - dc); }
+  function chooseTargetRoom(m) {
+    if (m.env.piece) return ROOMS.indexOf(m.env.piece);
+    for (var i = 0; i < 9; i++) if (!m.holds[ROOMS[i]] && m.env.piece !== ROOMS[i]) return i;
+    return 0;
+  }
+  function pickTest(cards, m, lvl) {
+    var rem = cards.filter(function (c) { return !m.holds[c]; });
+    if (!rem.length) rem = cards.slice();
+    if (lvl === 'easy') return rem[Math.floor(Math.random() * rem.length)];
+    return rem[0];
+  }
+  function closestTowardRoom(reach, targetIdx) {
+    var doors = doorLanes(targetIdx), best = null, bd = 1e9;
+    Object.keys(reach).forEach(function (n) {
+      if (isRoomNode(n)) return;
+      var d = Math.min.apply(null, doors.map(function (dl) { return man(n, dl[0], dl[1]); }));
+      if (d < bd) { bd = d; best = n; }
+    });
+    return best;
+  }
+  function closestTowardPool(reach) {
+    var pool = poolCells(), best = null, bd = 1e9;
+    Object.keys(reach).forEach(function (n) {
+      if (isRoomNode(n)) return;
+      var d = Math.min.apply(null, pool.map(function (pc) { return man(n, pc[0], pc[1]); }));
+      if (d < bd) { bd = d; best = n; }
+    });
+    return best;
+  }
+  // Joue UN pas du bot pour le joueur courant. level : 'easy' | 'normal' | 'hard'.
+  function botStep(s, level) {
+    if (s.phase === 'disprove') { disprove(s, botDisproveChoice(s)); return; }
+    var pid = s.turn, m = s.mem[pid];
+    var solv = solved(m), inPool = isPoolNode(s.pos[pid]);
+    if (s.phase === 'roll') {
+      if (solv && inPool) { accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
+      roll(s); return;
+    }
+    if (s.phase === 'move') {
+      if (solv) { // affaire résolue → foncer vers la piscine centrale pour accuser
+        var reachP = s.reach || {};
+        var poolReach = Object.keys(reachP).filter(function (n) { return isPoolNode(n); });
+        if (poolReach.length) { moveTo(s, poolReach[0]); return; }
+        var towardPool = closestTowardPool(reachP);
+        if (towardPool) { moveTo(s, towardPool); return; }
+        stay(s); return;
+      }
+      var node = s.pos[pid];
+      if (isRoomNode(node)) {
+        var rn = ROOMS[roomIdx(node)];
+        if ((!m.env.piece && !m.holds[rn]) || m.env.piece === rn) { stay(s); return; }
+      }
+      var reach = s.reach || {}, target = chooseTargetRoom(m);
+      if (reach['R' + target] != null) { moveTo(s, 'R' + target); return; }
+      var useful = Object.keys(reach).filter(function (n) { return isRoomNode(n) && !m.holds[ROOMS[roomIdx(n)]]; });
+      if (useful.length) { moveTo(s, useful[0]); return; }
+      var cell = closestTowardRoom(reach, target);
+      if (cell) { moveTo(s, cell); return; }
+      var corr = Object.keys(reach).filter(function (n) { return !isRoomNode(n); });
+      if (corr.length) { moveTo(s, corr[Math.floor(Math.random() * corr.length)]); return; }
+      stay(s); return;
+    }
+    if (s.phase === 'action') {
+      if (solv && inPool) { accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
+      if (isRoomNode(s.pos[pid])) { suggest(s, pickTest(SUSPECTS, m, level), pickTest(WEAPONS, m, level)); return; }
+      endTurn(s); return;
+    }
+    if (s.phase === 'postsuggest') {
+      if (solv && inPool) { accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
+      endTurn(s); return;
+    }
+  }
+
   // ── Exports ──────────────────────────────────────────────────────────────────
   root.CluedoEngine = {
     SUSPECTS: SUSPECTS, WEAPONS: WEAPONS, ROOMS: ROOMS, ALLCARDS: ALLCARDS, SECRET: SECRET,
@@ -316,6 +395,6 @@
     suggest: suggest, disprove: disprove, botDisproveChoice: botDisproveChoice, accuse: accuse,
     endTurn: endTurn, actor: actor, alivePlayers: alivePlayers,
     mem: function (s, pid) { return s.mem[pid]; }, solved: solved, recordEvent: recordEvent,
-    setNameFn: function (f) { NAMEFN = f; }, nm: nm, log: log
+    setNameFn: function (f) { NAMEFN = f; }, nm: nm, log: log, botStep: botStep
   };
 })(typeof module !== 'undefined' && module.exports ? module.exports : (this.window = this.window || this));

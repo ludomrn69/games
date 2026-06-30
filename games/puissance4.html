@@ -60,7 +60,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js" data-engine="p4-ai.js"></script>
+  <script src="/boot.js" data-engine="ai/p4-ai.js"></script>
 
   <div class="app">
     <!-- Écrans gérés par lobby.js -->
@@ -159,9 +159,10 @@
     });
 
     /* ━━ IA (mode solo / ordis en ligne) ━━ Recherche pure dans p4-ai.js (négamax
-       α-β + table de transposition + approfondissement itératif). Profondeur selon
-       la difficulté (Bots.level) : facile ≈ 2 (+ coups aléatoires), moyen 6,
-       difficile 9 → quasi parfait (Puissance 4 est un jeu résolu). ━━ */
+       α-β + table de transposition + tri des coups TT/killer + approfondissement
+       itératif). Profondeur selon la difficulté (Bots.level) : facile ≈ 2 (+ coups
+       aléatoires), moyen 6, difficile 12 — la borne de nœuds décide la profondeur
+       réelle atteinte → quasi parfait (Puissance 4 est un jeu résolu). ━━ */
     function p4Bot(state, pid) {
       var order = state.order, me = String(order.indexOf(pid)), opp = String(1 - (+me));
       var b = state.board || emptyBoard();
@@ -169,7 +170,7 @@
       if (!vc.length) return;
       // Facile : joue parfois au hasard → réellement battable.
       if (window.Bots && window.Bots.shouldBlunder(state)) return dropInColumn(vc[Math.floor(Math.random() * vc.length)]);
-      var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 9 }) : 6);
+      var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 12 }) : 8);
       var col = window.P4AI.bestColumn(b, me, opp, depth);
       dropInColumn(col >= 0 ? col : vc[0]);
     }

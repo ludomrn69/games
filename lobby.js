@@ -178,8 +178,10 @@
     // Choisit une valeur selon le niveau : pick(state, {easy:.., normal:.., hard:..}).
     pick: function (state, m) { var l = window.Bots.level(state); return (m[l] !== undefined) ? m[l] : m.normal; },
     // Probabilité, par niveau, de jouer un coup volontairement sous-optimal (au
-    // hasard parmi les coups légaux). 0 en difficile, faible en moyen, élevé en facile.
-    blunderP: function (state) { return window.Bots.pick(state, { easy: 0.5, normal: 0.12, hard: 0 }); },
+    // hasard parmi les coups légaux). Espacement net : DIFFICILE ne se trompe JAMAIS
+    // (force maximale), MOYEN se trompe parfois (1 coup sur 5), FACILE souvent (plus
+    // d'1 coup sur 2) → trois niveaux franchement différents.
+    blunderP: function (state) { return window.Bots.pick(state, { easy: 0.55, normal: 0.2, hard: 0 }); },
     // true s'il faut jouer un coup au hasard ce tour-ci (selon le niveau).
     shouldBlunder: function (state) { return Math.random() < window.Bots.blunderP(state); }
   };

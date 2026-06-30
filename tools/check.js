@@ -30,8 +30,11 @@ var gameHtmls = fs.existsSync(gamesDir)
   ? fs.readdirSync(gamesDir).filter(function (f) { return f.endsWith('.html'); })
   : [];
 
-// 1) .js racine
+// 1) .js racine + modules d'IA dans ai/
 files.filter(function (f) { return f.endsWith('.js'); }).forEach(function (f) { checkSyntax(read(f), f); });
+var aiDir = path.join(ROOT, 'ai');
+var aiJs = fs.existsSync(aiDir) ? fs.readdirSync(aiDir).filter(function (f) { return f.endsWith('.js'); }) : [];
+aiJs.forEach(function (f) { checkSyntax(read(path.join('ai', f)), 'ai/' + f); });
 
 // 2) JS inline des .html (index racine + pages dans games/)
 function checkInline(code, label) {
@@ -60,8 +63,16 @@ gameHtmls.forEach(function (f) {
   if (gameKeys.indexOf(k) < 0) err('Fichier games/' + f + ' présent mais pas listé dans index.html (jeu orphelin ?)');
 });
 // moteurs partagés référencés par des pages doivent être en cache
-['monopoly-engine.js', 'cluedo-engine.js'].forEach(function (eng) {
+['ai/monopoly-engine.js', 'ai/cluedo-engine.js'].forEach(function (eng) {
   if (fs.existsSync(path.join(ROOT, eng)) && sw.indexOf("'" + eng + "'") < 0) err(eng + ' présent mais absent du cache service worker');
+});
+// chaque moteur d'IA chargé via data-engine="X" doit exister ET être en cache (offline)
+gameHtmls.forEach(function (f) {
+  var m = /data-engine="([^"]+)"/.exec(read(path.join('games', f)));
+  if (!m) return;
+  var eng = m[1];
+  if (!fs.existsSync(path.join(ROOT, eng))) err('games/' + f + ' charge data-engine="' + eng + '" mais ' + eng + ' est absent');
+  else if (sw.indexOf("'" + eng + "'") < 0) err(eng + ' (moteur de games/' + f + ') absent du cache service worker (sw.js)');
 });
 
 // 4) JSON
@@ -70,4 +81,4 @@ gameHtmls.forEach(function (f) {
 });
 
 if (errors.length) { console.error('❌ ' + errors.length + ' problème(s) :\n\n' + errors.join('\n\n')); process.exit(1); }
-console.log('✅ Vérifs OK : ' + files.filter(function (f) { return f.endsWith('.js'); }).length + ' JS, ' + (gameHtmls.length + 1) + ' HTML, ' + gameKeys.length + ' jeux cohérents (index/sw/fichiers).');
+console.log('✅ Vérifs OK : ' + (files.filter(function (f) { return f.endsWith('.js'); }).length + aiJs.length) + ' JS (dont ' + aiJs.length + ' modules ai/), ' + (gameHtmls.length + 1) + ' HTML, ' + gameKeys.length + ' jeux cohérents (index/sw/fichiers).');

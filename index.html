@@ -69,7 +69,7 @@
   <script>
     var GAMES = [      { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true, type: 'mots' },
       { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
-      { key: 'othello',         name: 'Othello',         emoji: '⚫', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'reversi',         name: 'Reversi',         emoji: '⚫', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
       { key: 'dames',           name: 'Dames',           emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
       { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true, type: 'rapidité' },
       { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true, type: 'mots' },
@@ -95,7 +95,12 @@
       { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true, type: 'déduction (IA solveur)' },
       { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true, type: 'coopératif / timing' },
       { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true, type: 'puzzle / course (IA)' },
-      { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true, type: 'puzzle / course (IA)' },
+      { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'queens',          name: 'Queens',          emoji: '👑', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'tango',           name: 'Tango',           emoji: '🌙', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'zip',             name: 'Zip',             emoji: '🔗', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'sutom',           name: 'Sutom',           emoji: '🟥', players: '1–6',  on: true, offline: true, type: 'mot mystère (chrono)' },
+      { key: 'solitaire',       name: 'Solitaire',       emoji: '🃏', players: '1–6',  on: true, offline: true, type: 'cartes solo (chrono)' },
       { key: 'millebornes',     name: 'Mille Bornes',    emoji: '🚗', players: '2–4',  on: true, offline: true, type: 'cartes / course' },
       { key: 'loupgarou',       name: 'Loup-Garou',      emoji: '🐺', players: '4–12', on: true, offline: true, type: 'déduction sociale (IA)' },
       { key: 'timesup',         name: "Time's Up",       emoji: '⏱️', players: '1–12', on: true, offline: true, type: 'équipes (+ solo chrono)' },
@@ -104,10 +109,10 @@
     // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
     // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
     var CATS = [
-      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'othello', 'dames', 'morpion', 'mastermind', 'sudoku', '2048'] },
-      { title: 'Cartes',              emoji: '🃏', keys: ['blackjack', 'uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye'] },
+      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'reversi', 'dames', 'morpion', 'mastermind', 'sudoku', 'queens', 'tango', 'zip', '2048'] },
+      { title: 'Cartes',              emoji: '🃏', keys: ['solitaire', 'blackjack', 'uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye'] },
       { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale'] },
-      { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'crack-list', 'pictionary', 'telephone-dessine'] },
+      { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'sutom', 'crack-list', 'pictionary', 'telephone-dessine'] },
       { title: 'Observation & ambiance', emoji: '⚡', keys: ['dobble-emoji', 'lynx', 'timesup', 'themind'] },
       { title: 'Plateau',             emoji: '🎲', keys: ['monopoly', 'ludo', 'blokus'] }
     ];

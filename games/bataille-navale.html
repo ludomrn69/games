@@ -63,7 +63,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="ai/bataille-navale-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -156,11 +156,8 @@
     function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
 
     function freshFleet() { return FLEET.map(function (s) { return { name: s.name, size: s.size, cells: [], placed: false }; }); }
-    function cellsFor(size, idx, dir) {
-      var r = Math.floor(idx / 10), c = idx % 10, cells = [];
-      for (var k = 0; k < size; k++) { var rr = dir === 'v' ? r + k : r, cc = dir === 'h' ? c + k : c; if (rr > 9 || cc > 9) return null; cells.push(rr * 10 + cc); }
-      return cells;
-    }
+    // Géométrie des bateaux : centralisée dans bataille-navale-ai.js.
+    var cellsFor = window.BattleshipAI.cellsFor;
     function overlaps(cells, exceptIdx) {
       for (var i = 0; i < localFleet.length; i++) { if (i === exceptIdx) continue; var cs = localFleet[i].cells || []; for (var j = 0; j < cs.length; j++) if (cells.indexOf(cs[j]) >= 0) return true; }
       return false;
@@ -192,25 +189,20 @@
         bnBotPlace(pid); return;
       }
       if (state.status !== 'playing' || state.winner || state.turn !== pid) return;
-      var s = (((state.players[pid] || {}).shots) || emptyShots()).split('');
-      while (s.length < 100) s.push('.');
+      var shots = (((state.players[pid] || {}).shots) || emptyShots());
+      while (shots.length < 100) shots += '.';
+      // Bateaux adverses encore à flot (tailles) + cases déjà coulées : ce que sait
+      // tout joueur (les coulés sont annoncés). L'IA s'en sert pour viser juste.
+      var opp = oppPid(state), oppShips = (opp && state.players[opp] && state.players[opp].ships) || [];
+      var sunk = sunkCellSet(oppShips, shots);
+      var remaining = oppShips.filter(function (sh) { return !(sh.cells || []).every(function (c) { return shots[c] === 'h'; }); }).map(function (sh) { return (sh.cells || []).length; });
       var lvl = window.Bots ? window.Bots.level(state) : 'normal';
-      var t = bnChooseShot(s, lvl);
+      var t = window.BattleshipAI.chooseShot(shots, remaining, sunk, lvl);
       if (t >= 0) fire(t);
     }
     function bnBotPlace(pid) {
-      var occ = {}, ships = [];
-      FLEET.forEach(function (sh) {
-        var ok = false, tr = 0;
-        while (!ok && tr++ < 2000) {
-          var dir = Math.random() < 0.5 ? 'h' : 'v', idx = Math.floor(Math.random() * 100);
-          var cells = cellsFor(sh.size, idx, dir);
-          if (!cells) continue;
-          var clash = false; for (var k = 0; k < cells.length; k++) if (occ[cells[k]]) { clash = true; break; }
-          if (clash) continue;
-          cells.forEach(function (c) { occ[c] = true; }); ships.push({ n: sh.name, cells: cells }); ok = true;
-        }
-      });
+      var placed = window.BattleshipAI.placeFleet(FLEET.map(function (s) { return s.size; }));
+      var ships = placed.map(function (p, i) { return { n: FLEET[i].name, cells: p.cells }; });
       rref().child('players/' + pid).update({ ships: ships, placed: true }, function () {
         rref().transaction(function (cur) {
           if (!cur || cur.status !== 'placing') return cur;
@@ -222,52 +214,8 @@
         });
       });
     }
-    // Cible : prolonger les touches. Chasse : densité (placements 100% sur cases vierges).
-    // lvl : 'easy' = tir au hasard (faible) ; 'hard' = chasse en damier (parité) pour
-    // ne jamais gaspiller de tir (un navire ≥2 occupe forcément une case sur deux).
-    function bnChooseShot(s, lvl) {
-      function tried(i) { return s[i] !== '.'; }
-      function nbrs(i) { var r = Math.floor(i / 10), c = i % 10, a = []; if (r > 0) a.push(i - 10); if (r < 9) a.push(i + 10); if (c > 0) a.push(i - 1); if (c < 9) a.push(i + 1); return a; }
-      // Facile : tir totalement au hasard sur une case non essayée.
-      if (lvl === 'easy') { var free = []; for (var f = 0; f < 100; f++) if (!tried(f)) free.push(f); return free.length ? free[Math.floor(Math.random() * free.length)] : -1; }
-      var best = -1, bestSc = -1;
-      for (var i = 0; i < 100; i++) {
-        if (s[i] !== 'h') continue;
-        var ri = Math.floor(i / 10), ns = nbrs(i);
-        for (var x = 0; x < ns.length; x++) {
-          var nb = ns[x]; if (tried(nb)) continue;
-          var di = nb - i, opp = i - di, sc = 2;
-          if (Math.abs(di) === 1) { if (opp >= 0 && Math.floor(opp / 10) === ri && s[opp] === 'h') sc = 18; }
-          else { if (opp >= 0 && opp < 100 && s[opp] === 'h') sc = 18; }
-          if (sc > bestSc || (sc === bestSc && Math.random() < 0.4)) { bestSc = sc; best = nb; }
-        }
-      }
-      if (best >= 0) return best;
-      var W = []; for (var z = 0; z < 100; z++) W.push(0);
-      for (var si = 0; si < FLEET.length; si++) {
-        var L = FLEET[si].size;
-        for (var dir = 0; dir < 2; dir++) {
-          for (var p = 0; p < 100; p++) {
-            var cells = cellsFor(L, p, dir ? 'v' : 'h'); if (!cells) continue;
-            var clean = true; for (var k = 0; k < cells.length; k++) if (tried(cells[k])) { clean = false; break; }
-            if (!clean) continue;
-            for (var b = 0; b < cells.length; b++) W[cells[b]] += 1;
-          }
-        }
-      }
-      // Difficile : en phase de chasse, ne considérer que les cases en damier
-      // (parité) — il y a toujours un navire de taille ≥2 à y trouver, donc on
-      // couvre la grille deux fois plus vite.
-      var bc = -1, bw = -1;
-      for (var c = 0; c < 100; c++) {
-        if (tried(c)) continue;
-        if (lvl === 'hard' && ((Math.floor(c / 10) + (c % 10)) % 2 !== 0)) continue;
-        if (W[c] > bw) { bw = W[c]; bc = c; }
-      }
-      if (bc >= 0) return bc;
-      for (var d = 0; d < 100; d++) if (!tried(d)) return d;
-      return -1;
-    }
+    // (IA de tir + placement : voir bataille-navale-ai.js — densité de probabilité
+    //  sur les bateaux encore en vie + poursuite des touches, partagé avec le banc.)
 
     function onStart(players, cur) {
       players.forEach(function (p) { cur.players[p.pid].placed = false; cur.players[p.pid].ships = null; cur.players[p.pid].shots = emptyShots(); });

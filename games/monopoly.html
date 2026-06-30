@@ -26,11 +26,11 @@
 
     /* Plateau */
     .mo-board { width: min(96vw, 600px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(11, 1fr); gap: 2px; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 10px; padding: 2px; }
-    .mo-cell { position: relative; background: var(--cream); border-radius: 3px; overflow: hidden; display: flex; flex-direction: column; font-size: 7px; line-height: 1.05; cursor: pointer; min-width: 0; }
+    .mo-cell { position: relative; background: var(--cream); border-radius: 3px; overflow: hidden; display: flex; flex-direction: column; font-size: clamp(6px, 1.5vw, 9px); line-height: 1; cursor: pointer; min-width: 0; }
     html[data-theme="dark"] .mo-cell { background: #14101c; }
     .mo-cell .bar { height: 7px; flex-shrink: 0; }
-    .mo-cell .nm { padding: 1px 2px; font-weight: 700; color: var(--ink); overflow: hidden; }
-    .mo-cell .pr { padding: 0 2px; color: var(--ink-light); font-size: 6px; margin-top: auto; }
+    .mo-cell .nm { padding: 1px 2px; font-weight: 700; color: var(--ink); line-height: 1; word-break: break-word; overflow-wrap: anywhere; hyphens: auto; -webkit-hyphens: auto; }
+    .mo-cell .pr { padding: 0 2px; color: var(--ink-light); font-size: 0.82em; margin-top: auto; }
     .mo-cell .own { position: absolute; top: 0px; right: 0px; min-width: 13px; height: 13px; border-radius: 7px; border: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; line-height: 1; }
     .mo-cell .hh { position: absolute; bottom: 1px; right: 1px; font-size: 7px; }
     .mo-cell.mo-cell-me { box-shadow: inset 0 0 0 3px var(--terracotta); animation: moMePulse 1s ease-in-out infinite alternate; z-index: 2; }
@@ -45,7 +45,7 @@
     .mo-rem-chip { font-size: 0.72rem; background: var(--cream); border-radius: 8px; padding: 2px 7px; cursor: pointer; white-space: nowrap; }
     .mo-rem-chip b { color: var(--terracotta); }
     html[data-theme="dark"] .mo-rem-chip { background: #2a2433; }
-    .mo-cell.corner { font-size: 8px; align-items: center; justify-content: center; text-align: center; padding: 2px; }
+    .mo-cell.corner { font-size: 1.15em; align-items: center; justify-content: center; text-align: center; padding: 2px; }
     .mo-cell.mortg { opacity: .55; }
     .mo-toks { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0; pointer-events: none; }
     .mo-tok { font-size: 11px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
@@ -108,7 +108,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js" data-engine="monopoly-engine.js"></script>
+  <script src="/boot.js" data-engine="ai/monopoly-engine.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -161,7 +161,8 @@
         <p style="margin-top:8px">• Lance les dés, avance, achète la case libre (ou mets-la aux <b>enchères</b>).</p>
         <p style="margin-top:6px">• Réunis toutes les rues d'une couleur = <b>monopole</b> → tu peux bâtir maisons/hôtels et les loyers explosent.</p>
         <p style="margin-top:6px">• <b>Échange</b> des rues avec les autres pour compléter tes couleurs.</p>
-        <p style="margin-top:6px">• Hypothèque pour faire du cash. Faute de payer → faillite.</p>
+        <p style="margin-top:6px">• <b>Hypothèque</b> 🏦 (bouton dispo à ton tour, avant OU après les dés) : une propriété te donne la <b>moitié</b> de son prix mais ne rapporte plus de loyer. Pour la <b>lever</b> (racheter), tu paies cette moitié <b>+ 10 %</b> — il faut donc avoir le cash. Impossible d'hypothéquer un groupe qui a des maisons (revends-les d'abord).</p>
+        <p style="margin-top:6px">• <b>Faillite</b> 💀 : si tu ne peux pas payer même en hypothéquant tout, tu es éliminé. Tes biens (argent + propriétés, hypothèques comprises) vont au <b>joueur</b> que tu devais payer ; si c'était la banque, ils y retournent. Le <b>dernier en jeu</b> gagne.</p>
         <p style="margin-top:6px">• Touche 200 € en passant par la case Départ.</p>
       </div>
       <button class="btn-primary" style="width:auto;padding:.6rem 1.4rem;margin:6px auto 0" onclick="closeModal('modal-rules')">Compris</button>
@@ -202,44 +203,13 @@
     });
 
     /* ━━━━━━━━━━ IA (réacteur : une action par appel) ━━━━━━━━━━ */
+    // IA : un pas de bot dans monopoly-engine.js (ENG.botStep), partagé avec le banc.
     function monoBot() {
-      tx(function (cur) { monoStep(cur); });
-    }
-    function monoStep(s) {
-      if (s.winner) return;
-      var pid = ENG.actor(s), ph = s.phase;
-      if (s.trade && s.trade.from === pid) return; // attend une réponse (ne devrait pas arriver : bots ne proposent qu'aux bots)
-      if (ph === 'roll') {
-        if (s.jail[pid] > 0) {
-          if (s.getout[pid] > 0) { ENG.useGetout(s, pid); return; }
-          if (s.cash[pid] >= ENG.JAIL_FINE + 300) { ENG.payJail(s, pid); return; }
-        }
-        ENG.roll(s); return;
-      }
-      var easy = window.Bots && window.Bots.level(s) === 'easy';
-      if (ph === 'buy') {
-        var price = B[s.pending].p;
-        // Facile : laisse parfois filer une propriété abordable (joue moins bien).
-        if (easy && Math.random() < 0.4) { ENG.declineBuy(s); return; }
-        if (s.cash[pid] - price >= 50) ENG.buy(s, pid); else ENG.declineBuy(s);
-        return;
-      }
-      if (ph === 'auction') {
-        var au = s.auction, pr = B[au.prop].p, g = B[au.prop].g;
-        var maxWant = pr * 0.7;
-        if (g && ENG.ownedInGroup(s, g, pid) === GROUPS[g].length - 1) maxWant = pr * 1.1;
-        var cap = Math.min(s.cash[pid] - 30, maxWant), next = au.highBid + 10;
-        if (next <= cap) ENG.auctionAct(s, pid, next); else ENG.auctionAct(s, pid, null);
-        return;
-      }
-      if (ph === 'manage') {
-        // Facile : ne construit pas (laisse ses monopoles nus) et finit son tour.
-        if (easy) { ENG.endTurn(s); return; }
-        for (var i = 0; i < 40; i++) { if (ENG.canBuildOn(s, i, pid) && s.cash[pid] - B[i].h >= 50) { ENG.buildHouse(s, i, pid); return; } }
-        var t = ENG.aiProposeTrade(s, pid);
-        if (t && isBotPid(s, t.to) && ENG.aiAcceptTrade(s, t)) { ENG.applyTrade(s, t); return; }
-        ENG.endTurn(s); return;
-      }
+      var s = window.room;
+      // Le bot a proposé un échange à l'humain → il ATTEND sa réponse (ne rien
+      // faire, sinon on rejouerait en boucle). Il reprendra dès que je réponds.
+      if (s && s.trade && s.trade.from === ENG.actor(s)) return;
+      tx(function (cur) { ENG.botStep(cur, window.Bots ? window.Bots.level(cur) : 'normal'); });
     }
 
     /* ━━━━━━━━━━ Rendu ━━━━━━━━━━ */
@@ -259,7 +229,9 @@
       if (i <= 30) return { r: 1, c: (i - 20) + 1 };
       return { r: (i - 30) + 1, c: 11 };
     }
-    function abbr(n) { return n.length > 16 ? n.slice(0, 15) + '…' : n; }
+    // On affiche le nom COMPLET (le CSS le fait passer à la ligne et s'adapte) ;
+    // on ne coupe que les noms vraiment hors-normes, par sécurité.
+    function abbr(n) { return n.length > 26 ? n.slice(0, 25) + '…' : n; }
 
     function renderBoard(s) {
       var toks = {}; // pos -> [emoji]
@@ -373,7 +345,9 @@
             (s.getout[me] > 0 ? '<button class="btn-primary btn-ghost" onclick="act(\'getout\')">Carte « sortie »</button>' : '') + '</div>';
         } else {
           html = '<div class="hint">' + (s.doubles > 0 ? 'Double ! Tu rejoues.' : 'À toi de jouer') + '</div>' +
-            '<div class="mo-btn-row"><button class="btn-primary" onclick="act(\'roll\')">🎲 Lancer les dés</button></div>';
+            '<div class="mo-btn-row"><button class="btn-primary" onclick="act(\'roll\')">🎲 Lancer les dés</button>' +
+            '<button class="btn-primary btn-ghost" onclick="openMortg()">🏦 Hypothèques</button>' +
+            (canBuildAny(s, me) ? '<button class="btn-primary btn-ghost" onclick="openBuild()">🏗 Bâtir</button>' : '') + '</div>';
         }
       } else if (s.phase === 'buy') {
         var sp = B[s.pending];
@@ -551,9 +525,14 @@
       if (!ENG.tradeValid(window.room, t)) { lbToast('Échange invalide (maisons ? cash ?)'); return; }
       closeModal('modal-trade');
       if (isBotPid(window.room, tradeTarget)) {
-        var ok = ENG.aiAcceptTrade(window.room, t);
-        if (ok) { tx(function (cur) { ENG.applyTrade(cur, t); }); lbToast('✅ ' + Room.name(tradeTarget) + ' accepte !'); }
-        else lbToast('❌ ' + Room.name(tradeTarget) + ' refuse.');
+        if (ENG.aiAcceptTrade(window.room, t)) {
+          tx(function (cur) { ENG.applyTrade(cur, t); });
+          lbToast('✅ ' + Room.name(tradeTarget) + ' accepte l\'échange !');
+        } else {
+          var counter = ENG.aiCounterTrade(window.room, t);
+          if (counter) { tx(function (cur) { cur.trade = counter; }); lbToast('🔄 ' + Room.name(tradeTarget) + ' fait une contre-offre'); }
+          else lbToast('❌ ' + Room.name(tradeTarget) + ' refuse (il ne lâche pas un monopole)');
+        }
       } else {
         tx(function (cur) { cur.trade = t; });
         lbToast('Proposition envoyée à ' + Room.name(tradeTarget));
@@ -563,7 +542,7 @@
       var t = s.trade;
       function lst(arr, cash) { var a = (arr || []).map(function (i) { return B[i].n; }); if (cash) a.push(money(cash)); return a.length ? a.map(escapeHtml).join(', ') : 'rien'; }
       // du point de vue du destinataire (moi) : je reçois t.give, je donne t.recv
-      return '<div class="hint">🤝 ' + escapeHtml(Room.name(t.from)) + ' te propose un échange</div>' +
+      return '<div class="hint">' + (t.counter ? '🔄 ' + escapeHtml(Room.name(t.from)) + ' fait une CONTRE-OFFRE' : '🤝 ' + escapeHtml(Room.name(t.from)) + ' te propose un échange') + '</div>' +
         '<div style="font-size:.85rem;text-align:center"><b>Tu reçois :</b> ' + lst(t.give.props, t.give.cash) + '<br><b>Tu donnes :</b> ' + lst(t.recv.props, t.recv.cash) + '</div>' +
         '<div class="mo-btn-row"><button class="btn-primary" onclick="respondTrade(true)">Accepter</button><button class="btn-primary btn-ghost" onclick="respondTrade(false)">Refuser</button></div>';
     }

@@ -98,7 +98,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="ai/uno-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -208,35 +208,13 @@
 
   <script>
     /* ━━ Constantes ━━ */
-    var COLORS = ['R', 'Y', 'G', 'B'];
-    function buildDeck() {
-      var deck = [];
-      COLORS.forEach(function (c) {
-        deck.push(c + '0');
-        for (var n = 1; n <= 9; n++) { deck.push(c + n); deck.push(c + n); }
-        ['S', 'V', 'D'].forEach(function (a) { deck.push(c + a); deck.push(c + a); });
-      });
-      for (var i = 0; i < 4; i++) { deck.push('W'); deck.push('W4'); }
-      return deck;
-    }
+    // Couleurs + deck : centralisés dans uno-ai.js (partagé avec le banc).
+    var COLORS = window.UnoAI.COLORS;
+    var buildDeck = window.UnoAI.buildDeck;
     function shuffle(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-    function parseCard(card) {
-      if (!card) return null;
-      if (card === 'W') return { wild: true, draw4: false };
-      if (card === 'W4') return { wild: true, draw4: true };
-      var c = card.charAt(0), rest = card.slice(1);
-      if (rest === 'S' || rest === 'V' || rest === 'D') return { color: c, action: rest };
-      return { color: c, number: parseInt(rest, 10) };
-    }
-    function canPlay(card, top, currentColor) {
-      var p = parseCard(card); if (!p) return false;
-      if (p.wild) return true;
-      if (p.color === currentColor) return true;
-      var t = parseCard(top); if (!t || t.wild) return false;
-      if (p.action && t.action && p.action === t.action) return true;
-      if (typeof p.number === 'number' && typeof t.number === 'number' && p.number === t.number) return true;
-      return false;
-    }
+    // Lecture de carte + légalité : centralisées dans uno-ai.js (partagé avec le banc).
+    var parseCard = window.UnoAI.parseCard;
+    var canPlay = window.UnoAI.canPlay;
     function cardSort(a, b) {
       var pa = parseCard(a), pb = parseCard(b);
       var oa = pa.wild ? 9 : COLORS.indexOf(pa.color), ob = pb.wild ? 9 : COLORS.indexOf(pb.color);
@@ -295,59 +273,27 @@
 
     /* ━━ IA solo : empile les +2, garde les jokers, joue sa couleur dominante,
        perturbe l'adversaire proche de gagner, et dit UNO ━━ */
+    // IA : décision dans uno-ai.js (partagée avec le banc). La page exécute l'action.
     function unoBot(state, pid) {
       if (state.status === 'roundEnd') { if (!((state.players[pid] || {}).nextReady)) setNextReady(); return; }
       if (state.status !== 'playing' || state.turn !== pid) return;
       var hand = (((state.players[pid] || {}).hand) || []).slice();
       if (!hand.length) return;
       if (hand.length === 1 && !((state.players[pid] || {}).unoCalled)) { callUno(); return; }
-      var top = (state.discardPile || []).slice(-1)[0], cc = state.currentColor, pend = state.pendingDraw || 0;
-      if (pend > 0) {
-        var twos = hand.filter(function (c) { return (parseCard(c) || {}).action === 'D'; });
-        if (twos.length) { unoBotPlay(hand, twos[0], parseCard(twos[0]).color); return; }
-        drawCard(); return; // subir le cumul
-      }
-      var playable = hand.filter(function (c) { return canPlay(c, top, cc); });
-      if (!playable.length) { if (state.drewThisTurn) passTurn(); else drawCard(); return; }
-      // Facile : joue une carte jouable au hasard (couleur de relance au hasard si joker).
-      var choice = (window.Bots && window.Bots.shouldBlunder(state))
-        ? playable[Math.floor(Math.random() * playable.length)]
-        : unoChoose(hand, playable, state, pid);
-      var color = (parseCard(choice) || {}).wild ? unoBestColor(hand) : parseCard(choice).color;
-      unoBotPlay(hand, choice, color);
+      var nextP = step(state.order || [], pid, state.dir || 1, 1);
+      var act = window.UnoAI.decide({
+        hand: hand, top: (state.discardPile || []).slice(-1)[0], currentColor: state.currentColor,
+        pendingDraw: state.pendingDraw || 0, nextCount: (((state.players[nextP] || {}).hand) || []).length,
+        drewThisTurn: state.drewThisTurn, blunder: window.Bots && window.Bots.shouldBlunder(state)
+      });
+      if (act.type === 'play') unoBotPlay(hand, act.card, act.color);
+      else if (act.type === 'draw') drawCard();
+      else passTurn();
     }
     function unoBotPlay(hand, card, color) {
       var willBeOne = (hand.length - 1 === 1);
       playCard(card, color);
       if (willBeOne) callUno();
-    }
-    function unoBestColor(hand) {
-      var best = 'R', bc = -1;
-      COLORS.forEach(function (col) { var n = hand.filter(function (c) { var p = parseCard(c); return p && !p.wild && p.color === col; }).length; if (n > bc) { bc = n; best = col; } });
-      return best;
-    }
-    function unoChoose(hand, playable, state, pid) {
-      var order = state.order || [], dir = state.dir || 1;
-      var nextP = step(order, pid, dir, 1);
-      var nextCount = (((state.players[nextP] || {}).hand) || []).length;
-      function colorCount(col) { return hand.filter(function (c) { var p = parseCard(c); return p && !p.wild && p.color === col; }).length; }
-      var nonWild = playable.filter(function (c) { return !(parseCard(c) || {}).wild; });
-      if (nonWild.length) {
-        if (nextCount <= 2) {
-          var disrupt = nonWild.filter(function (c) { var a = parseCard(c).action; return a === 'D' || a === 'S'; });
-          if (disrupt.length) { disrupt.sort(function (a, b) { return (parseCard(b).action === 'D' ? 1 : 0) - (parseCard(a).action === 'D' ? 1 : 0); }); return disrupt[0]; }
-        }
-        nonWild.sort(function (a, b) {
-          var pa = parseCard(a), pb = parseCard(b);
-          var ca = colorCount(pa.color), cb = colorCount(pb.color);
-          if (ca !== cb) return cb - ca;                 // couleur dominante d'abord
-          var aAct = pa.action ? 1 : 0, bAct = pb.action ? 1 : 0;
-          return aAct - bAct;                            // chiffres avant actions (on garde les actions)
-        });
-        return nonWild[0];
-      }
-      var w = playable.filter(function (c) { return c === 'W'; });   // garder le +4 si possible
-      return w.length ? 'W' : playable[0];
     }
 
     function lobbyExtraHTML(room) {

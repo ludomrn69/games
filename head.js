@@ -15,7 +15,9 @@
   var emoji = (me && me.getAttribute('data-emoji')) || '🎲';
   var head = document.head || document.getElementsByTagName('head')[0];
   function add(tag, attrs) { var el = document.createElement(tag); for (var k in attrs) { if (attrs[k] === '') el.setAttribute(k, ''); else el.setAttribute(k, attrs[k]); } head.appendChild(el); }
-  document.title = title;
+  // Un seul emoji dans l'onglet : celui du FAVICON (icône avant le nom). On retire
+  // donc l'émoji final éventuel du titre pour ne pas le doubler visuellement.
+  document.title = (title || '').replace(/[^\p{L}\p{N}!?'’.()\- ]+$/u, '').replace(/\s+$/, '') || title;
   add('meta', { name: 'robots', content: 'noindex, nofollow' });
   add('link', { rel: 'icon', href: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>" + emoji + "</text></svg>" });
   add('link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' });

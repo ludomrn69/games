@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <script src="/head.js" data-title="Othello ⚫" data-emoji="⚫"></script>
+  <script src="/head.js" data-title="Reversi ⚫" data-emoji="⚫"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
@@ -53,7 +53,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js" data-engine="othello-ai.js"></script>
+  <script src="/boot.js" data-engine="ai/reversi-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -100,7 +100,7 @@
 
   <div class="modal" id="modal-rules">
     <div class="modal-card">
-      <div class="modal-title">Othello</div>
+      <div class="modal-title">Reversi</div>
       <div class="modal-body">
         <p>Chacun son tour, on pose un pion de sa couleur de façon à <b>encadrer</b> une ou plusieurs lignes de pions adverses (horizontale, verticale ou diagonale).</p>
         <p style="margin-top:10px">Tous les pions adverses encadrés sont <b>retournés</b> à ta couleur. On ne peut jouer que sur une case qui retourne au moins un pion.</p>
@@ -113,7 +113,7 @@
   <div class="lb-toast" id="lb-toast"></div>
 
   <script>
-    /* ━━ Othello / Reversi — 2 joueurs, en ligne + hors-ligne (solo/local) ━━ */
+    /* ━━ Reversi / Reversi — 2 joueurs, en ligne + hors-ligne (solo/local) ━━ */
     var prevStatus = null;
     var flipAnim = {};       // index -> signature du dernier coup (anti-rejeu d'anim)
     var lastSeen = -2;
@@ -134,8 +134,8 @@
     function count(b, m) { var n = 0; for (var i = 0; i < 64; i++) if (b[i] === m) n++; return n; }
 
     GameRoom({
-      gameKey: 'othello',
-      name: 'Othello',
+      gameKey: 'reversi',
+      name: 'Reversi',
       emoji: '⚫',
       tagline: 'Reversi',
       minPlayers: 2,
@@ -147,24 +147,24 @@
         'Pas de coup possible → on passe · plus de pions à la fin = gagné'
       ],
       offline: { solo: true, local: true },
-      bot: othelloBot,
+      bot: reversiBot,
       onState: onState,
       onStart: onStart
     });
 
-    /* ━━ IA : recherche pure dans othello-ai.js (négamax α-β + table positionnelle
+    /* ━━ IA : recherche pure dans reversi-ai.js (négamax α-β + table positionnelle
        + mobilité). Profondeur selon la difficulté. Facile blunder parfois. ━━ */
-    function othelloBot(state, pid) {
+    function reversiBot(state, pid) {
       var b = state.board || startBoard();
       var me = markOf(state, pid), opp = (me === '0' ? '1' : '0');
-      var legal = window.OthelloAI.legalMoves(b, me);
+      var legal = window.ReversiAI.legalMoves(b, me);
       if (!legal.length) { passMove(); return; }
       var idx;
       if (window.Bots && window.Bots.shouldBlunder(state)) {
         idx = legal[Math.floor(Math.random() * legal.length)];
       } else {
-        var depth = (window.Bots ? window.Bots.pick(state, { easy: 1, normal: 4, hard: 7 }) : 4);
-        idx = window.OthelloAI.bestMove(b, me, opp, depth);
+        var depth = (window.Bots ? window.Bots.pick(state, { easy: 1, normal: 4, hard: 8 }) : 4);
+        idx = window.ReversiAI.bestMove(b, me, opp, depth);
         if (idx < 0 || legal.indexOf(idx) < 0) idx = legal[0];
       }
       playAt(idx);
@@ -191,7 +191,7 @@
       var state = window.room || {};
       if (state.status !== 'playing' || state.winner) return;
       if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
-      var AI = window.OthelloAI;
+      var AI = window.ReversiAI;
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner) return cur;
         if (cur.turn !== window.myPid) return cur;
@@ -214,7 +214,7 @@
       var state = window.room || {};
       if (state.status !== 'playing' || state.winner) return;
       if (state.turn !== window.myPid) return;
-      var AI = window.OthelloAI;
+      var AI = window.ReversiAI;
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner) return cur;
         if (cur.turn !== window.myPid) return cur;
@@ -231,13 +231,13 @@
     // Après un coup : si l'adversaire a un coup → à lui ; sinon si moi j'en ai encore
     // un → je rejoue ; sinon → fin de partie.
     function advance(cur, order, me, opp) {
-      var AI = window.OthelloAI, b = cur.board;
+      var AI = window.ReversiAI, b = cur.board;
       if (AI.legalMoves(b, opp).length) { cur.turn = order[+opp]; return; }
       if (AI.legalMoves(b, me).length) { cur.turn = order[+me]; return; } // adversaire passe, je rejoue
       finish(cur, order);
     }
     function advanceAfterPass(cur, order, me, opp) {
-      var AI = window.OthelloAI, b = cur.board;
+      var AI = window.ReversiAI, b = cur.board;
       if (AI.legalMoves(b, opp).length) { cur.turn = order[+opp]; return; }
       finish(cur, order); // ni l'un ni l'autre ne peut jouer
     }
@@ -275,7 +275,7 @@
 
       var myMark = markOf(state, window.myPid);
       var myTurn = (state.turn === window.myPid) && !state.winner;
-      var legalForMe = myTurn ? window.OthelloAI.legalMoves(b, myMark) : [];
+      var legalForMe = myTurn ? window.ReversiAI.legalMoves(b, myMark) : [];
 
       var ti = document.getElementById('ot-turn');
       if (state.winner) { ti.innerHTML = ''; setText('ot-hint', ''); }

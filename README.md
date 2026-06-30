@@ -39,7 +39,7 @@ la synchro temps réel.
 |---|---|:---:|---|
 | 📝 Petit bac | 2–12 |  | mots |
 | 🔴 Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
-| ⚫ Othello | 2 | ✈️ | réflexion (IA forte) |
+| ⚫ Reversi | 2 | ✈️ | réflexion (IA forte) |
 | 🔴 Dames | 2 | ✈️ | réflexion (IA forte) |
 | ✨ Dobble | 2–8 |  | rapidité |
 | ⚡ Crack-list | 2–8 |  | mots |
@@ -65,7 +65,12 @@ la synchro temps réel.
 | 🎯 Mastermind | 1–8 | ✈️ | déduction (IA solveur) |
 | 🧠 The Mind | 2–6 | ✈️ | coopératif / timing |
 | 🔢 2048 | 1–6 | ✈️ | puzzle / course (IA) |
-| 9️⃣ Sudoku | 1–6 | ✈️ | puzzle / course (IA) |
+| 9️⃣ Sudoku | 1–6 | ✈️ | solo + course (chrono) |
+| 👑 Queens | 1–6 | ✈️ | solo + course (chrono) |
+| 🌙 Tango | 1–6 | ✈️ | solo + course (chrono) |
+| 🔗 Zip | 1–6 | ✈️ | solo + course (chrono) |
+| 🟥 Sutom | 1–6 | ✈️ | mot mystère (chrono) |
+| 🃏 Solitaire | 1–6 | ✈️ | cartes solo (chrono) |
 | 🚗 Mille Bornes | 2–4 | ✈️ | cartes / course |
 | 🐺 Loup-Garou | 4–12 | ✈️ | déduction sociale (IA) |
 | ⏱️ Time's Up | 1–12 | ✈️ | équipes (+ solo chrono) |

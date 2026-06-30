@@ -75,7 +75,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="ai/sixnimmt-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -143,9 +143,8 @@
     function headsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].heads) || 0; }
     function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
-    // Têtes de bœuf d'une carte.
-    function heads(n) { if (n === 55) return 7; if (n % 11 === 0) return 5; if (n % 10 === 0) return 3; if (n % 5 === 0) return 2; return 1; }
-    function sumHeads(row) { return (row || []).reduce(function (s, v) { return s + heads(v); }, 0); }
+    // Têtes de bœuf : règles centralisées dans sixnimmt-ai.js (partagé avec le banc).
+    var heads = window.SixNimmtAI.heads, sumHeads = window.SixNimmtAI.sumHeads;
 
     /* ━━ Enregistrement ━━ */
     var prevStatus = null, picked = null; // picked : carte choisie localement (avant révélation)
@@ -300,20 +299,18 @@
       });
     }
 
-    /* ━━ IA ━━ Choisit la carte qui ramasse le moins de têtes (et se cale au plus
-       près d'une fin de rangée). Prend la rangée la moins chère si forcée. ━━ */
+    /* ━━ IA ━━ Choix de carte + de rangée : voir sixnimmt-ai.js (évite les têtes,
+       fuit les rangées pleines, se cale au plus près — partagé avec le banc). ━━ */
     function sixBot(state, pid) {
       if (state.status !== 'playing') return;
       if (state.phase === 'chooseRow' && state.pendingLow === pid) {
-        var best = 0, bh = 1e9;
-        for (var i = 0; i < 4; i++) { var hd = sumHeads(state.rows[i]); if (hd < bh) { bh = hd; best = i; } }
-        return chooseRow(best);
+        return chooseRow(window.SixNimmtAI.chooseRow(state.rows)); // rangée la moins chère
       }
       if (state.phase === 'select' && !(state.picks && pid in state.picks)) {
         var hand = handOf(state, pid); if (!hand.length) return;
-        var val;
-        if (window.Bots && window.Bots.shouldBlunder(state)) val = hand[Math.floor(Math.random() * hand.length)];
-        else val = sixChoose(state, hand);
+        var val = (window.Bots && window.Bots.shouldBlunder(state))
+          ? hand[Math.floor(Math.random() * hand.length)]
+          : window.SixNimmtAI.chooseCard(state.rows, hand);
         return pickFor(pid, val);
       }
     }
@@ -327,19 +324,6 @@
         maybeResolve(cur);
         return cur;
       });
-    }
-    function sixChoose(state, hand) {
-      var best = hand[0], bestScore = 1e18;
-      hand.forEach(function (val) {
-        var tgt = -1, tend = -1;
-        for (var i = 0; i < 4; i++) { var end = state.rows[i][state.rows[i].length - 1]; if (end < val && end > tend) { tend = end; tgt = i; } }
-        var penalty, gap;
-        if (tgt < 0) { var minH = 1e9; for (var j = 0; j < 4; j++) minH = Math.min(minH, sumHeads(state.rows[j])); penalty = minH; gap = 999; }
-        else { var row = state.rows[tgt]; if (row.length >= 5) { penalty = sumHeads(row); gap = val - tend; } else { penalty = 0; gap = val - tend; } }
-        var score = penalty * 1000 + gap;
-        if (score < bestScore) { bestScore = score; best = val; }
-      });
-      return best;
     }
 
     /* ━━ Rendu ━━ */
@@ -405,7 +389,7 @@
           if (cur.phase === 'select') {
             var ap = (cur.order || []).filter(function (p) { return !(cur.picks && (p in cur.picks)); })[0];
             if (ap && Lobby.isOffline(cur, ap)) {
-              var val = sixChoose(cur, handOf(cur, ap));
+              var val = window.SixNimmtAI.chooseCard(cur.rows, handOf(cur, ap));
               cur.picks = cur.picks || {}; cur.picks[ap] = val; maybeResolve(cur); return cur;
             }
           }

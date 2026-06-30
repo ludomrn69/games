@@ -129,7 +129,7 @@
   function hasMonopoly(s, g, pid) { return GROUPS[g].every(function (i) { return s.owners[i] === pid; }); }
   function countRails(s, pid) { return RAILS.filter(function (i) { return s.owners[i] === pid; }).length; }
   function countUtils(s, pid) { return UTILS.filter(function (i) { return s.owners[i] === pid; }).length; }
-  function groupHouses(s, g) { return GROUPS[g].reduce(function (a, i) { return a + (s.houses[i] || 0); }, 0); }
+  function groupHouses(s, g) { return (GROUPS[g] || []).reduce(function (a, i) { return a + (s.houses[i] || 0); }, 0); }
 
   function rentOf(s, prop, diceSum) {
     var sp = B[prop], owner = s.owners[prop];
@@ -194,7 +194,7 @@
   }
 
   function bankrupt(s, pid, to) {
-    log(s, '💀 ' + nameish(pid) + ' fait faillite');
+    log(s, '💀 ' + nameish(pid) + ' fait faillite' + (to != null ? ' — argent et propriétés (hypothèques comprises) vont à ' + nameish(to) : ' — ses biens retournent à la banque'));
     // Transférer l'argent restant et les propriétés au créancier, ou à la banque.
     if (to != null && !s.bankrupt[to]) {
       s.cash[to] = (s.cash[to] || 0) + (s.cash[pid] || 0);
@@ -441,6 +441,26 @@
     if (keepsMonopoly) return false;
     return recvV >= giveV * 1.15;
   }
+  // Si le bot (t.to) refuse, il peut faire une CONTRE-OFFRE : mêmes propriétés mais
+  // il réclame le cash qui rendrait l'échange équitable (sauf s'il devrait céder un
+  // monopole → pas de contre-offre). Renvoie un trade RETOURNÉ (du bot vers l'humain),
+  // prêt à être affiché à l'humain, ou null.
+  function aiCounterTrade(s, t) { norm(s);
+    if (!t || s.bankrupt[t.from] || s.bankrupt[t.to]) return null;
+    var bot = t.to;
+    if ((t.recv.props || []).some(function (i) { return hasMonopoly(s, B[i].g, bot); })) return null;
+    var recvV = (t.give.cash || 0); (t.give.props || []).forEach(function (i) { recvV += B[i].p; }); // ce que le bot reçoit
+    var giveV = (t.recv.cash || 0); (t.recv.props || []).forEach(function (i) { giveV += B[i].p; }); // ce que le bot cède
+    var target = Math.ceil(giveV * 1.15);
+    if (recvV >= target) return null;                       // il accepterait déjà
+    var extra = target - recvV;                             // cash en plus demandé à l'humain
+    if ((t.give.cash || 0) + extra > (s.cash[t.from] || 0)) return null; // l'humain ne peut pas payer
+    return {
+      from: bot, to: t.from, counter: true,
+      give: { props: (t.recv.props || []).slice(), cash: (t.recv.cash || 0) },        // le bot donne ce que l'humain voulait
+      recv: { props: (t.give.props || []).slice(), cash: (t.give.cash || 0) + extra }  // le bot réclame l'offre de l'humain + extra
+    };
+  }
 
   function useGetout(s, pid) { norm(s);
     if (s.jail[pid] > 0 && (s.getout[pid] || 0) > 0) { s.getout[pid]--; s.jail[pid] = 0; log(s, nameish(pid) + ' utilise une carte « sortie de prison »'); return true; }
@@ -468,6 +488,55 @@
     s.phase = 'over';
   }
 
+  // ── IA (un pas de bot) ───────────────────────────────────────────────────────
+  // Décision du bot pour le joueur courant, selon la phase. Achète si la trésorerie
+  // reste saine, enchérit jusqu'à ~70 % de la valeur (110 % pour compléter un
+  // monopole), construit dès qu'un monopole est nu, propose un échange utile à un
+  // autre bot. « facile » : laisse parfois filer une propriété et ne construit pas.
+  function botStep(s, level) {
+    if (s.winner) return;
+    var pid = actor(s), ph = s.phase;
+    if (s.trade && s.trade.from === pid) return; // attend une réponse
+    if (ph === 'roll') {
+      if (s.jail[pid] > 0) {
+        if (s.getout[pid] > 0) { useGetout(s, pid); return; }
+        if (s.cash[pid] >= JAIL_FINE + 300) { payJail(s, pid); return; }
+      }
+      roll(s); return;
+    }
+    var easy = level === 'easy';
+    if (ph === 'buy') {
+      var price = B[s.pending].p;
+      if (easy && Math.random() < 0.4) { declineBuy(s); return; }
+      if (s.cash[pid] - price >= 50) buy(s, pid); else declineBuy(s);
+      return;
+    }
+    if (ph === 'auction') {
+      var au = s.auction, pr = B[au.prop].p, g = B[au.prop].g;
+      var maxWant = pr * 0.7;
+      if (g && ownedInGroup(s, g, pid) === GROUPS[g].length - 1) maxWant = pr * 1.1;
+      var cap = Math.min(s.cash[pid] - 30, maxWant), next = au.highBid + 10;
+      if (next <= cap) auctionAct(s, pid, next); else auctionAct(s, pid, null);
+      return;
+    }
+    if (ph === 'manage') {
+      if (easy) { endTurn(s); return; } // facile : ne construit pas
+      for (var i = 0; i < 40; i++) { if (canBuildOn(s, i, pid) && s.cash[pid] - B[i].h >= 50) { buildHouse(s, i, pid); return; } }
+      // Échange : le bot cherche à compléter un monopole. `botProposed` évite de
+      // re-proposer en boucle si l'humain a déjà répondu ce tour-ci.
+      if (s.botProposed !== pid) {
+        var t = aiProposeTrade(s, pid);
+        if (t) {
+          var toIsBot = !s.players || (s.players[t.to] && s.players[t.to].isBot);
+          if (toIsBot) { if (aiAcceptTrade(s, t)) { applyTrade(s, t); return; } } // bot ↔ bot : applique si l'autre accepte
+          else { s.trade = t; s.botProposed = pid; return; } // bot → HUMAIN : on propose et on ATTEND sa réponse
+        }
+      }
+      s.botProposed = null;
+      endTurn(s); return;
+    }
+  }
+
   // ── Exports ──────────────────────────────────────────────────────────────────
   root.MonoEngine = {
     B: B, GROUPS: GROUPS, RAILS: RAILS, UTILS: UTILS, JAIL_POS: JAIL_POS,
@@ -475,11 +544,11 @@
     initGame: initGame, roll: roll, buy: buy, declineBuy: declineBuy, auctionAct: auctionAct,
     buildHouse: buildHouse, sellHouse: sellHouse, mortgage: mortgage, unmortgage: unmortgage,
     canBuildOn: canBuildOn, canSellOn: canSellOn, endTurn: endTurn,
-    tradeValid: tradeValid, applyTrade: applyTrade, aiProposeTrade: aiProposeTrade, aiAcceptTrade: aiAcceptTrade,
+    tradeValid: tradeValid, applyTrade: applyTrade, aiProposeTrade: aiProposeTrade, aiAcceptTrade: aiAcceptTrade, aiCounterTrade: aiCounterTrade,
     useGetout: useGetout, payJail: payJail,
     actor: actor, alive: alive, rentOf: rentOf, netWorth: netWorth, hasMonopoly: hasMonopoly,
     ownedInGroup: ownedInGroup, countRails: countRails, countUtils: countUtils,
-    setNameFn: function (f) { NAMEFN = f; }, nameish: nameish, log: log
+    setNameFn: function (f) { NAMEFN = f; }, nameish: nameish, log: log, botStep: botStep
   };
 })(typeof module !== 'undefined' && module.exports ? module.exports : (this.window = this.window || this));
 if (typeof module !== 'undefined' && module.exports) { /* node */ }

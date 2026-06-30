@@ -64,7 +64,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="ai/mastermind-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -130,12 +130,8 @@
     function shuffleInt() { return Math.floor(Math.random() * NC); }
 
     // Indices noir/blanc d'une proposition g face au code.
-    function feedback(g, code) {
-      var black = 0, cc = [0, 0, 0, 0, 0, 0], gc = [0, 0, 0, 0, 0, 0];
-      for (var i = 0; i < PEGS; i++) { if (g[i] === code[i]) black++; else { cc[code[i]]++; gc[g[i]]++; } }
-      var white = 0; for (var k = 0; k < NC; k++) white += Math.min(cc[k], gc[k]);
-      return { black: black, white: white };
-    }
+    // Indices noirs/blancs : centralisé dans mastermind-ai.js (partagé avec le banc).
+    var feedback = window.MastermindAI.feedback;
 
     /* ━━ Enregistrement ━━ */
     var prevStatus = null, draft = [];
@@ -152,7 +148,7 @@
         'Tout le monde cherche le même code, chacun sa grille',
         'Le premier à craquer le code gagne'
       ],
-      offline: { solo: true, local: true, soloMinBots: 1 },
+      offline: { solo: true, local: true, soloMinBots: 0 },
       bot: mmBot,
       offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
       offlineEnter: function () { draft = []; if (window.room) render(window.room); },
@@ -205,41 +201,13 @@
       cur.banner = 'Au tour de ' + Room.name(cur.turn);
     }
 
-    /* ━━ IA solveur ━━ Niveau facile : propose au hasard (ignore les indices).
-       Moyen : propose un code COHÉRENT avec tous ses indices. Difficile : minimax
-       (façon Knuth) — la proposition qui réduit le plus le pire cas. ━━ */
-    var ALL_CODES = null;
-    function allCodes() {
-      if (ALL_CODES) return ALL_CODES;
-      var a = []; for (var i = 0; i < NC * NC * NC * NC; i++) { a.push([i % NC, (i / NC | 0) % NC, (i / NC / NC | 0) % NC, (i / NC / NC / NC | 0) % NC]); }
-      ALL_CODES = a; return a;
-    }
-    function consistentWith(hist) {
-      return allCodes().filter(function (cand) {
-        return hist.every(function (h) { var f = feedback(h.g, cand); return f.black === h.black && f.white === h.white; });
-      });
-    }
-    function mmChoose(hist, level) {
-      if (!hist.length) return [0, 0, 1, 1]; // bonne ouverture (Knuth : 1122)
-      if (level === 'easy') { var a = allCodes(); return a[Math.floor(Math.random() * a.length)].slice(); }
-      var cons = consistentWith(hist);
-      if (!cons.length) { var b = allCodes(); return b[Math.floor(Math.random() * b.length)].slice(); }
-      if (level !== 'hard' || cons.length <= 2) return cons[Math.floor(Math.random() * cons.length)].slice();
-      // minimax : candidat (parmi les cohérents) minimisant la plus grosse partition.
-      var best = cons[0], bestWorst = 1e9;
-      var cand = cons.length > 220 ? cons.slice(0, 220) : cons; // borne de calcul
-      cand.forEach(function (guess) {
-        var part = {};
-        cons.forEach(function (code) { var f = feedback(guess, code); var key = f.black + ',' + f.white; part[key] = (part[key] || 0) + 1; });
-        var worst = 0; Object.keys(part).forEach(function (k) { if (part[k] > worst) worst = part[k]; });
-        if (worst < bestWorst) { bestWorst = worst; best = guess; }
-      });
-      return best.slice();
-    }
+    /* ━━ IA solveur ━━ Voir mastermind-ai.js : facile = au hasard, moyen = code
+       cohérent avec les indices, difficile = minimax de Knuth COMPLET (≤ 5 coups).
+       Partagé avec le banc d'essai. ━━ */
     function mmBot(state, pid) {
       if (state.status !== 'playing' || state.turn !== pid) return;
       var level = window.Bots ? window.Bots.level(state) : 'normal';
-      var g = mmChoose(guessesOf(state, pid), level);
+      var g = window.MastermindAI.choose(guessesOf(state, pid), level);
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
         applyGuess(cur, pid, g);

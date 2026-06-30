@@ -13,10 +13,10 @@
 'use strict';
 var path = require('path');
 var ROOT = path.resolve(__dirname, '..');
-var P4 = require(path.join(ROOT, 'p4-ai.js')).P4AI;
-var MP = require(path.join(ROOT, 'morpion-ai.js')).MorpionAI;
-var OT = require(path.join(ROOT, 'othello-ai.js')).OthelloAI;
-var DA = require(path.join(ROOT, 'dames-ai.js')).DamesAI;
+var P4 = require(path.join(ROOT, 'ai', 'p4-ai.js')).P4AI;
+var MP = require(path.join(ROOT, 'ai', 'morpion-ai.js')).MorpionAI;
+var OT = require(path.join(ROOT, 'ai', 'reversi-ai.js')).ReversiAI;
+var DA = require(path.join(ROOT, 'ai', 'dames-ai.js')).DamesAI;
 
 var FULL = process.argv.indexOf('--full') >= 0;
 var failures = [];
@@ -72,7 +72,7 @@ function mpMatch(label, pickA, pickB, n, expect) {
   report('Morpion', label, w, n, expect);
 }
 
-// ── Othello / Reversi ──────────────────────────────────────────────────────
+// ── Reversi / Reversi ──────────────────────────────────────────────────────
 function otStart() { var a = '.'.repeat(64).split(''); a[27] = '1'; a[28] = '0'; a[35] = '0'; a[36] = '1'; return a.join(''); }
 function otCount(b, m) { var n = 0; for (var i = 0; i < 64; i++) if (b[i] === m) n++; return n; }
 function otRandom(b, me) { var lm = OT.legalMoves(b, me); return lm.length ? lm[(Math.random() * lm.length) | 0] : -1; }
@@ -95,7 +95,7 @@ function otPlay(pickA, pickB) {
 function otMatch(label, pickA, pickB, n, expect) {
   var w = { A: 0, B: 0, draw: 0 };
   for (var i = 0; i < n; i++) w[otPlay(pickA, pickB)]++;
-  report('Othello', label, w, n, expect);
+  report('Reversi', label, w, n, expect);
 }
 
 // ── Dames / Checkers ───────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ p4Match('difficile (A) vs facile (B)', hard4, easy4, FULL ? 60 : 10, { minA: 0.6
 mpMatch('difficile (A) vs aléatoire (B)', hardM, rndM, NM, { maxBLoss: 0.0 });
 mpMatch('difficile (A) vs facile (B)', hardM, easyM, Math.max(20, NM / 3 | 0), { maxBLoss: 0.05 });
 
-// Othello : « difficile » doit largement dominer l'aléatoire et le « facile ».
+// Reversi : « difficile » doit largement dominer l'aléatoire et le « facile ».
 otMatch('difficile (A) vs aléatoire (B)', hardO, rndO, NO, { minA: 0.9, maxBLoss: 0.05 });
 otMatch('difficile (A) vs facile (B)', hardO, easyO, Math.max(16, NO / 2 | 0), { minA: 0.6 });
 

@@ -78,7 +78,7 @@
   </style>
 </head>
 <body>
-  <script src="/boot.js"></script>
+  <script src="/boot.js" data-engine="ai/trio-ai.js"></script>
 
   <div class="app">
     <div id="s-home" class="screen active"></div>
@@ -144,7 +144,7 @@
 
   <script>
     var escapeHtml = window.esc;
-    var HAND_PER = { 3: 9, 4: 7, 5: 6, 6: 5 };
+    var HAND_PER = window.TrioAI.HAND_PER; // cartes par joueur : centralisé dans trio-ai.js
     function rref() { return window.roomRef; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
@@ -294,43 +294,25 @@
 
     /* ━━ IA ━━ Sait ses propres cartes + celles retournées ce tour ; complète quand
        elle peut, tente sa chance sinon. Facile = retournes au hasard. ━━ */
+    // IA : décision dans trio-ai.js (partagée avec le banc). On lui fournit ce que
+    // le joueur sait (ses cartes accessibles, le centre, les autres) ; on exécute.
     function trioBot(state, pid) {
       if (state.status !== 'playing' || state.winner || state.turn !== pid) return;
       var reveal = state.reveal || { picks: [] }, picks = reveal.picks || [];
-      var easy = window.Bots && window.Bots.shouldBlunder(state);
-
-      function myAcc(which) { var idx = accessibleIdx(state, pid, which); return idx < 0 ? null : { idx: idx, v: handOf(state, pid)[idx] }; }
-      function gambleCenter() {
-        var flipped = picks.filter(function (p) { return p.src === 'center'; }).map(function (p) { return p.ci; });
-        var avail = []; for (var ci = 0; ci < (state.center || []).length; ci++) if (flipped.indexOf(ci) < 0) avail.push(ci);
-        return avail.length ? avail[Math.floor(Math.random() * avail.length)] : -1;
-      }
-      function gambleOther() {
-        var others = (state.order || []).filter(function (p) { return p !== pid && handOf(state, p).length; });
-        if (!others.length) return null;
-        var op = others[Math.floor(Math.random() * others.length)];
-        return { pid: op, which: Math.random() < 0.5 ? 'low' : 'high' };
-      }
-
-      if (!picks.length) {
-        // Démarrer : retourner sa plus basse (ou au hasard en facile).
-        var which = (easy || Math.random() < 0.5) ? 'low' : 'high';
-        if (myAcc(which)) return revealHand(pid, which);
-        var g0 = gambleCenter(); if (g0 >= 0) return revealCenter(g0);
-        var go0 = gambleOther(); if (go0) return revealHand(go0.pid, go0.which); return;
-      }
-      var target = picks[0].v;
-      if (!easy) {
-        // Compléter avec une de ses propres cartes accessibles si elle vaut la cible.
-        var lo = myAcc('low'), hi = myAcc('high');
-        if (lo && lo.v === target) return revealHand(pid, 'low');
-        if (hi && hi.v === target) return revealHand(pid, 'high');
-      }
-      // Tenter sa chance : centre d'abord, sinon un autre joueur.
-      var g = gambleCenter(); if (g >= 0) return revealCenter(g);
-      var go = gambleOther(); if (go) return revealHand(go.pid, go.which);
-      // Rien d'accessible : retourner une de ses cartes (terminera sans doute le tour).
-      if (myAcc('low')) return revealHand(pid, 'low'); else if (myAcc('high')) return revealHand(pid, 'high');
+      var myHand = handOf(state, pid);
+      var loIdx = accessibleIdx(state, pid, 'low'), hiIdx = accessibleIdx(state, pid, 'high');
+      var flippedC = picks.filter(function (p) { return p.src === 'center'; }).map(function (p) { return p.ci; });
+      var centerAvail = []; for (var ci = 0; ci < (state.center || []).length; ci++) if (flippedC.indexOf(ci) < 0) centerAvail.push(ci);
+      var act = window.TrioAI.decide({
+        picks: picks, self: pid,
+        myLow: loIdx >= 0 ? myHand[loIdx] : null, myHigh: hiIdx >= 0 ? myHand[hiIdx] : null,
+        centerAvail: centerAvail,
+        others: (state.order || []).filter(function (p) { return p !== pid && handOf(state, p).length; }),
+        easy: window.Bots && window.Bots.shouldBlunder(state)
+      });
+      if (!act) return;
+      if (act.type === 'hand') return revealHand(act.pid, act.which);
+      if (act.type === 'center') return revealCenter(act.ci);
     }
 
     /* ━━ Rendu ━━ */
