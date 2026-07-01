@@ -19,6 +19,8 @@
   var params = new URLSearchParams(location.search);
   var mode = params.get('mode');
   if (mode !== 'solo' && mode !== 'local') return; // mode EN LIGNE → on ne touche à rien
+  var daily = params.get('daily') === '1' && mode === 'solo'; // Défi du jour (voir daily.js)
+  var dailyRecorded = false;
 
   // ── firebase factice (au cas où le SDK n'a pas pu se charger, ex. en avion) ──
   if (typeof window.firebase === 'undefined') {
@@ -85,9 +87,52 @@
     cfg = c || {};
     window.myPid = null;
     injectStyles();
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderSetup, { once: true });
-    else renderSetup();
+    // Défi du jour : on saute l'écran de réglages et on démarre la grille du jour.
+    var enter = (daily && (cfg.offline || {}).daily && window.Daily) ? startDaily : renderSetup;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enter, { once: true });
+    else enter();
   };
+
+  // ── Défi du jour (solo) : graine + difficulté imposées par la DATE ───────────
+  function startDaily() {
+    var off = cfg.offline || {};
+    if (!off.solo || !cfg.bot) { renderSetup(); return; } // repli si le solo n'est pas géré
+    // Graine fixée au jour : onStart appelle Puzzle.seed() → on lui rend la graine du jour.
+    if (window.Puzzle) { var ds = Daily.seed(cfg.gameKey); Puzzle.seed = function () { return ds; }; }
+    offlineDifficulty = Daily.level();
+    totalPlayers = 1;
+    startGame(null);
+  }
+  function fmtDur(ms) { return window.Puzzle ? Puzzle.fmtTime(ms) : Math.max(0, Math.round(ms / 1000)) + 's'; }
+  function recordDaily() {
+    if (!window.Daily || dailyRecorded) return;
+    var me = room.players[humanPid], won = room.winner === humanPid;
+    if (!won) { showDailyShare(false, 0, Daily.stateOf(cfg.gameKey)); return; } // raté → propose de réessayer
+    dailyRecorded = true;
+    var t = (me && me.finishedAt) || (room.startedAt ? Date.now() - room.startedAt : 0);
+    showDailyShare(true, t, Daily.record(cfg.gameKey, t));
+  }
+  function dailyShareText(t) {
+    var d = Daily.today(), name = cfg.name || cfg.gameKey;
+    return name + ' — défi du ' + d.label + ' (' + Daily.levelLabel() + ')\n✅ résolu en ' + fmtDur(t) +
+      '\n' + location.origin + location.pathname;
+  }
+  function showDailyShare(won, t, st) {
+    var old = document.getElementById('off-daily'); if (old) old.remove();
+    var box = document.createElement('div'); box.id = 'off-daily';
+    box.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:3000;background:var(--white);border:1.5px solid var(--gold);border-radius:18px;box-shadow:var(--shadow-hover);padding:14px 18px;max-width:340px;width:calc(100% - 28px);text-align:center;font-family:DM Sans,sans-serif';
+    if (won) {
+      box.innerHTML = '<div style="font-weight:800;color:var(--terracotta)">🗓️ Défi du jour réussi !</div>' +
+        '<div style="margin:6px 0;font-size:.9rem">⏱ ' + esc(fmtDur(t)) + (st.streak ? ' · série ' + st.streak + ' 🔥' : '') + '</div>' +
+        '<button id="off-daily-share" style="border:none;border-radius:30px;padding:.55rem 1.4rem;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff">📤 Partager</button>';
+      box.querySelector('#off-daily-share').onclick = function () { var r = Daily.share(dailyShareText(t)); if (window.lbToast) lbToast(r === 'copy' ? 'Résultat copié !' : r === 'share' ? '' : dailyShareText(t)); };
+    } else {
+      box.innerHTML = '<div style="font-weight:800;color:var(--terracotta)">🗓️ Défi du jour</div>' +
+        '<div style="margin:6px 0;font-size:.9rem">Pas encore trouvé — réessaie, c\'est la même grille aujourd\'hui.</div>' +
+        '<button style="border:none;border-radius:30px;padding:.55rem 1.4rem;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="location.reload()">↻ Réessayer</button>';
+    }
+    document.body.appendChild(box);
+  }
 
   // ── Écran de configuration hors-ligne ───────────────────────────────────────
   function renderSetup() {
@@ -239,6 +284,7 @@
       safeOnState();
       try { if (window.Lobby && Lobby.turnAlertFor) Lobby.turnAlertFor(room); } catch (e) {}
       if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
+      if (daily && ended()) setTimeout(recordDaily, 450); // Défi du jour : enregistre + partage
     } else {
       if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); return; }
       window.myPid = active || room.turn || (room.order || [])[0];

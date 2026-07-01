@@ -14,11 +14,11 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v24';
+var CACHE = 'jeux-v25';
 var ASSETS = [
   './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
-  'head.js', 'boot.js', 'puzzle.js', 'ai/p4-ai.js', 'ai/morpion-ai.js', 'ai/reversi-ai.js', 'ai/dames-ai.js',
+  'head.js', 'boot.js', 'puzzle.js', 'daily.js', 'ai/p4-ai.js', 'ai/morpion-ai.js', 'ai/reversi-ai.js', 'ai/dames-ai.js',
   'ai/monopoly-engine.js', 'ai/cluedo-engine.js',
   'ai/bataille-navale-ai.js', 'ai/uno-ai.js', 'ai/president-ai.js', 'ai/skyjo-ai.js', 'ai/sixnimmt-ai.js',
   'ai/papayoo-ai.js', 'ai/trio-ai.js', 'ai/blokus-ai.js', 'ai/mastermind-ai.js', 'ai/millebornes-ai.js',

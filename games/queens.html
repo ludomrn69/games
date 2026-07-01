@@ -164,7 +164,7 @@
         'Touche : vide → ❌ → 👑 → vide',
         'Solo : bats ton chrono ⏱ · Salon : course entre vous'
       ],
-      offline: { solo: true, soloMinBots: 0, soloNoBots: true },
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
       bot: function () {}, offlineTurn: function () { return null; },
       offlineEnter: function () { if (window.room) render(window.room); },
       onState: onState, onStart: onStart

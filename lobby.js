@@ -246,6 +246,17 @@
     else window.showScreen('s-home');
   }
 
+  // Encart « Défi du jour » (jeux de puzzle solo) — grille du jour + série.
+  function dailyHomeHTML(c) {
+    var t = window.Daily.today(), st = window.Daily.stateOf(c.gameKey);
+    var sub = st.doneToday
+      ? ('✅ Fait aujourd\'hui' + (st.best && window.Puzzle ? ' en ' + window.Puzzle.fmtTime(st.best) : ''))
+      : ('Difficulté du jour : ' + window.Daily.levelLabel());
+    var streak = st.streak > 0 ? ' · série ' + st.streak + ' 🔥' : '';
+    return '<button class="lb-btn" style="background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="Lobby.goDaily()">🗓️ Défi du jour — ' + esc(t.label) + '</button>' +
+      '<div style="margin:-6px 0 16px;font-size:0.82rem;color:var(--ink-light)">' + sub + streak + '</div>';
+  }
+
   // ── Écran ACCUEIL d'un jeu ────────────────────────────────────────────────
   function renderHome() {
     var host = document.getElementById('s-home');
@@ -259,12 +270,13 @@
         (c.emoji ? '<div class="lb-emoji-big">' + c.emoji + '</div>' : '') +
         '<h1 class="lb-title">' + esc(c.name || 'Jeu') + '</h1>' +
         '<p class="lb-sub">' + esc(c.tagline || '') + (c.tagline ? ' · ' : '') + range + '</p>' +
+        ((c.offline && c.offline.daily && window.Daily) ? dailyHomeHTML(c) : '') +
         '<button class="lb-btn" onclick="Lobby.createRoom()">Créer une partie</button>' +
         '<div style="margin:18px 0 8px;color:var(--ink-light);font-size:0.85rem">ou rejoindre avec un code</div>' +
         '<input id="lb-join-code" class="lb-input code" maxlength="4" placeholder="CODE" autocomplete="off" inputmode="text">' +
         '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()">Rejoindre</button>' +
         (c.offline ? ('<div style="margin:18px 0 6px;color:var(--ink-light);font-size:0.85rem">ou sans connexion ✈️</div>' +
-          (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">🤖 Solo (contre l\'ordi)</button>' : '') +
+          (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">' + (c.offline.soloNoBots ? '⏱ Solo (chrono)' : '🤖 Solo (contre l\'ordi)') + '</button>' : '') +
           (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">📱 Local (même appareil)</button>' : '')) : '') +
         (rules ? '<div class="lb-code-card" style="text-align:left;margin-top:24px"><div class="lb-code-label">Règles rapides</div><ul style="list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:6px;font-size:0.86rem;color:var(--ink-light)">' + rules + '</ul></div>' : '') +
         '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
@@ -685,6 +697,7 @@
 
   // Bascule vers un mode hors-ligne (solo / local) — voir offline.js.
   function goOffline(m) { location.href = location.pathname + '?mode=' + m; }
+  function goDaily() { location.href = location.pathname + '?mode=solo&daily=1'; }
 
   // ── « Revoir le plateau » (après une fin de partie) ───────────────────────
   // Affiche l'écran de jeu (le plateau/la main reste rendu derrière) et propose un
@@ -780,6 +793,7 @@
     leaveRoom: leaveRoom,
     resetToLobby: resetToLobby,
     goOffline: goOffline,
+    goDaily: goDaily,
     peekBoard: peekBoard,
     hidePeek: hidePeek,
     sweepOldRooms: sweepOldRooms,
