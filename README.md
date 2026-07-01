@@ -69,6 +69,7 @@ la synchro temps réel.
 | 👑 Queens | 1–6 | ✈️ | solo + course (chrono) |
 | 🌙 Tango | 1–6 | ✈️ | solo + course (chrono) |
 | 🔗 Zip | 1–6 | ✈️ | solo + course (chrono) |
+| 🧩 Patches | 1–6 | ✈️ | solo + course (chrono) |
 | 🟥 Sutom | 1–6 | ✈️ | mot mystère (chrono) |
 | 🃏 Solitaire | 1–6 | ✈️ | cartes solo (chrono) |
 | 🚗 Mille Bornes | 2–4 | ✈️ | cartes / course |
