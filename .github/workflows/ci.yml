@@ -23,3 +23,5 @@ jobs:
         run: node tools/bench-games.js
       - name: Tests de la brique puzzle-course (déterminisme + classement)
         run: node tools/bench-puzzles.js
+      - name: Générateurs de puzzles (grilles valides + solvables)
+        run: node tools/bench-generators.js
