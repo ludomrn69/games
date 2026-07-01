@@ -8,117 +8,76 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
-    background:radial-gradient(circle at 50% 30%,#1c1740,#0c0a1e 70%);display:flex;flex-direction:column;
-    align-items:center;touch-action:manipulation}
+    background:radial-gradient(circle at 50% 30%,#12306a,#060c1e 70%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
   .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
-  .hud a{color:#c7bffb;text-decoration:none;font-size:1.4rem;line-height:1}
-  .score{font-size:1.6rem}
-  .best{font-size:.8rem;color:#9d94d6;font-weight:600}
-  #stage{flex:1;width:100%;max-width:520px;position:relative;touch-action:manipulation}
+  .hud a{color:#9ec7f0;text-decoration:none;font-size:1.4rem;line-height:1}.score{font-size:1.6rem}.lives{font-size:1.2rem}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
   canvas{display:block;width:100%;height:100%}
-  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;
-    text-align:center;padding:24px;background:rgba(12,10,30,.82);backdrop-filter:blur(6px)}
-  .screen.hidden{display:none}
-  .screen h1{font-size:2.2rem;font-weight:900;letter-spacing:-.5px}
-  .screen p{color:#c7bffb;max-width:280px;line-height:1.4;font-size:.95rem}
+  .hint{position:absolute;bottom:26px;left:0;right:0;text-align:center;color:#9ec7f0;font-weight:700;font-size:.95rem;pointer-events:none}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(6,12,30,.85);backdrop-filter:blur(6px)}
+  .screen.hidden{display:none}.screen h1{font-size:2.2rem;font-weight:900}.screen p{color:#9ec7f0;max-width:280px;line-height:1.4;font-size:.95rem}
   .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
-  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;
-    background:linear-gradient(135deg,#8b3fd6,#c94b9e);box-shadow:0 8px 24px rgba(139,63,214,.45);font-family:inherit}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#3f8fd6,#4bc9c0);box-shadow:0 8px 24px rgba(63,143,214,.45);font-family:inherit}
   .btn:active{transform:scale(.96)}
 </style>
 </head>
 <body>
-  <div class="hud"><a href="../../index.html" aria-label="Retour">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
+  <div class="hud"><a href="../../index.html" aria-label="Retour">‹</a><span class="score" id="score">0</span><span class="lives" id="lives">❤️❤️❤️</span></div>
   <div id="stage">
     <canvas id="cv"></canvas>
+    <div class="hint">Tape pour planter le couteau au centre</div>
     <div class="screen" id="start">
       <h1>🎯 Center Hit</h1>
-      <p>Tape pour lancer un couteau sur la cible qui tourne. Ne touche jamais un couteau déjà planté&nbsp;!</p>
+      <p>Le curseur balaie la barre. Tape pile quand il est sur la zone verte du centre. Elle rétrécit à chaque réussite&nbsp;!</p>
       <button class="btn" id="startBtn">Jouer</button>
     </div>
     <div class="screen hidden" id="over">
       <h1>Raté&nbsp;!</h1>
       <div class="big" id="finalScore">0</div>
-      <p id="overMsg">Couteaux plantés</p>
+      <p id="overMsg">centres touchés</p>
       <button class="btn" id="replayBtn">Rejouer</button>
     </div>
   </div>
 <script>
 (function(){
-  var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-  var stage=document.getElementById('stage');
-  var scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),livesEl=document.getElementById('lives');
   var startScr=document.getElementById('start'),overScr=document.getElementById('over');
   var W,H,DPR;
-  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;
-    cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
   addEventListener('resize',resize);
-
-  var BEST_KEY='playus_centerhit_best';
-  var best=+localStorage.getItem(BEST_KEY)||0;
-  function showBest(){bestEl.textContent=best?'⭐ '+best:'';}
-  showBest();
-
-  var state='idle',score,knives,rot,speed,cx,cy,R,flying;
-  function reset(){score=0;knives=[];rot=0;speed=0.02;flying=null;scoreEl.textContent='0';}
-  function start(){resize();reset();state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');}
-  function vibrate(ms){if(navigator.vibrate)navigator.vibrate(ms);}
-
-  function gameOver(){
-    state='over';
-    document.getElementById('finalScore').textContent=score;
-    if(score>best){best=score;localStorage.setItem(BEST_KEY,best);document.getElementById('overMsg').textContent='Nouveau record ! 🏆';}
-    else document.getElementById('overMsg').textContent='Couteaux plantés';
-    showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);
-  }
-
-  function launch(){
-    if(state!=='play'||flying)return;
-    flying={t:0};
-  }
-  stage.addEventListener('pointerdown',function(e){
-    if(state==='play')launch();
+  var BEST='playus_centerhit_best',best=+localStorage.getItem(BEST)||0;
+  var state,score,lives,pos,dir,speed,zone,barX,barW,flash;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function start(){resize();score=0;lives=3;pos=0;dir=1;speed=0.018;zone=0.34;flash=0;
+    scoreEl.textContent='0';livesEl.textContent='❤️❤️❤️';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');}
+  function end(){state='over';document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Nouveau record ! 🏆';}
+    else document.getElementById('overMsg').textContent='centres touchés';overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  stage.addEventListener('pointerdown',function(){if(state!=='play')return;
+    var d=Math.abs(pos); // 0 = centre, 1 = bord
+    if(d<=zone/2){var pts=Math.max(5,Math.round((1-d/(zone/2))*100));score+=pts;scoreEl.textContent=score;
+      zone=Math.max(0.08,zone*0.9);speed+=0.003;flash=1;vibrate(d<0.03?[15,25,15]:12);}
+    else{lives--;livesEl.textContent='❤️'.repeat(Math.max(0,lives))+'🖤'.repeat(3-Math.max(0,lives));vibrate([30,40,80]);
+      if(lives<=0){end();return;}}
   });
-  document.getElementById('startBtn').onclick=start;
-  document.getElementById('replayBtn').onclick=start;
-
-  function stick(){
-    // angle du bas (PI/2) ramené dans le repère de la cible
-    var a=((Math.PI/2 - rot)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
-    for(var i=0;i<knives.length;i++){
-      var d=Math.abs(((a-knives[i])+Math.PI)%(2*Math.PI)-Math.PI);
-      if(d<0.30){gameOver();return;}
-    }
-    knives.push(a);score++;scoreEl.textContent=score;
-    speed=(0.02+score*0.0016)*(1);vibrate(15);
-  }
-
-  function frame(){
-    requestAnimationFrame(frame);
-    cx=W/2;cy=H*0.40;R=Math.min(W,H)*0.20;
-    ctx.clearRect(0,0,W,H);
-    if(state==='play')rot+=speed;
-    // cible
-    ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);
-    ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle='#e8524a';ctx.fill();
-    ctx.beginPath();ctx.arc(0,0,R*0.62,0,7);ctx.fillStyle='#f2e9d8';ctx.fill();
-    ctx.beginPath();ctx.arc(0,0,R*0.24,0,7);ctx.fillStyle='#e8524a';ctx.fill();
-    // couteaux plantés
-    knives.forEach(function(a){
-      ctx.save();ctx.rotate(a-Math.PI/2);
-      ctx.fillStyle='#cfd4dc';ctx.fillRect(-3,R,6,R*0.72);
-      ctx.fillStyle='#7a5230';ctx.fillRect(-4,R+R*0.72,8,R*0.28);
-      ctx.restore();
-    });
-    ctx.restore();
-    // couteau volant / en attente
-    var ky=H-70;
-    if(flying){flying.t+=0.16;ky=(H-70)-(H-70-(cy+R))*flying.t;
-      if(flying.t>=1){flying=null;stick();ky=cy+R;}}
-    if(state==='play'){
-      ctx.fillStyle='#cfd4dc';ctx.fillRect(cx-3,ky,6,52);
-      ctx.fillStyle='#7a5230';ctx.fillRect(cx-4,ky+52,8,20);
-    }
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);
+    barW=Math.min(W*0.86,440);barX=(W-barW)/2;var barY=H*0.46,barH=Math.max(26,H*0.05);
+    if(state==='play'){pos+=dir*speed;if(pos>1){pos=1;dir=-1;}if(pos<-1){pos=-1;dir=1;}if(flash>0)flash-=0.08;}
+    // barre rayée
+    ctx.fillStyle='#e8524a';ctx.fillRect(barX,barY,barW,barH);
+    // zones jaunes intermédiaires
+    ctx.fillStyle='#ffb020';var zx=barW*zone*1.8;ctx.fillRect(W/2-zx/2,barY,zx,barH);
+    // zone verte centrale
+    var gz=barW*zone;ctx.fillStyle=flash>0?'#a8ff9e':'#3fb562';ctx.fillRect(W/2-gz/2,barY,gz,barH);
+    // repère centre
+    ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W/2,barY-8);ctx.lineTo(W/2,barY+barH+8);ctx.stroke();
+    // curseur couteau
+    var kx=W/2+pos*(barW/2);
+    ctx.fillStyle='#e6ebf2';ctx.fillRect(kx-4,barY-46,8,46);
+    ctx.fillStyle='#7a5230';ctx.fillRect(kx-5,barY-64,10,18);
+    ctx.beginPath();ctx.moveTo(kx-6,barY);ctx.lineTo(kx+6,barY);ctx.lineTo(kx,barY+12);ctx.fillStyle='#e6ebf2';ctx.fill();
   }
   resize();frame();
 })();

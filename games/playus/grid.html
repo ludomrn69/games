@@ -29,7 +29,7 @@
   <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="timer" id="timer">30</span></div>
   <div id="stage">
     <div id="board"></div>
-    <div class="screen" id="start"><h1>🟦 Grid</h1><p>Tape les cases <b>vertes</b> le plus vite possible. Ne touche jamais une <b>bombe</b> 💣&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen" id="start"><h1>🟦 Grid</h1><p>Tape les cases <b>vertes</b> dès qu'elles s'allument, le plus vite possible. Ne touche jamais une <b>bombe</b> 💣&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
     <div class="screen hidden" id="over"><h1 id="overTitle">Temps écoulé&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">cases touchées</p><button class="btn" id="replayBtn">Rejouer</button></div>
   </div>
 <script>
@@ -39,24 +39,24 @@
   var startScr=document.getElementById('start'),overScr=document.getElementById('over');
   var BEST='playus_grid_best',best=+localStorage.getItem(BEST)||0;
   var cells=[];for(var i=0;i<9;i++){var c=document.createElement('div');c.className='cell';c.dataset.i=i;board.appendChild(c);cells.push(c);}
-  var state,score,timeLeft,tickT,spawnT,litSet,interval;
+  var state,score,timeLeft,tickT,bombT,litCount;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
-  function clearCell(c){c.className='cell';c.textContent='';}
-  function litUp(){
-    // éteint tout, allume 1-2 verts + parfois une bombe
-    cells.forEach(clearCell);litSet={};
-    var idxs=[0,1,2,3,4,5,6,7,8].sort(function(){return Math.random()-0.5;});
-    var n=1+Math.floor(Math.random()*2);
-    for(var k=0;k<n;k++){cells[idxs[k]].classList.add('on');litSet[idxs[k]]='on';}
-    if(Math.random()<0.6){cells[idxs[n]].classList.add('bomb');cells[idxs[n]].textContent='💣';litSet[idxs[n]]='bomb';}
-    spawnT=setTimeout(litUp,interval);
+  function freeCells(){return cells.filter(function(c){return c.className==='cell';});}
+  function lightGreen(){var free=freeCells();if(!free.length)return;var c=free[Math.floor(Math.random()*free.length)];c.classList.add('on');}
+  function topUp(){var target=Math.min(4,2+Math.floor(score/8));var lit=cells.filter(function(c){return c.classList.contains('on');}).length;
+    while(lit<target){lightGreen();lit++;}}
+  function bombCycle(){ // une bombe apparaît brièvement puis disparaît
+    var free=freeCells();if(free.length){var c=free[Math.floor(Math.random()*free.length)];c.classList.add('bomb');c.textContent='💣';
+      setTimeout(function(){if(c.classList.contains('bomb')){c.className='cell';c.textContent='';}},Math.max(650,1200-score*8));}
+    bombT=setTimeout(bombCycle,Math.max(700,1500-score*10));
   }
-  function start(){score=0;timeLeft=30;interval=900;scoreEl.textContent='0';timerEl.textContent='30';
-    state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');
-    clearTimeout(spawnT);litUp();
+  function start(){cells.forEach(function(c){c.className='cell';c.textContent='';});
+    score=0;timeLeft=30;scoreEl.textContent='0';timerEl.textContent='30';state='play';
+    startScr.classList.add('hidden');overScr.classList.add('hidden');topUp();
+    clearTimeout(bombT);bombT=setTimeout(bombCycle,1400);
     clearInterval(tickT);tickT=setInterval(function(){timeLeft--;timerEl.textContent=timeLeft;if(timeLeft<=0)end(false);},1000);
   }
-  function end(bomb){state='over';clearInterval(tickT);clearTimeout(spawnT);
+  function end(bomb){state='over';clearInterval(tickT);clearTimeout(bombT);
     document.getElementById('overTitle').textContent=bomb?'Bombe ! 💥':'Temps écoulé !';
     document.getElementById('finalScore').textContent=score;
     if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
@@ -64,10 +64,8 @@
     overScr.classList.remove('hidden');vibrate(bomb?[40,60,120]:[30]);
   }
   board.addEventListener('pointerdown',function(e){if(state!=='play')return;var c=e.target.closest('.cell');if(!c)return;
-    var i=c.dataset.i;
-    if(litSet[i]==='bomb'){end(true);}
-    else if(litSet[i]==='on'){score++;scoreEl.textContent=score;delete litSet[i];clearCell(c);
-      interval=Math.max(420,interval-12);vibrate(10);}
+    if(c.classList.contains('bomb')){end(true);}
+    else if(c.classList.contains('on')){c.className='cell';score++;scoreEl.textContent=score;vibrate(10);topUp();}
   });
   document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
 })();
