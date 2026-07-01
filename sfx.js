@@ -1,13 +1,12 @@
 /*
-  sfx.js — Sons + petites animations PARTAGÉS, 100 % HORS-LIGNE.
+  sfx.js — Sons PARTAGÉS, discrets, 100 % HORS-LIGNE.
 
   Les sons sont SYNTHÉTISÉS à la volée (Web Audio, oscillateurs) : aucun fichier
   audio à télécharger → fonctionne parfaitement en avion. Tout respecte la bascule
-  localStorage 'games.sound' (même réglage que le bip de tour). Les confettis sont
-  de simples <div> animés en CSS (pas d'image). Rien ici ne touche au réseau.
+  localStorage 'games.sound' (même réglage que le bip de tour). Rien ici ne touche
+  au réseau.
 
   API : Sfx.play('win'|'lose'|'place'|'click'|'coin'|'flip'|'score'|'error'|'turn'|'big')
-        Sfx.confetti()   → petite pluie de confettis
 */
 (function (root) {
   var ctx = null;
@@ -47,31 +46,9 @@
     big:   function () { seq([523, 659, 784, 1047, 1319], 'square', 0.16, 0.07); }
   };
 
-  var CONFETTI = ['🎉', '✨', '🎊', '⭐', '🃏'];
-  function confetti() {
-    if (typeof document === 'undefined' || !document.body) return;
-    if (!document.getElementById('sfx-conf-style')) {
-      var st = document.createElement('style'); st.id = 'sfx-conf-style';
-      st.textContent = '@keyframes sfxFall{0%{transform:translateY(-12vh) rotate(0);opacity:1}100%{transform:translateY(105vh) rotate(720deg);opacity:.9}}';
-      document.head.appendChild(st);
-    }
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4000;overflow:hidden';
-    for (var i = 0; i < 26; i++) {
-      var s = document.createElement('div');
-      var left = Math.round(Math.random() * 100), dur = 1.6 + Math.random() * 1.4, delay = Math.random() * 0.5, sz = 14 + Math.round(Math.random() * 16);
-      s.textContent = CONFETTI[(Math.random() * CONFETTI.length) | 0];
-      s.style.cssText = 'position:absolute;top:0;left:' + left + 'vw;font-size:' + sz + 'px;animation:sfxFall ' + dur.toFixed(2) + 's ' + delay.toFixed(2) + 's linear forwards';
-      wrap.appendChild(s);
-    }
-    document.body.appendChild(wrap);
-    setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 3600);
-  }
-
   root.Sfx = {
     on: on,
     play: function (name) { if (!on()) return; var s = SOUNDS[name]; if (s) { try { s(); } catch (e) {} } },
-    confetti: confetti,
     tone: tone
   };
 })(typeof window !== 'undefined' ? window : this);

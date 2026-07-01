@@ -44,6 +44,10 @@
     .ba-card.debuff { opacity: 0.45; filter: grayscale(0.6); }
     .ba-card .rk { font-size: clamp(0.9rem, 3.6vw, 1.15rem); line-height: 1; }
     .ba-card .su { font-size: clamp(1.1rem, 4.4vw, 1.5rem); text-align: right; line-height: 1; }
+    .ba-card.enh { box-shadow: 0 0 0 2px #7c5cdb, 0 2px 5px rgba(0,0,0,0.18); }
+    .ba-enh { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); font-size: 0.56rem; font-weight: 800; color: #fff; border-radius: 8px; padding: 1px 5px; }
+    .ba-enh.chips { background: #3b6fd8; } .ba-enh.mult { background: #d8453b; }
+    .ba-card { position: relative; }
 
     .ba-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
     .ba-btn { border: none; border-radius: 30px; padding: 0.62rem 1.3rem; font-weight: 800; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.92rem; box-shadow: var(--shadow); }
@@ -87,6 +91,7 @@
 </head>
 <body>
   <script src="/nav.js"></script>
+  <script src="/sfx.js"></script>
   <div class="ba-wrap">
     <!-- Écran de jeu -->
     <div id="ba-game" style="display:none">
@@ -223,11 +228,24 @@
     function scoreHand(cards) {
       var ev = evaluate(cards), hb = handBase(ev.key);
       var res = { key: ev.key, name: HANDS[ev.key].name, scoring: ev.scoring, chips: hb.chips, mult: hb.mult };
-      ev.scoring.forEach(function (c) { if (!(G.boss === 'club' && c.s === '♣')) res.chips += chipOf(c.r); });
-      var ctx = { played: cards.length, money: G.money, discardsLeft: G.discardsLeft, jokers: G.jokers.length, deck: G.deck.length };
-      G.jokers.forEach(function (id) { (JOKERS[id].apply || function () {})(res, ctx); });
+      ev.scoring.forEach(function (c) {
+        if (G.boss === 'club' && c.s === '♣') return;                 // couleur débuffée par le boss
+        res.chips += chipOf(c.r);
+        if (c.enh === 'bonus') res.chips += 30;                        // carte améliorée (tarot Le Magicien)
+        else if (c.enh === 'mult') res.mult += 4;                      // carte améliorée (tarot Le Diable)
+      });
+      var idsPlayed = {}; cards.forEach(function (c) { idsPlayed[c.id] = 1; });
+      var held = (G.hand || []).filter(function (c) { return !idsPlayed[c.id]; });
+      var ctx = { played: cards.length, money: G.money, discardsLeft: G.discardsLeft, jokers: G.jokers.length, deck: G.deck.length, held: held, plays: (G.handPlays || {})[ev.key] || 0 };
+      G.jokers.forEach(function (id) { (JOKERS[id].apply || function () {})(res, ctx, (G.jscale || {})[id] || 0); });
       res.score = Math.floor(res.chips * res.mult);
       return res;
+    }
+    // Met à jour l'état des jokers « cumulatifs » (appelé UNE fois, à la main jouée).
+    function tickJokers(res, cards) {
+      var idsPlayed = {}; cards.forEach(function (c) { idsPlayed[c.id] = 1; });
+      var ctx = { played: cards.length, held: (G.hand || []).filter(function (c) { return !idsPlayed[c.id]; }) };
+      G.jokers.forEach(function (id) { var t = JOKERS[id].tick; if (t) { G.jscale = G.jscale || {}; G.jscale[id] = t((G.jscale[id] || 0), res, ctx); } });
     }
 
     /* ━━ Jokers ━━ */
@@ -258,9 +276,36 @@
       bluejoker: { name: 'Joker Bleu',   cost: 5, desc: '+2 Jetons par carte dans la pioche', apply: function (r, c) { r.chips += 2 * c.deck; } },
       duo:       { name: 'Le Duo',       cost: 8, desc: '×2 Mult si Paire', apply: function (r) { if (HAS_PAIR.indexOf(r.key) >= 0) r.mult *= 2; } },
       trio:      { name: 'Le Trio',      cost: 9, desc: '×3 Mult si Brelan', apply: function (r) { if (HAS_THREE.indexOf(r.key) >= 0) r.mult *= 3; } },
-      family:    { name: 'La Famille',   cost: 9, desc: '×4 Mult si Carré', apply: function (r) { if (r.key === 'FOUR') r.mult *= 4; } }
+      family:    { name: 'La Famille',   cost: 9, desc: '×4 Mult si Carré', apply: function (r) { if (r.key === 'FOUR') r.mult *= 4; } },
+      cavendish: { name: 'Cavendish',    cost: 9, desc: '×3 Mult', apply: function (r) { r.mult *= 3; } },
+      smiley:    { name: 'Souriard',     cost: 4, desc: '+4 Mult par figure comptée (J/Q/K)', apply: function (r) { each(r, function (c) { if (c.r >= 11 && c.r <= 13) r.mult += 4; }); } },
+      photograph:{ name: 'Photographe',  cost: 5, desc: 'La 1re figure comptée : ×2 Mult', apply: function (r) { var d = false; each(r, function (c) { if (!d && c.r >= 11 && c.r <= 13) { r.mult *= 2; d = true; } }); } },
+      blackboard:{ name: 'Tableau Noir', cost: 6, desc: '×3 Mult si les cartes en main sont toutes ♠/♣', apply: function (r, c) { if (c.held.every(function (x) { return x.s === '♠' || x.s === '♣'; })) r.mult *= 3; } },
+      baron:     { name: 'Baron',        cost: 8, desc: '×1,5 Mult par Roi gardé en main', apply: function (r, c) { c.held.forEach(function (x) { if (x.r === 13) r.mult *= 1.5; }); } },
+      bootstrap: { name: 'Tire-Botte',   cost: 6, desc: '+2 Mult par tranche de 5 $', apply: function (r, c) { r.mult += 2 * Math.floor(Math.max(0, c.money) / 5); } },
+      // ── Jokers CUMULATIFS (grandissent pendant la partie) ──
+      ridebus:   { name: 'Autobus',      cost: 6, desc: '+1 Mult par main SANS figure (annulé par une figure)', apply: function (r, c, n) { r.mult += n; }, tick: function (n, r) { return r.scoring.some(function (x) { return x.r >= 11 && x.r <= 13; }) ? 0 : n + 1; } },
+      green:     { name: 'Joker Vert',   cost: 4, desc: '+1 Mult à chaque main jouée', apply: function (r, c, n) { r.mult += n; }, tick: function (n) { return n + 1; } },
+      runner:    { name: 'Coureur',      cost: 5, desc: '+15 Jetons cumulés à chaque Suite', apply: function (r, c, n) { r.chips += n; }, tick: function (n, r) { return (r.key === 'STR' || r.key === 'SF') ? n + 15 : n; } },
+      squarej:   { name: 'Joker Carré',  cost: 4, desc: '+4 Jetons cumulés par main de 4 cartes', apply: function (r, c, n) { r.chips += n; }, tick: function (n, r, c) { return c.played === 4 ? n + 4 : n; } },
+      supernova: { name: 'Supernova',    cost: 5, desc: '+Mult = nombre de fois cette main jouée', apply: function (r, c) { r.mult += c.plays; } }
     };
     var JOKER_POOL = Object.keys(JOKERS);
+
+    /* ━━ Tarots (consommables : max 2, s'utilisent depuis l'écran de jeu) ━━ */
+    var TAROTS = {
+      force:   { name: 'La Force',     cost: 3, desc: '+1 rang à 2 cartes sélectionnées', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 2).forEach(function (c) { if (c.r < 14) c.r++; }); return true; } },
+      magicien:{ name: 'Le Magicien',  cost: 3, desc: '+30 Jetons sur 2 cartes (améliore)', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 2).forEach(function (c) { c.enh = 'bonus'; }); return true; } },
+      diable:  { name: 'Le Diable',    cost: 3, desc: '+4 Mult sur 1 carte (améliore)', need: 1, use: function (s) { if (!s.length) return false; s[0].enh = 'mult'; return true; } },
+      etoile:  { name: 'L\'Étoile',    cost: 3, desc: '3 cartes sélectionnées → ♦', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 3).forEach(function (c) { c.s = '♦'; }); return true; } },
+      lune:    { name: 'La Lune',      cost: 3, desc: '3 cartes sélectionnées → ♣', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 3).forEach(function (c) { c.s = '♣'; }); return true; } },
+      soleil:  { name: 'Le Soleil',    cost: 3, desc: '3 cartes sélectionnées → ♥', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 3).forEach(function (c) { c.s = '♥'; }); return true; } },
+      monde:   { name: 'Le Monde',     cost: 3, desc: '3 cartes sélectionnées → ♠', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 3).forEach(function (c) { c.s = '♠'; }); return true; } },
+      pendu:   { name: 'Le Pendu',     cost: 3, desc: 'Détruit jusqu\'à 2 cartes sélectionnées', need: 1, use: function (s) { if (!s.length) return false; var ids = s.slice(0, 2).map(function (c) { return c.id; }); G.hand = G.hand.filter(function (c) { return ids.indexOf(c.id) < 0; }); draw(); return true; } },
+      hermite: { name: 'L\'Hermite',   cost: 4, desc: 'Double ton argent (max +20 $)', use: function () { G.money += Math.min(20, G.money); return true; } },
+      jugement:{ name: 'Le Jugement',  cost: 5, desc: 'Crée un Joker aléatoire', use: function () { if (G.jokers.length >= 5) return false; var pool = JOKER_POOL.filter(function (id) { return G.jokers.indexOf(id) < 0; }); if (!pool.length) return false; G.jokers.push(pool[rnd(pool.length)]); return true; } }
+    };
+    var TAROT_POOL = Object.keys(TAROTS);
 
     /* ━━ Planètes (améliorent le niveau d'une main) ━━ */
     var PLANETS = { HIGH: 'Pluton', PAIR: 'Mercure', TWO: 'Uranus', THREE: 'Vénus', STR: 'Saturne', FLUSH: 'Jupiter', FULL: 'La Terre', FOUR: 'Mars', SF: 'Neptune' };
@@ -279,23 +324,33 @@
     var BOSS_KEYS = Object.keys(BOSSES);
 
     /* ━━ État de la partie ━━ */
-    var G = null, SAVE = 'balatro.run.v1';
+    var G = null, SAVE = 'balatro.run.v2';
     function rnd(n) { return Math.floor(Math.random() * n); }
     function fullDeck() { var d = [], su = ['♠', '♥', '♦', '♣'], id = 0; for (var s = 0; s < 4; s++) for (var r = 2; r <= 14; r++) d.push({ r: r, s: su[s], id: id++ }); return d; }
+    function cloneCard(c) { return { r: c.r, s: c.s, id: c.id, enh: c.enh }; }         // copie de blind (les mods vivent dans G.stock)
+    function stockCard(id) { for (var i = 0; i < G.stock.length; i++) if (G.stock[i].id === id) return G.stock[i]; return null; }
     function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
     function save() { try { localStorage.setItem(SAVE, JSON.stringify(G)); } catch (e) {} }
     function clearSave() { try { localStorage.removeItem(SAVE); } catch (e) {} }
 
     function newGame() {
-      G = { levels: {}, jokers: [], money: 4, ante: 1, blindIdx: 0, phase: 'blind',
-        deck: [], hand: [], sel: [], roundScore: 0, target: 0, handsLeft: 4, discardsLeft: 3, handSize: 8, boss: null,
+      G = { levels: {}, jokers: [], jscale: {}, consumables: [], handPlays: {}, money: 4, ante: 1, blindIdx: 0, phase: 'blind',
+        stock: fullDeck(), deck: [], hand: [], sel: [], roundScore: 0, target: 0, handsLeft: 4, discardsLeft: 3, handSize: 8, boss: null,
         bosses: {}, shop: null, lastHand: null };
       HAND_ORDER.forEach(function (k) { G.levels[k] = 1; });
+      _endFx = false;
       // pré-tire un boss par ante (déterministe pour l'affichage du blind)
       for (var a = 1; a <= 8; a++) G.bosses[a] = BOSS_KEYS[rnd(BOSS_KEYS.length)];
       showBlindScreen(); save();
     }
-    function resumeGame() { try { G = JSON.parse(localStorage.getItem(SAVE)); } catch (e) { G = null; } if (!G) { newGame(); return; } route(); }
+    function resumeGame() {
+      try { G = JSON.parse(localStorage.getItem(SAVE)); } catch (e) { G = null; }
+      if (!G) { newGame(); return; }
+      // filet de sécurité : champs récents éventuellement absents d'une vieille sauvegarde
+      G.jscale = G.jscale || {}; G.consumables = G.consumables || []; G.handPlays = G.handPlays || {};
+      if (!G.stock || !G.stock.length) G.stock = fullDeck();
+      route();
+    }
 
     function blindTarget(ante, idx) { var t = Math.round(BLIND_BASE[ante - 1] * BLIND_MULT[idx]); if (idx === 2 && G.bosses[ante] === 'wall') t = Math.round(t * 1.5); return t; }
 
@@ -307,7 +362,7 @@
       if (G.boss === 'water') G.discardsLeft = 0;
       if (G.boss === 'manacle') G.handSize = 7;
       G.target = blindTarget(G.ante, G.blindIdx);
-      G.deck = shuffle(fullDeck()); G.hand = []; G.sel = [];
+      G.deck = shuffle(G.stock.map(cloneCard)); G.hand = []; G.sel = []; // depuis le deck PERSISTANT de la partie
       draw(); route(); save();
     }
     function draw() { while (G.hand.length < G.handSize && G.deck.length) G.hand.push(G.deck.pop()); }
@@ -322,15 +377,37 @@
 
     function playHand() {
       var cards = selCards(); if (!cards.length) { toast('Choisis des cartes'); return; }
+      var key = evaluate(cards).key; G.handPlays[key] = (G.handPlays[key] || 0) + 1; // compte cette main (Supernova)
       var res = scoreHand(cards);
-      G.roundScore += res.score; G.lastHand = res.name + '  ' + res.chips + ' × ' + res.mult + ' = ' + res.score;
+      tickJokers(res, cards);                                  // jokers cumulatifs → main suivante
+      var before = G.roundScore; G.roundScore += res.score;
+      G.lastHand = res.name + '  ' + res.chips + ' × ' + res.mult + ' = ' + res.score;
       G.handsLeft--;
-      // retire les cartes jouées de la main
+      if (window.Sfx) Sfx.play('place');
       G.hand = G.hand.filter(function (c) { return G.sel.indexOf(c.id) < 0; }); G.sel = [];
       if (G.boss === 'hook') { for (var k = 0; k < 2 && G.hand.length; k++) G.hand.splice(rnd(G.hand.length), 1); }
       draw();
-      if (G.roundScore >= G.target) return beatBlind();
-      if (G.handsLeft <= 0) return gameOver();
+      if (G.roundScore >= G.target) { if (window.Sfx) Sfx.play('coin'); return beatBlind(); }
+      if (G.handsLeft <= 0) { if (window.Sfx) Sfx.play('lose'); return gameOver(); }
+      route(); animateCount(before, G.roundScore); save();
+    }
+    function animateCount(from, to) {
+      var el = $('ba-round'); if (!el || typeof requestAnimationFrame !== 'function') return;
+      el.classList.remove('ba-flash'); void el.offsetWidth; el.classList.add('ba-flash');
+      if (window.Sfx) Sfx.play('score');
+      var start = null;
+      function step(ts) { if (start == null) start = ts; var p = Math.min(1, (ts - start) / 500), v = Math.round(from + (to - from) * p * (2 - p)); el.textContent = v.toLocaleString('fr'); if (p < 1) requestAnimationFrame(step); else el.textContent = to.toLocaleString('fr'); }
+      requestAnimationFrame(step);
+    }
+    // Utiliser un consommable (tarot) depuis l'écran de jeu, sur les cartes sélectionnées.
+    function useConsumable(idx) {
+      var id = G.consumables[idx]; if (!id) return;
+      var t = TAROTS[id], sel = selCards();
+      if (t.need && !sel.length) { toast('Sélectionne des cartes d\'abord'); return; }
+      if (t.use(sel) === false) { toast('Impossible'); return; }
+      sel.forEach(function (c) { var sc = stockCard(c.id); if (sc) { sc.r = c.r; sc.s = c.s; sc.enh = c.enh; } }); // persiste dans le deck
+      G.consumables.splice(idx, 1); G.sel = [];
+      if (window.Sfx) Sfx.play('coin');
       route(); save();
     }
     function discardCards() {
@@ -356,25 +433,31 @@
       shuffle(pool);
       var js = pool.slice(0, 2);
       var planetKeys = shuffle(HAND_ORDER.slice()).slice(0, 2);
-      G.shop = { jokers: js, planets: planetKeys, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
+      var tarots = [shuffle(TAROT_POOL.slice())[0]];
+      G.shop = { jokers: js, planets: planetKeys, tarots: tarots, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
     }
     function reroll() {
       if (G.money < G.shop.rerollCost) { toast('Pas assez d\'argent'); return; }
-      G.money -= G.shop.rerollCost; var rc = G.shop.rerollCost + 1; buildShop(); G.shop.rerollCost = rc; route(); save();
+      G.money -= G.shop.rerollCost; var rc = G.shop.rerollCost + 1; buildShop(); G.shop.rerollCost = rc; if (window.Sfx) Sfx.play('flip'); route(); save();
     }
     function buyJoker(id) {
       var cost = JOKERS[id].cost;
       if (G.jokers.length >= 5) { toast('5 Jokers maximum (vends-en un)'); return; }
       if (G.money < cost) { toast('Pas assez d\'argent'); return; }
-      G.money -= cost; G.jokers.push(id); G.shop.bought['j_' + id] = true; route(); save();
+      G.money -= cost; G.jokers.push(id); G.shop.bought['j_' + id] = true; if (window.Sfx) Sfx.play('coin'); route(); save();
     }
     function buyPlanet(key) {
       if (G.money < 3) { toast('Pas assez d\'argent'); return; }
-      G.money -= 3; G.levels[key] = (G.levels[key] || 1) + 1; G.shop.bought['p_' + key] = true; toast(PLANETS[key] + ' : ' + HANDS[key].name + ' niv. ' + G.levels[key]); route(); save();
+      G.money -= 3; G.levels[key] = (G.levels[key] || 1) + 1; G.shop.bought['p_' + key] = true; if (window.Sfx) Sfx.play('coin'); toast(PLANETS[key] + ' : ' + HANDS[key].name + ' niv. ' + G.levels[key]); route(); save();
+    }
+    function buyTarot(id) {
+      if (G.consumables.length >= 2) { toast('2 consommables maximum'); return; }
+      if (G.money < TAROTS[id].cost) { toast('Pas assez d\'argent'); return; }
+      G.money -= TAROTS[id].cost; G.consumables.push(id); G.shop.bought['t_' + id] = true; if (window.Sfx) Sfx.play('coin'); route(); save();
     }
     function sellJoker(id) {
       var i = G.jokers.indexOf(id); if (i < 0) return;
-      G.jokers.splice(i, 1); G.money += Math.max(1, Math.floor(JOKERS[id].cost / 2)); closeModal('ba-modal-joker'); route(); save();
+      G.jokers.splice(i, 1); delete G.jscale[id]; G.money += Math.max(1, Math.floor(JOKERS[id].cost / 2)); if (window.Sfx) Sfx.play('coin'); closeModal('ba-modal-joker'); route(); save();
     }
     function leaveShop() {
       G.blindIdx++;
@@ -393,7 +476,11 @@
       else { renderEnd(); $('ba-end').style.display = 'block'; }
     }
     function jokerChip(id, sellable) { var j = JOKERS[id]; return '<div class="ba-joker' + (sellable ? ' sellable' : '') + '" onclick="showJoker(\'' + id + '\',' + !!sellable + ')"><span class="jn">' + j.name + '</span>' + j.desc + '</div>'; }
-    function cardHTML(c) { var sel = G.sel.indexOf(c.id) >= 0, deb = G.boss === 'club' && c.s === '♣'; return '<div class="ba-card ' + (isRed(c.s) ? 'red' : 'black') + (sel ? ' sel' : '') + (deb ? ' debuff' : '') + '" onclick="toggleSel(' + c.id + ')"><div class="rk">' + rankName(c.r) + '</div><div class="su">' + c.s + '</div></div>'; }
+    function cardHTML(c) {
+      var sel = G.sel.indexOf(c.id) >= 0, deb = G.boss === 'club' && c.s === '♣';
+      var badge = c.enh === 'bonus' ? '<div class="ba-enh chips">+30</div>' : c.enh === 'mult' ? '<div class="ba-enh mult">+4</div>' : '';
+      return '<div class="ba-card ' + (isRed(c.s) ? 'red' : 'black') + (sel ? ' sel' : '') + (deb ? ' debuff' : '') + (c.enh ? ' enh' : '') + '" onclick="toggleSel(' + c.id + ')">' + badge + '<div class="rk">' + rankName(c.r) + '</div><div class="su">' + c.s + '</div></div>';
+    }
 
     function renderGame() {
       $('ba-ante').textContent = G.ante; $('ba-blind').textContent = BLIND_NAME[G.blindIdx] + (G.boss ? ' · ' + BOSSES[G.boss].name : '');
@@ -401,6 +488,9 @@
       $('ba-hands').textContent = G.handsLeft; $('ba-disc').textContent = G.discardsLeft; $('ba-money').textContent = G.money;
       $('ba-bar').style.width = Math.min(100, 100 * G.roundScore / G.target) + '%';
       $('ba-jokers').innerHTML = (G.jokers.length ? G.jokers.map(function (id) { return jokerChip(id, false); }).join('') : '<span class="ba-slots">Pas encore de Joker</span>') + '<span class="ba-slots">' + G.jokers.length + '/5</span>';
+      // consommables (tarots) : cliquer pour utiliser sur les cartes sélectionnées
+      var cel = $('ba-consum'); if (!cel) { cel = document.createElement('div'); cel.id = 'ba-consum'; cel.className = 'ba-jokers'; var jk = $('ba-jokers'); jk.parentNode.insertBefore(cel, jk.nextSibling); }
+      cel.innerHTML = G.consumables.length ? (G.consumables.map(function (id, i) { var t = TAROTS[id]; return '<div class="ba-joker" style="border-color:#7c5cdb;cursor:pointer" onclick="useConsumable(' + i + ')"><span class="jn" style="color:#7c5cdb">🎴 ' + t.name + '</span>' + t.desc + '</div>'; }).join('') + '<span class="ba-slots">Touche pour utiliser · ' + G.consumables.length + '/2</span>') : '';
       // info main sélectionnée
       var cards = selCards(), info = '';
       if (cards.length) { var ev = evaluate(cards), hb = handBase(ev.key); info = '<div class="ht">' + HANDS[ev.key].name + ' <span style="font-size:0.7rem;color:var(--ink-light)">niv.' + hb.lvl + '</span></div><div><span class="hs ba-chips">' + hb.chips + '</span> × <span class="hs ba-mult">' + hb.mult + '</span></div>'; }
@@ -433,18 +523,25 @@
         html += '<div class="ba-shop-item planet"><div class="si-name">🪐 ' + PLANETS[key] + '</div><div class="si-desc">' + HANDS[key].name + ' niveau +1 (actuel ' + (G.levels[key] || 1) + ')</div>' +
           '<button class="si-buy" ' + (bought ? 'disabled' : '') + ' onclick="buyPlanet(\'' + key + '\')">' + (bought ? 'Acheté ✓' : '$3') + '</button></div>';
       });
+      (G.shop.tarots || []).forEach(function (id) {
+        var bought = G.shop.bought['t_' + id], t = TAROTS[id], full = G.consumables.length >= 2;
+        html += '<div class="ba-shop-item" style="border-color:#7c5cdb"><div class="si-name" style="color:#7c5cdb">🎴 ' + t.name + '</div><div class="si-desc">' + t.desc + '</div>' +
+          '<button class="si-buy" ' + (bought || full ? 'disabled' : '') + ' onclick="buyTarot(\'' + id + '\')">' + (bought ? 'Acheté ✓' : full ? 'Plein' : '$' + t.cost) + '</button></div>';
+      });
       $('sh-grid').innerHTML = html;
       $('sh-reroll').disabled = G.money < G.shop.rerollCost;
       // jokers possédés (revendables) sous la boutique
       var owned = G.jokers.length ? '<div style="margin-top:12px"><div class="ba-slots">Tes Jokers (clique pour vendre) :</div><div class="ba-jokers" style="justify-content:center">' + G.jokers.map(function (id) { return jokerChip(id, true); }).join('') + '</div></div>' : '';
       var ex = $('sh-owned'); if (!ex) { ex = document.createElement('div'); ex.id = 'sh-owned'; $('sh-grid').parentNode.insertBefore(ex, $('sh-reroll')); } ex.innerHTML = owned;
     }
+    var _endFx = false;
     function renderEnd() {
       var won = G.phase === 'won';
       $('end-emoji').textContent = won ? '🏆' : '💀';
       $('end-title').textContent = won ? 'Victoire ! Ante 8 vaincu 🏆' : 'Défaite';
       $('end-sub').textContent = won ? 'Tu as survécu à toute la run, chapeau !' : 'Blind non atteint à l\'Ante ' + G.ante + '.';
       $('end-stats').textContent = 'Jokers : ' + (G.jokers.length ? G.jokers.map(function (id) { return JOKERS[id].name; }).join(', ') : 'aucun') + ' · Argent : $' + G.money;
+      if (!_endFx && window.Sfx) { _endFx = true; Sfx.play(won ? 'big' : 'lose'); }
     }
     function showJoker(id, sellable) {
       var j = JOKERS[id]; $('jk-title').textContent = '🃏 ' + j.name; $('jk-desc').textContent = j.desc;

@@ -285,7 +285,7 @@
       safeOnState();
       try { if (window.Lobby && Lobby.turnAlertFor) Lobby.turnAlertFor(room); } catch (e) {}
       if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
-      if (ended() && !endFx) { endFx = true; if (window.Sfx) { if (room.winner) { Sfx.play('win'); Sfx.confetti(); } else Sfx.play('lose'); } }
+      if (ended() && !endFx) { endFx = true; if (window.Sfx) Sfx.play(room.winner ? 'win' : 'lose'); }
       if (daily && ended()) setTimeout(recordDaily, 450); // Défi du jour : enregistre + partage
     } else {
       if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); return; }
