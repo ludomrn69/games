@@ -18,11 +18,11 @@
 */
 // La version est estampillée automatiquement (empreinte du contenu mis en cache)
 // par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
-var CACHE = 'jeux-2d3992ae32';
+var CACHE = 'jeux-06cf811612';
 var ASSETS = [
   './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
   'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',
-  'avatars.js', 'boot.js', 'daily.js', 'firebase-init.js', 'head.js', 'lobby.js', 'nav.js', 'offline.js', 'presence.js', 'puzzle.js', 'sfx.js', 'stats.js',
+  'avatars.js', 'common.js', 'daily.js', 'firebase-init.js', 'head.js', 'lobby.js', 'nav.js', 'offline.js', 'presence.js', 'puzzle.js', 'sfx.js', 'stats.js',
   'ai/aventuriers-engine.js', 'ai/bataille-navale-ai.js', 'ai/blokus-ai.js', 'ai/cluedo-engine.js', 'ai/dames-ai.js', 'ai/mastermind-ai.js', 'ai/millebornes-ai.js', 'ai/monopoly-engine.js', 'ai/morpion-ai.js', 'ai/p4-ai.js', 'ai/papayoo-ai.js', 'ai/president-ai.js', 'ai/reversi-ai.js', 'ai/sixnimmt-ai.js', 'ai/skyjo-ai.js', 'ai/trio-ai.js', 'ai/uno-ai.js',
   'games/2048.html', 'games/aventuriers-du-rail.html', 'games/balatro.html', 'games/bataille-navale.html', 'games/blackjack.html', 'games/blokus.html',
   'games/cluedo.html', 'games/codenames.html', 'games/crack-list.html', 'games/dames.html', 'games/diamants.html', 'games/dobble-emoji.html',

@@ -32,7 +32,8 @@
   var ROOT = window.GAMES_ROOT || 'games';
   var ID_KEY = 'games.identity.v1';
   var PID_KEY = 'games.pid';
-  var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ'; // sans I ni O (lisibilité)
+  var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // lettres + chiffres, sans I/O/0/1 (lisibilité)
+  var CODE_LEN = 5;
 
   function cfg() { return window.ROOM || {}; }
   function db() { return firebase.database(); }
@@ -228,7 +229,7 @@
   }
   function genCode() {
     var s = '';
-    for (var i = 0; i < 4; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    for (var i = 0; i < CODE_LEN; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
     return s;
   }
 
@@ -286,7 +287,7 @@
         (window.GameStats ? GameStats.summaryHTML(c.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
         '<button class="lb-btn" onclick="Lobby.createRoom()">Créer une partie</button>' +
         '<div style="margin:18px 0 8px;color:var(--ink-light);font-size:0.85rem">ou rejoindre avec un code</div>' +
-        '<input id="lb-join-code" class="lb-input code" maxlength="4" placeholder="CODE" autocomplete="off" inputmode="text">' +
+        '<input id="lb-join-code" class="lb-input code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text">' +
         '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()">Rejoindre</button>' +
         (c.offline ? ('<div style="margin:18px 0 6px;color:var(--ink-light);font-size:0.85rem">ou sans connexion ✈️</div>' +
           (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">' + (c.offline.soloNoBots ? '⏱ Solo (chrono)' : '🤖 Solo (contre l\'ordi)') + '</button>' : '') +
@@ -296,7 +297,7 @@
       '</div>';
     var inp = document.getElementById('lb-join-code');
     if (inp) {
-      inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, ''); });
+      inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') joinFromInput(); });
     }
   }
@@ -304,7 +305,7 @@
   function joinFromInput() {
     var inp = document.getElementById('lb-join-code');
     var code = (inp && inp.value || '').trim().toUpperCase();
-    if (code.length < 4) { lbToast('Entre les 4 lettres du code'); return; }
+    if (code.length < CODE_LEN) { lbToast('Entre les 5 caractères du code'); return; }
     joinRoomByCode(code, false);
   }
 

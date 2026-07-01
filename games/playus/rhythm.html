@@ -23,7 +23,7 @@
 </style>
 </head>
 <body>
-  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives">❤️❤️❤️</span></div>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives"></span></div>
   <div id="stage">
     <canvas id="cv"></canvas>
     <div id="judge"></div>
@@ -46,13 +46,13 @@
     o.start();o.stop(ac.currentTime+0.17);}catch(e){}}
   var state,score,lives,period,t0,tapped;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
-  function start(){resize();score=0;lives=3;period=1400;t0=performance.now();tapped=false;
+  function start(){resize();score=0;lives=1;period=1400;t0=performance.now();tapped=false;
     try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();}catch(e){}
-    state='play';scoreEl.textContent='0';livesEl.textContent='❤️❤️❤️';judge.textContent='';startScr.classList.add('hidden');overScr.classList.add('hidden');requestAnimationFrame(loop);}
+    state='play';scoreEl.textContent='0';livesEl.textContent='';judge.textContent='';startScr.classList.add('hidden');overScr.classList.add('hidden');requestAnimationFrame(loop);}
   function end(){state='over';document.getElementById('finalScore').textContent=score;
     if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
     else document.getElementById('overMsg').textContent='temps parfaits';overScr.classList.remove('hidden');vibrate([40,60,120]);}
-  function loseLife(txt){lives--;livesEl.textContent='❤️'.repeat(Math.max(0,lives))+'🖤'.repeat(3-Math.max(0,lives));
+  function loseLife(txt){lives--;livesEl.textContent='';
     judge.style.color='#e8524a';judge.textContent=txt;vibrate([30,40,80]);if(lives<=0)setTimeout(end,300);}
   stage.addEventListener('pointerdown',function(){if(state!=='play'||tapped)return;tapped=true;
     var phase=((performance.now()-t0)%period)/period; // 0..1, impact à 1 (ou 0)

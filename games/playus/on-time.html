@@ -27,7 +27,7 @@
 </style>
 </head>
 <body>
-  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives">❤️❤️❤️</span></div>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives"></span></div>
   <div id="stage">
     <div class="target">Arrête-toi à <b id="targetT">5.000s</b></div>
     <div id="tapzone">Tape pour lancer</div>
@@ -57,7 +57,7 @@
     targetT.textContent=(targetMs/1000).toFixed(3)+'s';
     tap.textContent='Tape pour lancer';tap.classList.remove('running');result.textContent='';
   }
-  function start(){score=0;lives=3;scoreEl.textContent='0';livesEl.textContent='❤️❤️❤️';
+  function start(){score=0;lives=1;scoreEl.textContent='0';livesEl.textContent='';
     state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');newRound();}
   function end(){state='over';document.getElementById('finalScore').textContent=score;
     if(score>best){best=score;localStorage.setItem(BEST_KEY,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
@@ -72,7 +72,7 @@
       if(err<=tol){var pts=Math.max(5,Math.round((tol-err)/tol*100));score+=pts;scoreEl.textContent=score;
         result.style.color='#7ac94b';result.textContent='+'+pts+'  ('+(err/1000).toFixed(3)+'s d\'écart)';vibrate(err<40?[15,30,15]:15);
         phase='ready';setTimeout(newRound,900);}
-      else{lives--;livesEl.textContent='❤️'.repeat(lives)+'🖤'.repeat(3-lives);
+      else{lives--;livesEl.textContent='';
         result.style.color='#e8524a';result.textContent='Raté de '+(err/1000).toFixed(3)+'s';vibrate([30,40,80]);
         if(lives<=0){setTimeout(end,700);}else{phase='ready';setTimeout(newRound,900);}}
     }

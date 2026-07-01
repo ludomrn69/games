@@ -126,7 +126,7 @@ Glisser le dossier sur Netlify (ou `netlify deploy`). Aucun build.
 | `presence.js` | Présence temps réel (qui est en ligne) |
 | `avatars.js` | Palette de couleurs + liste d'émojis |
 | `nav.js` | Barre du haut (accueil + thème clair/sombre) |
-| `head.js` / `boot.js` | En-tête HTML commun + chargement des scripts partagés |
+| `head.js` / `common.js` | En-tête HTML commun + bundle des scripts partagés (généré par `tools/gen-common.js`) |
 | `theme.css` / `game.css` | Palette + mode sombre + coquille commune des jeux |
 | `p4-ai.js` / `morpion-ai.js` / `othello-ai.js` / `dames-ai.js` | Cœurs d'IA purs (réutilisés par la page **et** le benchmark) |
 | `monopoly-engine.js` / `cluedo-engine.js` | Moteurs de règles purs (sans DOM) |

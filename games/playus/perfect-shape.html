@@ -22,7 +22,7 @@
 </style>
 </head>
 <body>
-  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives">❤️❤️❤️</span></div>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives"></span></div>
   <div id="stage">
     <canvas id="cv"></canvas>
     <div class="hint">Tape quand le cercle remplit le gabarit</div>
@@ -49,7 +49,7 @@
   var BEST_KEY='playus_perfectshape_best';var best=+localStorage.getItem(BEST_KEY)||0;
   var state,score,lives,phase,r,dir,target,speed,flash;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
-  function start(){resize();score=0;lives=3;scoreEl.textContent='0';livesEl.textContent='❤️❤️❤️';
+  function start(){resize();score=0;lives=1;scoreEl.textContent='0';livesEl.textContent='';
     speed=1.7;r=10;dir=1;phase='play';flash=0;state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');}
   function end(){state='over';document.getElementById('finalScore').textContent=score;
     if(score>best){best=score;localStorage.setItem(BEST_KEY,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
@@ -61,7 +61,7 @@
     var err=Math.abs(r-target),tol=target*0.14;
     if(err<=tol){var pts=Math.max(5,Math.round((tol-err)/tol*100));score+=pts;scoreEl.textContent=score;
       flash=1;speed=Math.min(6,speed+0.28);vibrate(err<target*0.03?[15,25,15]:15);}
-    else{lives--;livesEl.textContent='❤️'.repeat(Math.max(0,lives))+'🖤'.repeat(3-Math.max(0,lives));vibrate([30,40,80]);
+    else{lives--;livesEl.textContent='';vibrate([30,40,80]);
       if(lives<=0){end();return;}}
     r=10;dir=1;
   });

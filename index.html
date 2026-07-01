@@ -27,6 +27,16 @@
       box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
     .join-bar button:hover { transform: translateY(-2px); }
 
+    .search-bar { position: relative; max-width: 460px; margin: 0 auto 30px; }
+    .search-bar input { width: 100%; padding: 0.8rem 2.6rem 0.8rem 2.6rem; border: 1.5px solid var(--gold-light); border-radius: 14px;
+      background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1rem; }
+    .search-bar input:focus { outline: none; border-color: var(--gold); }
+    .search-bar .s-icon { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); font-size: 1rem; pointer-events: none; opacity: 0.7; }
+    .search-bar .s-clear { position: absolute; right: 0.55rem; top: 50%; transform: translateY(-50%); border: none; background: none;
+      cursor: pointer; font-size: 1.2rem; color: var(--ink-light); line-height: 1; padding: 4px 6px; display: none; }
+    .search-bar.has-value .s-clear { display: block; }
+    .search-empty { text-align: center; color: var(--ink-light); font-size: 0.95rem; margin: 10px 0 4px; display: none; }
+
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
     .cat-title { grid-column: 1 / -1; font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; color: var(--ink);
       margin: 18px 2px 2px; padding-bottom: 6px; border-bottom: 1.5px solid var(--gold-light); display: flex; align-items: center; gap: 8px; }
@@ -82,11 +92,19 @@
     </div>
 
     <div class="join-bar">
-      <input id="join-code" maxlength="4" placeholder="CODE" autocomplete="off" inputmode="text" aria-label="Code du salon">
+      <input id="join-code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text" aria-label="Code du salon">
       <button onclick="joinByCode()">Rejoindre une partie</button>
     </div>
 
+    <div class="search-bar" id="search-bar">
+      <span class="s-icon">🔍</span>
+      <input id="game-search" type="search" placeholder="Rechercher un jeu…" autocomplete="off" aria-label="Rechercher un jeu">
+      <button class="s-clear" id="search-clear" type="button" aria-label="Effacer">✕</button>
+    </div>
+
     <div class="grid" id="grid"></div>
+
+    <p class="search-empty" id="search-empty">Aucun jeu ne correspond à ta recherche.</p>
 
     <section class="playus-section">
       <div class="playus-banner">
@@ -257,8 +275,50 @@
       }).join('');
     }
 
+    // ── Recherche de jeu ──────────────────────────────────────────────────────
+    // Filtre en direct les cartes (jeux classiques + Playus Arena) par nom.
+    // Masque les titres de catégorie vides et la section Playus si rien ne matche.
+    (function setupSearch() {
+      var search = document.getElementById('game-search');
+      var clearBtn = document.getElementById('search-clear');
+      var bar = document.getElementById('search-bar');
+      var emptyMsg = document.getElementById('search-empty');
+      var gridEl = document.getElementById('grid');
+      var playusGrid = document.getElementById('playus-grid');
+      var playusSection = document.querySelector('.playus-section');
+      if (!search || !gridEl) return;
+      function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+      function nameOf(el) { var n = el.querySelector('.name'); return norm(n ? n.textContent : ''); }
+      function apply() {
+        var q = norm(search.value.trim());
+        bar.classList.toggle('has-value', !!search.value);
+        var anyVisible = false;
+        // Grille principale : parcours en gardant le titre de catégorie courant.
+        var currentTitle = null, groupHasVisible = false;
+        function closeGroup() { if (currentTitle) currentTitle.style.display = groupHasVisible ? '' : 'none'; }
+        Array.prototype.forEach.call(gridEl.children, function (el) {
+          if (el.classList.contains('cat-title')) { closeGroup(); currentTitle = el; groupHasVisible = false; return; }
+          var show = !q || nameOf(el).indexOf(q) !== -1;
+          el.style.display = show ? '' : 'none';
+          if (show) { groupHasVisible = true; anyVisible = true; }
+        });
+        closeGroup();
+        // Grille Playus Arena.
+        var playusVisible = false;
+        if (playusGrid) Array.prototype.forEach.call(playusGrid.children, function (el) {
+          var show = !q || nameOf(el).indexOf(q) !== -1;
+          el.style.display = show ? '' : 'none';
+          if (show) { playusVisible = true; anyVisible = true; }
+        });
+        if (playusSection) playusSection.style.display = playusVisible ? '' : 'none';
+        emptyMsg.style.display = (q && !anyVisible) ? 'block' : 'none';
+      }
+      search.addEventListener('input', apply);
+      if (clearBtn) clearBtn.addEventListener('click', function () { search.value = ''; apply(); search.focus(); });
+    })();
+
     var input = document.getElementById('join-code');
-    input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^A-Z]/g, ''); });
+    input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
 
     function toast(m) { var t = document.getElementById('lb-toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('show'); }, 2200); }
@@ -274,7 +334,7 @@
 
     function joinByCode() {
       var code = (input.value || '').trim().toUpperCase();
-      if (code.length < 4) { toast('Entre les 4 lettres du code'); return; }
+      if (code.length < 5) { toast('Entre les 5 caractères du code'); return; }
       whenReady(function () {
         firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms/' + code).once('value').then(function (snap) {
           var room = snap.val();

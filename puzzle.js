@@ -10,7 +10,7 @@
    • cycle de course : enregistrer le temps de fin d'un joueur, désigner le 1er,
      terminer quand tout le monde a fini ; classement par temps.
 
-  Chargé via boot.js : <script src="/boot.js" data-engine="puzzle.js"></script>.
+  Chargé comme moteur de la page, juste après common.js : <script src="/puzzle.js"></script>.
   Utilisé par games/sudoku.html, games/queens.html, … (et testable en headless).
 */
 (function (root) {
