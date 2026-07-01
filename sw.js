@@ -14,7 +14,7 @@
    • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
      hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v23';
+var CACHE = 'jeux-v24';
 var ASSETS = [
   './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
@@ -28,7 +28,7 @@ var ASSETS = [
   'games/undercover.html', 'games/president.html', 'games/ludo.html',
   'games/juste-prix.html', 'games/telephone-dessine.html',
   'games/monopoly.html', 'games/cluedo.html',
-  'games/papayoo.html', 'games/trio.html', 'games/sixnimmt.html', 'games/mastermind.html', 'games/themind.html', 'games/2048.html', 'games/sudoku.html', 'games/queens.html', 'games/tango.html', 'games/zip.html', 'games/sutom.html', 'games/solitaire.html', 'games/patches.html', 'games/millebornes.html', 'games/loupgarou.html', 'games/timesup.html', 'games/lapaye.html'
+  'games/papayoo.html', 'games/trio.html', 'games/sixnimmt.html', 'games/mastermind.html', 'games/themind.html', 'games/2048.html', 'games/sudoku.html', 'games/queens.html', 'games/tango.html', 'games/zip.html', 'games/sutom.html', 'games/solitaire.html', 'games/patches.html', 'games/balatro.html', 'games/millebornes.html', 'games/loupgarou.html', 'games/timesup.html', 'games/lapaye.html'
 ];
 
 self.addEventListener('install', function (e) {

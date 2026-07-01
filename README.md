@@ -72,6 +72,7 @@ la synchro temps réel.
 | 🧩 Patches | 1–6 | ✈️ | solo + course (chrono) |
 | 🟥 Sutom | 1–6 | ✈️ | mot mystère (chrono) |
 | 🃏 Solitaire | 1–6 | ✈️ | cartes solo (chrono) |
+| 🃏 Balatro | 1 | ✈️ | roguelike poker (solo) |
 | 🚗 Mille Bornes | 2–4 | ✈️ | cartes / course |
 | 🐺 Loup-Garou | 4–12 | ✈️ | déduction sociale (IA) |
 | ⏱️ Time's Up | 1–12 | ✈️ | équipes (+ solo chrono) |

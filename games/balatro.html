@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Balatro 🃏" data-emoji="🃏"></script>
+  <style>
+    body { padding-top: 52px; }
+    .ba-wrap { max-width: 720px; margin: 0 auto; padding: 10px 12px 40px; }
+
+    /* Bandeau d'état */
+    .ba-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .ba-stat { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); }
+    .ba-stat .lab { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-light); }
+    .ba-stat .val { font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    .ba-blindname { color: var(--terracotta); }
+    .ba-score-wrap { grid-column: 1 / -1; background: linear-gradient(135deg, #2c2540, #4a3270); color: #fff; border: none; border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; }
+    .ba-score-wrap .big { font-size: 1.5rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .ba-score-wrap .tgt { font-size: 0.8rem; opacity: 0.85; }
+    .ba-progress { height: 7px; background: rgba(255,255,255,0.18); border-radius: 5px; margin-top: 6px; overflow: hidden; }
+    .ba-progress > div { height: 100%; background: linear-gradient(90deg, var(--gold), var(--terracotta)); transition: width .35s; }
+
+    /* Jokers */
+    .ba-jokers { display: flex; gap: 6px; flex-wrap: wrap; min-height: 20px; margin-bottom: 8px; align-items: stretch; }
+    .ba-joker { background: var(--white); border: 1.5px solid var(--gold); border-radius: 10px; padding: 6px 8px; width: 88px; box-shadow: var(--shadow); font-size: 0.64rem; position: relative; cursor: help; }
+    .ba-joker .jn { font-weight: 800; font-size: 0.72rem; color: var(--terracotta); display: block; margin-bottom: 2px; }
+    .ba-joker.sellable::after { content: '💰'; position: absolute; top: 2px; right: 3px; font-size: 0.7rem; }
+    .ba-slots { font-size: 0.7rem; color: var(--ink-light); align-self: center; }
+
+    /* Info main jouée */
+    .ba-handinfo { text-align: center; min-height: 40px; margin: 4px 0 8px; }
+    .ba-handinfo .ht { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.05rem; }
+    .ba-handinfo .hs { font-weight: 800; }
+    .ba-chips { color: #3b6fd8; } .ba-mult { color: #d8453b; }
+    .ba-flash { animation: baPop .5s; }
+    @keyframes baPop { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+    /* Cartes */
+    .ba-hand { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; min-height: 92px; margin-bottom: 12px; }
+    .ba-card { width: clamp(44px, 12vw, 60px); aspect-ratio: 0.68; background: #fff; border: 1px solid rgba(44,37,32,0.3); border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; padding: 4px 5px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.18); user-select: none; transition: transform .12s; font-weight: 800; }
+    .ba-card:hover { transform: translateY(-3px); }
+    .ba-card.sel { transform: translateY(-14px); box-shadow: 0 6px 14px rgba(196,116,90,0.4); border-color: var(--terracotta); }
+    .ba-card.red { color: #d8453b; } .ba-card.black { color: #2C2520; }
+    .ba-card.debuff { opacity: 0.45; filter: grayscale(0.6); }
+    .ba-card .rk { font-size: clamp(0.9rem, 3.6vw, 1.15rem); line-height: 1; }
+    .ba-card .su { font-size: clamp(1.1rem, 4.4vw, 1.5rem); text-align: right; line-height: 1; }
+
+    .ba-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .ba-btn { border: none; border-radius: 30px; padding: 0.62rem 1.3rem; font-weight: 800; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.92rem; box-shadow: var(--shadow); }
+    .ba-btn.play { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .ba-btn.disc { background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); }
+    .ba-btn.ghost { background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); }
+    .ba-btn:disabled { opacity: 0.4; cursor: default; }
+    .ba-sort { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+    .ba-sort button { background: transparent; border: 1px solid var(--gold-light); border-radius: 20px; padding: 3px 12px; font-size: 0.76rem; cursor: pointer; color: var(--ink); font-weight: 700; }
+
+    /* Écran blind / boutique / fin */
+    .ba-panel { text-align: center; padding: 16px 6px; }
+    .ba-panel h2 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; margin-bottom: 4px; }
+    .ba-blinds { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 16px 0; }
+    .ba-blind { background: var(--white); border: 2px solid var(--gold-light); border-radius: 16px; padding: 14px 12px; width: 150px; box-shadow: var(--shadow); }
+    .ba-blind.cur { border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(196,116,90,0.2), var(--shadow); }
+    .ba-blind.done { opacity: 0.5; }
+    .ba-blind .bt { font-weight: 800; font-size: 1rem; } .ba-blind .bg { font-size: 0.72rem; color: var(--ink-light); min-height: 26px; margin: 4px 0; }
+    .ba-blind .bq { font-weight: 800; color: #7c5cdb; font-variant-numeric: tabular-nums; } .ba-blind .br { font-size: 0.72rem; color: var(--sage); }
+    .ba-shop-grid { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 14px 0; }
+    .ba-shop-item { background: var(--white); border: 1.5px solid var(--gold); border-radius: 14px; padding: 12px 10px; width: 150px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+    .ba-shop-item.planet { border-color: #4aa3e0; }
+    .ba-shop-item .si-name { font-weight: 800; color: var(--terracotta); font-size: 0.86rem; }
+    .ba-shop-item.planet .si-name { color: #3b6fd8; }
+    .ba-shop-item .si-desc { font-size: 0.72rem; color: var(--ink-light); flex: 1; }
+    .ba-shop-item .si-buy { border: none; border-radius: 20px; padding: 5px; font-weight: 800; cursor: pointer; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .ba-shop-item .si-buy:disabled { opacity: 0.4; cursor: default; }
+    .ba-money { font-weight: 800; color: #c99a2e; }
+
+    .ba-hands-table { width: 100%; max-width: 420px; margin: 10px auto; border-collapse: collapse; font-size: 0.82rem; }
+    .ba-hands-table td { padding: 4px 8px; border-bottom: 1px solid var(--gold-light); }
+    .ba-hands-table td:last-child { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .ba-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #2c2540; color: #fff; padding: 10px 18px; border-radius: 30px; font-weight: 700; z-index: 2000; opacity: 0; transition: opacity .2s; pointer-events: none; }
+    .ba-toast.show { opacity: 1; }
+    .ba-link { background: none; border: none; color: var(--ink-light); text-decoration: underline; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; margin-top: 10px; }
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 24px; box-shadow: var(--shadow-hover); max-width: 420px; width: 100%; max-height: 82vh; overflow: auto; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; text-align: center; }
+  </style>
+</head>
+<body>
+  <script src="/nav.js"></script>
+  <div class="ba-wrap">
+    <!-- Écran de jeu -->
+    <div id="ba-game" style="display:none">
+      <div class="ba-top">
+        <div class="ba-stat"><div class="lab">Ante</div><div class="val"><span id="ba-ante">1</span>/8</div></div>
+        <div class="ba-stat"><div class="lab">Blind</div><div class="val ba-blindname" id="ba-blind">—</div></div>
+        <div class="ba-score-wrap">
+          <div><div class="tgt">Objectif <span id="ba-target">300</span></div><div class="big" id="ba-round">0</div>
+            <div class="ba-progress"><div id="ba-bar" style="width:0%"></div></div></div>
+          <div style="text-align:right"><div class="tgt">Mains 🖐 <b id="ba-hands">4</b></div><div class="tgt">Défausses ♻ <b id="ba-disc">3</b></div><div class="tgt ba-money">$<span id="ba-money">4</span></div></div>
+        </div>
+      </div>
+
+      <div class="ba-jokers" id="ba-jokers"></div>
+      <div class="ba-handinfo" id="ba-handinfo"></div>
+
+      <div class="ba-sort">
+        <button onclick="sortHand('rank')">Trier par rang</button>
+        <button onclick="sortHand('suit')">Trier par couleur</button>
+        <button onclick="openModal('ba-modal-hands')">📖 Mains</button>
+      </div>
+      <div class="ba-hand" id="ba-hand"></div>
+      <div class="ba-actions">
+        <button class="ba-btn play" id="ba-play" onclick="playHand()">Jouer la main</button>
+        <button class="ba-btn disc" id="ba-discard" onclick="discardCards()">Défausser</button>
+      </div>
+    </div>
+
+    <!-- Écran blind -->
+    <div id="ba-blindscreen" class="ba-panel" style="display:none">
+      <h2>Ante <span id="bs-ante">1</span> / 8</h2>
+      <p style="color:var(--ink-light)">Choisis le blind à affronter</p>
+      <div class="ba-blinds" id="bs-blinds"></div>
+      <button class="ba-btn play" onclick="startBlind()">Jouer ce blind ▶</button>
+    </div>
+
+    <!-- Boutique -->
+    <div id="ba-shop" class="ba-panel" style="display:none">
+      <h2>🛒 Boutique</h2>
+      <p class="ba-money">Argent : $<span id="sh-money">0</span></p>
+      <div class="ba-shop-grid" id="sh-grid"></div>
+      <button class="ba-btn ghost" id="sh-reroll" onclick="reroll()">🎲 Relancer ($<span id="sh-reroll-cost">5</span>)</button>
+      <br><button class="ba-btn play" style="margin-top:12px" onclick="leaveShop()">Continuer ▶</button>
+    </div>
+
+    <!-- Fin -->
+    <div id="ba-end" class="ba-panel" style="display:none">
+      <div style="font-size:3.4rem" id="end-emoji">🃏</div>
+      <h2 id="end-title">—</h2>
+      <p id="end-sub" style="color:var(--ink-light);margin:6px 0 4px"></p>
+      <p id="end-stats" style="color:var(--ink-light);font-size:0.86rem"></p>
+      <button class="ba-btn play" style="margin-top:16px" onclick="newGame()">Nouvelle partie</button>
+      <br><a class="ba-link" href="/index.html">← Retour à l'accueil</a>
+    </div>
+
+    <!-- Accueil -->
+    <div id="ba-home" class="ba-panel">
+      <div style="font-size:3.4rem">🃏</div>
+      <h2>Balatro</h2>
+      <p style="color:var(--ink-light);max-width:460px;margin:8px auto 0;font-size:0.9rem">
+        Un <b>roguelike de poker</b>. Joue des mains de poker pour atteindre l'objectif de chaque blind.
+        Chaque main vaut <span class="ba-chips">Jetons</span> × <span class="ba-mult">Mult</span>.
+        Entre les manches, achète des <b>Jokers</b> qui transforment ton score, et des <b>planètes</b>
+        qui améliorent tes mains. Survis jusqu'à l'<b>Ante 8</b> !</p>
+      <div style="margin-top:18px"><button class="ba-btn play" onclick="newGame()">Commencer</button></div>
+      <button class="ba-link" id="ba-resume" style="display:none" onclick="resumeGame()">↩ Reprendre la partie en cours</button>
+    </div>
+  </div>
+
+  <div class="ba-toast" id="ba-toast"></div>
+  <div class="modal" id="ba-modal-hands">
+    <div class="modal-card">
+      <div class="modal-title">📖 Mains de poker</div>
+      <table class="ba-hands-table" id="ba-hands-table"></table>
+      <div style="text-align:center;margin-top:12px"><button class="ba-btn ghost" onclick="closeModal('ba-modal-hands')">Fermer</button></div>
+    </div>
+  </div>
+  <div class="modal" id="ba-modal-joker">
+    <div class="modal-card"><div class="modal-title" id="jk-title">Joker</div><p id="jk-desc" style="text-align:center;color:var(--ink-light)"></p>
+      <div style="text-align:center;margin-top:14px" id="jk-actions"></div></div>
+  </div>
+
+  <script>
+    function $(id) { return document.getElementById(id); }
+    function openModal(id) { $(id).classList.add('active'); }
+    function closeModal(id) { $(id).classList.remove('active'); }
+    function toast(m) { var t = $('ba-toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('show'); }, 1600); }
+
+    /* ━━ Moteur de score (validé en headless) ━━ */
+    var HANDS = {
+      HIGH:  { name: 'Carte haute',  chips: 5,   mult: 1, lc: 10, lm: 1 },
+      PAIR:  { name: 'Paire',        chips: 10,  mult: 2, lc: 15, lm: 1 },
+      TWO:   { name: 'Double paire', chips: 20,  mult: 2, lc: 20, lm: 1 },
+      THREE: { name: 'Brelan',       chips: 30,  mult: 3, lc: 20, lm: 2 },
+      STR:   { name: 'Suite',        chips: 30,  mult: 4, lc: 30, lm: 3 },
+      FLUSH: { name: 'Couleur',      chips: 35,  mult: 4, lc: 15, lm: 2 },
+      FULL:  { name: 'Full',         chips: 40,  mult: 4, lc: 25, lm: 2 },
+      FOUR:  { name: 'Carré',        chips: 60,  mult: 7, lc: 30, lm: 3 },
+      SF:    { name: 'Quinte flush', chips: 100, mult: 8, lc: 40, lm: 4 }
+    };
+    var HAND_ORDER = ['SF', 'FOUR', 'FULL', 'FLUSH', 'STR', 'THREE', 'TWO', 'PAIR', 'HIGH'];
+    var HAS_PAIR = ['PAIR', 'TWO', 'THREE', 'FULL', 'FOUR', 'SF'], HAS_THREE = ['THREE', 'FULL', 'FOUR'];
+    function chipOf(r) { return r >= 14 ? 11 : r >= 11 ? 10 : r; }
+    function rankName(r) { return r === 14 ? 'A' : r === 13 ? 'K' : r === 12 ? 'Q' : r === 11 ? 'J' : '' + r; }
+    function isRed(s) { return s === '♥' || s === '♦'; }
+
+    function evaluate(cards) {
+      var n = cards.length, byRank = {};
+      cards.forEach(function (c) { (byRank[c.r] = byRank[c.r] || []).push(c); });
+      var counts = Object.keys(byRank).map(function (r) { return { r: +r, cs: byRank[r] }; }).sort(function (a, b) { return b.cs.length - a.cs.length || b.r - a.r; });
+      var isFlush = n === 5 && cards.every(function (c) { return c.s === cards[0].s; });
+      var isStraight = false;
+      if (n === 5) {
+        var rs = cards.map(function (c) { return c.r; }).sort(function (a, b) { return a - b; });
+        var uniq = rs.filter(function (v, i) { return rs.indexOf(v) === i; });
+        if (uniq.length === 5) {
+          if (rs[4] - rs[0] === 4) isStraight = true;
+          else if (rs[0] === 2 && rs[1] === 3 && rs[2] === 4 && rs[3] === 5 && rs[4] === 14) isStraight = true;
+        }
+      }
+      if (isStraight && isFlush) return { key: 'SF', scoring: cards.slice() };
+      if (counts[0].cs.length === 4) return { key: 'FOUR', scoring: counts[0].cs.slice() };
+      if (counts[0].cs.length === 3 && counts[1] && counts[1].cs.length >= 2) return { key: 'FULL', scoring: cards.slice() };
+      if (isFlush) return { key: 'FLUSH', scoring: cards.slice() };
+      if (isStraight) return { key: 'STR', scoring: cards.slice() };
+      if (counts[0].cs.length === 3) return { key: 'THREE', scoring: counts[0].cs.slice() };
+      if (counts[0].cs.length === 2 && counts[1] && counts[1].cs.length === 2) return { key: 'TWO', scoring: counts[0].cs.concat(counts[1].cs) };
+      if (counts[0].cs.length === 2) return { key: 'PAIR', scoring: counts[0].cs.slice() };
+      var hi = cards.slice().sort(function (a, b) { return b.r - a.r; })[0];
+      return { key: 'HIGH', scoring: [hi] };
+    }
+    function handBase(key) { var h = HANDS[key], lvl = (G.levels[key] || 1); return { chips: h.chips + (lvl - 1) * h.lc, mult: h.mult + (lvl - 1) * h.lm, lvl: lvl }; }
+    // Score complet d'une main jouée (jetons de base + cartes + jokers), boss inclus.
+    function scoreHand(cards) {
+      var ev = evaluate(cards), hb = handBase(ev.key);
+      var res = { key: ev.key, name: HANDS[ev.key].name, scoring: ev.scoring, chips: hb.chips, mult: hb.mult };
+      ev.scoring.forEach(function (c) { if (!(G.boss === 'club' && c.s === '♣')) res.chips += chipOf(c.r); });
+      var ctx = { played: cards.length, money: G.money, discardsLeft: G.discardsLeft, jokers: G.jokers.length, deck: G.deck.length };
+      G.jokers.forEach(function (id) { (JOKERS[id].apply || function () {})(res, ctx); });
+      res.score = Math.floor(res.chips * res.mult);
+      return res;
+    }
+
+    /* ━━ Jokers ━━ */
+    function each(res, fn) { res.scoring.forEach(fn); }
+    var JOKERS = {
+      joker:     { name: 'Joker',        cost: 2, desc: '+4 Mult', apply: function (r) { r.mult += 4; } },
+      greedy:    { name: 'Avide',        cost: 5, desc: '+3 Mult par ♦ comptée', apply: function (r) { each(r, function (c) { if (c.s === '♦') r.mult += 3; }); } },
+      lusty:     { name: 'Lascif',       cost: 5, desc: '+3 Mult par ♥ comptée', apply: function (r) { each(r, function (c) { if (c.s === '♥') r.mult += 3; }); } },
+      wrathful:  { name: 'Vengeur',      cost: 5, desc: '+3 Mult par ♠ comptée', apply: function (r) { each(r, function (c) { if (c.s === '♠') r.mult += 3; }); } },
+      gluttony:  { name: 'Glouton',      cost: 5, desc: '+3 Mult par ♣ comptée', apply: function (r) { each(r, function (c) { if (c.s === '♣') r.mult += 3; }); } },
+      jolly:     { name: 'Jovial',       cost: 3, desc: '+8 Mult si Paire', apply: function (r) { if (HAS_PAIR.indexOf(r.key) >= 0) r.mult += 8; } },
+      zany:      { name: 'Loufoque',     cost: 4, desc: '+12 Mult si Brelan', apply: function (r) { if (HAS_THREE.indexOf(r.key) >= 0) r.mult += 12; } },
+      mad:       { name: 'Fou',          cost: 4, desc: '+10 Mult si Double paire', apply: function (r) { if (r.key === 'TWO' || r.key === 'FULL') r.mult += 10; } },
+      crazy:     { name: 'Cinglé',       cost: 4, desc: '+12 Mult si Suite', apply: function (r) { if (r.key === 'STR' || r.key === 'SF') r.mult += 12; } },
+      droll:     { name: 'Drôle',        cost: 4, desc: '+10 Mult si Couleur', apply: function (r) { if (r.key === 'FLUSH' || r.key === 'SF') r.mult += 10; } },
+      sly:       { name: 'Malin',        cost: 3, desc: '+50 Jetons si Paire', apply: function (r) { if (HAS_PAIR.indexOf(r.key) >= 0) r.chips += 50; } },
+      wily:      { name: 'Rusé',         cost: 4, desc: '+100 Jetons si Brelan', apply: function (r) { if (HAS_THREE.indexOf(r.key) >= 0) r.chips += 100; } },
+      clever:    { name: 'Astucieux',    cost: 4, desc: '+80 Jetons si Double paire', apply: function (r) { if (r.key === 'TWO' || r.key === 'FULL') r.chips += 80; } },
+      half:      { name: 'Demi-Joker',   cost: 4, desc: '+20 Mult si main ≤ 3 cartes', apply: function (r, c) { if (c.played <= 3) r.mult += 20; } },
+      even:      { name: 'Pair Parfait', cost: 4, desc: '+4 Mult par carte paire comptée', apply: function (r) { each(r, function (c) { if (c.r <= 10 && c.r % 2 === 0) r.mult += 4; }); } },
+      odd:       { name: 'Impair Malin', cost: 4, desc: '+31 Jetons par carte impaire comptée', apply: function (r) { each(r, function (c) { if (c.r === 14 || (c.r <= 10 && c.r % 2 === 1)) r.chips += 31; }); } },
+      scholar:   { name: 'Érudit',       cost: 4, desc: 'Chaque As compté : +20 Jetons, +4 Mult', apply: function (r) { each(r, function (c) { if (c.r === 14) { r.chips += 20; r.mult += 4; } }); } },
+      fibonacci: { name: 'Fibonacci',    cost: 8, desc: 'A,2,3,5,8 comptés : +8 Mult chacun', apply: function (r) { each(r, function (c) { if ([14, 2, 3, 5, 8].indexOf(c.r) >= 0) r.mult += 8; }); } },
+      abstract:  { name: 'Abstrait',     cost: 4, desc: '+3 Mult par Joker possédé', apply: function (r, c) { r.mult += 3 * c.jokers; } },
+      banner:    { name: 'Bannière',     cost: 5, desc: '+30 Jetons par défausse restante', apply: function (r, c) { r.chips += 30 * c.discardsLeft; } },
+      mystic:    { name: 'Sommet',       cost: 5, desc: '+15 Mult si 0 défausse restante', apply: function (r, c) { if (c.discardsLeft === 0) r.mult += 15; } },
+      bull:      { name: 'Taureau',      cost: 6, desc: '+2 Jetons par $ possédé', apply: function (r, c) { r.chips += 2 * Math.max(0, c.money); } },
+      bluejoker: { name: 'Joker Bleu',   cost: 5, desc: '+2 Jetons par carte dans la pioche', apply: function (r, c) { r.chips += 2 * c.deck; } },
+      duo:       { name: 'Le Duo',       cost: 8, desc: '×2 Mult si Paire', apply: function (r) { if (HAS_PAIR.indexOf(r.key) >= 0) r.mult *= 2; } },
+      trio:      { name: 'Le Trio',      cost: 9, desc: '×3 Mult si Brelan', apply: function (r) { if (HAS_THREE.indexOf(r.key) >= 0) r.mult *= 3; } },
+      family:    { name: 'La Famille',   cost: 9, desc: '×4 Mult si Carré', apply: function (r) { if (r.key === 'FOUR') r.mult *= 4; } }
+    };
+    var JOKER_POOL = Object.keys(JOKERS);
+
+    /* ━━ Planètes (améliorent le niveau d'une main) ━━ */
+    var PLANETS = { HIGH: 'Pluton', PAIR: 'Mercure', TWO: 'Uranus', THREE: 'Vénus', STR: 'Saturne', FLUSH: 'Jupiter', FULL: 'La Terre', FOUR: 'Mars', SF: 'Neptune' };
+
+    /* ━━ Blinds / bosses ━━ */
+    var BLIND_BASE = [300, 800, 2000, 5000, 11000, 20000, 35000, 50000];
+    var BLIND_MULT = [1, 1.5, 2], BLIND_NAME = ['Petit blind', 'Grand blind', 'Blind Boss'], BLIND_REWARD = [3, 4, 5];
+    var BOSSES = {
+      wall:    { name: 'Le Mur',      desc: 'Objectif encore plus grand' },
+      needle:  { name: 'L\'Aiguille', desc: 'Une seule main !' },
+      water:   { name: 'L\'Eau',      desc: 'Aucune défausse' },
+      manacle: { name: 'La Menotte',  desc: 'Main réduite à 7 cartes' },
+      club:    { name: 'Le Trèfle',   desc: 'Les ♣ ne comptent aucun jeton' },
+      hook:    { name: 'Le Crochet',  desc: 'Défausse 2 cartes après chaque main' }
+    };
+    var BOSS_KEYS = Object.keys(BOSSES);
+
+    /* ━━ État de la partie ━━ */
+    var G = null, SAVE = 'balatro.run.v1';
+    function rnd(n) { return Math.floor(Math.random() * n); }
+    function fullDeck() { var d = [], su = ['♠', '♥', '♦', '♣'], id = 0; for (var s = 0; s < 4; s++) for (var r = 2; r <= 14; r++) d.push({ r: r, s: su[s], id: id++ }); return d; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    function save() { try { localStorage.setItem(SAVE, JSON.stringify(G)); } catch (e) {} }
+    function clearSave() { try { localStorage.removeItem(SAVE); } catch (e) {} }
+
+    function newGame() {
+      G = { levels: {}, jokers: [], money: 4, ante: 1, blindIdx: 0, phase: 'blind',
+        deck: [], hand: [], sel: [], roundScore: 0, target: 0, handsLeft: 4, discardsLeft: 3, handSize: 8, boss: null,
+        bosses: {}, shop: null, lastHand: null };
+      HAND_ORDER.forEach(function (k) { G.levels[k] = 1; });
+      // pré-tire un boss par ante (déterministe pour l'affichage du blind)
+      for (var a = 1; a <= 8; a++) G.bosses[a] = BOSS_KEYS[rnd(BOSS_KEYS.length)];
+      showBlindScreen(); save();
+    }
+    function resumeGame() { try { G = JSON.parse(localStorage.getItem(SAVE)); } catch (e) { G = null; } if (!G) { newGame(); return; } route(); }
+
+    function blindTarget(ante, idx) { var t = Math.round(BLIND_BASE[ante - 1] * BLIND_MULT[idx]); if (idx === 2 && G.bosses[ante] === 'wall') t = Math.round(t * 1.5); return t; }
+
+    function showBlindScreen() { G.phase = 'blind'; route(); }
+    function startBlind() {
+      G.phase = 'play'; G.roundScore = 0; G.boss = (G.blindIdx === 2) ? G.bosses[G.ante] : null;
+      G.handSize = 8; G.handsLeft = 4; G.discardsLeft = 3;
+      if (G.boss === 'needle') G.handsLeft = 1;
+      if (G.boss === 'water') G.discardsLeft = 0;
+      if (G.boss === 'manacle') G.handSize = 7;
+      G.target = blindTarget(G.ante, G.blindIdx);
+      G.deck = shuffle(fullDeck()); G.hand = []; G.sel = [];
+      draw(); route(); save();
+    }
+    function draw() { while (G.hand.length < G.handSize && G.deck.length) G.hand.push(G.deck.pop()); }
+
+    function toggleSel(id) {
+      var i = G.sel.indexOf(id);
+      if (i >= 0) G.sel.splice(i, 1);
+      else { if (G.sel.length >= 5) { toast('5 cartes maximum'); return; } G.sel.push(id); }
+      route();
+    }
+    function selCards() { return G.sel.map(function (id) { return G.hand.filter(function (c) { return c.id === id; })[0]; }).filter(Boolean); }
+
+    function playHand() {
+      var cards = selCards(); if (!cards.length) { toast('Choisis des cartes'); return; }
+      var res = scoreHand(cards);
+      G.roundScore += res.score; G.lastHand = res.name + '  ' + res.chips + ' × ' + res.mult + ' = ' + res.score;
+      G.handsLeft--;
+      // retire les cartes jouées de la main
+      G.hand = G.hand.filter(function (c) { return G.sel.indexOf(c.id) < 0; }); G.sel = [];
+      if (G.boss === 'hook') { for (var k = 0; k < 2 && G.hand.length; k++) G.hand.splice(rnd(G.hand.length), 1); }
+      draw();
+      if (G.roundScore >= G.target) return beatBlind();
+      if (G.handsLeft <= 0) return gameOver();
+      route(); save();
+    }
+    function discardCards() {
+      if (G.discardsLeft <= 0) { toast('Plus de défausse'); return; }
+      var cards = selCards(); if (!cards.length) { toast('Choisis des cartes à défausser'); return; }
+      G.discardsLeft--; G.hand = G.hand.filter(function (c) { return G.sel.indexOf(c.id) < 0; }); G.sel = [];
+      draw(); route(); save();
+    }
+    function sortHand(mode) {
+      G.hand.sort(mode === 'suit' ? function (a, b) { return a.s.localeCompare(b.s) || b.r - a.r; } : function (a, b) { return b.r - a.r || a.s.localeCompare(b.s); });
+      route();
+    }
+
+    function beatBlind() {
+      var reward = BLIND_REWARD[G.blindIdx] + Math.max(0, G.handsLeft) + Math.min(5, Math.floor(G.money / 5));
+      G.money += reward; G.lastReward = reward;
+      G.phase = 'shop'; buildShop(); route(); save();
+    }
+    function gameOver() { G.phase = 'lost'; clearSave(); route(); }
+
+    function buildShop() {
+      var pool = JOKER_POOL.filter(function (id) { return G.jokers.indexOf(id) < 0; });
+      shuffle(pool);
+      var js = pool.slice(0, 2);
+      var planetKeys = shuffle(HAND_ORDER.slice()).slice(0, 2);
+      G.shop = { jokers: js, planets: planetKeys, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
+    }
+    function reroll() {
+      if (G.money < G.shop.rerollCost) { toast('Pas assez d\'argent'); return; }
+      G.money -= G.shop.rerollCost; var rc = G.shop.rerollCost + 1; buildShop(); G.shop.rerollCost = rc; route(); save();
+    }
+    function buyJoker(id) {
+      var cost = JOKERS[id].cost;
+      if (G.jokers.length >= 5) { toast('5 Jokers maximum (vends-en un)'); return; }
+      if (G.money < cost) { toast('Pas assez d\'argent'); return; }
+      G.money -= cost; G.jokers.push(id); G.shop.bought['j_' + id] = true; route(); save();
+    }
+    function buyPlanet(key) {
+      if (G.money < 3) { toast('Pas assez d\'argent'); return; }
+      G.money -= 3; G.levels[key] = (G.levels[key] || 1) + 1; G.shop.bought['p_' + key] = true; toast(PLANETS[key] + ' : ' + HANDS[key].name + ' niv. ' + G.levels[key]); route(); save();
+    }
+    function sellJoker(id) {
+      var i = G.jokers.indexOf(id); if (i < 0) return;
+      G.jokers.splice(i, 1); G.money += Math.max(1, Math.floor(JOKERS[id].cost / 2)); closeModal('ba-modal-joker'); route(); save();
+    }
+    function leaveShop() {
+      G.blindIdx++;
+      if (G.blindIdx > 2) { G.blindIdx = 0; G.ante++; }
+      if (G.ante > 8) { G.phase = 'won'; clearSave(); route(); return; }
+      showBlindScreen(); save();
+    }
+
+    /* ━━ Rendu ━━ */
+    function route() {
+      ['ba-home', 'ba-game', 'ba-blindscreen', 'ba-shop', 'ba-end'].forEach(function (id) { $(id).style.display = 'none'; });
+      if (!G) { $('ba-home').style.display = 'block'; return; }
+      if (G.phase === 'blind') { renderBlindScreen(); $('ba-blindscreen').style.display = 'block'; }
+      else if (G.phase === 'play') { renderGame(); $('ba-game').style.display = 'block'; }
+      else if (G.phase === 'shop') { renderShop(); $('ba-shop').style.display = 'block'; }
+      else { renderEnd(); $('ba-end').style.display = 'block'; }
+    }
+    function jokerChip(id, sellable) { var j = JOKERS[id]; return '<div class="ba-joker' + (sellable ? ' sellable' : '') + '" onclick="showJoker(\'' + id + '\',' + !!sellable + ')"><span class="jn">' + j.name + '</span>' + j.desc + '</div>'; }
+    function cardHTML(c) { var sel = G.sel.indexOf(c.id) >= 0, deb = G.boss === 'club' && c.s === '♣'; return '<div class="ba-card ' + (isRed(c.s) ? 'red' : 'black') + (sel ? ' sel' : '') + (deb ? ' debuff' : '') + '" onclick="toggleSel(' + c.id + ')"><div class="rk">' + rankName(c.r) + '</div><div class="su">' + c.s + '</div></div>'; }
+
+    function renderGame() {
+      $('ba-ante').textContent = G.ante; $('ba-blind').textContent = BLIND_NAME[G.blindIdx] + (G.boss ? ' · ' + BOSSES[G.boss].name : '');
+      $('ba-target').textContent = G.target.toLocaleString('fr'); $('ba-round').textContent = G.roundScore.toLocaleString('fr');
+      $('ba-hands').textContent = G.handsLeft; $('ba-disc').textContent = G.discardsLeft; $('ba-money').textContent = G.money;
+      $('ba-bar').style.width = Math.min(100, 100 * G.roundScore / G.target) + '%';
+      $('ba-jokers').innerHTML = (G.jokers.length ? G.jokers.map(function (id) { return jokerChip(id, false); }).join('') : '<span class="ba-slots">Pas encore de Joker</span>') + '<span class="ba-slots">' + G.jokers.length + '/5</span>';
+      // info main sélectionnée
+      var cards = selCards(), info = '';
+      if (cards.length) { var ev = evaluate(cards), hb = handBase(ev.key); info = '<div class="ht">' + HANDS[ev.key].name + ' <span style="font-size:0.7rem;color:var(--ink-light)">niv.' + hb.lvl + '</span></div><div><span class="hs ba-chips">' + hb.chips + '</span> × <span class="hs ba-mult">' + hb.mult + '</span></div>'; }
+      else if (G.lastHand) info = '<div style="color:var(--ink-light);font-size:0.86rem">Dernière : ' + G.lastHand + '</div>';
+      $('ba-handinfo').innerHTML = info;
+      $('ba-hand').innerHTML = G.hand.map(cardHTML).join('');
+      $('ba-play').disabled = !cards.length; $('ba-discard').disabled = !cards.length || G.discardsLeft <= 0;
+    }
+    function renderBlindScreen() {
+      $('bs-ante').textContent = G.ante;
+      var html = '';
+      for (var i = 0; i < 3; i++) {
+        var boss = i === 2 ? BOSSES[G.bosses[G.ante]] : null;
+        var cls = 'ba-blind' + (i === G.blindIdx ? ' cur' : (i < G.blindIdx ? ' done' : ''));
+        html += '<div class="' + cls + '"><div class="bt">' + BLIND_NAME[i] + '</div><div class="bg">' + (boss ? '☠ ' + boss.name + ' — ' + boss.desc : (i < G.blindIdx ? 'vaincu' : '—')) + '</div>' +
+          '<div class="bq">' + blindTarget(G.ante, i).toLocaleString('fr') + '</div><div class="br">récompense $' + BLIND_REWARD[i] + '</div></div>';
+      }
+      $('bs-blinds').innerHTML = html;
+    }
+    function renderShop() {
+      $('sh-money').textContent = G.money; $('sh-reroll-cost').textContent = G.shop.rerollCost;
+      var html = '';
+      G.shop.jokers.forEach(function (id) {
+        var owned = G.jokers.indexOf(id) >= 0, bought = G.shop.bought['j_' + id], j = JOKERS[id];
+        html += '<div class="ba-shop-item"><div class="si-name">🃏 ' + j.name + '</div><div class="si-desc">' + j.desc + '</div>' +
+          '<button class="si-buy" ' + (bought || owned ? 'disabled' : '') + ' onclick="buyJoker(\'' + id + '\')">' + (bought ? 'Acheté ✓' : '$' + j.cost) + '</button></div>';
+      });
+      G.shop.planets.forEach(function (key) {
+        var bought = G.shop.bought['p_' + key];
+        html += '<div class="ba-shop-item planet"><div class="si-name">🪐 ' + PLANETS[key] + '</div><div class="si-desc">' + HANDS[key].name + ' niveau +1 (actuel ' + (G.levels[key] || 1) + ')</div>' +
+          '<button class="si-buy" ' + (bought ? 'disabled' : '') + ' onclick="buyPlanet(\'' + key + '\')">' + (bought ? 'Acheté ✓' : '$3') + '</button></div>';
+      });
+      $('sh-grid').innerHTML = html;
+      $('sh-reroll').disabled = G.money < G.shop.rerollCost;
+      // jokers possédés (revendables) sous la boutique
+      var owned = G.jokers.length ? '<div style="margin-top:12px"><div class="ba-slots">Tes Jokers (clique pour vendre) :</div><div class="ba-jokers" style="justify-content:center">' + G.jokers.map(function (id) { return jokerChip(id, true); }).join('') + '</div></div>' : '';
+      var ex = $('sh-owned'); if (!ex) { ex = document.createElement('div'); ex.id = 'sh-owned'; $('sh-grid').parentNode.insertBefore(ex, $('sh-reroll')); } ex.innerHTML = owned;
+    }
+    function renderEnd() {
+      var won = G.phase === 'won';
+      $('end-emoji').textContent = won ? '🏆' : '💀';
+      $('end-title').textContent = won ? 'Victoire ! Ante 8 vaincu 🏆' : 'Défaite';
+      $('end-sub').textContent = won ? 'Tu as survécu à toute la run, chapeau !' : 'Blind non atteint à l\'Ante ' + G.ante + '.';
+      $('end-stats').textContent = 'Jokers : ' + (G.jokers.length ? G.jokers.map(function (id) { return JOKERS[id].name; }).join(', ') : 'aucun') + ' · Argent : $' + G.money;
+    }
+    function showJoker(id, sellable) {
+      var j = JOKERS[id]; $('jk-title').textContent = '🃏 ' + j.name; $('jk-desc').textContent = j.desc;
+      $('jk-actions').innerHTML = sellable ? '<button class="ba-btn disc" onclick="sellJoker(\'' + id + '\')">Vendre (+$' + Math.max(1, Math.floor(j.cost / 2)) + ')</button>' : '<button class="ba-btn ghost" onclick="closeModal(\'ba-modal-joker\')">Fermer</button>';
+      openModal('ba-modal-joker');
+    }
+
+    // Table des mains (modal)
+    $('ba-hands-table').innerHTML = HAND_ORDER.map(function (k) { var h = HANDS[k]; return '<tr><td>' + h.name + '</td><td><span class="ba-chips">' + h.chips + '</span> × <span class="ba-mult">' + h.mult + '</span></td></tr>'; }).join('');
+
+    // Reprise éventuelle
+    (function () {
+      var raw = null; try { raw = localStorage.getItem(SAVE); } catch (e) {}
+      if (raw) { try { var s = JSON.parse(raw); if (s && s.phase && s.phase !== 'won' && s.phase !== 'lost') $('ba-resume').style.display = 'inline-block'; } catch (e) {} }
+      route();
+    })();
+  </script>
+</body>
+</html>
