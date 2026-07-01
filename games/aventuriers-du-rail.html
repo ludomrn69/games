@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Aventuriers du Rail 🚂" data-emoji="🚂"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.5; }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .tr-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .tr-head { background: rgba(20,16,28,0.97); }
+    .tr-round-label { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--gold); white-space: nowrap; }
+    .tr-head-actions { display: flex; gap: 6px; }
+
+    .tr-players { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 8px 10px 2px; }
+    .tr-pl { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 3px 10px 3px 4px; box-shadow: var(--shadow); font-size: 0.76rem; font-weight: 700; border: 2px solid transparent; }
+    .tr-pl.turn { border-color: var(--terracotta); }
+    .tr-pl-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .tr-pl .mini { color: var(--ink-light); font-weight: 600; }
+
+    .tr-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
+    .tr-map-wrap { padding: 4px 8px; }
+    .tr-map { width: 100%; max-width: 640px; margin: 0 auto; display: block; background: linear-gradient(160deg, #f3ead9, #e8dcc4); border-radius: 14px; box-shadow: var(--shadow); }
+    html[data-theme="dark"] .tr-map { background: linear-gradient(160deg, #241d31, #191322); }
+    .tr-city-dot { fill: #2c2520; } html[data-theme="dark"] .tr-city-dot { fill: #e8dcc8; }
+    .tr-city-label { fill: #2c2520; font-family: 'DM Sans', sans-serif; font-weight: 700; } html[data-theme="dark"] .tr-city-label { fill: #e8dcc8; }
+    .tr-route-hit { stroke: transparent; cursor: default; }
+    .tr-route-hit.claimable { cursor: pointer; }
+
+    .tr-market { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 8px 10px 2px; }
+    .tr-cardpile { width: 40px; height: 56px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,0.18); border: 2px solid rgba(0,0,0,0.08); cursor: default; color: #fff; }
+    .tr-cardpile.clk { cursor: pointer; } .tr-cardpile.clk:hover { transform: translateY(-3px); }
+    .tr-cardpile.deck { background: linear-gradient(135deg, #2c2520, #4a3f37); }
+    .tr-cardpile.W { color: #2c2520; } .tr-cardpile.L { background: conic-gradient(from 45deg,#d63636,#e8862e,#f1c40f,#27ae60,#2980b9,#8e44ad,#d63636); }
+
+    .tr-hand { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; padding: 6px 10px; }
+    .tr-hchip { display: inline-flex; align-items: center; gap: 3px; border-radius: 20px; padding: 3px 9px 3px 3px; font-size: 0.82rem; font-weight: 800; color: #fff; }
+    .tr-hchip .sw { width: 16px; height: 16px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.5); }
+
+    .tr-tickets { max-width: 520px; margin: 4px auto; padding: 0 12px; }
+    .tr-tickets-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-light); text-align: center; margin: 6px 0 4px; }
+    .tr-ticket { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--white); border-radius: 12px; padding: 6px 12px; box-shadow: var(--shadow); font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; }
+    .tr-ticket.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .tr-ticket .pts { color: var(--gold); font-weight: 800; }
+
+    .tr-actions { max-width: 520px; margin: 8px auto; padding: 0 12px calc(16px + env(safe-area-inset-bottom)); }
+    .tr-hint { text-align: center; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); margin-bottom: 8px; }
+    .tr-act-row { display: flex; gap: 8px; justify-content: center; }
+    .tr-act { flex: 1; max-width: 220px; border: none; border-radius: 14px; padding: 0.75rem 0.5rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.9rem; cursor: pointer; box-shadow: var(--shadow); background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); }
+    .tr-act.primary { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border: none; }
+    .tr-act:disabled { opacity: 0.45; cursor: default; }
+    .tr-wait { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); padding: 12px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 24px 22px; box-shadow: var(--shadow-hover); text-align: center; max-width: 400px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 14px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+    .tk-opt { display: flex; align-items: center; gap: 8px; background: var(--cream); border-radius: 12px; padding: 8px 12px; margin-bottom: 6px; cursor: pointer; font-weight: 700; font-size: 0.85rem; text-align: left; border: 2px solid transparent; }
+    .tk-opt.sel { border-color: var(--terracotta); background: var(--white); }
+    .pay-opt { border: none; border-radius: 12px; padding: 0.6rem 1rem; font-weight: 800; cursor: pointer; color: #fff; margin: 4px; }
+
+    #s-results { align-items: center; justify-content: flex-start; min-height: calc(100vh - 52px); padding: 30px 20px; text-align: center; }
+    .res-emoji { font-size: 3rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.7rem; margin: 4px 0 10px; }
+    .res-rank { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; margin: 0 auto 20px; }
+    .res-row { background: var(--cream); border-radius: 14px; padding: 10px 14px; text-align: left; }
+    .res-row .top { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+    .res-row .top .av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .res-row .top .tot { margin-left: auto; color: var(--gold); font-size: 1.1rem; }
+    .res-row .brk { font-size: 0.76rem; color: var(--ink-light); margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/aventuriers-engine.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="tr-head">
+        <span class="tr-round-label" id="tr-round-label">🚂</span>
+        <div class="tr-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="tr-players" id="tr-players"></div>
+      <div class="tr-banner" id="tr-banner"></div>
+      <div class="tr-map-wrap" id="tr-map-wrap"></div>
+      <div class="tr-market" id="tr-market"></div>
+      <div class="tr-hand" id="tr-hand"></div>
+      <div class="tr-tickets" id="tr-tickets"></div>
+      <div class="tr-actions" id="tr-actions"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🚂</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-tickets"><div class="modal-card">
+    <div class="modal-title">🎫 Choisis tes billets</div>
+    <div class="modal-sub">Garde-en au moins 1. Non complété en fin de partie = points perdus !</div>
+    <div id="tk-list"></div>
+    <button class="btn-primary" style="margin-top:8px" onclick="confirmTickets()">Garder</button>
+  </div></div>
+  <div class="modal" id="modal-pay"><div class="modal-card">
+    <div class="modal-title">Payer la route avec…</div>
+    <div id="pay-list" style="display:flex;flex-wrap:wrap;justify-content:center"></div>
+    <button class="btn-link mt-4" onclick="closeModal('modal-pay')">Annuler</button>
+  </div></div>
+  <div class="modal" id="modal-restart"><div class="modal-card">
+    <div class="modal-title">Nouvelle partie ?</div>
+    <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+    <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+      <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+  </div></div>
+  <div class="modal" id="modal-rules"><div class="modal-card">
+    <div class="modal-title">🚂 Aventuriers du Rail</div>
+    <div class="modal-body">
+      <p>À ton tour, <b>UNE</b> action : <b>piocher 2 cartes wagon</b> (marché visible ou pioche), <b>réclamer une route</b> (payer sa longueur en cartes de sa couleur, ⚙️ locomotives = jokers), ou <b>piocher des billets</b> de destination.</p>
+      <p style="margin-top:8px">• Routes <b>grises</b> : n'importe quelle couleur (une seule).</p>
+      <p style="margin-top:6px">• Chaque route rapporte des points selon sa longueur (1→1, 3→4, 6→15).</p>
+      <p style="margin-top:6px">• <b>Billets</b> : relie les 2 villes pour gagner leurs points (sinon tu les perds !).</p>
+      <p style="margin-top:6px">• <b>+10</b> au plus long chemin continu. Quand un joueur atteint ≤ 2 wagons, dernier tour pour tout le monde.</p>
+    </div>
+    <div class="modal-btns" style="margin-top:14px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+  </div></div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    var A = window.Aventuriers;
+    var COLOR_HEX = { R: '#d63636', O: '#e8862e', Y: '#f1c40f', G: '#27ae60', B: '#2980b9', P: '#8e44ad', K: '#2c2520', W: '#e6e9ec', X: '#9a8c7a', L: '#7a5cc4' };
+    var COLOR_NAME = { R: 'Rouge', O: 'Orange', Y: 'Jaune', G: 'Vert', B: 'Bleu', P: 'Violet', K: 'Noir', W: 'Blanc', L: 'Loco' };
+    var cityById = {}; A.CITIES.forEach(function (c) { cityById[c.id] = c; });
+
+    var prevStatus = null, pickTickets = null;
+
+    GameRoom({
+      gameKey: 'aventuriers-du-rail', name: 'Aventuriers du Rail', emoji: '🚂', tagline: 'Bâtis ton réseau ferré',
+      minPlayers: 2, maxPlayers: 5,
+      rules: [
+        'À ton tour : piocher 2 cartes, réclamer une route, ou piocher des billets',
+        'Paie une route en cartes de sa couleur (locos = jokers)',
+        'Relie les villes de tes billets · +10 au plus long chemin',
+        'À ≤ 2 wagons : dernier tour, puis on compte'
+      ],
+      offline: { solo: true, local: true },
+      bot: ttrBot,
+      offlineTurn: offlineTurn,
+      offlineEnter: function () { pickTickets = null; if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    function offlineTurn(r) {
+      if (!r || r.status !== 'playing') return null;
+      if (r.phase === 'chooseTickets') { var p = r.pendingTickets && r.pendingTickets.pid; return (p && r.players[p] && r.players[p].isBot) ? p : null; }
+      var t = r.turn; return (r.players[t] && r.players[t].isBot) ? t : null;
+    }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var seed = ((Date.now() >>> 0) ^ Math.floor(Math.random() * 1e9)) >>> 0;
+      var s = A.setup(order, seed);
+      order.forEach(function (p) { var sp = s.players[p]; for (var k in sp) cur.players[p][k] = sp[k]; });
+      return {
+        deck: s.deck, discard: s.discard, market: s.market, ticketDeck: s.ticketDeck, claimed: s.claimed,
+        turn: s.turn, phase: 'play', lastRound: false, endBy: null, pendingTickets: null, winner: null,
+        banner: A.CITIES ? '' : ''
+      };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { pickTickets = null; showScreen('s-playing'); }
+        render(state);
+        // Ma modale de choix de billets s'ouvre quand c'est à MOI de choisir.
+        if (state.phase === 'chooseTickets' && state.pendingTickets && state.pendingTickets.pid === window.myPid) openTicketChoice(state);
+        else closeModal('modal-tickets');
+      } else if (status === 'ended') {
+        closeModal('modal-tickets'); showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Actions (transactions via le moteur) ━━ */
+    function doDraw(marketIndex) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== window.myPid) return cur;
+        A.drawCard(cur, window.myPid, marketIndex);
+        return cur;
+      });
+    }
+    function tryClaim(id) {
+      var st = window.room;
+      if (!st || st.turn !== window.myPid || st.phase !== 'play') { lbToast('Ce n\'est pas ton tour'); return; }
+      if ((st.players[window.myPid].drawn || 0) > 0) { lbToast('Tu es en train de piocher'); return; }
+      if (A.isClaimed(st, id)) { lbToast('Route déjà prise'); return; }
+      var opts = A.paymentOptions(st, window.myPid, id);
+      if (!opts.length) { lbToast('Pas assez de cartes pour cette route'); return; }
+      if (opts.length === 1) { doClaim(id, opts[0]); return; }
+      openPayChoice(id, opts);
+    }
+    function doClaim(id, payment) {
+      closeModal('modal-pay');
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== window.myPid) return cur;
+        if ((cur.players[window.myPid].drawn || 0) > 0) return cur;
+        A.claim(cur, window.myPid, id, payment);
+        return cur;
+      });
+    }
+    function doDrawTickets() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== window.myPid) return cur;
+        if ((cur.players[window.myPid].drawn || 0) > 0) return cur;
+        A.drawTickets(cur, window.myPid);
+        return cur;
+      });
+    }
+    function confirmTickets() {
+      var keep = pickTickets ? pickTickets.slice() : null;
+      rref().transaction(function (cur) {
+        if (!cur || cur.phase !== 'chooseTickets' || !cur.pendingTickets || cur.pendingTickets.pid !== window.myPid) return cur;
+        A.keepTickets(cur, window.myPid, keep && keep.length ? keep : null);
+        return cur;
+      });
+      pickTickets = null; closeModal('modal-tickets');
+    }
+
+    /* ━━ Bot ━━ */
+    function ttrBot(state, pid) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status === 'ended') return cur;
+        var actor = cur.phase === 'chooseTickets' ? (cur.pendingTickets && cur.pendingTickets.pid) : cur.turn;
+        if (actor !== pid) return cur;
+        A.applyBot(cur, pid);
+        return cur;
+      });
+    }
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var order = state.order || [], me = window.myPid, P = state.players[me] || {};
+      var lastTxt = state.lastRound ? ' · DERNIER TOUR' : '';
+      setText('tr-round-label', '🚂 ' + (P.trains != null ? P.trains + ' wagons' : '') + lastTxt);
+
+      setHTML('tr-players', order.map(function (pid) {
+        var pl = state.players[pid] || {};
+        return '<div class="tr-pl' + (state.turn === pid ? ' turn' : '') + '">' +
+          '<span class="tr-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + (pid === me ? '' : '') +
+          ' <span class="mini">🚃' + (pl.trains != null ? pl.trains : '-') + ' · 🃏' + A.handCount(pl.hand || {}) + ' · 🎫' + ((pl.tickets || []).length) + '</span></div>';
+      }).join(''));
+      setText('tr-banner', state.banner || (state.turn === me ? 'À toi de jouer !' : 'Au tour de ' + Room.name(state.turn)));
+
+      renderMap(state);
+      renderMarket(state);
+      renderHand(state);
+      renderTickets(state);
+      renderActions(state);
+    }
+
+    function renderMap(state) {
+      var me = window.myPid, myTurn = state.turn === me && state.phase === 'play' && (state.players[me].drawn || 0) === 0;
+      var svg = '<svg class="tr-map" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">';
+      // routes
+      A.ROUTES.forEach(function (r) {
+        var a = cityById[r.a], b = cityById[r.b];
+        var owner = state.claimed[r.id];
+        var col = owner ? Room.color(owner) : COLOR_HEX[r.color];
+        var w = owner ? 2.6 : 1.9;
+        var dash = (!owner && r.color === 'X') ? ' stroke-dasharray="2 1.4"' : '';
+        var claimable = myTurn && !owner && A.canClaim(state, me, r.id);
+        svg += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="round"' + dash + (owner ? '' : ' opacity="0.85"') + '/>';
+        // longueur au milieu
+        var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        svg += '<circle cx="' + mx + '" cy="' + my + '" r="1.7" fill="#fff" stroke="' + col + '" stroke-width="0.4"/>';
+        svg += '<text x="' + mx + '" y="' + (my + 0.9) + '" font-size="2.2" text-anchor="middle" fill="#2c2520" font-weight="800">' + r.len + '</text>';
+        // zone cliquable
+        svg += '<line class="tr-route-hit' + (claimable ? ' claimable' : '') + '" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke-width="4"' + (claimable ? ' onclick="tryClaim(\'' + r.id + '\')"' : '') + '>' +
+          (claimable ? '<title>Réclamer ' + a.n + ' — ' + b.n + '</title>' : '') + '</line>';
+        if (claimable) svg += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#fff" stroke-width="0.5" stroke-dasharray="0.6 1.2" opacity="0.9" pointer-events="none"/>';
+      });
+      // villes
+      A.CITIES.forEach(function (c) {
+        svg += '<circle class="tr-city-dot" cx="' + c.x + '" cy="' + c.y + '" r="1.5"/>';
+        var anchor = c.x < 15 ? 'start' : c.x > 85 ? 'end' : 'middle';
+        svg += '<text class="tr-city-label" x="' + c.x + '" y="' + (c.y - 2.2) + '" font-size="2.5" text-anchor="' + anchor + '">' + escapeHtml(c.n) + '</text>';
+      });
+      svg += '</svg>';
+      setHTML('tr-map-wrap', svg);
+    }
+
+    function renderMarket(state) {
+      var me = window.myPid, myTurn = state.turn === me && state.phase === 'play';
+      var canDeck = myTurn;
+      var h = (state.market || []).map(function (c, i) {
+        var clk = myTurn; // prendre une loco visible reste permis (termine le tour)
+        return '<div class="tr-cardpile ' + c + (clk ? ' clk' : '') + '" style="background:' + (c === 'L' ? '' : COLOR_HEX[c]) + '"' + (clk ? ' onclick="doDraw(' + i + ')"' : '') + '>' + (c === 'L' ? '⚙️' : '') + '</div>';
+      }).join('');
+      h += '<div class="tr-cardpile deck' + (canDeck ? ' clk' : '') + '"' + (canDeck ? ' onclick="doDraw(-1)"' : '') + '>🂠</div>';
+      setHTML('tr-market', h);
+    }
+
+    function renderHand(state) {
+      var P = state.players[window.myPid] || {}, hand = P.hand || {};
+      var chips = A.COLORS.concat(['L']).filter(function (c) { return (hand[c] || 0) > 0; }).map(function (c) {
+        var bg = c === 'L' ? 'background:linear-gradient(135deg,#d63636,#e8862e,#f1c40f,#27ae60,#2980b9,#8e44ad)' : 'background:' + COLOR_HEX[c] + (c === 'W' ? ';color:#2c2520' : '');
+        return '<span class="tr-hchip" style="' + bg + '"><span class="sw" style="background:' + (c === 'L' ? '#fff' : COLOR_HEX[c]) + '"></span>' + (c === 'L' ? '⚙️' : '') + (hand[c]) + '</span>';
+      }).join('');
+      setHTML('tr-hand', '<span style="font-size:.78rem;color:var(--ink-light);align-self:center;margin-right:2px">Ta main :</span>' + (chips || '<span class="tr-wait" style="padding:2px">vide</span>'));
+    }
+
+    function renderTickets(state) {
+      var P = state.players[window.myPid] || {}, edges = A.edgesOf(state, window.myPid);
+      var tk = (P.tickets || []).map(function (ti) {
+        var t = A.TICKETS[ti], done = A.connected(edges, t.a, t.b);
+        return '<div class="tr-ticket' + (done ? ' done' : '') + '"><span>' + (done ? '✅ ' : '🎫 ') + escapeHtml(cityById[t.a].n) + ' → ' + escapeHtml(cityById[t.b].n) + '</span><span class="pts">' + t.pts + '</span></div>';
+      }).join('');
+      setHTML('tr-tickets', tk ? '<div class="tr-tickets-title">Tes billets (cachés des autres)</div>' + tk : '');
+    }
+
+    function renderActions(state) {
+      var host = document.getElementById('tr-actions'), me = window.myPid, P = state.players[me] || {};
+      if (state.phase === 'chooseTickets') {
+        host.innerHTML = state.pendingTickets && state.pendingTickets.pid === me
+          ? '<div class="tr-wait">Choisis tes billets…</div>'
+          : '<div class="tr-wait">' + escapeHtml(Room.name(state.pendingTickets ? state.pendingTickets.pid : '?')) + ' choisit ses billets…</div>';
+        return;
+      }
+      if (state.turn !== me) { host.innerHTML = '<div class="tr-wait">Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>'; return; }
+      var drawn = P.drawn || 0;
+      if (drawn > 0) {
+        host.innerHTML = '<div class="tr-hint">Pioche encore <b>1 carte</b> (marché ou pioche 🂠).</div>';
+        return;
+      }
+      var canTk = (state.ticketDeck || []).length > 0;
+      host.innerHTML = '<div class="tr-hint">Choisis UNE action : 2 cartes wagon, une route (clique-la), ou des billets.</div>' +
+        '<div class="tr-act-row">' +
+          '<button class="tr-act" onclick="lbToast(\'Clique une carte du marché ou la pioche 🂠\')">🃏 Piocher 2 cartes</button>' +
+          '<button class="tr-act primary" ' + (canTk ? '' : 'disabled') + ' onclick="doDrawTickets()">🎫 Piocher billets</button>' +
+        '</div>';
+    }
+
+    /* ━━ Modales ━━ */
+    function openTicketChoice(state) {
+      pickTickets = pickTickets || [];
+      var offered = state.pendingTickets.offered, edges = A.edgesOf(state, window.myPid);
+      // par défaut on présélectionne le premier
+      if (!pickTickets.length) pickTickets = [offered[0]];
+      setHTML('tk-list', offered.map(function (ti) {
+        var t = A.TICKETS[ti], sel = pickTickets.indexOf(ti) >= 0;
+        return '<div class="tk-opt' + (sel ? ' sel' : '') + '" onclick="toggleTicket(' + ti + ')">' +
+          '<span>' + (sel ? '☑' : '☐') + '</span><span style="flex:1">' + escapeHtml(cityById[t.a].n) + ' → ' + escapeHtml(cityById[t.b].n) + '</span><span class="pts" style="color:var(--gold);font-weight:800">' + t.pts + '</span></div>';
+      }).join(''));
+      openModal('modal-tickets');
+    }
+    function toggleTicket(ti) {
+      if (!pickTickets) pickTickets = [];
+      var i = pickTickets.indexOf(ti);
+      if (i >= 0) { if (pickTickets.length > 1) pickTickets.splice(i, 1); } else pickTickets.push(ti);
+      if (window.room) openTicketChoice(window.room);
+    }
+    function openPayChoice(id, opts) {
+      setHTML('pay-list', opts.map(function (o) {
+        var lbl = o.colorCards + ' × ' + COLOR_NAME[o.color] + (o.loco ? ' + ' + o.loco + ' ⚙️' : '');
+        return '<button class="pay-opt" style="background:' + COLOR_HEX[o.color] + (o.color === 'W' ? ';color:#2c2520' : '') + '" onclick="doClaim(\'' + id + '\',' + JSON.stringify(o).replace(/"/g, '&quot;') + ')">' + lbl + '</button>';
+      }).join(''));
+      openModal('modal-pay');
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice(), sc = state.finalScores || {};
+      order.sort(function (a, b) { return (sc[b] ? sc[b].total : 0) - (sc[a] ? sc[a].total : 0); });
+      var w = state.winner, iWon = w === window.myPid;
+      setText('res-emoji', iWon ? '🏆' : '🚂');
+      setText('res-title', iWon ? 'Tu gagnes ! 🏆' : (w ? Room.name(w) + ' gagne !' : 'Terminé'));
+      var medals = ['🥇', '🥈', '🥉'];
+      setHTML('res-rank', order.map(function (pid, i) {
+        var s = sc[pid] || { routes: 0, tickets: [], longest: 0, total: 0 };
+        var tkOk = s.tickets.filter(function (x) { return x.ok; }).length, tkNo = s.tickets.length - tkOk;
+        var brk = 'routes +' + s.routes + ' · billets ' + (tkOk ? '+' + s.tickets.filter(function (x) { return x.ok; }).reduce(function (a, x) { return a + x.t.pts; }, 0) : '0') +
+          (tkNo ? ' / −' + s.tickets.filter(function (x) { return !x.ok; }).reduce(function (a, x) { return a + x.t.pts; }, 0) : '') +
+          (s.longestBonus ? ' · plus long chemin +10' : '') + ' · plus long : ' + s.longest;
+        return '<div class="res-row"><div class="top"><span>' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span>' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="tot">' + s.total + '</span></div><div class="brk">' + brk + '</div></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { pickTickets = null; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); pickTickets = null; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

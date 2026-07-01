@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Sudoku 🔢" data-emoji="9️⃣"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .su-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .su-head { background: rgba(20,16,28,0.97); }
+    .su-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .su-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+    .su-head-actions { display: flex; gap: 6px; }
+
+    .su-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
+    .su-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
+    .su-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .su-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .su-opp .pc { color: var(--sage); }
+
+    .su-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
+
+    .su-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 6px 10px; }
+    .su-grid { width: min(94vw, 430px); aspect-ratio: 1; display: grid; background: #2C2520; gap: 1px; border: 2.5px solid #2C2520; border-radius: 6px; overflow: hidden; }
+    .su-cell { background: var(--cream); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: clamp(1rem, 6vw, 1.7rem); cursor: pointer; user-select: none; }
+    html[data-theme="dark"] .su-cell { background: #221a2e; color: #e8dcc8; }
+    .su-cell.given { font-weight: 900; color: #2C2520; cursor: default; }
+    html[data-theme="dark"] .su-cell.given { color: #fff; }
+    .su-cell.mine { color: #2a6fd6; }
+    .su-cell.sel { background: rgba(198,152,90,0.4); }
+    .su-cell.peer { background: rgba(198,152,90,0.16); }
+    .su-cell.bad { color: #e05a4e; background: rgba(224,90,78,0.18); }
+    .su-cell.br { border-right: 2.5px solid #2C2520; } .su-cell.bb { border-bottom: 2.5px solid #2C2520; }
+
+    .su-pad { display: grid; gap: 7px; width: min(94vw, 430px); }
+    .su-key { padding: 0.7rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1.2rem; cursor: pointer; color: var(--ink); }
+    .su-key.erase { color: var(--terracotta); }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/puzzle.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="su-head">
+        <span class="su-title-mini">Sudoku</span>
+        <span class="su-timer" id="su-timer">⏱ 0:00</span>
+        <div class="su-head-actions" id="su-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="su-opps" id="su-opps"></div>
+      <div class="su-banner" id="su-banner"></div>
+      <div class="su-stage">
+        <div class="su-grid" id="su-grid"></div>
+        <div class="su-pad" id="su-pad"></div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">9️⃣</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">9️⃣ Sudoku</div>
+      <div class="modal-body">
+        <p>• Remplis la grille : chaque <b>ligne</b>, chaque <b>colonne</b> et chaque <b>bloc</b> contient tous les chiffres une seule fois.</p>
+        <p style="margin-top:6px">• Choisis la <b>taille</b> (6×6 ou 9×9) et la <b>difficulté</b> (nombre d'indices) dans le salon.</p>
+        <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : tout le monde a la <b>même grille</b>, le <b>plus rapide</b> gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+
+    // Taille : 6×6 (blocs 2×3) ou 9×9 (blocs 3×3).
+    function boxDims(N) { return N === 6 ? { bh: 2, bw: 3 } : { bh: 3, bw: 3 }; }
+
+    /* ━━ Générateur / solveur (taille N quelconque) ━━ */
+    function validAt(g, idx, n, N, bh, bw) {
+      var r = (idx / N | 0), c = idx % N, br = (r / bh | 0) * bh, bc = (c / bw | 0) * bw;
+      for (var i = 0; i < N; i++) { if (g[r * N + i] === n) return false; if (g[i * N + c] === n) return false; }
+      for (var a = 0; a < bh; a++) for (var b = 0; b < bw; b++) if (g[(br + a) * N + bc + b] === n) return false;
+      return true;
+    }
+    function solveRnd(g, N, bh, bw, rnd) {
+      var i = g.indexOf(0); if (i < 0) return true;
+      var nums = []; for (var k = 1; k <= N; k++) nums.push(k); Puzzle.shuffle(nums, rnd);
+      for (var j = 0; j < N; j++) { var n = nums[j]; if (validAt(g, i, n, N, bh, bw)) { g[i] = n; if (solveRnd(g, N, bh, bw, rnd)) return true; g[i] = 0; } }
+      return false;
+    }
+    // Compte les solutions (borné à `cap`) → sert à garantir l'UNICITÉ du puzzle.
+    function countSolutions(g, N, bh, bw, cap) {
+      var i = g.indexOf(0); if (i < 0) return 1;
+      var total = 0;
+      for (var n = 1; n <= N; n++) { if (validAt(g, i, n, N, bh, bw)) { g[i] = n; total += countSolutions(g, N, bh, bw, cap); g[i] = 0; if (total >= cap) break; } }
+      return total;
+    }
+    function genPuzzle(level, N, seed) {
+      var d = boxDims(N), bh = d.bh, bw = d.bw, rnd = Puzzle.rng(seed), cells = N * N;
+      var full = []; for (var i = 0; i < cells; i++) full.push(0); solveRnd(full, N, bh, bw, rnd);
+      var keepFrac = level === 'easy' ? 0.58 : level === 'hard' ? 0.34 : 0.45; // part d'indices
+      var target = cells - Math.round(cells * keepFrac);                        // cases à retirer
+      var puzzle = full.slice(), ord = []; for (var j = 0; j < cells; j++) ord.push(j); Puzzle.shuffle(ord, rnd);
+      var removed = 0;
+      for (var k = 0; k < ord.length && removed < target; k++) {
+        var idx = ord[k]; if (!puzzle[idx]) continue; var save = puzzle[idx]; puzzle[idx] = 0;
+        if (countSolutions(puzzle.slice(), N, bh, bw, 2) !== 1) puzzle[idx] = save; else removed++;  // garder l'unicité
+      }
+      return { puzzle: puzzle, solution: full };
+    }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, sel = -1, timerInt = null;
+    GameRoom({
+      gameKey: 'sudoku', name: 'Sudoku', emoji: '9️⃣', tagline: 'Course à la grille remplie',
+      minPlayers: 1, maxPlayers: 6,
+      rules: [
+        'Chaque ligne, colonne et bloc contient tous les chiffres',
+        'Tout le monde a la MÊME grille : le plus rapide gagne',
+        'Solo : bats ton chrono ⏱ · Salon : course entre vous',
+        'Choisis la taille (6×6 / 9×9) et la difficulté'
+      ],
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
+      bot: function () {}, offlineTurn: function () { return null; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      lobbyExtraHTML: lobbyExtraHTML, onState: onState, onStart: onStart
+    });
+
+    function lobbyExtraHTML(room) {
+      var sz = (room && room.size) || 9;
+      var btns = [6, 9].map(function (n) { return '<button style="flex:1;padding:.5rem;border:1.5px solid var(--gold-light);border-radius:12px;background:' + (n === sz ? 'linear-gradient(135deg,var(--terracotta),var(--gold))' : 'var(--white)') + ';color:' + (n === sz ? '#fff' : 'var(--ink)') + ';font-weight:700;cursor:pointer" onclick="setSize(' + n + ')">' + n + '×' + n + '</button>'; }).join('');
+      return '<div style="background:var(--white);border-radius:16px;padding:14px;box-shadow:var(--shadow);max-width:340px;margin:0 auto 14px"><div style="font-size:.78rem;text-transform:uppercase;letter-spacing:1px;color:var(--ink-light);margin-bottom:8px">Taille de la grille</div><div style="display:flex;gap:8px">' + btns + '</div></div>';
+    }
+    function setSize(n) { if (window.roomRef) window.roomRef.child('size').set(n); }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var level = (cur && cur.difficulty) || 'normal', size = (cur && cur.size) || 9;
+      var P = genPuzzle(level, size, Puzzle.seed());
+      order.forEach(function (p) { cur.players[p].grid = P.puzzle.slice(); cur.players[p].finishedAt = null; });
+      return { size: size, puzzle: P.puzzle, solution: P.solution, startedAt: Date.now(), banner: 'Remplis la grille le plus vite possible !', winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { sel = -1; showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
+      else { stopTimer(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+    function startTimer(state) { stopTimer(); function tick() { setText('su-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+
+    function N() { return (window.room && window.room.size) || 9; }
+    function gridOf(s, pid) { return (s.players[pid] && s.players[pid].grid) || []; }
+    function filledCount(s, pid) { var g = gridOf(s, pid), n = 0; for (var i = 0; i < g.length; i++) if (g[i]) n++; return n; }
+    function isComplete(grid, sol) { for (var i = 0; i < sol.length; i++) if (grid[i] !== sol[i]) return false; return true; }
+    function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
+
+    function setCell(pid, idx, val) {
+      // Empile l'état d'avant pour « Annuler » seulement si le coup change vraiment la grille.
+      var s = window.room;
+      if (assist && s && s.status === 'playing' && !doneOf(s, pid) && (s.puzzle || [])[idx] === 0 && gridOf(s, pid)[idx] !== val) assist.record();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing') return cur;
+        if ((cur.puzzle || [])[idx] !== 0) return cur;             // case-indice : verrouillée
+        if (doneOf(cur, pid)) return cur;
+        var g = gridOf(cur, pid).slice(); g[idx] = val; cur.players[pid].grid = g;
+        if (isComplete(g, cur.solution)) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' finit en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+    }
+
+    /* ━━ Aide au joueur (Annuler / Indice) ━━ */
+    function assistCanEdit() { var s = window.room; return !!(s && s.status === 'playing' && !doneOf(s, window.myPid)); }
+    function assistSnap() { return gridOf(window.room, window.myPid).slice(); }
+    function assistRestore(prev) {
+      var pid = window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        cur.players[pid].grid = (prev || []).slice();
+        return cur;
+      });
+    }
+    // Indice : révèle une case vide/fausse à partir de la solution (déjà en base pour le Sudoku).
+    function hintMove() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      var pid = window.myPid, puzzle = s.puzzle || [], sol = s.solution || [], g = gridOf(s, pid), cand = [];
+      for (var i = 0; i < sol.length; i++) if (puzzle[i] === 0 && g[i] !== sol[i]) cand.push(i);
+      if (!cand.length) return;
+      var idx = cand[Math.floor(Math.random() * cand.length)];
+      setCell(pid, idx, sol[idx]);      // setCell empile déjà l'état pour l'annulation
+      sel = idx; render(window.room);
+    }
+    var assist = Puzzle.assist({ mount: 'su-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
+    function tapCell(idx) { if ((window.room.puzzle || [])[idx] !== 0) { sel = -1; render(window.room); return; } sel = (sel === idx ? -1 : idx); render(window.room); }
+    function tapKey(val) { if (sel < 0) { lbToast('Choisis une case'); return; } setCell(window.myPid, sel, val); }
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var me = window.myPid, order = state.order || [], puzzle = state.puzzle || [], g = gridOf(state, me);
+      var n = state.size || 9, d = boxDims(n), bh = d.bh, bw = d.bw, cells = n * n;
+      setHTML('su-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        return '<div class="su-opp' + (doneOf(state, pid) ? ' done' : '') + '"><span class="su-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : filledCount(state, pid) + '/' + cells) + '</span></div>';
+      }).join(''));
+      setText('su-banner', state.banner || '');
+
+      var selR = sel >= 0 ? (sel / n | 0) : -1, selC = sel >= 0 ? sel % n : -1;
+      var html = '';
+      for (var i = 0; i < cells; i++) {
+        var r = i / n | 0, c = i % n, v = g[i], given = puzzle[i] !== 0;
+        var cls = 'su-cell';
+        if (given) cls += ' given'; else if (v) cls += ' mine';
+        if (i === sel) cls += ' sel';
+        else if (sel >= 0 && (r === selR || c === selC || ((r / bh | 0) === (selR / bh | 0) && (c / bw | 0) === (selC / bw | 0)))) cls += ' peer';
+        if (v && !given && !validDisplay(g, i, v, n, bh, bw)) cls += ' bad';
+        if (c % bw === bw - 1 && c !== n - 1) cls += ' br';
+        if (r % bh === bh - 1 && r !== n - 1) cls += ' bb';
+        html += '<div class="' + cls + '" onclick="tapCell(' + i + ')">' + (v ? v : '') + '</div>';
+      }
+      var grid = document.getElementById('su-grid');
+      grid.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+      grid.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
+      grid.innerHTML = html;
+      var pad = ''; for (var k = 1; k <= n; k++) pad += '<button class="su-key" onclick="tapKey(' + k + ')">' + k + '</button>';
+      pad += '<button class="su-key erase" onclick="tapKey(0)">⌫</button>';
+      var padEl = document.getElementById('su-pad');
+      padEl.style.gridTemplateColumns = 'repeat(' + (n === 6 ? 4 : 5) + ', 1fr)';
+      padEl.innerHTML = pad;
+      if (typeof assist !== 'undefined' && assist) assist.refresh();
+    }
+    // Validité d'une valeur posée (surlignage rouge) : on ignore la case elle-même.
+    function validDisplay(g, idx, val, N, bh, bw) {
+      var r = idx / N | 0, c = idx % N, br = (r / bh | 0) * bh, bc = (c / bw | 0) * bw;
+      for (var i = 0; i < N; i++) { if (i !== c && g[r * N + i] === val) return false; if (i !== r && g[i * N + c] === val) return false; }
+      for (var a = 0; a < bh; a++) for (var b = 0; b < bw; b++) { var j = (br + a) * N + bc + b; if (j !== idx && g[j] === val) return false; }
+      return true;
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      stopTimer();
+      var cells = (state.size || 9) * (state.size || 9), winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '9️⃣');
+      setText('res-title', winner === window.myPid ? 'Tu finis premier ! 🏆' : (winner ? Room.name(winner) + ' gagne' : 'Terminé'));
+      var order = Puzzle.rankByTime(state, filledCount);
+      setHTML('res-rank', order.map(function (pid, i) {
+        var done = doneOf(state, pid);
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + (done ? '⏱ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : filledCount(state, pid) + '/' + cells) + '</span></div>';
+      }).join(''));
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (!document.getElementById('s-playing').classList.contains('active')) return;
+      var n = N();
+      if (e.key >= '1' && e.key <= String(n)) tapKey(+e.key);
+      else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') tapKey(0);
+    });
+
+    function handleReplay() { stopTimer(); sel = -1; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); stopTimer(); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

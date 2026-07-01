@@ -32,13 +32,17 @@
   var ROOT = window.GAMES_ROOT || 'games';
   var ID_KEY = 'games.identity.v1';
   var PID_KEY = 'games.pid';
-  var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ'; // sans I ni O (lisibilité)
+  var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // lettres + chiffres, sans I/O/0/1 (lisibilité)
+  var CODE_LEN = 5;
 
   function cfg() { return window.ROOM || {}; }
   function db() { return firebase.database(); }
 
   // ── Identité de l'appareil ────────────────────────────────────────────────
   function getPid() {
+    // Auth anonyme active → l'uid cryptographique fait office d'identité (impossible
+    // à usurper dans la console). Sinon, identité stable localStorage (comportement actuel).
+    if (window.GAMES_UID) return window.GAMES_UID;
     var p = null;
     try { p = localStorage.getItem(PID_KEY); } catch (e) {}
     if (!p) {
@@ -109,6 +113,92 @@
     }
   };
 
+  // ── Alerte « c'est ton tour » (son + vibration), partagée ─────────────────
+  // Un jeu n'a rien à faire : masterOnState (en ligne) et offline.js (hors-ligne)
+  // appellent turnAlertFor(room) à chaque changement d'état ; le bip + la vibration
+  // ne se déclenchent qu'au PASSAGE à ton tour. Désactivable (localStorage games.sound).
+  var _lastMine = false, _audioCtx = null;
+  function soundOn() { try { return localStorage.getItem('games.sound') !== '0'; } catch (e) { return true; } }
+  function beep() {
+    if (!soundOn()) return;
+    if (window.Sfx) return Sfx.play('turn'); // même son, synthèse mutualisée (sfx.js)
+    try {
+      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      var o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(_audioCtx.destination);
+      var t = _audioCtx.currentTime; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32); o.start(t); o.stop(t + 0.34);
+    } catch (e) {}
+  }
+  window.Lobby = window.Lobby || {};
+  window.Lobby.toggleSound = function () { var on = !soundOn(); try { localStorage.setItem('games.sound', on ? '1' : '0'); } catch (e) {} if (on) beep(); return on; };
+  window.Lobby.soundOn = soundOn;
+  window.Lobby.turnAlertFor = function (room) {
+    var mine = !!(room && room.status === 'playing' && !room.winner && room.turn === window.myPid);
+    if (mine && !_lastMine) { beep(); try { if (soundOn() && navigator.vibrate) navigator.vibrate(180); } catch (e) {} }
+    _lastMine = mine;
+    updateTurnClock(room);
+  };
+
+  // ── Chrono de tour — pastille flottante, jeux EN LIGNE au tour par tour ───────
+  // Compte à rebours local depuis le dernier changement de `turn`. À zéro, si un
+  // JOUEUR HUMAIN traîne (ou s'est déconnecté), l'HÔTE joue un coup légal à sa
+  // place via l'IA du jeu (cfg.bot) — la partie ne reste jamais bloquée.
+  //   • EN LIGNE uniquement : en solo/local (mode avion) le chrono est masqué et
+  //     rien n'est joué automatiquement → le hors-ligne n'est pas touché.
+  //   • Réutilise le mécanisme « l'hôte pilote les ordis » : aucun double coup.
+  var _clockTurn = null, _clockStart = 0, _clockInt = null, _timedOutTurn = null;
+  var TURN_SECONDS_DEFAULT = 40;
+  // Temps adapté à chaque jeu (secondes). Un jeu peut surcharger via cfg.turnSeconds.
+  var TURN_SECONDS_BY_GAME = {
+    morpion: 20, puissance4: 25, reversi: 35, dames: 45, mastermind: 40,
+    uno: 30, skyjo: 35, president: 35, papayoo: 40, millebornes: 40, trio: 25, blackjack: 25,
+    blokus: 45, ludo: 25, monopoly: 60, cluedo: 45, 'bataille-navale': 30
+  };
+  function turnSecondsFor() { var c = cfg() || {}; return c.turnSeconds || TURN_SECONDS_BY_GAME[c.gameKey] || TURN_SECONDS_DEFAULT; }
+  function isOfflineMode() { try { var m = new URLSearchParams(location.search).get('mode'); return m === 'solo' || m === 'local'; } catch (e) { return false; } }
+  function turnClockEl() {
+    var el = document.getElementById('lb-turnclock');
+    if (!el) { el = document.createElement('div'); el.id = 'lb-turnclock'; el.className = 'lb-turnclock'; document.body.appendChild(el); }
+    return el;
+  }
+  function updateTurnClock(room) {
+    var active = room && room.status === 'playing' && !room.winner && room.turn;
+    // Au moins 2 HUMAINS dans la manche (exclut solo + ordis) et jeu EN LIGNE.
+    var humans = active && room.order ? room.order.filter(function (pid) { return room.players[pid] && !room.players[pid].isBot; }) : [];
+    var multi = humans.length >= 2 && !isOfflineMode();
+    if (!active || !multi) { if (_clockInt) { clearInterval(_clockInt); _clockInt = null; } var e = document.getElementById('lb-turnclock'); if (e) e.style.display = 'none'; _clockTurn = null; return; }
+    if (room.turn !== _clockTurn) { _clockTurn = room.turn; _clockStart = Date.now(); _timedOutTurn = null; }
+    if (_clockInt) clearInterval(_clockInt);
+    var total = turnSecondsFor();
+    var render = function () {
+      var left = Math.max(0, total - Math.floor((Date.now() - _clockStart) / 1000));
+      var el = turnClockEl(); el.style.display = 'block';
+      var mine = room.turn === window.myPid;
+      el.textContent = '⏱ ' + left + 's' + (mine ? ' — à toi' : '');
+      el.className = 'lb-turnclock' + (left <= 10 ? ' urgent' : '') + (mine ? ' mine' : '');
+      if (left <= 0) {
+        clearInterval(_clockInt); _clockInt = null;
+        if (_timedOutTurn !== _clockTurn) { _timedOutTurn = _clockTurn; timeoutActivePlayer(window.room); }
+      }
+    };
+    render(); _clockInt = setInterval(render, 1000);
+  }
+  // Joue un coup pour le joueur actif humain qui a dépassé le temps (hôte seulement).
+  function timeoutActivePlayer(room) {
+    var c = cfg();
+    if (!c || !c.bot || !room || room.status !== 'playing' || room.winner) return;
+    if (room.host !== window.myPid) return;              // seul l'hôte pilote (comme les ordis)
+    if (isOfflineMode()) return;                          // sécurité : jamais en mode avion
+    var pid = botActivePid(room), p = pid && room.players && room.players[pid];
+    if (!p || p.isBot) return;                            // uniquement à la place d'un HUMAIN
+    var saved = window.myPid; window.myPid = pid;
+    try { c.bot(JSON.parse(JSON.stringify(room)), pid); }
+    catch (e) { console.error('timeout autoplay', e); }
+    finally { window.myPid = saved; }
+  }
+
   // ── Difficulté des ordis (partagée par tous les jeux) ─────────────────────
   // Niveau stocké dans le salon (room.difficulty) : 'easy' | 'normal' | 'hard'.
   // Les bots de chaque jeu lisent window.Bots.level(state) et adaptent soit leur
@@ -124,8 +214,10 @@
     // Choisit une valeur selon le niveau : pick(state, {easy:.., normal:.., hard:..}).
     pick: function (state, m) { var l = window.Bots.level(state); return (m[l] !== undefined) ? m[l] : m.normal; },
     // Probabilité, par niveau, de jouer un coup volontairement sous-optimal (au
-    // hasard parmi les coups légaux). 0 en difficile, faible en moyen, élevé en facile.
-    blunderP: function (state) { return window.Bots.pick(state, { easy: 0.5, normal: 0.12, hard: 0 }); },
+    // hasard parmi les coups légaux). Espacement net : DIFFICILE ne se trompe JAMAIS
+    // (force maximale), MOYEN se trompe parfois (1 coup sur 5), FACILE souvent (plus
+    // d'1 coup sur 2) → trois niveaux franchement différents.
+    blunderP: function (state) { return window.Bots.pick(state, { easy: 0.55, normal: 0.2, hard: 0 }); },
     // true s'il faut jouer un coup au hasard ce tour-ci (selon le niveau).
     shouldBlunder: function (state) { return Math.random() < window.Bots.blunderP(state); }
   };
@@ -138,17 +230,26 @@
   }
   function genCode() {
     var s = '';
-    for (var i = 0; i < 4; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    for (var i = 0; i < CODE_LEN; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
     return s;
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
   window.GameRoom = function (config) {
     window.ROOM = config || {};
-    window.myPid = getPid();
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', init, { once: true });
-    } else { init(); }
+    function begin() {
+      window.myPid = getPid();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init, { once: true });
+      } else { init(); }
+    }
+    // Auth anonyme active mais uid pas encore prêt : on attend l'uid pour que le
+    // salon soit créé/rejoint sous la bonne identité (repli 2,5 s si l'auth traîne).
+    if (window.GAMES_USE_AUTH && !window.GAMES_UID && window.whenGamesAuth) {
+      var done = false, go = function () { if (done) return; done = true; begin(); };
+      window.whenGamesAuth(go);
+      setTimeout(go, 2500);
+    } else { begin(); }
   };
 
   function init() {
@@ -157,6 +258,17 @@
     var code = (params.get('room') || '').trim().toUpperCase();
     if (code) joinRoomByCode(code, true);
     else window.showScreen('s-home');
+  }
+
+  // Encart « Défi du jour » (jeux de puzzle solo) — grille du jour + série.
+  function dailyHomeHTML(c) {
+    var t = window.Daily.today(), st = window.Daily.stateOf(c.gameKey);
+    var sub = st.doneToday
+      ? ('✅ Fait aujourd\'hui' + (st.best && window.Puzzle ? ' en ' + window.Puzzle.fmtTime(st.best) : ''))
+      : ('Difficulté du jour : ' + window.Daily.levelLabel());
+    var streak = st.streak > 0 ? ' · série ' + st.streak + ' 🔥' : '';
+    return '<button class="lb-btn" style="background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="Lobby.goDaily()">🗓️ Défi du jour — ' + esc(t.label) + '</button>' +
+      '<div style="margin:-6px 0 16px;font-size:0.82rem;color:var(--ink-light)">' + sub + streak + '</div>';
   }
 
   // ── Écran ACCUEIL d'un jeu ────────────────────────────────────────────────
@@ -172,19 +284,21 @@
         (c.emoji ? '<div class="lb-emoji-big">' + c.emoji + '</div>' : '') +
         '<h1 class="lb-title">' + esc(c.name || 'Jeu') + '</h1>' +
         '<p class="lb-sub">' + esc(c.tagline || '') + (c.tagline ? ' · ' : '') + range + '</p>' +
+        ((c.offline && c.offline.daily && window.Daily) ? dailyHomeHTML(c) : '') +
+        (window.GameStats ? GameStats.summaryHTML(c.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
         '<button class="lb-btn" onclick="Lobby.createRoom()">Créer une partie</button>' +
         '<div style="margin:18px 0 8px;color:var(--ink-light);font-size:0.85rem">ou rejoindre avec un code</div>' +
-        '<input id="lb-join-code" class="lb-input code" maxlength="4" placeholder="CODE" autocomplete="off" inputmode="text">' +
+        '<input id="lb-join-code" class="lb-input code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text">' +
         '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()">Rejoindre</button>' +
         (c.offline ? ('<div style="margin:18px 0 6px;color:var(--ink-light);font-size:0.85rem">ou sans connexion ✈️</div>' +
-          (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">🤖 Solo (contre l\'ordi)</button>' : '') +
+          (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">' + (c.offline.soloNoBots ? '⏱ Solo (chrono)' : '🤖 Solo (contre l\'ordi)') + '</button>' : '') +
           (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">📱 Local (même appareil)</button>' : '')) : '') +
         (rules ? '<div class="lb-code-card" style="text-align:left;margin-top:24px"><div class="lb-code-label">Règles rapides</div><ul style="list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:6px;font-size:0.86rem;color:var(--ink-light)">' + rules + '</ul></div>' : '') +
-        '<a class="lb-link" href="index.html">← Tous les jeux</a>' +
+        '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
       '</div>';
     var inp = document.getElementById('lb-join-code');
     if (inp) {
-      inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, ''); });
+      inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') joinFromInput(); });
     }
   }
@@ -192,7 +306,7 @@
   function joinFromInput() {
     var inp = document.getElementById('lb-join-code');
     var code = (inp && inp.value || '').trim().toUpperCase();
-    if (code.length < 4) { lbToast('Entre les 4 lettres du code'); return; }
+    if (code.length < CODE_LEN) { lbToast('Entre les 5 caractères du code'); return; }
     joinRoomByCode(code, false);
   }
 
@@ -225,10 +339,13 @@
       if (!room) { lbToast('Salon introuvable'); if (fromUrl) window.showScreen('s-home'); return; }
       // Mauvais jeu pour cette page → on redirige vers la bonne page de jeu.
       if (room.game && room.game !== cfg().gameKey) {
-        location.href = room.game + '.html?room=' + code; return;
+        location.href = '/games/' + room.game + '.html?room=' + code; return;
       }
       var players = room.players || {};
-      var iAmIn = !!players[window.myPid];
+      // « déjà dedans » : présent dans players, OU membre de la manche en cours
+      // (room.order) — couvre la reconnexion après une coupure qui aurait effacé
+      // le nœud joueur (on peut alors revenir au lieu d'être exclu).
+      var iAmIn = !!players[window.myPid] || (room.order || []).indexOf(window.myPid) >= 0;
       var onlineCount = Object.keys(players).filter(function (k) { return players[k].online; }).length;
       var max = cfg().maxPlayers || 8;
       if (!iAmIn && room.status !== 'waiting') { lbToast('La partie a déjà commencé'); if (fromUrl) window.showScreen('s-home'); return; }
@@ -294,6 +411,27 @@
     }
   }
 
+  // ── Garde « anti-fantôme » (salle d'attente SEULEMENT) ────────────────────
+  // En attente : si on ferme l'onglet, notre nœud joueur disparaît (liste nette).
+  // En PARTIE : surtout pas — le nœud joueur porte l'état du jeu (main, score…) ;
+  // une coupure réseau le détruirait et exclurait le joueur définitivement. On
+  // annule donc le remove() au démarrage, et presence.js se contente de basculer
+  // online=false à la déconnexion. (cancel() annule aussi les onDisconnect des
+  // chemins ENFANTS → on ré-arme celui de presence juste après.)
+  var _ghostArmed = false;
+  function armGhostGuard() {
+    if (_ghostArmed || !window.roomRef || !window.myPid) return;
+    try { window.roomRef.child('players/' + window.myPid).onDisconnect().remove(); _ghostArmed = true; } catch (e) {}
+  }
+  function disarmGhostGuard() {
+    if (!_ghostArmed || !window.roomRef || !window.myPid) return;
+    _ghostArmed = false;
+    try {
+      window.roomRef.child('players/' + window.myPid).onDisconnect().cancel();
+      window.roomRef.child('players/' + window.myPid + '/online').onDisconnect().set(false);
+    } catch (e) {}
+  }
+
   // ── Entrer dans la salle d'attente ────────────────────────────────────────
   function enterRoom() {
     var c = cfg();
@@ -312,12 +450,12 @@
       };
       return cur;
     }, function (err, committed, snap) {
-      // anti-fantôme : si on ferme l'onglet pendant l'attente, on disparaît.
-      try { window.roomRef.child('players/' + window.myPid).onDisconnect().remove(); } catch (e) {}
+      var status = (snap && snap.val() && snap.val().status) || 'waiting';
+      // anti-fantôme : seulement tant qu'on ATTEND (voir armGhostGuard).
+      if (status === 'waiting') armGhostGuard();
       if (window.GamePresence) GamePresence.start(window.roomRef, window.myPid);
       // Si la partie n'a pas (encore) commencé, on montre la salle d'attente ;
       // sinon on laisse le jeu router vers son écran de jeu (reconnexion en cours).
-      var status = (snap && snap.val() && snap.val().status) || 'waiting';
       if (status === 'waiting') window.showScreen('s-lobby');
       if (!window.listenersOn) { window.roomRef.on('value', masterOnState); window.listenersOn = true; }
       if (c.afterJoin) try { c.afterJoin(); } catch (e) {}
@@ -335,14 +473,31 @@
     if (status === 'waiting') {
       // En attente : la salle d'attente est gérée ici. On y revient si on était
       // sur l'écran de jeu (fin de partie) ou encore sur l'accueil (auto-join).
+      armGhostGuard(); // retour au lobby (rejouer) → la garde anti-fantôme reprend
       if (isActive('s-playing') || isActive('s-home')) window.showScreen('s-lobby');
       if (isActive('s-lobby')) renderLobby(room);
       maybeAutoStart(room);
+    } else {
+      disarmGhostGuard(); // partie lancée : le nœud joueur ne doit plus s'effacer
     }
     // Dans tous les cas on laisse le jeu réagir (il gère son écran 's-playing').
     if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
+    try { window.Lobby.turnAlertFor(room); } catch (e) {}
+    try { recordStatsFor(room); } catch (e) {}
+  }
+
+  // ── Stats par jeu (localStorage) : enregistrées une fois par partie terminée ──
+  var _statsEndRecorded = false;
+  function recordStatsFor(room) {
+    if (!window.GameStats) return;
+    var ended = room.status === 'ended' || room.status === 'finished' || !!room.winner;
+    if (!ended) { _statsEndRecorded = false; return; }
+    if (_statsEndRecorded) return;
+    _statsEndRecorded = true;
+    var me = room.players && room.players[window.myPid];
+    GameStats.record(cfg().gameKey, { won: room.winner === window.myPid, timeMs: (me && me.finishedAt) || null });
   }
   function isActive(id) { var el = document.getElementById(id); return el && el.classList.contains('active'); }
 
@@ -597,6 +752,7 @@
 
   // Bascule vers un mode hors-ligne (solo / local) — voir offline.js.
   function goOffline(m) { location.href = location.pathname + '?mode=' + m; }
+  function goDaily() { location.href = location.pathname + '?mode=solo&daily=1'; }
 
   // ── « Revoir le plateau » (après une fin de partie) ───────────────────────
   // Affiche l'écran de jeu (le plateau/la main reste rendu derrière) et propose un
@@ -618,14 +774,20 @@
   // ── Nettoyage TTL des vieux salons (best-effort, appelé depuis l'accueil) ──
   // Supprime les salons abandonnés (créés il y a plus de maxAgeMs). Borné à
   // quelques suppressions par passage pour rester léger. Nécessite l'index
-  // « createdAt » côté règles Firebase (voir database.rules.example.json).
+  // « createdAt » côté règles Firebase (voir database.rules.json).
   function sweepOldRooms(maxAgeMs) {
     maxAgeMs = maxAgeMs || 12 * 60 * 60 * 1000; // 12 h par défaut
     if (typeof firebase === 'undefined' || !firebase.database) return;
     try {
       db().ref(ROOT + '/rooms').orderByChild('createdAt').endAt(Date.now() - maxAgeMs).limitToFirst(20)
         .once('value', function (snap) {
-          snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
+          snap.forEach(function (child) {
+            var v = child.val() || {};
+            // partie encore EN COURS (createdAt figé à la création : une soirée
+            // marathon dépasse 12 h) → épargnée jusqu'à 48 h.
+            if (v.status === 'playing' && (v.createdAt || 0) > Date.now() - 48 * 60 * 60 * 1000) return;
+            try { child.ref.remove(); } catch (e) {}
+          });
         });
     } catch (e) {}
   }
@@ -633,6 +795,7 @@
   function leaveRoom() {
     var c = cfg();
     if (window.roomRef && window.myPid) {
+      _ghostArmed = false;
       try { window.roomRef.child('players/' + window.myPid).onDisconnect().cancel(); } catch (e) {}
       // On se retire ; si on était le dernier, le salon est supprimé (pas de
       // coquille vide qui traîne dans la base).
@@ -648,7 +811,7 @@
     if (window.listenersOn) { window.roomRef.off('value', masterOnState); window.listenersOn = false; }
     if (window.GamePresence) GamePresence.stop();
     if (c.onLeave) try { c.onLeave(); } catch (e) {}
-    location.href = 'index.html';
+    location.href = '/index.html';
   }
 
   // ── Gestion d'un joueur absent en cours de partie (helpers d'UI partagés) ──
@@ -678,7 +841,10 @@
   }
 
   // ── API publique appelée par les onclick injectés et par les jeux ─────────
-  window.Lobby = {
+  // FUSION (surtout pas d'écrasement) : window.Lobby porte déjà toggleSound,
+  // soundOn et turnAlertFor, posés plus haut — un objet littéral les perdrait
+  // (bip de tour, chrono et coup automatique sur timeout morts en silence).
+  Object.assign(window.Lobby, {
     createRoom: createRoom,
     joinRoomByCode: joinRoomByCode,
     joinFromInput: joinFromInput,
@@ -692,10 +858,11 @@
     leaveRoom: leaveRoom,
     resetToLobby: resetToLobby,
     goOffline: goOffline,
+    goDaily: goDaily,
     peekBoard: peekBoard,
     hidePeek: hidePeek,
     sweepOldRooms: sweepOldRooms,
     isOffline: isOffline,
     absentBanner: absentBanner
-  };
+  });
 })();

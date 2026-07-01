@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Solitaire 🃏" data-emoji="🃏"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .so-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .so-head { background: rgba(20,16,28,0.97); }
+    .so-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .so-timer { font-weight: 800; color: var(--terracotta); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+    .so-head-actions { display: flex; gap: 6px; }
+
+    .so-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 6px 12px 0; }
+    .so-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 3px 10px 3px 4px; box-shadow: var(--shadow); font-size: 0.74rem; font-weight: 700; }
+    .so-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .so-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--terracotta); min-height: 22px; padding: 2px 12px; }
+
+    .so-board { flex: 1; padding: 6px 8px 20px; max-width: 620px; margin: 0 auto; width: 100%; }
+    .so-top { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 12px; }
+    .so-tab { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; align-items: start; }
+    .so-col { position: relative; min-height: 70px; }
+    .so-slot { aspect-ratio: 0.7; border-radius: 7px; border: 1.5px dashed var(--gold-light); display: flex; align-items: center; justify-content: center; color: var(--ink-light); font-size: 1.1rem; }
+    .so-card { aspect-ratio: 0.7; border-radius: 7px; background: var(--white); border: 1px solid rgba(44,37,32,0.25); box-shadow: 0 1px 2px rgba(0,0,0,0.15); display: flex; flex-direction: column; padding: 2px 3px; cursor: pointer; font-weight: 800; line-height: 1; }
+    .so-card.red { color: #d8453b; } .so-card.black { color: #2C2520; }
+    html[data-theme="dark"] .so-card { background: #efe7da; }
+    .so-card.down { background: linear-gradient(135deg, #6a4c93, #4a3270); border-color: #3a2860; }
+    .so-card .rk { font-size: clamp(0.7rem, 3.3vw, 1.05rem); } .so-card .st { font-size: clamp(0.65rem, 3vw, 1rem); }
+    .so-card.sel { box-shadow: 0 0 0 3px var(--terracotta); }
+    .so-col .so-card { position: absolute; left: 0; right: 0; }
+    .so-stack { position: relative; }
+
+    .so-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+    .so-act { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.45rem 1.1rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--ink); }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; } .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; } .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; } .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; } .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/puzzle.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="so-head">
+        <span class="so-title-mini">Solitaire</span>
+        <span class="so-timer" id="so-timer">⏱ 0:00</span>
+        <div class="so-head-actions">
+          <button class="game-restart-btn" id="so-undo" onclick="undoMove()" title="Annuler le dernier coup" disabled>↩</button>
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="so-opps" id="so-opps"></div>
+      <div class="so-banner" id="so-banner"></div>
+      <div class="so-board">
+        <div class="so-top" id="so-top"></div>
+        <div class="so-tab" id="so-tab"></div>
+        <div class="so-actions"><button class="so-act" onclick="autoFound()">⬆️ Tout monter</button></div>
+      </div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🃏</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🃏 Solitaire</div>
+      <div class="modal-body">
+        <p>• Remonte les 4 familles de l'<b>As au Roi</b> (en haut à droite) pour gagner.</p>
+        <p style="margin-top:6px">• Dans les colonnes : empile en <b>descendant</b> et en <b>alternant les couleurs</b> (rouge/noir).</p>
+        <p style="margin-top:6px">• Touche une carte pour la sélectionner, puis touche sa destination. Touche la pioche pour retourner une carte. <b>⬆️ Tout monter</b> envoie tout ce qui peut l'être vers les familles.</p>
+        <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : même donne pour tous, le plus rapide gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'], SUITS = ['S', 'H', 'D', 'C'];
+    var SUIT_GLYPH = { S: '♠', H: '♥', D: '♦', C: '♣' };
+    function rankVal(card) { return RANKS.indexOf(card[0]) + 1; }
+    function suitOf(card) { return card[1]; }
+    function isRed(card) { return card[1] === 'H' || card[1] === 'D'; }
+
+    function deal(seed) {
+      var deck = []; SUITS.forEach(function (s) { RANKS.forEach(function (r) { deck.push(r + s); }); });
+      Puzzle.shuffle(deck, Puzzle.rng(seed));
+      var t = []; for (var c = 0; c < 7; c++) { var col = { d: [], u: [] }; for (var k = 0; k <= c; k++) { var card = deck.pop(); if (k === c) col.u.push(card); else col.d.push(card); } t.push(col); }
+      return { stock: deck, waste: [], f: { S: [], H: [], D: [], C: [] }, t: t };
+    }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, timerInt = null, sel = null, undoStack = []; // sel = {from:'waste'|col index, idx}
+    GameRoom({
+      gameKey: 'solitaire', name: 'Solitaire', emoji: '🃏', tagline: 'Le grand classique, en chrono',
+      minPlayers: 1, maxPlayers: 6,
+      rules: [
+        'Remonte les 4 familles de l\'As au Roi',
+        'Colonnes : descendant + couleurs alternées',
+        'Touche une carte puis sa destination · pioche = retourner',
+        'Solo : bats ton chrono ⏱ · Salon : course entre vous'
+      ],
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true },
+      bot: function () {}, offlineTurn: function () { return null; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var seed = Puzzle.seed();
+      order.forEach(function (p) { cur.players[p].g = deal(seed); cur.players[p].finishedAt = null; });
+      return { seed: seed, startedAt: Date.now(), banner: 'Remonte les familles le plus vite possible !', winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { sel = null; undoStack = []; showScreen('s-playing'); } render(state); startTimer(state); updateUndoBtn(); }
+      else { stopTimer(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+    function startTimer(state) { stopTimer(); function tick() { setText('so-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+
+    function gOf(s, pid) { return (s.players[pid] && s.players[pid].g) || null; }
+    function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
+    function foundCount(g) { if (!g) return 0; return g.f.S.length + g.f.H.length + g.f.D.length + g.f.C.length; }
+    function won(g) { return foundCount(g) === 52; }
+
+    // Peut-on poser `card` sur la famille (même couleur=même couleur n/a → même SUIT, +1) ?
+    function canFound(g, card) { var f = g.f[suitOf(card)]; var top = f.length ? f[f.length - 1] : null; return top ? rankVal(card) === rankVal(top) + 1 : rankVal(card) === 1; }
+    // Peut-on poser `card` (tête d'une suite) sur la colonne `col` ?
+    function canTab(g, card, col) { var u = g.t[col].u; if (!u.length) return rankVal(card) === 13; var top = u[u.length - 1]; return (isRed(card) !== isRed(top)) && rankVal(card) === rankVal(top) - 1; }
+
+    /* ── Actions (toutes via transaction sur MA partie) ── */
+    function withG(fn) {
+      var pid = window.myPid, s = window.room;
+      // État d'AVANT (pour « Annuler ») : empilé seulement si le coup change vraiment la partie.
+      var beforeStr = (s && s.players && s.players[pid] && s.players[pid].g) ? JSON.stringify(s.players[pid].g) : null;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        var g = cur.players[pid].g; if (!g) return cur;
+        var changed = fn(g);
+        if (!changed) return cur;
+        cur.players[pid].g = g;
+        if (won(g)) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' gagne en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      }, function (err, committed, snap) {
+        if (err || !beforeStr) return;
+        var val = snap && snap.val && snap.val();
+        var after = val && val.players && val.players[pid] && val.players[pid].g;
+        if (after && JSON.stringify(after) !== beforeStr) { undoStack.push(beforeStr); if (updateUndoBtn) updateUndoBtn(); }
+      });
+    }
+    // Annuler le dernier coup : restaure l'état de la partie d'avant (sur MA partie).
+    function undoMove() {
+      var s = window.room; if (!s || s.status !== 'playing' || !undoStack.length) return;
+      var me = window.myPid; if (doneOf(s, me)) return;
+      var before = undoStack.pop(); sel = null;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.players[me]) return cur;
+        cur.players[me].g = JSON.parse(before);
+        return cur;
+      });
+      updateUndoBtn();
+    }
+    function updateUndoBtn() { var b = document.getElementById('so-undo'); if (b) b.disabled = !undoStack.length; }
+    function drawStock() { sel = null; withG(function (g) { if (g.stock.length) { g.waste.push(g.stock.pop()); } else if (g.waste.length) { g.stock = g.waste.reverse(); g.waste = []; } else return false; return true; }); }
+    function flipIfNeeded(col) { if (!col.u.length && col.d.length) col.u.push(col.d.pop()); }
+
+    function tapWaste() {
+      var g = gOf(window.room, window.myPid); if (!g || !g.waste.length) return;
+      // sélection de la carte de la défausse (ou tentative d'aller en famille)
+      var card = g.waste[g.waste.length - 1];
+      if (canFound(g, card)) { withG(function (gg) { gg.f[suitOf(card)].push(gg.waste.pop()); return true; }); sel = null; return; }
+      sel = (sel && sel.from === 'waste') ? null : { from: 'waste', idx: g.waste.length - 1 }; render(window.room);
+    }
+    function tapFound(suit) {
+      if (!sel) return; var g = gOf(window.room, window.myPid);
+      var card = sel.from === 'waste' ? g.waste[g.waste.length - 1] : g.t[sel.from].u[sel.idx];
+      // une seule carte (tête de la sélection = dernière de la colonne) peut monter
+      var single = sel.from === 'waste' || sel.idx === g.t[sel.from].u.length - 1;
+      if (single && suitOf(card) === suit && canFound(g, card)) {
+        withG(function (gg) { if (sel.from === 'waste') gg.f[suit].push(gg.waste.pop()); else { gg.f[suit].push(gg.t[sel.from].u.pop()); flipIfNeeded(gg.t[sel.from]); } return true; });
+      }
+      sel = null; render(window.room);
+    }
+    function tapCol(col) {
+      var g = gOf(window.room, window.myPid); if (!g) return;
+      if (sel) { // tenter de déplacer la sélection vers cette colonne
+        var run, fromCol = sel.from;
+        if (fromCol === 'waste') run = [g.waste[g.waste.length - 1]]; else run = g.t[fromCol].u.slice(sel.idx);
+        if (run.length && canTab(g, run[0], col)) {
+          withG(function (gg) {
+            if (fromCol === 'waste') gg.t[col].u.push(gg.waste.pop());
+            else { var moving = gg.t[fromCol].u.splice(sel.idx); moving.forEach(function (c) { gg.t[col].u.push(c); }); flipIfNeeded(gg.t[fromCol]); }
+            return true;
+          });
+        }
+        sel = null; render(window.room);
+      }
+    }
+    function tapCard(col, idx) {
+      var g = gOf(window.room, window.myPid); if (!g) return;
+      var u = g.t[col].u; if (idx >= u.length) return;
+      if (sel) { tapCol(col); return; }      // une sélection existe → cette colonne est la cible
+      // sinon : sélectionner la suite à partir de cette carte si elle est valide (descendante alternée)
+      var ok = true; for (var k = idx; k < u.length - 1; k++) { if (!(isRed(u[k]) !== isRed(u[k + 1]) && rankVal(u[k]) === rankVal(u[k + 1]) + 1)) { ok = false; break; } }
+      if (!ok) return;
+      sel = { from: col, idx: idx }; render(window.room);
+    }
+    function autoFound() {
+      var moved = true;
+      function once() { var g = gOf(window.room, window.myPid); if (!g) return false; var did = false;
+        if (g.waste.length && canFound(g, g.waste[g.waste.length - 1])) { withG(function (gg) { gg.f[suitOf(gg.waste[gg.waste.length - 1])].push(gg.waste.pop()); return true; }); return true; }
+        for (var c = 0; c < 7; c++) { var u = g.t[c].u; if (u.length) { var card = u[u.length - 1]; if (canFound(g, card)) { (function (col) { withG(function (gg) { gg.f[suitOf(card)].push(gg.t[col].u.pop()); flipIfNeeded(gg.t[col]); return true; }); })(c); return true; } } }
+        return false;
+      }
+      var guard = 0; while (once() && guard++ < 60) {} sel = null;
+    }
+
+    /* ━━ Rendu ━━ */
+    function cardHTML(card, extra, onclick) { var cl = 'so-card ' + (isRed(card) ? 'red' : 'black') + (extra || ''); return '<div class="' + cl + '"' + (onclick ? ' onclick="' + onclick + '"' : '') + '><span class="rk">' + card[0] + '</span><span class="st">' + SUIT_GLYPH[suitOf(card)] + '</span></div>'; }
+    function render(state) {
+      var me = window.myPid, order = state.order || [], g = gOf(state, me);
+      setHTML('so-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        return '<div class="so-opp' + (doneOf(state, pid) ? ' done' : '') + '"><span>' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' ' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : foundCount(gOf(state, pid)) + '/52') + '</div>';
+      }).join(''));
+      setText('so-banner', state.banner || '');
+      if (!g) return;
+      // haut : pioche, défausse, 4 familles
+      var top = '';
+      top += g.stock.length ? '<div class="so-card down" onclick="drawStock()"><span class="rk">🂠</span></div>' : '<div class="so-slot" onclick="drawStock()">↺</div>';
+      var wsel = sel && sel.from === 'waste' ? ' sel' : '';
+      top += g.waste.length ? cardHTML(g.waste[g.waste.length - 1], wsel, 'tapWaste()') : '<div class="so-slot"></div>';
+      top += '<div class="so-slot"></div>'; // espace
+      SUITS.forEach(function (s) { var f = g.f[s]; top += f.length ? cardHTML(f[f.length - 1], '', 'tapFound(\'' + s + '\')') : '<div class="so-slot" onclick="tapFound(\'' + s + '\')">' + SUIT_GLYPH[s] + '</div>'; });
+      setHTML('so-top', top);
+      // colonnes
+      var tab = '';
+      for (var c = 0; c < 7; c++) {
+        var col = g.t[c], n = col.d.length + col.u.length, step = Math.min(22, Math.max(13, 150 / Math.max(1, n)));
+        tab += '<div class="so-col" style="min-height:' + (n ? (n - 1) * step + 64 : 64) + 'px" onclick="tapColEmpty(' + c + ',event)">';
+        if (!n) tab += '<div class="so-slot"></div>';
+        var pos = 0;
+        for (var d = 0; d < col.d.length; d++) { tab += '<div class="so-card down" style="top:' + pos + 'px"></div>'; pos += step; }
+        for (var u = 0; u < col.u.length; u++) { var selc = (sel && sel.from === c && u >= sel.idx) ? ' sel' : ''; tab += '<div class="so-card ' + (isRed(col.u[u]) ? 'red' : 'black') + selc + '" style="top:' + pos + 'px" onclick="event.stopPropagation();tapCard(' + c + ',' + u + ')"><span class="rk">' + col.u[u][0] + '</span><span class="st">' + SUIT_GLYPH[suitOf(col.u[u])] + '</span></div>'; pos += step; }
+        tab += '</div>';
+      }
+      setHTML('so-tab', tab);
+    }
+    function tapColEmpty(c, e) { tapCol(c); }
+
+    function showResults(state) {
+      stopTimer();
+      var winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🃏');
+      setText('res-title', winner === window.myPid ? 'Gagné ! 🏆' : (winner ? Room.name(winner) + ' gagne' : 'Terminé'));
+      var order = Puzzle.rankByTime(state, function (s, pid) { return foundCount(gOf(s, pid)); });
+      setHTML('res-rank', order.map(function (pid, i) {
+        var done = doneOf(state, pid);
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + (done ? '⏱ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : foundCount(gOf(state, pid)) + '/52') + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { stopTimer(); sel = null; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); stopTimer(); sel = null; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

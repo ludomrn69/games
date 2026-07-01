@@ -19,6 +19,8 @@
   var params = new URLSearchParams(location.search);
   var mode = params.get('mode');
   if (mode !== 'solo' && mode !== 'local') return; // mode EN LIGNE → on ne touche à rien
+  var daily = params.get('daily') === '1' && mode === 'solo'; // Défi du jour (voir daily.js)
+  var dailyRecorded = false, endFx = false; // endFx : son/confetti de fin joués une seule fois
 
   // ── firebase factice (au cas où le SDK n'a pas pu se charger, ex. en avion) ──
   if (typeof window.firebase === 'undefined') {
@@ -31,6 +33,7 @@
   var cfg = null, room = null, players = [], totalPlayers = 2;
   var humanPids = [], humanPid = null, lastTurnShown = null;
   var offlineDifficulty = 'normal';
+  var statsRecorded = false; // stats par jeu : un seul enregistrement par partie
   var BOT_DELAY = 650;
 
   function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
@@ -55,7 +58,13 @@
       child: function (sub) { return childRef(parts.concat(String(sub).split('/'))); },
       onDisconnect: function () { return noDisc; },
       on: function () {}, off: function () {},
-      once: function (cb) { if (typeof cb === 'function') cb({ val: function () { return clone(getPath(parts)); } }); return Promise.resolve({ val: function () { return clone(getPath(parts)); } }); }
+      // Signature Firebase : once('value', cb) — on tolère aussi once(cb).
+      once: function (ev, cb) {
+        var f = (typeof ev === 'function') ? ev : cb;
+        var s = { val: function () { return clone(getPath(parts)); } };
+        if (typeof f === 'function') f(s);
+        return Promise.resolve(s);
+      }
     };
   }
 
@@ -71,7 +80,8 @@
     child: function (path) { return childRef(String(path).split('/')); },
     onDisconnect: function () { return noDisc; },
     on: function () {}, off: function () {},
-    once: function (cb) { if (typeof cb === 'function') cb(snap()); return Promise.resolve(snap()); }
+    // Signature Firebase : once('value', cb) — on tolère aussi once(cb).
+    once: function (ev, cb) { var f = (typeof ev === 'function') ? ev : cb; if (typeof f === 'function') f(snap()); return Promise.resolve(snap()); }
   };
 
   // ── Lobby factice ────────────────────────────────────────────────────────────
@@ -85,9 +95,52 @@
     cfg = c || {};
     window.myPid = null;
     injectStyles();
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderSetup, { once: true });
-    else renderSetup();
+    // Défi du jour : on saute l'écran de réglages et on démarre la grille du jour.
+    var enter = (daily && (cfg.offline || {}).daily && window.Daily) ? startDaily : renderSetup;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enter, { once: true });
+    else enter();
   };
+
+  // ── Défi du jour (solo) : graine + difficulté imposées par la DATE ───────────
+  function startDaily() {
+    var off = cfg.offline || {};
+    if (!off.solo || !cfg.bot) { renderSetup(); return; } // repli si le solo n'est pas géré
+    // Graine fixée au jour : onStart appelle Puzzle.seed() → on lui rend la graine du jour.
+    if (window.Puzzle) { var ds = Daily.seed(cfg.gameKey); Puzzle.seed = function () { return ds; }; }
+    offlineDifficulty = Daily.level();
+    totalPlayers = 1;
+    startGame(null);
+  }
+  function fmtDur(ms) { return window.Puzzle ? Puzzle.fmtTime(ms) : Math.max(0, Math.round(ms / 1000)) + 's'; }
+  function recordDaily() {
+    if (!window.Daily || dailyRecorded) return;
+    var me = room.players[humanPid], won = room.winner === humanPid;
+    if (!won) { showDailyShare(false, 0, Daily.stateOf(cfg.gameKey)); return; } // raté → propose de réessayer
+    dailyRecorded = true;
+    var t = (me && me.finishedAt) || (room.startedAt ? Date.now() - room.startedAt : 0);
+    showDailyShare(true, t, Daily.record(cfg.gameKey, t));
+  }
+  function dailyShareText(t) {
+    var d = Daily.today(), name = cfg.name || cfg.gameKey;
+    return name + ' — défi du ' + d.label + ' (' + Daily.levelLabel() + ')\n✅ résolu en ' + fmtDur(t) +
+      '\n' + location.origin + location.pathname;
+  }
+  function showDailyShare(won, t, st) {
+    var old = document.getElementById('off-daily'); if (old) old.remove();
+    var box = document.createElement('div'); box.id = 'off-daily';
+    box.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:3000;background:var(--white);border:1.5px solid var(--gold);border-radius:18px;box-shadow:var(--shadow-hover);padding:14px 18px;max-width:340px;width:calc(100% - 28px);text-align:center;font-family:DM Sans,sans-serif';
+    if (won) {
+      box.innerHTML = '<div style="font-weight:800;color:var(--terracotta)">🗓️ Défi du jour réussi !</div>' +
+        '<div style="margin:6px 0;font-size:.9rem">⏱ ' + esc(fmtDur(t)) + (st.streak ? ' · série ' + st.streak + ' 🔥' : '') + '</div>' +
+        '<button id="off-daily-share" style="border:none;border-radius:30px;padding:.55rem 1.4rem;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff">📤 Partager</button>';
+      box.querySelector('#off-daily-share').onclick = function () { var r = Daily.share(dailyShareText(t)); if (window.lbToast) lbToast(r === 'copy' ? 'Résultat copié !' : r === 'share' ? '' : dailyShareText(t)); };
+    } else {
+      box.innerHTML = '<div style="font-weight:800;color:var(--terracotta)">🗓️ Défi du jour</div>' +
+        '<div style="margin:6px 0;font-size:.9rem">Pas encore trouvé — réessaie, c\'est la même grille aujourd\'hui.</div>' +
+        '<button style="border:none;border-radius:30px;padding:.55rem 1.4rem;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="location.reload()">↻ Réessayer</button>';
+    }
+    document.body.appendChild(box);
+  }
 
   // ── Écran de configuration hors-ligne ───────────────────────────────────────
   function renderSetup() {
@@ -103,28 +156,46 @@
     // autoriser 0 (vrai solo : le joueur seul, ex. Le juste prix) via
     // offline:{ soloMinBots: 0 }.
     var loBots = (off.soloMinBots != null) ? off.soloMinBots : 1;
+    // Jeu SOLO PUR (puzzle au chrono : Sudoku, Zip, Patches…) : aucun adversaire
+    // ordi, on cache le compteur d'adversaires et on parle de « Difficulté ».
+    var noBots = mode === 'solo' && off.soloNoBots;
     var controls = '';
     if (mode === 'solo') {
-      if (max > 2) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
-      // Difficulté des ordis (présente dès qu'il peut y avoir au moins un ordi).
-      if (max - 1 >= 1) controls += diffRow();
+      if (max > 2 && !noBots) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
+      // Difficulté (des ordis, ou de la grille pour un solo pur).
+      if (max - 1 >= 1) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
     }
     var sub = mode === 'solo'
-      ? (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi')
+      ? (noBots ? 'Toi contre le chrono ⏱' : (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi'))
       : 'Chacun son tour, on se passe l\'appareil';
+    // Reprise d'une partie interrompue (le plus utile en avion) : proposée en tête,
+    // avant les réglages, si un snapshot valide existe pour ce jeu et ce mode.
+    var saved = loadResume();
+    var resumeBtn = saved
+      ? '<button class="lb-btn" id="off-resume" style="background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff">▶ Reprendre la partie</button>' +
+        '<div style="margin:-6px 0 14px;font-size:.82rem;color:var(--ink-light)">' + resumeAgeLabel(saved.ts) + ' · <button id="off-resume-drop" style="background:none;border:none;color:var(--ink-light);text-decoration:underline;cursor:pointer;font:inherit;padding:0">effacer</button></div>'
+      : '';
     host.innerHTML =
       '<div class="lb-wrap">' +
         (cfg.emoji ? '<div class="lb-emoji-big">' + cfg.emoji + '</div>' : '') +
         '<h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
         '<p class="lb-sub">' + (mode === 'solo' ? '🤖 Solo' : '📱 Local') + ' · ' + sub + '</p>' +
+        (window.GameStats ? GameStats.summaryHTML(cfg.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
+        resumeBtn +
         controls +
-        '<button class="lb-btn" id="off-start">Commencer</button>' +
+        '<button class="lb-btn" id="off-start">' + (saved ? 'Nouvelle partie' : 'Commencer') + '</button>' +
         '<a class="lb-link" href="' + location.pathname + '">↺ Passer en mode en ligne</a>' +
-        '<a class="lb-link" href="index.html">← Tous les jeux</a>' +
+        '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
       '</div>';
     document.getElementById('off-start').onclick = startFromSetup;
+    if (saved) {
+      var rb = document.getElementById('off-resume');
+      if (rb) rb.onclick = function () { resumeGame(loadResume()); };
+      var rd = document.getElementById('off-resume-drop');
+      if (rd) rd.onclick = function () { clearResume(); renderSetup(); };
+    }
     // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
     host.querySelectorAll('.off-set-row').forEach(function (row) {
       row.addEventListener('click', function (e) {
@@ -139,7 +210,7 @@
     host.innerHTML = '<div class="lb-wrap"><div class="lb-emoji-big">🚫</div><h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
       '<p class="lb-sub">' + esc(msg) + '</p>' +
       '<a class="lb-btn" href="' + location.pathname + '">Jouer en ligne</a>' +
-      '<a class="lb-link" href="index.html">← Tous les jeux</a></div>';
+      '<a class="lb-link" href="/index.html">← Tous les jeux</a></div>';
     showScreen('s-home');
   }
   function counterRow(label, lo, hi, initial) {
@@ -147,19 +218,20 @@
     for (var v = lo; v <= hi; v++) btns += '<button type="button" class="off-num' + (v === initial ? ' active' : '') + '" data-val="' + v + '">' + v + '</button>';
     return '<div class="off-set"><div class="off-set-label">' + label + '</div><div class="off-set-row">' + btns + '</div></div>';
   }
-  function diffRow() {
+  function diffRow(label) {
     var B = window.Bots || { LEVELS: ['easy', 'normal', 'hard'], LABELS: { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' } };
     var def = 'normal';
     var btns = B.LEVELS.map(function (lv) {
       return '<button type="button" class="off-diff' + (lv === def ? ' active' : '') + '" data-diff="' + lv + '">' + B.LABELS[lv] + '</button>';
     }).join('');
-    return '<div class="off-set"><div class="off-set-label">Niveau des ordis</div><div class="off-set-row">' + btns + '</div></div>';
+    return '<div class="off-set"><div class="off-set-label">' + (label || 'Niveau des ordis') + '</div><div class="off-set-row">' + btns + '</div></div>';
   }
   function startFromSetup() {
     var min = cfg.minPlayers || 2, max = cfg.maxPlayers || 8;
+    var noBots = mode === 'solo' && cfg.offline && cfg.offline.soloNoBots;
     var active = document.querySelector('.off-num.active');
     var val = active ? +active.dataset.val : min;
-    if (mode === 'solo') totalPlayers = (max > 2) ? (1 + val) : 2;
+    if (mode === 'solo') totalPlayers = noBots ? 1 : ((max > 2) ? (1 + val) : 2);
     else totalPlayers = (max > 2) ? val : min;
     // En solo « 0 adversaire autorisé », le plancher tombe à 1 (joueur seul).
     var soloPure = (mode === 'solo' && cfg.offline && cfg.offline.soloMinBots === 0);
@@ -174,6 +246,8 @@
   var BOT_EMOJI = ['🤖', '👾', '🐲', '🦾'];
 
   function startGame(savedKeep) {
+    endFx = false; // ré-arme le son/confetti de fin pour cette nouvelle partie
+    statsRecorded = false;
     var id0 = readIdentity();
     var pmap = {}, ids = [];
     players = [];
@@ -216,6 +290,64 @@
     startGame(saved);
   }
 
+  // ── Sauvegarde / reprise d'une partie hors-ligne (le plus utile en avion) ────
+  //  Tout l'état durable d'un jeu de plateau/cartes vit dans `room` : le jeu se
+  //  re-rend intégralement depuis `room` via onState (comme un client qui rejoint
+  //  une partie en cours). On sérialise donc `room` dans localStorage à chaque
+  //  changement ; « Reprendre » recharge ce snapshot. On EXCLUT les puzzles-chrono
+  //  (soloNoBots : leur grille vit dans les variables locales de la page, pas dans
+  //  `room`) et le défi du jour (grille imposée par la date).
+  function resumeKey() { return 'games.resume.' + ((cfg && cfg.gameKey) || 'x') + '.' + mode; }
+  function canResume() { return !!cfg && !(cfg.offline && cfg.offline.soloNoBots) && !daily; }
+  function saveResume() {
+    if (!canResume() || !room) return;
+    if (ended() || room.status !== 'playing') { clearResume(); return; }
+    try {
+      localStorage.setItem(resumeKey(), JSON.stringify({
+        v: 1, ts: Date.now(), room: room,
+        totalPlayers: totalPlayers, offlineDifficulty: offlineDifficulty
+      }));
+    } catch (e) {}
+  }
+  function clearResume() { try { localStorage.removeItem(resumeKey()); } catch (e) {} }
+  function resumeAgeLabel(ts) {
+    var m = Math.max(0, Math.round((Date.now() - (ts || 0)) / 60000));
+    if (m < 1) return 'sauvegardée à l\'instant';
+    if (m < 60) return 'interrompue il y a ' + m + ' min';
+    var h = Math.round(m / 60);
+    return 'interrompue il y a ' + h + ' h';
+  }
+  function loadResume() {
+    if (!canResume()) return null;
+    try {
+      var raw = localStorage.getItem(resumeKey()); if (!raw) return null;
+      var d = JSON.parse(raw);
+      if (!d || !d.room || d.room.game !== cfg.gameKey || d.room.status !== 'playing') return null;
+      return d;
+    } catch (e) { return null; }
+  }
+  // Repart d'un snapshot sauvegardé : on reconstruit l'état moteur puis on laisse
+  // afterChange re-rendre le jeu (et relancer l'ordi si c'est son tour).
+  function resumeGame(saved) {
+    if (!saved || !saved.room) { renderSetup(); return; }
+    endFx = false;
+    room = saved.room;
+    var order = (room.order && room.order.length) ? room.order : Object.keys(room.players || {});
+    totalPlayers = saved.totalPlayers || order.length;
+    offlineDifficulty = saved.offlineDifficulty || room.difficulty || 'normal';
+    players = order.map(function (pid) {
+      var p = (room.players || {})[pid] || {};
+      return { pid: pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat, isBot: !!p.isBot };
+    });
+    humanPids = players.filter(function (p) { return !p.isBot; }).map(function (p) { return p.pid; });
+    humanPid = humanPids[0];
+    window.room = room;
+    window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
+    lastTurnShown = null;
+    hidePass();
+    afterChange();
+  }
+
   // ── Après chaque changement d'état : router l'écran / faire jouer l'ordi ──────
   function safeOnState() { try { if (cfg.onState) cfg.onState(snap()); } catch (e) { console.error(e); } }
 
@@ -233,15 +365,25 @@
     if (mode === 'solo') {
       window.myPid = humanPid;
       safeOnState();
+      try { if (window.Lobby && Lobby.turnAlertFor) Lobby.turnAlertFor(room); } catch (e) {}
       if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
+      if (ended() && !endFx) { endFx = true; if (window.Sfx) Sfx.play(room.winner ? 'win' : 'lose'); }
+      if (daily && ended()) setTimeout(recordDaily, 450); // Défi du jour : enregistre + partage
+      // Stats par jeu (solo, hors défi du jour qui a son propre suivi) : une fois par partie.
+      if (ended() && !daily && window.GameStats && !statsRecorded) {
+        statsRecorded = true;
+        try { GameStats.record(cfg.gameKey, { won: room.winner === humanPid, timeMs: (room.players[humanPid] || {}).finishedAt || null }); } catch (e) {}
+      }
+      if (ended()) clearResume(); else saveResume();
     } else {
-      if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); return; }
+      if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); clearResume(); return; }
       window.myPid = active || room.turn || (room.order || [])[0];
       var changed = (active !== lastTurnShown);
       safeOnState();
       // À chaque changement de joueur actif : réinit éventuelle de l'état local du jeu.
       if (changed && cfg.offlineEnter) { try { cfg.offlineEnter(room, window.myPid); } catch (e) {} }
       if (changed && active) { showPass(active); lastTurnShown = active; }
+      saveResume();
     }
   }
 

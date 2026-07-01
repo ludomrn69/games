@@ -12,8 +12,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Vérifs (syntaxe JS + cohérence index/sw + JSON)
         run: node tools/check.js
-      - name: Banc d'essai des IA (taux de victoire attendus)
+      - name: README à jour avec le catalogue index.html
+        run: node tools/gen-readme.js --check
+      - name: Bundle des scripts communs (common.js) à jour avec ses sources
+        run: node tools/gen-common.js --check
+      - name: Version du cache (sw.js) à jour avec le contenu préchargé
+        run: node tools/gen-sw-version.js --check
+      - name: Banc d'essai des IA de recherche (taux de victoire attendus)
         run: node tools/bench.js
+      - name: Banc d'essai des IA des jeux (légalité + force vs aléatoire)
+        run: node tools/bench-games.js
+      - name: Tests de la brique puzzle-course (déterminisme + classement)
+        run: node tools/bench-puzzles.js
+      - name: Générateurs de puzzles (grilles valides + solvables)
+        run: node tools/bench-generators.js
+      - name: Mode hors-ligne / avion (solo + défi du jour sans réseau)
+        run: node tools/bench-offline.js
+      - name: "Playus Arena (smoke test : chaque mini-jeu charge, démarre et tourne)"
+        run: node tools/bench-playus.js
+      - name: "Aventuriers du Rail (moteur : plus long chemin, scoring, parties complètes)"
+        run: node tools/bench-aventuriers.js

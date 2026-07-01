@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Descend · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:linear-gradient(180deg,#e8524a,#7a1f1f);display:flex;flex-direction:column;align-items:center;touch-action:none}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#ffdada;text-decoration:none;font-size:1.4rem}.score{font-size:1.7rem}.best{font-size:.8rem;color:#ffc2c2}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:absolute;bottom:20px;left:0;right:0;text-align:center;color:#ffdada;font-weight:700;font-size:.9rem;pointer-events:none}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(60,10,10,.82);backdrop-filter:blur(6px)}
+  .screen.hidden{display:none}.screen h1{font-size:2.2rem;font-weight:900}.screen p{color:#ffdada;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#333,#111);box-shadow:0 8px 24px rgba(0,0,0,.4);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint">Touche gauche / droite pour guider la bille</div>
+    <div class="screen" id="start"><h1>🔵 Descend</h1><p>La bille descend dans un tunnel qui serpente de plus en plus vite. Reste au milieu du couloir sans toucher les parois&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Aïe&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">distance</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  var BEST='playus_descend_best',best=+localStorage.getItem(BEST)||0;
+  function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
+  // Le tunnel défile vers le haut. Chaque rangée a un centre (centerX) et une
+  // largeur ; l'ensemble forme un couloir sinueux. La bille (fixe en y) se déplace
+  // en x ; si elle sort du couloir, game over.
+  var state,score,rows,rowH,scroll,speed,bx,dir,phase,amp,width,dist;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function centerFor(worldY){return W/2+Math.sin(worldY*0.010)*W*0.22+Math.sin(worldY*0.023+1.3)*W*0.12;}
+  function widthFor(d){return Math.max(W*0.20,W*0.42-d*0.00003*W);}
+  function start(){resize();score=0;dist=0;scroll=0;speed=Math.max(2.6,H*0.0045);bx=W/2;dir=0;
+    state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');}
+  function end(){state='over';document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='distance';showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  function setDir(e){if(state!=='play')return;var rect=cv.getBoundingClientRect();dir=(e.clientX-rect.left)<W/2?-1:1;}
+  stage.addEventListener('pointerdown',setDir);stage.addEventListener('pointermove',function(e){if(dir)setDir(e);});
+  stage.addEventListener('pointerup',function(){dir=0;});stage.addEventListener('pointercancel',function(){dir=0;});
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);var by=H*0.68,r=Math.max(11,W*0.032);
+    if(state==='play'){scroll+=speed;dist+=speed;speed+=0.0011;score=Math.floor(dist/40);scoreEl.textContent=score;
+      bx+=dir*Math.max(3.4,W*0.010);bx=Math.max(r,Math.min(W-r,bx));
+      var worldY=scroll+(H-by);var c=centerFor(worldY),wdt=widthFor(dist);
+      if(bx<c-wdt/2+r||bx>c+wdt/2-r)end();
+    }
+    // parois du tunnel
+    ctx.fillStyle='#1a0808';
+    for(var y=-4;y<H+4;y+=6){var worldY=scroll+(H-y);var c=centerFor(worldY),wdt=widthFor(dist- (y-by));
+      ctx.fillRect(0,y,c-wdt/2,7);ctx.fillRect(c+wdt/2,y,W-(c+wdt/2),7);}
+    // liseré du couloir
+    ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=3;
+    ctx.beginPath();for(var y2=0;y2<=H;y2+=8){var wy=scroll+(H-y2);var c2=centerFor(wy),w2=widthFor(dist-(y2-by));ctx.lineTo(c2-w2/2,y2);}ctx.stroke();
+    ctx.beginPath();for(var y3=0;y3<=H;y3+=8){var wy3=scroll+(H-y3);var c3=centerFor(wy3),w3=widthFor(dist-(y3-by));ctx.lineTo(c3+w3/2,y3);}ctx.stroke();
+    // bille
+    ctx.beginPath();ctx.arc(bx,by,r,0,7);var grd=ctx.createRadialGradient(bx-r*0.3,by-r*0.3,r*0.2,bx,by,r);
+    grd.addColorStop(0,'#dff');grd.addColorStop(1,'#3f8fd6');ctx.fillStyle=grd;ctx.fill();
+  }
+  resize();frame();
+})();
+</script>
+</body>
+</html>

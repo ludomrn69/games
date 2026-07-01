@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Petit Bac 📝" data-emoji="📝"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .page-inner { width: 100%; max-width: 640px; margin: 0 auto; padding: 18px 18px 60px; }
+
+    .btn-primary { display: block; width: 100%; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* Réglages dans le salon (nombre de manches) */
+    .pb-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .pb-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+    .pb-rounds-row { display: flex; gap: 8px; justify-content: center; }
+    .pb-round-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; transition: all 0.18s; }
+    .pb-round-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .pb-cats-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .pb-cat-chip { border: 1.5px solid var(--gold-light); background: var(--cream); color: var(--ink-light); border-radius: 20px; padding: 4px 10px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+    .pb-cat-chip.on { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .pb-cat-add { display: flex; gap: 6px; }
+    .pb-cat-input { flex: 1; min-width: 0; padding: 0.45rem 0.7rem; border: 1.5px solid var(--gold-light); border-radius: 10px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; }
+    .pb-cat-addbtn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 10px; padding: 0 0.8rem; font-weight: 700; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
+
+    /* Playing */
+    .pb-head { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; }
+    html[data-theme="dark"] .pb-head { background: rgba(20,16,28,0.97); }
+    .pb-head-inner { max-width: 640px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .pb-round { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--ink-light); white-space: nowrap; }
+    .pb-big-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2.4rem; line-height: 1; background: linear-gradient(135deg, var(--terracotta), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .pb-head-actions { display: flex; gap: 6px; }
+
+    .input-list { width: 100%; max-width: 640px; margin: 0 auto; padding: 18px 16px 120px; display: flex; flex-direction: column; gap: 10px; }
+    .input-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 8px 12px; box-shadow: var(--shadow); }
+    .input-emoji { font-size: 1.2rem; }
+    .input-label { font-size: 0.85rem; font-weight: 700; color: var(--ink-light); width: 92px; flex-shrink: 0; }
+    .bac-input { flex: 1; min-width: 0; padding: 0.55rem 0.7rem; border: 1.5px solid var(--gold-light); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; background: var(--cream); color: var(--ink); }
+    .bac-input:focus { outline: none; border-color: var(--gold); }
+    .bac-input:disabled { opacity: 0.7; }
+
+    .buzz-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--cream) 60%, transparent); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 150; }
+    .buzz-notif { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); }
+    .btn-buzz { width: 100%; max-width: 420px; padding: 1rem; border: none; border-radius: 50px; font-family: 'DM Sans', sans-serif; font-size: 1.1rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, #d6584e, var(--terracotta)); box-shadow: 0 6px 20px rgba(214,88,78,0.4); cursor: pointer; transition: transform 0.15s; }
+    .btn-buzz:active { transform: scale(0.97); }
+    .btn-buzz:disabled { opacity: 0.5; }
+
+    /* Reviewing */
+    .pb-review-head { text-align: center; margin-bottom: 14px; }
+    .pb-review-round { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); }
+    .pb-review-letter { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; background: linear-gradient(135deg, var(--terracotta), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .pb-cat { background: var(--white); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); margin-bottom: 12px; }
+    .pb-cat-title { font-size: 0.82rem; font-weight: 800; color: var(--ink-light); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .pb-ans-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; cursor: pointer; transition: background 0.15s; }
+    .pb-ans-row:hover { background: var(--cream); }
+    .pb-ans-av { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+    .pb-ans-name { font-size: 0.8rem; color: var(--ink-light); width: 64px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pb-ans-word { flex: 1; font-weight: 700; font-size: 0.98rem; }
+    .pb-ans-row.invalid .pb-ans-word { text-decoration: line-through; opacity: 0.5; }
+    .pb-ans-word.empty { color: var(--ink-light); font-style: italic; font-weight: 400; }
+    .pb-ans-pts { font-weight: 800; font-size: 0.95rem; width: 34px; text-align: right; flex-shrink: 0; }
+    .pb-review-scores { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 16px; }
+    .pb-score-chip { display: flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 5px 12px 5px 6px; box-shadow: var(--shadow); font-weight: 700; font-size: 0.9rem; }
+    .pb-score-chip .av { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; }
+    .pb-review-msg { text-align: center; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); min-height: 24px; margin-top: 8px; }
+    .pb-tip { text-align: center; font-size: 0.8rem; color: var(--ink-light); margin-bottom: 12px; }
+
+    /* Results */
+    .pb-results { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .pb-trophy { font-size: 3.4rem; margin-bottom: 8px; }
+    .pb-headline { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 900; margin-bottom: 18px; }
+    .pb-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+    .pb-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .pb-rank-pos { font-weight: 800; width: 26px; }
+    .pb-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .pb-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .pb-rank-score { font-weight: 800; color: var(--gold); }
+
+    .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="pb-head">
+        <div class="pb-head-inner">
+          <span class="pb-round" id="pb-round">Manche 1</span>
+          <span class="pb-big-letter" id="pb-letter">A</span>
+          <div class="pb-head-actions">
+            <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+            <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+          </div>
+        </div>
+      </div>
+      <div class="input-list" id="input-list"></div>
+      <div class="buzz-bar">
+        <div id="buzz-notif" class="buzz-notif" style="display:none"></div>
+        <button id="btn-buzz" class="btn-buzz" onclick="handleStop()">J'ai fini ! ✋</button>
+      </div>
+    </div>
+
+    <!-- ══ REVIEWING ══ -->
+    <div id="s-reviewing" class="screen">
+      <div class="page-inner">
+        <div class="pb-review-head">
+          <div class="pb-review-round" id="pb-review-round">Manche 1</div>
+          <div class="pb-review-letter" id="pb-review-letter">Lettre A</div>
+        </div>
+        <div class="pb-tip">Touche une réponse pour la contester (mot invalide, mauvaise lettre…)</div>
+        <div class="pb-review-scores" id="pb-review-scores"></div>
+        <div id="pb-review-list"></div>
+        <button id="btn-next-round" class="btn-primary" onclick="setReviewReady()">Manche suivante ▶</button>
+        <div class="pb-review-msg" id="pb-review-msg"></div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="pb-results">
+        <div class="pb-trophy" id="pb-trophy">🏆</div>
+        <h2 class="pb-headline" id="pb-headline">Résultats</h2>
+        <div class="pb-rank" id="pb-rank"></div>
+        <button class="btn-primary" style="max-width:320px" onclick="handleReplay()">Rejouer</button>
+        <button class="btn-link mt-4" onclick="window.location.href='/index.html'">← Accueil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour à la salle d'attente.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Petit Bac</div>
+      <div class="modal-body">
+        <p>Une <b>lettre</b> est tirée. Remplis chaque catégorie avec un mot commençant par cette lettre.</p>
+        <p style="margin-top:10px">Le premier qui a tout rempli appuie sur <b>J'ai fini !</b> — ça bloque tout le monde.</p>
+        <p style="margin-top:10px">Scores : <b>2 pts</b> par réponse valide et unique, <b>1 pt</b> si quelqu'un d'autre a le même mot, <b>0</b> si vide / invalide. Touche une réponse pour la contester.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Constantes ━━ */
+    var ALL_LETTERS = 'ABCDEFGHIJLMNOPRSTV'.split('');
+    var CATEGORIES = [
+      { id: 'prenom',         label: 'Prénom',           emoji: '👤' },
+      { id: 'pays',           label: 'Pays',             emoji: '🌍' },
+      { id: 'ville',          label: 'Ville',            emoji: '🏙️' },
+      { id: 'fruits_legumes', label: 'Fruit / Légume',   emoji: '🍓' },
+      { id: 'marque',         label: 'Marque',           emoji: '🏷️' },
+      { id: 'metier',         label: 'Métier',           emoji: '💼' },
+      { id: 'personnalite',   label: 'Personnalité',     emoji: '⭐' },
+      { id: 'film_serie',     label: 'Film / Série',     emoji: '🎬' },
+      { id: 'animaux',        label: 'Animal',           emoji: '🦁' }
+    ];
+    // Catégories ACTIVES : choisies dans le salon (room.cats), figées au lancement
+    // dans state.cats. Par défaut, les 9 ci-dessus.
+    function curCats() { return (window.room && window.room.cats) || CATEGORIES; }
+
+    /* ━━ State local ━━ */
+    var prevStatus = null;
+    var inputsBuilt = false;
+    var buzzWrittenFor = null;   // round pour lequel j'ai déjà écrit mes réponses
+    var buzzTimer = null;
+    var answersSyncTimer = null; // sauvegarde « au fil de l'eau » des réponses
+
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+
+    /* ━━ Scoring ━━ */
+    function normalize(s) { return (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+    function startsWithLetter(s, letter) { var n = normalize(s); var L = normalize(letter); return n.length > 0 && n[0] === L; }
+
+    function computeRound(letter, order, answers, invalid) {
+      var perCat = {}, totals = {};
+      order.forEach(function (p) { totals[p] = 0; });
+      curCats().forEach(function (cat) {
+        var entries = order.map(function (pid) {
+          var raw = (answers[pid] && answers[pid][cat.id]) || '';
+          var contested = invalid[cat.id] && invalid[cat.id][pid];
+          var ok = !contested && startsWithLetter(raw, letter);
+          return { pid: pid, raw: raw, ok: ok, norm: normalize(raw) };
+        });
+        var counts = {};
+        entries.forEach(function (e) { if (e.ok) counts[e.norm] = (counts[e.norm] || 0) + 1; });
+        entries.forEach(function (e) {
+          e.pts = !e.ok ? 0 : (counts[e.norm] > 1 ? 1 : 2);
+          totals[e.pid] += e.pts;
+        });
+        perCat[cat.id] = entries;
+      });
+      return { perCat: perCat, totals: totals };
+    }
+
+    function drawLetter(used) {
+      var avail = ALL_LETTERS.filter(function (l) { return (used || []).indexOf(l) === -1; });
+      if (!avail.length) return null;
+      return avail[Math.floor(Math.random() * avail.length)];
+    }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'petit-bac',
+      name: 'Petit Bac',
+      emoji: '📝',
+      tagline: 'Une lettre, des catégories',
+      minPlayers: 2,
+      maxPlayers: 12,
+      rules: [
+        'Une lettre est tirée à chaque manche',
+        'Remplis chaque catégorie avec un mot commençant par cette lettre',
+        'Le premier qui a fini appuie sur « J\'ai fini ! » et bloque tout le monde',
+        '2 pts par réponse unique, 1 pt si partagée, 0 si vide/invalide'
+      ],
+      lobbyExtraHTML: lobbyExtraHTML,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* Réglages du salon : nombre de manches + choix des catégories. */
+    function lobbyExtraHTML(room) {
+      var sel = (room && room.maxRounds) || 5;
+      var btns = [3, 5, 7, 10].map(function (n) {
+        return '<button class="pb-round-btn' + (n === sel ? ' active' : '') + '" onclick="setMaxRounds(' + n + ')">' + n + '</button>';
+      }).join('');
+      var active = (room && room.cats) || CATEGORIES;
+      var activeIds = active.map(function (c) { return c.id; });
+      // chips des catégories intégrées (on/off) + les custom déjà ajoutées
+      var chips = curCats().map(function (c) {
+        var on = activeIds.indexOf(c.id) >= 0;
+        return '<button class="pb-cat-chip' + (on ? ' on' : '') + '" onclick="toggleCat(\'' + c.id + '\')">' + c.emoji + ' ' + c.label + (on ? ' ✓' : '') + '</button>';
+      }).join('');
+      var customs = active.filter(function (c) { return c.id.indexOf('custom_') === 0; }).map(function (c) {
+        return '<button class="pb-cat-chip on" onclick="toggleCat(\'' + c.id + '\')">✏️ ' + escapeHtml(c.label) + ' ✕</button>';
+      }).join('');
+      return '<div class="pb-settings"><div class="pb-settings-label">Nombre de manches</div><div class="pb-rounds-row">' + btns + '</div></div>' +
+        '<div class="pb-settings"><div class="pb-settings-label">Catégories (' + active.length + ')</div>' +
+        '<div class="pb-cats-row">' + chips + customs + '</div>' +
+        '<div class="pb-cat-add"><input id="pb-cat-new" class="pb-cat-input" maxlength="20" placeholder="Catégorie perso…"><button class="pb-cat-addbtn" onclick="addCat()">+ Ajouter</button></div></div>';
+    }
+    function setMaxRounds(n) { if (window.roomRef) window.roomRef.child('maxRounds').set(n); }
+    function lobbyCatsNow() { return (window.room && window.room.cats) ? window.room.cats.slice() : CATEGORIES.slice(); }
+    function toggleCat(id) {
+      var list = lobbyCatsNow(), i = list.map(function (c) { return c.id; }).indexOf(id);
+      if (i >= 0) { if (list.length <= 1) { lbToast('Garde au moins 1 catégorie'); return; } list.splice(i, 1); }
+      else { var def = CATEGORIES.filter(function (c) { return c.id === id; })[0]; if (def) list.push(def); }
+      if (window.roomRef) window.roomRef.child('cats').set(list);
+    }
+    function addCat() {
+      var inp = document.getElementById('pb-cat-new'); var v = (inp && inp.value || '').trim();
+      if (!v) return;
+      var list = lobbyCatsNow();
+      if (list.length >= 14) { lbToast('14 catégories max'); return; }
+      list.push({ id: 'custom_' + Date.now().toString(36), label: v, emoji: '✏️' });
+      if (window.roomRef) window.roomRef.child('cats').set(list);
+      if (inp) inp.value = '';
+    }
+
+    /* ━━ État initial d'une partie ━━ */
+    function onStart(players, cur) {
+      var letter = drawLetter([]);
+      var scores = {};
+      players.forEach(function (p) { scores[p.pid] = 0; });
+      return {
+        round: 1,
+        maxRounds: (cur && cur.maxRounds) || 5,
+        cats: (cur && cur.cats) || CATEGORIES,   // catégories figées pour la partie
+        currentLetter: letter,
+        usedLetters: [letter],
+        scores: scores,
+        answers: null,
+        invalid: null,
+        buzzedBy: null
+      };
+    }
+
+    /* ━━ Réception de l'état ━━ */
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+
+      if (status !== 'buzzing' && buzzTimer) { clearTimeout(buzzTimer); buzzTimer = null; }
+
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') enterPlaying(state);
+        else updatePlayHeader(state);
+      } else if (status === 'buzzing') {
+        handleBuzzing(state);
+      } else if (status === 'reviewing') {
+        showReview(state);
+      } else if (status === 'ended') {
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Jeu ━━ */
+    function buildInputs() {
+      var list = document.getElementById('input-list');
+      list.innerHTML = curCats().map(function (cat) {
+        return '<div class="input-row"><span class="input-emoji">' + cat.emoji + '</span>' +
+          '<span class="input-label">' + cat.label + '</span>' +
+          '<input type="text" id="input-' + cat.id + '" class="bac-input" autocomplete="off" maxlength="40"></div>';
+      }).join('');
+      // Synchronisation au fil de la saisie : quand quelqu'un buzze, les réponses
+      // déjà tapées sont en base, même si cet onglet est en arrière-plan au moment
+      // du buzz (les timers throttlés ne peuvent plus rien perdre).
+      list.querySelectorAll('.bac-input').forEach(function (inp) { inp.addEventListener('input', scheduleAnswerSync); });
+      inputsBuilt = true;
+    }
+
+    function scheduleAnswerSync() {
+      if (answersSyncTimer) clearTimeout(answersSyncTimer);
+      answersSyncTimer = setTimeout(function () {
+        answersSyncTimer = null;
+        if ((window.room || {}).status === 'playing') writeMyAnswers();
+      }, 500);
+    }
+    function enterPlaying(state) {
+      if (!inputsBuilt) buildInputs();
+      // reset des champs pour la nouvelle manche
+      if (answersSyncTimer) { clearTimeout(answersSyncTimer); answersSyncTimer = null; }
+      curCats().forEach(function (cat) { var i = document.getElementById('input-' + cat.id); if (i) { i.value = ''; i.disabled = false; } });
+      buzzWrittenFor = null;
+      var notif = document.getElementById('buzz-notif'); if (notif) notif.style.display = 'none';
+      var btn = document.getElementById('btn-buzz'); if (btn) { btn.disabled = false; btn.textContent = "J'ai fini ! ✋"; }
+      updatePlayHeader(state);
+      showScreen('s-playing');
+      var first = document.getElementById('input-' + curCats()[0].id);
+      if (first) setTimeout(function () { first.focus(); }, 150);
+    }
+    function updatePlayHeader(state) {
+      setText('pb-round', 'Manche ' + (state.round || 1) + '/' + (state.maxRounds || 5));
+      setText('pb-letter', state.currentLetter || '?');
+    }
+    function collectAnswers() {
+      var ans = {};
+      curCats().forEach(function (cat) {
+        var i = document.getElementById('input-' + cat.id);
+        var v = (i && i.value || '').trim();
+        if (v) ans[cat.id] = v;
+      });
+      return ans;
+    }
+    function lockInputs() {
+      curCats().forEach(function (cat) { var i = document.getElementById('input-' + cat.id); if (i) i.disabled = true; });
+      var btn = document.getElementById('btn-buzz'); if (btn) btn.disabled = true;
+    }
+    function writeMyAnswers() {
+      rref().child('answers/' + window.myPid).set(collectAnswers());
+    }
+
+    function handleStop() {
+      var st = window.room || {};
+      if (st.status !== 'playing') return;
+      writeMyAnswers();
+      buzzWrittenFor = st.round;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing') return cur;
+        cur.status = 'buzzing';
+        cur.buzzedBy = window.myPid;
+        cur.buzzAt = firebase.database.ServerValue.TIMESTAMP;
+        return cur;
+      });
+    }
+
+    function handleBuzzing(state) {
+      showScreen('s-playing');
+      lockInputs();
+      // J'écris mes réponses si pas encore fait pour cette manche.
+      if (buzzWrittenFor !== state.round) { writeMyAnswers(); buzzWrittenFor = state.round; }
+      var notif = document.getElementById('buzz-notif');
+      if (notif) {
+        notif.style.display = 'block';
+        var who = state.buzzedBy === window.myPid ? 'Tu' : Room.name(state.buzzedBy);
+        notif.textContent = who + ' a fini ! On compte les points…';
+      }
+      // Après un court délai, on passe à la révision (n'importe quel client, une seule fois).
+      if (!buzzTimer) {
+        buzzTimer = setTimeout(function () {
+          buzzTimer = null;
+          rref().transaction(function (cur) {
+            if (!cur || cur.status !== 'buzzing') return cur;
+            cur.status = 'reviewing';
+            return cur;
+          });
+        }, 2200);
+      }
+    }
+
+    /* ━━ Révision ━━ */
+    function showReview(state) {
+      showScreen('s-reviewing');
+      setText('pb-review-round', 'Manche ' + (state.round || 1) + '/' + (state.maxRounds || 5));
+      setText('pb-review-letter', 'Lettre ' + (state.currentLetter || '?'));
+
+      var order = state.order || [];
+      var res = computeRound(state.currentLetter, order, state.answers || {}, state.invalid || {});
+
+      // Scores cumulés (chips)
+      document.getElementById('pb-review-scores').innerHTML = order.map(function (pid) {
+        var tot = (state.scores && state.scores[pid]) || 0;
+        return '<span class="pb-score-chip"><span class="av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' ' + tot + ' <span style="color:var(--sage)">(+' + res.totals[pid] + ')</span></span>';
+      }).join('');
+
+      // Liste par catégorie
+      document.getElementById('pb-review-list').innerHTML = curCats().map(function (cat) {
+        var entries = res.perCat[cat.id] || [];
+        var rows = entries.map(function (e) {
+          var contested = state.invalid && state.invalid[cat.id] && state.invalid[cat.id][e.pid];
+          var word = e.raw ? escapeHtml(e.raw) : '—';
+          return '<div class="pb-ans-row' + (contested ? ' invalid' : '') + '" data-cat="' + cat.id + '" data-pid="' + e.pid + '">' +
+            '<span class="pb-ans-av" style="background:' + Room.color(e.pid) + '">' + Room.emoji(e.pid) + '</span>' +
+            '<span class="pb-ans-name">' + escapeHtml(Room.name(e.pid)) + '</span>' +
+            '<span class="pb-ans-word' + (e.raw ? '' : ' empty') + '">' + word + '</span>' +
+            '<span class="pb-ans-pts" style="color:' + (e.pts ? 'var(--sage)' : 'var(--ink-light)') + '">+' + e.pts + '</span></div>';
+        }).join('');
+        return '<div class="pb-cat"><div class="pb-cat-title">' + cat.emoji + ' ' + cat.label + '</div>' + rows + '</div>';
+      }).join('');
+
+      updateReviewReadyUI(state);
+    }
+
+    // Contestation d'une réponse (clic) — bascule invalid[cat][pid].
+    document.addEventListener('click', function (e) {
+      var row = e.target.closest && e.target.closest('.pb-ans-row');
+      if (!row) return;
+      if (!document.getElementById('s-reviewing').classList.contains('active')) return;
+      var cat = row.dataset.cat, pid = row.dataset.pid;
+      var path = 'invalid/' + cat + '/' + pid;
+      rref().child(path).transaction(function (v) { return v ? null : true; });
+    });
+
+    function updateReviewReadyUI(state) {
+      var order = state.order || [];
+      var online = order.filter(function (pid) { return state.players && state.players[pid] && state.players[pid].online; });
+      var ready = online.filter(function (pid) { return state.players[pid].reviewReady; });
+      var meReady = state.players && state.players[window.myPid] && state.players[window.myPid].reviewReady;
+      var btn = document.getElementById('btn-next-round');
+      if (btn) { btn.disabled = !!meReady; btn.textContent = meReady ? 'En attente… (' + ready.length + '/' + online.length + ')' : 'Manche suivante ▶'; }
+      setText('pb-review-msg', meReady ? 'En attente des autres joueurs…' : 'Vérifiez ensemble, puis validez');
+    }
+
+    function setReviewReady() {
+      rref().child('players/' + window.myPid + '/reviewReady').set(true, function () {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'reviewing') return cur;
+          var order = cur.order || [];
+          var online = order.filter(function (pid) { return cur.players[pid] && cur.players[pid].online; });
+          if (!online.length || !online.every(function (pid) { return cur.players[pid].reviewReady; })) return cur;
+          // Calcul des points de la manche
+          var res = computeRound(cur.currentLetter, order, cur.answers || {}, cur.invalid || {});
+          cur.scores = cur.scores || {};
+          order.forEach(function (pid) { cur.scores[pid] = (cur.scores[pid] || 0) + res.totals[pid]; });
+          order.forEach(function (pid) { if (cur.players[pid]) cur.players[pid].reviewReady = false; });
+          var isLast = (cur.round || 1) >= (cur.maxRounds || 5);
+          if (isLast) { cur.status = 'ended'; return cur; }
+          var letter = drawLetter(cur.usedLetters || []);
+          if (!letter) { cur.status = 'ended'; return cur; }
+          cur.status = 'playing';
+          cur.currentLetter = letter;
+          cur.usedLetters = (cur.usedLetters || []).concat([letter]);
+          cur.round = (cur.round || 1) + 1;
+          cur.answers = null;
+          cur.invalid = null;
+          cur.buzzedBy = null;
+          cur.buzzAt = null;
+          return cur;
+        });
+      });
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice();
+      var scores = state.scores || {};
+      order.sort(function (a, b) { return (scores[b] || 0) - (scores[a] || 0); });
+      var top = scores[order[0]] || 0;
+      var winners = order.filter(function (pid) { return (scores[pid] || 0) === top; });
+      var iWon = winners.indexOf(window.myPid) >= 0;
+      setText('pb-trophy', winners.length > 1 ? '🤝' : '🏆');
+      var headline = winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu as gagné !' : Room.name(order[0]) + ' a gagné');
+      setText('pb-headline', headline);
+      var medals = ['🥇', '🥈', '🥉'];
+      document.getElementById('pb-rank').innerHTML = order.map(function (pid, i) {
+        return '<div class="pb-rank-row"><span class="pb-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="pb-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="pb-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="pb-rank-score">' + (scores[pid] || 0) + ' pts</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

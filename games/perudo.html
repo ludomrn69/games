@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Perudo 🎲" data-emoji="🎲"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.5; }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .pd-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .pd-head { background: rgba(20,16,28,0.97); }
+    .pd-round-label { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--gold); white-space: nowrap; }
+    .pd-head-actions { display: flex; gap: 6px; }
+
+    .pd-players { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 10px 12px 4px; }
+    .pd-pl { display: flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 4px 12px 4px 5px; box-shadow: var(--shadow); font-size: 0.82rem; font-weight: 700; border: 2px solid transparent; }
+    .pd-pl.turn { border-color: var(--terracotta); }
+    .pd-pl.dead { opacity: 0.4; }
+    .pd-pl-av { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .pd-pl .dc { color: var(--terracotta); font-weight: 800; }
+
+    .pd-bid { text-align: center; padding: 10px; }
+    .pd-bid-label { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); }
+    .pd-bid-val { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.7rem; color: var(--terracotta); margin-top: 2px; }
+    .pd-bid-val .die { font-size: 1.9rem; vertical-align: -2px; }
+    .pd-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--gold); min-height: 26px; padding: 2px 12px; }
+
+    .pd-reveal { display: flex; flex-direction: column; gap: 6px; padding: 6px 12px; }
+    .pd-reveal-row { display: flex; align-items: center; gap: 8px; background: var(--white); border-radius: 12px; padding: 6px 10px; box-shadow: var(--shadow); }
+    .pd-reveal-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex: 0 0 auto; }
+    .pd-reveal-name { font-size: 0.8rem; font-weight: 700; flex: 0 0 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pd-dice { display: flex; gap: 3px; flex-wrap: wrap; }
+    .pd-die { font-size: 1.5rem; line-height: 1; color: var(--ink); }
+    .pd-die.hit { color: var(--terracotta); }
+
+    .pd-myzone { max-width: 460px; margin: 8px auto 0; padding: 0 14px calc(18px + env(safe-area-inset-bottom)); text-align: center; }
+    .pd-mylabel { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); margin-bottom: 4px; }
+    .pd-myhand { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
+    .pd-myhand .pd-die { font-size: 2.4rem; }
+    .pd-picker { background: var(--white); border-radius: 18px; padding: 12px; box-shadow: var(--shadow); margin-bottom: 10px; }
+    .pd-qty { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px; }
+    .pd-qty button { width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid var(--gold-light); background: var(--cream); font-size: 1.4rem; font-weight: 800; cursor: pointer; color: var(--ink); }
+    .pd-qty-val { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; min-width: 40px; }
+    .pd-faces { display: flex; gap: 6px; justify-content: center; margin-bottom: 4px; }
+    .pd-face { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid var(--gold-light); background: var(--cream); font-size: 1.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .pd-face.sel { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .pd-face .ace { font-size: 0.9rem; font-weight: 800; }
+    .pd-actions { display: flex; gap: 10px; }
+    .pd-act { flex: 1; border: none; border-radius: 16px; padding: 0.85rem 0.5rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.98rem; cursor: pointer; box-shadow: var(--shadow); }
+    .pd-act.bid { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .pd-act.dudo { background: linear-gradient(135deg, #e79a92, #cf5347); color: #fff; }
+    .pd-act:disabled { opacity: 0.45; cursor: default; }
+    .pd-wait { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); padding: 12px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-sub { color: var(--ink-light); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="pd-head">
+        <span class="pd-round-label" id="pd-round-label">Manche 1</span>
+        <div class="pd-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="pd-players" id="pd-players"></div>
+      <div class="pd-bid" id="pd-bid"></div>
+      <div class="pd-banner" id="pd-banner"></div>
+      <div id="pd-reveal"></div>
+      <div class="pd-myzone" id="pd-myzone"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🎲</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-sub" id="res-sub"></div>
+      <button class="btn-primary mt-4" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🎲 Perudo</div>
+      <div class="modal-body">
+        <p>Chacun a 5 dés cachés sous son gobelet. À ton tour, tu <b>surenchéris</b> sur le nombre de dés d'une valeur présents sur la table (chez TOUT le monde) — ex. « quatre ⚄ ».</p>
+        <p style="margin-top:8px">• Surenchérir = plus de dés, ou autant de dés d'une valeur plus haute.</p>
+        <p style="margin-top:6px">• Les <b>⚀ (1) sont jokers</b> : ils comptent pour n'importe quelle valeur. Miser sur les ⚀ : la quantité requise est ~divisée par deux.</p>
+        <p style="margin-top:6px">• <b>Dudo !</b> : tu doutes de l'enchère précédente → on révèle tout et on compte. Si l'enchère tenait, TU perds un dé ; sinon c'est l'enchérisseur.</p>
+        <p style="margin-top:6px">• Plus de dés = éliminé. Dernier joueur avec des dés gagne.</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+
+    /* ━━ Constantes ━━ */
+    var START_DICE = 5;
+    var DIE = { 1: '⚀', 2: '⚁', 3: '⚂', 4: '⚃', 5: '⚄', 6: '⚅' };
+    function faceHTML(f) { return f === 1 ? '<span class="die">⚀</span>' : '<span class="die">' + DIE[f] + '</span>'; }
+
+    var prevStatus = null, pick = null; // pick : enchère en cours de composition (locale)
+
+    GameRoom({
+      gameKey: 'perudo', name: 'Perudo', emoji: '🎲', tagline: 'Dés menteurs & bluff',
+      minPlayers: 2, maxPlayers: 6,
+      rules: [
+        'Chacun 5 dés cachés · tu surenchéris sur le nombre d\'une valeur sur la table',
+        'Les ⚀ sont jokers (comptent pour tout)',
+        '« Dudo ! » pour contester : le perdant perd un dé',
+        'Dernier joueur avec des dés gagne'
+      ],
+      offline: { solo: true, local: true },
+      bot: perudoBot,
+      offlineEnter: function () { pick = null; if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    /* ━━ Helpers d'état ━━ */
+    function activePids(cur) { return (cur.order || []).filter(function (p) { return (cur.diceCount || {})[p] > 0; }); }
+    function activeCount(cur) { return activePids(cur).length; }
+    function totalDice(cur) { return activePids(cur).reduce(function (a, p) { return a + (cur.diceCount[p] || 0); }, 0); }
+    function nextActive(cur, from) {
+      var o = cur.order || [], i = o.indexOf(from), n = o.length;
+      for (var s = 1; s <= n; s++) { var p = o[(i + s) % n]; if ((cur.diceCount || {})[p] > 0) return p; }
+      return from;
+    }
+    // Une enchère nb = {qty,face} est-elle STRICTEMENT plus haute que cur ? (⚀ = jokers, règle du /2)
+    function isHigher(nb, cur) {
+      if (!nb || nb.qty < 1 || nb.face < 1 || nb.face > 6) return false;
+      if (!cur) return nb.qty >= 1;
+      var na = nb.face === 1, ca = cur.face === 1;
+      if (na && !ca) return nb.qty >= Math.ceil(cur.qty / 2);
+      if (!na && ca) return nb.qty >= cur.qty * 2 + 1;
+      if (na && ca) return nb.qty > cur.qty;
+      return (nb.qty > cur.qty) || (nb.qty === cur.qty && nb.face > cur.face);
+    }
+    function minQtyHigher(face, cur) { for (var q = 1; q <= 60; q++) if (isHigher({ qty: q, face: face }, cur)) return q; return 999; }
+
+    /* ━━ Manche ━━ */
+    function rollDice(cur) {
+      (cur.order || []).forEach(function (p) {
+        var n = (cur.diceCount || {})[p] || 0, d = [];
+        for (var i = 0; i < n; i++) d.push(1 + Math.floor(Math.random() * 6));
+        cur.players[p].dice = d;
+      });
+    }
+    function startRound(cur, starter) {
+      rollDice(cur);
+      cur.bid = null; cur.phase = 'bid'; cur.reveal = null;
+      cur.turn = ((cur.diceCount || {})[starter] > 0) ? starter : nextActive(cur, starter);
+      cur.banner = Room.name(cur.turn) + ' ouvre les enchères';
+    }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      cur.diceCount = {}; order.forEach(function (p) { cur.diceCount[p] = START_DICE; });
+      cur.round = 1; cur.winner = null;
+      startRound(cur, order[Math.floor(Math.random() * order.length)]);
+      return { winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { pick = null; showScreen('s-playing'); }
+        render(state);
+      } else if (status === 'ended') {
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Actions ━━ */
+    function makeBid(qty, face) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
+        if (!isHigher({ qty: qty, face: face }, cur.bid)) return cur;
+        if (qty > totalDice(cur)) return cur;
+        cur.bid = { qty: qty, face: face, by: window.myPid };
+        cur.banner = Room.name(window.myPid) + ' mise ' + qty + ' × ' + DIE[face];
+        cur.turn = nextActive(cur, window.myPid);
+        return cur;
+      });
+    }
+    function callDudo() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
+        if (!cur.bid) return cur;
+        var face = cur.bid.face, qty = cur.bid.qty, count = 0, dice = {};
+        activePids(cur).forEach(function (p) {
+          var d = (cur.players[p].dice || []); dice[p] = d.slice();
+          d.forEach(function (v) { if (v === face || (face !== 1 && v === 1)) count++; });
+        });
+        var bidder = cur.bid.by, challenger = window.myPid;
+        var loser = (count >= qty) ? challenger : bidder; // l'enchère tient → le contesteur perd
+        cur.diceCount[loser] = Math.max(0, (cur.diceCount[loser] || 0) - 1);
+        cur.reveal = { face: face, qty: qty, count: count, loser: loser, bidder: bidder, challenger: challenger, dice: dice };
+        cur.phase = 'reveal';
+        cur.banner = '🎲 Dudo ! ' + count + ' × ' + DIE[face] + ' sur la table — ' +
+          (loser === challenger ? 'l\'enchère tenait, ' : 'enchère trop haute, ') + Room.name(loser) + ' perd un dé';
+        // Prochain lanceur = le perdant (s'il lui reste des dés), sinon le suivant actif.
+        cur.turn = ((cur.diceCount[loser] || 0) > 0) ? loser : nextActive(cur, loser);
+        if (activeCount(cur) <= 1) { cur.status = 'ended'; cur.winner = activePids(cur)[0] || loser; }
+        return cur;
+      });
+    }
+    function continueRound() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal' || cur.turn !== window.myPid) return cur;
+        cur.round = (cur.round || 1) + 1;
+        startRound(cur, cur.turn);
+        return cur;
+      });
+    }
+
+    /* ━━ IA : estimation probabiliste ━━ */
+    function perudoBot(state, pid) {
+      if (state.status !== 'playing') return;
+      if (state.phase === 'reveal') { if (state.turn === pid) continueRound(); return; }
+      if (state.phase !== 'bid' || state.turn !== pid) return;
+      var my = (state.players[pid] || {}).dice || [];
+      var tot = totalDice(state), unknown = tot - my.length;
+      function myCount(face) { var n = 0; my.forEach(function (v) { if (v === face || (face !== 1 && v === 1)) n++; }); return n; }
+      function prob(face) { return face === 1 ? 1 / 6 : 1 / 3; } // 1/3 car les ⚀ comptent aussi
+      var bid = state.bid;
+
+      // Contester ? (si l'enchère en cours dépasse nettement l'espérance)
+      if (bid) {
+        var expStanding = myCount(bid.face) + unknown * prob(bid.face);
+        var margin = window.Bots ? window.Bots.pick(state, { easy: 1.8, normal: 1.1, hard: 0.7 }) : 1.1;
+        var doubtful = bid.qty > expStanding + margin;
+        if (window.Bots && window.Bots.shouldBlunder(state)) doubtful = Math.random() < 0.5;
+        if (doubtful) { callDudo(); return; }
+      }
+
+      // Sinon, composer la meilleure enchère valide (la plus « sûre »).
+      var best = null;
+      for (var face = 1; face <= 6; face++) {
+        var exp = myCount(face) + unknown * prob(face);
+        var q = bid ? minQtyHigher(face, bid) : Math.max(1, Math.round(exp));
+        if (bid) q = Math.max(q, Math.min(Math.round(exp), tot)); // viser autour de l'espérance
+        if (q > tot || q < 1) continue;
+        var safety = exp - q; // marge positive = enchère crédible
+        if (best === null || safety > best.safety) best = { qty: q, face: face, safety: safety };
+      }
+      if (best && isHigher(best, bid)) makeBid(best.qty, best.face);
+      else if (bid) callDudo(); // aucune surenchère crédible → on conteste
+      else makeBid(1, 2);
+    }
+
+    /* ━━ Rendu ━━ */
+    function diceRow(dice, hitFace) {
+      return (dice || []).slice().sort(function (a, b) { return a - b; }).map(function (v) {
+        var hit = (v === hitFace) || (hitFace && hitFace !== 1 && v === 1);
+        return '<span class="pd-die' + (hit ? ' hit' : '') + '">' + DIE[v] + '</span>';
+      }).join('');
+    }
+    function render(state) {
+      var order = state.order || [], me = window.myPid, dc = state.diceCount || {};
+      setText('pd-round-label', 'Manche ' + (state.round || 1) + ' · ' + totalDice(state) + ' dés');
+      setHTML('pd-players', order.map(function (pid) {
+        var dead = (dc[pid] || 0) <= 0;
+        return '<div class="pd-pl' + (state.turn === pid && state.phase === 'bid' && !dead ? ' turn' : '') + (dead ? ' dead' : '') + '">' +
+          '<span class="pd-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + (pid === me ? '' : '') + ' <span class="dc">' + (dead ? '☠️' : '🎲×' + (dc[pid] || 0)) + '</span></div>';
+      }).join(''));
+
+      // Enchère en cours
+      if (state.phase === 'bid' && state.bid) {
+        setHTML('pd-bid', '<div class="pd-bid-label">Enchère de ' + escapeHtml(Room.name(state.bid.by)) + '</div>' +
+          '<div class="pd-bid-val">' + state.bid.qty + ' × ' + faceHTML(state.bid.face) + '</div>');
+      } else if (state.phase === 'bid') {
+        setHTML('pd-bid', '<div class="pd-bid-label">Nouvelle manche — première enchère à poser</div>');
+      } else { setHTML('pd-bid', ''); }
+      setText('pd-banner', state.banner || '');
+
+      // Révélation (Dudo)
+      var rev = document.getElementById('pd-reveal');
+      if (state.phase === 'reveal' && state.reveal) {
+        var R = state.reveal;
+        rev.innerHTML = '<div class="pd-reveal">' + activePids0(state).map(function (pid) {
+          var d = (R.dice || {})[pid] || [];
+          return '<div class="pd-reveal-row"><span class="pd-reveal-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+            '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face) + '</span></div>';
+        }).join('') + '</div>';
+      } else rev.innerHTML = '';
+
+      renderMyZone(state);
+    }
+    // Joueurs qui avaient des dés au moment de la révélation (inclut le perdant qui vient d'en perdre un).
+    function activePids0(state) {
+      var R = state.reveal || {}; var dice = R.dice || {};
+      return (state.order || []).filter(function (p) { return dice[p]; });
+    }
+
+    function renderMyZone(state) {
+      var host = document.getElementById('pd-myzone'), me = window.myPid;
+      var myAlive = (state.diceCount || {})[me] > 0;
+      var myDice = (state.players[me] || {}).dice || [];
+
+      if (state.phase === 'reveal') {
+        var isStarter = state.turn === me;
+        host.innerHTML = '<button class="btn-primary" ' + (isStarter ? '' : 'disabled') + ' onclick="continueRound()">' +
+          (isStarter ? 'Manche suivante →' : 'En attente de ' + escapeHtml(Room.name(state.turn)) + '…') + '</button>';
+        return;
+      }
+      // Phase enchères
+      var myTurn = state.turn === me && myAlive;
+      var handHTML = myAlive
+        ? '<div class="pd-mylabel">Tes dés (cachés des autres)</div><div class="pd-myhand">' + (myDice.length ? diceRow(myDice, myTurn && pick ? pick.face : 0) : '—') + '</div>'
+        : '<div class="pd-wait">☠️ Tu es éliminé·e — tu regardes la fin de la partie.</div>';
+      if (!myTurn) {
+        host.innerHTML = handHTML + (myAlive ? '<div class="pd-wait">Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>' : '');
+        pick = null; return;
+      }
+      // Contrôles d'enchère
+      if (!pick) { pick = state.bid ? { qty: state.bid.qty + 1, face: state.bid.face } : { qty: 1, face: bestFace(myDice) }; }
+      var faces = [1, 2, 3, 4, 5, 6].map(function (f) {
+        return '<button class="pd-face' + (pick.face === f ? ' sel' : '') + '" onclick="setFace(' + f + ')">' + (f === 1 ? '<span>⚀</span>' : DIE[f]) + '</button>';
+      }).join('');
+      host.innerHTML = handHTML +
+        '<div class="pd-picker">' +
+          '<div class="pd-qty"><button onclick="bumpQty(-1)">−</button><span class="pd-qty-val">' + pick.qty + '</span><button onclick="bumpQty(1)">+</button>' +
+            '<span style="font-size:1.4rem;margin:0 4px">×</span><span class="pd-qty-val">' + faceHTML(pick.face) + '</span></div>' +
+          '<div class="pd-faces">' + faces + '</div>' +
+        '</div>' +
+        '<div class="pd-actions">' +
+          '<button class="pd-act dudo" ' + (state.bid ? '' : 'disabled') + ' onclick="callDudo()">🚫 Dudo !</button>' +
+          '<button class="pd-act bid" onclick="submitBid()">Miser ' + pick.qty + ' × ' + DIE[pick.face] + '</button>' +
+        '</div>';
+    }
+    function bestFace(dice) { var t = {}; (dice || []).forEach(function (v) { if (v !== 1) t[v] = (t[v] || 0) + 1; }); var best = 2, n = -1; for (var f = 2; f <= 6; f++) if ((t[f] || 0) > n) { n = t[f] || 0; best = f; } return best; }
+    function bumpQty(d) { if (!pick) return; pick.qty = Math.max(1, Math.min(totalDice(window.room), pick.qty + d)); render(window.room); }
+    function setFace(f) { if (!pick) return; pick.face = f; render(window.room); }
+    function submitBid() {
+      if (!pick) return;
+      if (!isHigher(pick, window.room.bid)) { lbToast('Enchère trop basse'); return; }
+      var q = pick.qty, f = pick.face; pick = null; makeBid(q, f);
+    }
+
+    function showResults(state) {
+      showScreen('s-results');
+      var w = state.winner, iWon = w === window.myPid;
+      setText('res-emoji', iWon ? '🏆' : '🎲');
+      setText('res-title', iWon ? 'Tu gagnes ! 🏆' : Room.name(w) + ' gagne !');
+      setText('res-sub', 'Dernier joueur avec des dés dans la main.');
+    }
+
+    function handleReplay() { pick = null; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); pick = null; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

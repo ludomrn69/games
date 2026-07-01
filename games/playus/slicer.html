@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Slicer · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 20%,#12304a,#050c18 75%);display:flex;flex-direction:column;align-items:center;touch-action:none}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#9ec7f0;text-decoration:none;font-size:1.4rem}.score{font-size:1.6rem}.lives{font-size:1.2rem}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(5,12,24,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#9ec7f0;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#4bc9c0,#3f8fd6);box-shadow:0 8px 24px rgba(63,143,214,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives"></span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="screen" id="start"><h1>🔪 Slicer</h1><p>Tranche les formes en glissant le doigt. Évite les <b>bombes</b> 💣 et ne rate pas trop de formes&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1 id="overTitle">Fini&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">formes tranchées</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),livesEl=document.getElementById('lives');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  var BEST='playus_slicer_best',best=+localStorage.getItem(BEST)||0;
+  var PAL=['#e8524a','#ffb020','#ffd45e','#4ec97a','#4bc9c0','#c94bd6'];
+  var state,score,lives,objs=[],trail=[],spawnAcc,g,lastTs;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function start(){resize();score=0;lives=1;objs=[];trail=[];spawnAcc=0;g=Math.max(0.28,H*0.0005);lastTs=0;
+    scoreEl.textContent='0';livesEl.textContent='';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    lastTs=performance.now();requestAnimationFrame(loop);}
+  function end(bomb){state='over';document.getElementById('overTitle').textContent=bomb?'Bombe ! 💥':'Fini !';
+    document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='formes tranchées';overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  function spawn(){var bomb=Math.random()<0.16,x=W*(0.2+Math.random()*0.6);
+    objs.push({x:x,y:H+40,vx:(W/2-x)*0.004+(Math.random()-0.5)*2,vy:-Math.max(11,H*0.019)*(0.85+Math.random()*0.3),
+      r:Math.max(26,W*0.075),c:bomb?'#222':PAL[Math.floor(Math.random()*PAL.length)],bomb:bomb,sliced:false,rot:Math.random()*6});}
+  function at(e){var rect=cv.getBoundingClientRect();return {x:e.clientX-rect.left,y:e.clientY-rect.top};}
+  var slicing=false;
+  stage.addEventListener('pointerdown',function(e){slicing=true;trail=[at(e)];});
+  stage.addEventListener('pointermove',function(e){if(!slicing)return;trail.push(at(e));if(trail.length>10)trail.shift();
+    if(state!=='play')return;var p=at(e);
+    objs.forEach(function(o){if(!o.sliced&&(o.x-p.x)*(o.x-p.x)+(o.y-p.y)*(o.y-p.y)<o.r*o.r){
+      o.sliced=true;if(o.bomb){end(true);}else{score++;scoreEl.textContent=score;vibrate(8);}}});
+  });
+  stage.addEventListener('pointerup',function(){slicing=false;});stage.addEventListener('pointercancel',function(){slicing=false;});
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  function loop(ts){requestAnimationFrame(loop);var dt=Math.min(40,ts-lastTs);lastTs=ts;ctx.clearRect(0,0,W,H);
+    if(state==='play'){spawnAcc+=dt;if(spawnAcc>Math.max(650,1100-score*10)){spawnAcc=0;spawn();if(Math.random()<0.3)spawn();}
+      for(var i=objs.length-1;i>=0;i--){var o=objs[i];o.vy+=g;o.x+=o.vx;o.y+=o.vy;o.rot+=0.05;
+        if(o.y>H+60){if(!o.sliced&&!o.bomb){lives--;livesEl.textContent='';vibrate(20);
+          if(lives<=0){end(false);}}objs.splice(i,1);}
+      }
+    }
+    objs.forEach(function(o){ctx.save();ctx.translate(o.x,o.y);ctx.rotate(o.rot);
+      if(o.bomb){ctx.beginPath();ctx.arc(0,0,o.r,0,7);ctx.fillStyle='#1a1a1a';ctx.fill();ctx.fillStyle='#e8524a';ctx.fillRect(-3,-o.r-8,6,10);
+        ctx.font=o.r+'px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('💣',0,2);}
+      else{ctx.beginPath();ctx.arc(0,0,o.r,0,7);ctx.fillStyle=o.c;ctx.fill();ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.arc(-o.r*0.3,-o.r*0.3,o.r*0.25,0,7);ctx.fill();
+        if(o.sliced){ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-o.r,0);ctx.lineTo(o.r,0);ctx.stroke();}}
+      ctx.restore();});
+    if(trail.length>1){ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();
+      trail.forEach(function(p,i){if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);});ctx.stroke();}
+  }
+  resize();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Dames ♟️" data-emoji="🔴"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .btn-primary { display: block; width: 100%; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    .dm-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    html[data-theme="dark"] .dm-header { background: rgba(20,16,28,0.97); }
+    .dm-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .dm-turn-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
+    .dm-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
+    .dm-score-chip { display: inline-flex; align-items: center; gap: 5px; }
+    .dm-mini { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
+    .dm-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+
+    .dm-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 14px; width: 100%; }
+    .dm-frame { display: grid; grid-template-columns: repeat(8, 1fr); width: min(94vw, 460px); aspect-ratio: 1; border: 5px solid #5a3a26; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+    .dm-cell { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+    .dm-cell.light { background: #ecd9b6; }
+    .dm-cell.dark { background: #9c6b3f; cursor: pointer; }
+    .dm-cell.sel { box-shadow: inset 0 0 0 4px var(--gold); }
+    .dm-cell.target::after { content: ''; position: absolute; width: 34%; height: 34%; border-radius: 50%; background: rgba(255,255,255,0.55); }
+    .dm-cell.target:hover::after { background: rgba(255,255,255,0.8); }
+    .dm-cell.lastfrom, .dm-cell.lastto { box-shadow: inset 0 0 0 3px rgba(214,170,90,0.85); }
+    .dm-piece { width: 76%; height: 76%; border-radius: 50%; background-image: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.5), rgba(255,255,255,0) 55%); box-shadow: inset -2px -3px 6px rgba(0,0,0,0.35), inset 2px 2px 5px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+    .dm-piece.w { background-color: #ece3d2; }
+    .dm-piece.b { background-color: #23262e; }
+    .dm-piece .crown { font-size: 1.1rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+    .dm-hint { margin-top: 16px; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); text-align: center; min-height: 24px; }
+
+    .dm-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .dm-overlay.active { display: flex; animation: fadeUp 0.3s ease both; }
+    .dm-overlay-card { background: var(--white); border-radius: 22px; padding: 30px 26px; box-shadow: var(--shadow-hover); text-align: center; max-width: 340px; width: 100%; }
+    .dm-ov-emoji { font-size: 3rem; line-height: 1; margin-bottom: 8px; }
+    .dm-ov-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; margin-bottom: 6px; }
+    .dm-ov-scores { font-size: 1.1rem; font-weight: 700; margin: 10px 0 20px; }
+
+    .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .modal.active { display: flex; animation: fadeUp 0.25s ease both; }
+    .modal-card { background: var(--white); border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/dames-ai.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="dm-header">
+        <span class="dm-turn" id="dm-turn"></span>
+        <span class="dm-scores" id="dm-scores"></span>
+        <div class="dm-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="dm-stage">
+        <div class="dm-frame" id="dm-board"></div>
+        <div class="dm-hint" id="dm-hint"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dm-overlay" id="dm-overlay">
+    <div class="dm-overlay-card">
+      <div class="dm-ov-emoji" id="dm-ov-emoji">🏆</div>
+      <div class="dm-ov-title" id="dm-ov-title">—</div>
+      <div class="dm-ov-scores" id="dm-ov-scores"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="peekBoard()">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">Les scores repartent de 0.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Dames</div>
+      <div class="modal-body">
+        <p>Les pions se déplacent en diagonale vers l'avant, d'une case. On capture en <b>sautant</b> par-dessus un pion adverse vers une case vide derrière lui.</p>
+        <p style="margin-top:10px">La <b>prise est obligatoire</b>, et on enchaîne les sauts d'une même rafle tant que c'est possible.</p>
+        <p style="margin-top:10px">Un pion qui atteint la dernière rangée devient une <b>dame</b> 👑 (se déplace et prend dans les 4 diagonales).</p>
+        <p style="margin-top:10px">On gagne en capturant tous les pions adverses (ou en le bloquant).</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Dames (Checkers 8×8) — 2 joueurs, en ligne + hors-ligne. Moteur + IA dans
+       dames-ai.js (prise obligatoire, rafles, dames, négamax α-β). ━━ */
+    var prevStatus = null;
+    var selFrom = -1;        // case sélectionnée (départ d'un coup)
+    var selMoves = [];       // coups légaux depuis selFrom
+
+    function rref() { return window.roomRef; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    var escapeHtml = window.esc;
+    function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
+    // Siège 0 = BLANC (commence, en bas), siège 1 = NOIR (en haut).
+    function sideOf(state, pid) { return (state.order || []).indexOf(pid) === 0 ? 'w' : 'b'; }
+    function seatColor(seat) { return seat === 0 ? '#ece3d2' : '#23262e'; }
+
+    GameRoom({
+      gameKey: 'dames',
+      name: 'Dames',
+      emoji: '🔴',
+      tagline: 'Checkers',
+      minPlayers: 2,
+      maxPlayers: 2,
+      rules: [
+        'Les pions avancent en diagonale ; on capture en sautant par-dessus',
+        'La prise est obligatoire, et les rafles s\'enchaînent',
+        'Atteindre la dernière rangée transforme un pion en dame 👑',
+        'On gagne en capturant tous les pions adverses'
+      ],
+      offline: { solo: true, local: true },
+      bot: damesBot,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* ━━ IA : recherche pure dans dames-ai.js. Profondeur selon la difficulté. ━━ */
+    function damesBot(state, pid) {
+      var b = state.board || window.DamesAI.startBoard();
+      var me = sideOf(state, pid), opp = window.DamesAI.other(me);
+      var legal = window.DamesAI.legalMoves(b, me);
+      if (!legal.length) return; // bloqué → l'autre a déjà gagné (géré au coup précédent)
+      var move;
+      if (window.Bots && window.Bots.shouldBlunder(state)) {
+        move = legal[Math.floor(Math.random() * legal.length)];
+      } else {
+        var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 9 }) : 6);
+        move = window.DamesAI.bestMove(b, me, opp, depth) || legal[0];
+      }
+      commitMove(move);
+    }
+
+    function onStart(players) {
+      var starter = players[0].pid; // siège 0 = blanc commence
+      return { board: window.DamesAI.startBoard(), turn: starter, starter: starter, winner: null, lastFrom: -1, lastTo: -1 };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'waiting') hideResult();
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') startPlayingScreen(state);
+        else renderPlaying(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Application d'un coup (transaction) ━━ */
+    function commitMove(move) {
+      var AI = window.DamesAI;
+      var state = window.room || {};
+      if (state.status !== 'playing' || state.winner) return;
+      if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        if (cur.turn !== window.myPid) return cur;
+        var order = cur.order || [];
+        var me = order.indexOf(window.myPid) === 0 ? 'w' : 'b', opp = AI.other(me);
+        var b = cur.board || AI.startBoard();
+        // Valider que `move` est bien légal (anti-triche / anti-désync).
+        var legal = AI.legalMoves(b, me), ok = false;
+        for (var i = 0; i < legal.length; i++) { if (legal[i].join(',') === move.join(',')) { ok = true; break; } }
+        if (!ok) return cur;
+        cur.board = AI.applyMove(b, move, me);
+        cur.lastFrom = move[0];
+        cur.lastTo = move[move.length - 1];
+        // L'adversaire n'a plus de coup → victoire.
+        if (!AI.legalMoves(cur.board, opp).length) {
+          cur.winner = window.myPid;
+          if (!cur.players) cur.players = {};
+          if (!cur.players[window.myPid]) cur.players[window.myPid] = {};
+          cur.players[window.myPid].wins = (cur.players[window.myPid].wins || 0) + 1;
+        } else {
+          cur.turn = order[(order.indexOf(window.myPid) + 1) % order.length];
+        }
+        return cur;
+      });
+      selFrom = -1; selMoves = [];
+    }
+
+    /* ━━ Rendu ━━ */
+    function startPlayingScreen(state) { selFrom = -1; selMoves = []; hideResult(); showScreen('s-playing'); renderPlaying(state); }
+
+    function scoresHTML(state) {
+      var b = state.board || window.DamesAI.startBoard(), ord = state.order || [];
+      var c = window.DamesAI.counts(b);
+      return ord.map(function (pid, seat) {
+        var n = seat === 0 ? (c.w + c.W) : (c.b + c.B);
+        return '<span class="dm-score-chip"><span class="dm-mini" style="background:' + seatColor(seat) + '"></span>' +
+          escapeHtml(Room.name(pid)) + ' ' + n + ' <span style="color:var(--ink-light);font-weight:400">(' + winsOf(state, pid) + ')</span></span>';
+      }).join('<span style="color:var(--ink-light)">·</span>');
+    }
+
+    function renderPlaying(state) {
+      var AI = window.DamesAI;
+      var b = state.board || AI.startBoard();
+      var ord = state.order || [];
+      setHTML('dm-scores', scoresHTML(state));
+
+      var me = sideOf(state, window.myPid);
+      var myTurn = (state.turn === window.myPid) && !state.winner;
+      var legal = myTurn ? AI.legalMoves(b, me) : [];
+      // Cases de départ jouables (pour le surlignage / la sélection).
+      var fromSquares = {};
+      legal.forEach(function (m) { fromSquares[m[0]] = true; });
+
+      var ti = document.getElementById('dm-turn');
+      if (state.winner) { ti.innerHTML = ''; setText('dm-hint', ''); }
+      else {
+        var t = state.turn, seat = ord.indexOf(t);
+        ti.innerHTML = '<span class="dm-turn-dot" style="background:' + seatColor(seat) + '"></span>' +
+          (t === window.myPid ? 'À toi' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        var mustCapture = legal.length && legal[0].length > 2;
+        setText('dm-hint', myTurn ? (mustCapture ? 'Prise obligatoire — enchaîne les sauts !' : 'Touche un de tes pions, puis sa case d\'arrivée') : 'En attente de ' + Room.name(t) + '…');
+      }
+
+      // Cases cibles si une pièce est sélectionnée.
+      var targets = {};
+      if (selFrom >= 0) selMoves.forEach(function (m) { targets[m[1]] = true; });
+
+      var board = document.getElementById('dm-board');
+      var html = '';
+      for (var i = 0; i < 64; i++) {
+        var r = Math.floor(i / 8), col = i % 8, dark = (r + col) % 2 === 1;
+        var cls = 'dm-cell ' + (dark ? 'dark' : 'light');
+        if (i === selFrom) cls += ' sel';
+        if (targets[i]) cls += ' target';
+        if (i === state.lastFrom) cls += ' lastfrom';
+        if (i === state.lastTo) cls += ' lastto';
+        var ch = b[i], piece = '';
+        if (ch === 'w' || ch === 'W') piece = '<span class="dm-piece w">' + (ch === 'W' ? '<span class="crown">👑</span>' : '') + '</span>';
+        else if (ch === 'b' || ch === 'B') piece = '<span class="dm-piece b">' + (ch === 'B' ? '<span class="crown">👑</span>' : '') + '</span>';
+        html += '<div class="' + cls + '" data-i="' + i + '">' + piece + '</div>';
+      }
+      board.innerHTML = html;
+
+      if (state.winner) showResult(state); else hideResult();
+    }
+
+    function showResult(state) {
+      var ov = document.getElementById('dm-overlay');
+      var emoji = document.getElementById('dm-ov-emoji'), title = document.getElementById('dm-ov-title');
+      if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Égalité'; }
+      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
+      setHTML('dm-ov-scores', scoresHTML(state));
+      ov.classList.add('active'); hidePeekBtn();
+    }
+    function peekBoard() {
+      document.getElementById('dm-overlay').classList.remove('active');
+      var b = document.getElementById('dm-peek');
+      if (!b) {
+        b = document.createElement('button'); b.id = 'dm-peek'; b.className = 'p4-peek-btn';
+        b.textContent = '↩ Voir le résultat';
+        b.onclick = function () { document.getElementById('dm-overlay').classList.add('active'); hidePeekBtn(); };
+        document.body.appendChild(b);
+      }
+      b.style.display = 'block';
+    }
+    function hidePeekBtn() { var b = document.getElementById('dm-peek'); if (b) b.style.display = 'none'; }
+    function hideResult() { var ov = document.getElementById('dm-overlay'); if (ov) ov.classList.remove('active'); hidePeekBtn(); }
+
+    function handleReplay() { hideResult(); Lobby.resetToLobby(['wins']); }
+    function doRestart() { closeModal('modal-restart'); hideResult(); Lobby.resetToLobby([]); }
+
+    /* ━━ Interaction : sélection d'un pion puis d'une case d'arrivée ━━ */
+    (function () {
+      var board = document.getElementById('dm-board');
+      if (!board) return;
+      board.addEventListener('click', function (e) {
+        var cell = e.target.closest('.dm-cell');
+        if (!cell) return;
+        var i = +cell.dataset.i;
+        var AI = window.DamesAI, state = window.room || {};
+        if (state.status !== 'playing' || state.winner || state.turn !== window.myPid) return;
+        var me = state.order && state.order.indexOf(window.myPid) === 0 ? 'w' : 'b';
+        var b = state.board || AI.startBoard();
+        var legal = AI.legalMoves(b, me);
+
+        // Clic sur une case cible d'une pièce déjà sélectionnée → jouer.
+        if (selFrom >= 0) {
+          var chosen = selMoves.filter(function (m) { return m[1] === i; });
+          if (chosen.length) {
+            // S'il existe plusieurs coups vers cette case (rares), on prend la rafle la plus longue.
+            chosen.sort(function (a, z) { return z.length - a.length; });
+            commitMove(chosen[0]);
+            return;
+          }
+        }
+        // Sinon : (re)sélectionner une pièce de départ jouable.
+        var fromHere = legal.filter(function (m) { return m[0] === i; });
+        if (fromHere.length) { selFrom = i; selMoves = fromHere; renderPlaying(state); }
+        else { selFrom = -1; selMoves = []; renderPlaying(state); }
+      });
+    })();
+  </script>
+</body>
+</html>

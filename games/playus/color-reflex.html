@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Color Reflex · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 25%,#123a1e,#08160c 70%);display:flex;flex-direction:column;
+    align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#a9e0a0;text-decoration:none;font-size:1.4rem}
+  .score{font-size:1.5rem}.timer{font-size:1.2rem;color:#ffd45e}
+  #stage{flex:1;width:100%;max-width:520px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px}
+  .prompt{font-size:1.05rem;color:#bfe6b6;font-weight:700}
+  .swatch{width:44px;height:44px;border-radius:10px;display:inline-block;vertical-align:middle;box-shadow:0 3px 10px rgba(0,0,0,.4)}
+  #square{width:min(70vw,300px);height:min(70vw,300px);border-radius:26px;box-shadow:0 12px 40px rgba(0,0,0,.5);transition:transform .05s}
+  #square:active{transform:scale(.97)}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;
+    text-align:center;padding:24px;background:rgba(8,22,12,.85);backdrop-filter:blur(6px)}
+  .screen.hidden{display:none}
+  .screen h1{font-size:2rem;font-weight:900}.screen p{color:#bfe6b6;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,#3fb562,#7ac94b);box-shadow:0 8px 24px rgba(63,181,98,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="timer" id="timer">30</span></div>
+  <div id="stage">
+    <div class="prompt">Tape quand le carré est <span class="swatch" id="targetSw"></span></div>
+    <div id="square"></div>
+    <div class="screen" id="start">
+      <h1>🟩 Color Reflex</h1>
+      <p>Le carré change de couleur très vite. Tape dessus pile quand il correspond à la couleur demandée.</p>
+      <button class="btn" id="startBtn">Jouer</button>
+    </div>
+    <div class="screen hidden" id="over">
+      <h1 id="overTitle">Temps écoulé&nbsp;!</h1>
+      <div class="big" id="finalScore">0</div>
+      <p id="overMsg">bonnes réponses</p>
+      <button class="btn" id="replayBtn">Rejouer</button>
+    </div>
+  </div>
+<script>
+(function(){
+  var COLORS=[['#e8524a','rouge'],['#3fb562','vert'],['#4a7de8','bleu'],['#ffd45e','jaune'],['#c94bd6','violet'],['#ff9838','orange']];
+  var square=document.getElementById('square'),targetSw=document.getElementById('targetSw');
+  var scoreEl=document.getElementById('score'),timerEl=document.getElementById('timer');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var BEST_KEY='playus_colorreflex_best';var best=+localStorage.getItem(BEST_KEY)||0;
+  var state='idle',score,target,cur,timeLeft,tickT,cycleT,cycleMs;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function newTarget(){target=Math.floor(Math.random()*COLORS.length);targetSw.style.background=COLORS[target][0];}
+  function cycle(){var n;do{n=Math.floor(Math.random()*COLORS.length);}while(n===cur);cur=n;
+    square.style.background=COLORS[cur][0];cycleT=setTimeout(cycle,cycleMs);}
+  function start(){
+    score=0;timeLeft=30;cycleMs=780;scoreEl.textContent='0';timerEl.textContent='30';
+    state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    newTarget();clearTimeout(cycleT);cycle();
+    clearInterval(tickT);tickT=setInterval(function(){timeLeft--;timerEl.textContent=timeLeft;if(timeLeft<=0)end(false);},1000);
+  }
+  function end(wrong){
+    state='over';clearInterval(tickT);clearTimeout(cycleT);
+    document.getElementById('finalScore').textContent=score;
+    document.getElementById('overTitle').textContent=wrong?'Mauvaise couleur !':'Temps écoulé !';
+    if(score>best){best=score;localStorage.setItem(BEST_KEY,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='bonnes réponses';
+    overScr.classList.remove('hidden');vibrate(wrong?[40,60,120]:[30]);
+  }
+  square.addEventListener('pointerdown',function(){
+    if(state!=='play')return;
+    if(cur===target){score++;scoreEl.textContent=score;cycleMs=Math.max(300,cycleMs-14);vibrate(15);
+      clearTimeout(cycleT);newTarget();cycle();}
+    else end(true);
+  });
+  document.getElementById('startBtn').onclick=start;
+  document.getElementById('replayBtn').onclick=start;
+})();
+</script>
+</body>
+</html>

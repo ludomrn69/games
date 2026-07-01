@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Tango ☀️" data-emoji="🌙"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .tg-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .tg-head { background: rgba(20,16,28,0.97); }
+    .tg-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .tg-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+    .tg-head-actions { display: flex; gap: 6px; }
+
+    .tg-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
+    .tg-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
+    .tg-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .tg-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .tg-opp .pc { color: var(--sage); }
+
+    .tg-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
+
+    .tg-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 10px; }
+    .tg-wrap { position: relative; width: min(92vw, 420px); aspect-ratio: 1; }
+    .tg-grid { width: 100%; height: 100%; display: grid; gap: 3px; background: var(--gold-light); border: 3px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
+    .tg-cell { background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: clamp(1.3rem, 7vw, 2rem); cursor: pointer; user-select: none; }
+    html[data-theme="dark"] .tg-cell { background: #221a2e; }
+    .tg-cell.given { background: rgba(198,152,90,0.22); cursor: default; }
+    .tg-cell.bad { box-shadow: inset 0 0 0 3px #e05a4e; }
+    .tg-cons { position: absolute; inset: 0; pointer-events: none; }
+    .tg-con { position: absolute; transform: translate(-50%, -50%); background: var(--white); border: 1.5px solid var(--ink-light); border-radius: 50%; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--ink); }
+
+    .tg-hint { font-size: 0.82rem; color: var(--ink-light); text-align: center; padding: 0 12px; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/puzzle.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="tg-head">
+        <span class="tg-title-mini">Tango</span>
+        <span class="tg-timer" id="tg-timer">⏱ 0:00</span>
+        <div class="tg-head-actions" id="tg-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="tg-opps" id="tg-opps"></div>
+      <div class="tg-banner" id="tg-banner"></div>
+      <div class="tg-stage">
+        <div class="tg-wrap"><div class="tg-grid" id="tg-grid"></div><div class="tg-cons" id="tg-cons"></div></div>
+        <div class="tg-hint">Touche une case : vide → ☀️ → 🌙 → vide. <b>=</b> : mêmes symboles · <b>✕</b> : symboles différents.</div>
+      </div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🌙</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">☀️ Tango 🌙</div>
+      <div class="modal-body">
+        <p>• Remplis la grille 6×6 de ☀️ et 🌙. Chaque <b>ligne</b> et chaque <b>colonne</b> contient autant de ☀️ que de 🌙 (3 et 3).</p>
+        <p style="margin-top:6px">• <b>Jamais 3 identiques</b> qui se suivent (ligne ou colonne).</p>
+        <p style="margin-top:6px">• Entre deux cases : <b>=</b> = mêmes symboles, <b>✕</b> = symboles différents.</p>
+        <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : même grille pour tous, le plus rapide gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc, N = 6;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    var SYM = ['☀️', '🌙'];
+
+    /* ━━ Générateur ━━ Solution valide (3/3 par ligne/colonne, jamais 3 à la suite),
+       puis on RÉDUIT à un jeu minimal d'indices + contraintes = / ✕ (solution unique).
+       La difficulté ajoute quelques indices pour aider. ━━ */
+    function rowCount(g, r, v) { var n = 0; for (var c = 0; c < N; c++) if (g[r * N + c] === v) n++; return n; }
+    function colCount(g, c, v) { var n = 0; for (var r = 0; r < N; r++) if (g[r * N + c] === v) n++; return n; }
+    function okFull(g, i, v) {
+      var r = i / N | 0, c = i % N;
+      if (rowCount(g, r, v) >= N / 2) return false; if (colCount(g, c, v) >= N / 2) return false;
+      if (c >= 2 && g[i - 1] === v && g[i - 2] === v) return false;
+      if (c >= 1 && c < N - 1 && g[i - 1] === v && g[i + 1] === v) return false;
+      if (c < N - 2 && g[i + 1] === v && g[i + 2] === v) return false;
+      if (r >= 2 && g[i - N] === v && g[i - 2 * N] === v) return false;
+      if (r >= 1 && r < N - 1 && g[i - N] === v && g[i + N] === v) return false;
+      if (r < N - 2 && g[i + N] === v && g[i + 2 * N] === v) return false;
+      return true;
+    }
+    function genSolution(rnd) {
+      var g = []; for (var i = 0; i < N * N; i++) g.push(-1);
+      function rec(i) { if (i === N * N) return true; var vs = rnd() < 0.5 ? [0, 1] : [1, 0]; for (var k = 0; k < 2; k++) { if (okFull(g, i, vs[k])) { g[i] = vs[k]; if (rec(i + 1)) return true; g[i] = -1; } } return false; }
+      return rec(0) ? g : null;
+    }
+    function countSol(givens, cons, cap) {
+      var g = givens.slice(), cnt = 0;
+      function ok(g, i, v) { if (!okFull(g, i, v)) return false; for (var k = 0; k < cons.length; k++) { var cc = cons[k]; var o = cc.a === i ? cc.b : cc.b === i ? cc.a : -1; if (o < 0 || g[o] === -1) continue; if (cc.eq && g[o] !== v) return false; if (!cc.eq && g[o] === v) return false; } return true; }
+      (function rec() { var i = g.indexOf(-1); if (i < 0) { cnt++; return; } for (var v = 0; v < 2; v++) { if (ok(g, i, v)) { g[i] = v; rec(); g[i] = -1; if (cnt >= cap) return; } } })();
+      return cnt;
+    }
+    function genTango(level, seed) {
+      var rnd = Puzzle.rng(seed), sol = null;
+      for (var a = 0; a < 300 && !sol; a++) sol = genSolution(rnd);
+      if (!sol) return genTango(level, seed + 1);
+      var pairs = []; for (var i = 0; i < N * N; i++) { var r = i / N | 0, c = i % N; if (c < N - 1) pairs.push({ a: i, b: i + 1 }); if (r < N - 1) pairs.push({ a: i, b: i + N }); }
+      var givens = sol.slice(), cons = pairs.map(function (p) { return { a: p.a, b: p.b, eq: sol[p.a] === sol[p.b] }; });
+      var gi = []; for (var k = 0; k < N * N; k++) gi.push(k); Puzzle.shuffle(gi, rnd);
+      gi.forEach(function (idx) { var save = givens[idx]; if (save < 0) return; givens[idx] = -1; if (countSol(givens, cons, 2) !== 1) givens[idx] = save; });
+      var keep = cons.slice(); var ci = []; for (var k2 = 0; k2 < keep.length; k2++) ci.push(k2); Puzzle.shuffle(ci, rnd);
+      ci.forEach(function (idx) { var c = keep[idx]; if (!c) return; keep[idx] = null; if (countSol(givens, keep.filter(Boolean), 2) !== 1) keep[idx] = c; });
+      cons = keep.filter(Boolean);
+      // difficulté : révéler quelques cases en plus (aide)
+      var extra = level === 'easy' ? 8 : level === 'normal' ? 3 : 0;
+      var hidden = []; for (var k3 = 0; k3 < N * N; k3++) if (givens[k3] < 0) hidden.push(k3); Puzzle.shuffle(hidden, rnd);
+      for (var e = 0; e < extra && e < hidden.length; e++) givens[hidden[e]] = sol[hidden[e]];
+      return { givens: givens, cons: cons, solution: sol };
+    }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, timerInt = null;
+    GameRoom({
+      gameKey: 'tango', name: 'Tango', emoji: '🌙', tagline: 'Soleils et lunes en équilibre',
+      minPlayers: 1, maxPlayers: 6,
+      rules: [
+        '6×6 de ☀️ et 🌙 : 3 de chaque par ligne et colonne',
+        'Jamais 3 identiques à la suite',
+        '= : mêmes symboles · ✕ : symboles différents',
+        'Solo : bats ton chrono ⏱ · Salon : course entre vous'
+      ],
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
+      bot: function () {}, offlineTurn: function () { return null; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var level = (cur && cur.difficulty) || 'normal', P = genTango(level, Puzzle.seed());
+      order.forEach(function (p) { cur.players[p].marks = []; for (var i = 0; i < N * N; i++) cur.players[p].marks.push(-1); cur.players[p].finishedAt = null; });
+      return { givens: P.givens, cons: P.cons, startedAt: Date.now(), banner: 'Remplis la grille le plus vite possible !', winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
+      else { stopTimer(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+    function startTimer(state) { stopTimer(); function tick() { setText('tg-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+
+    function marksOf(s, pid) { return (s.players[pid] && s.players[pid].marks) || []; }
+    function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
+    function effective(s, pid) { var giv = s.givens || [], m = marksOf(s, pid), e = []; for (var i = 0; i < N * N; i++) e.push(giv[i] >= 0 ? giv[i] : (m[i] != null ? m[i] : -1)); return e; }
+    function filledCount(s, pid) { var e = effective(s, pid), n = 0; for (var i = 0; i < N * N; i++) if (e[i] >= 0) n++; return n; }
+
+    // Analyse : conflits (déséquilibre / 3-à-suivre / contrainte) + complétude.
+    function analyze(eff, cons) {
+      var conflict = {};
+      for (var r = 0; r < N; r++) { if (rowCount(eff, r, 0) > N / 2 || rowCount(eff, r, 1) > N / 2) for (var c = 0; c < N; c++) conflict[r * N + c] = 1; }
+      for (var c2 = 0; c2 < N; c2++) { if (colCount(eff, c2, 0) > N / 2 || colCount(eff, c2, 1) > N / 2) for (var r2 = 0; r2 < N; r2++) conflict[r2 * N + c2] = 1; }
+      for (var i = 0; i < N * N; i++) {
+        var rr = i / N | 0, cc = i % N, v = eff[i]; if (v < 0) continue;
+        if (cc < N - 2 && eff[i + 1] === v && eff[i + 2] === v) { conflict[i] = 1; conflict[i + 1] = 1; conflict[i + 2] = 1; }
+        if (rr < N - 2 && eff[i + N] === v && eff[i + 2 * N] === v) { conflict[i] = 1; conflict[i + N] = 1; conflict[i + 2 * N] = 1; }
+      }
+      (cons || []).forEach(function (cc) { var va = eff[cc.a], vb = eff[cc.b]; if (va < 0 || vb < 0) return; if (cc.eq ? va !== vb : va === vb) { conflict[cc.a] = 1; conflict[cc.b] = 1; } });
+      var full = true; for (var k = 0; k < N * N; k++) if (eff[k] < 0) { full = false; break; }
+      return { conflict: conflict, complete: full && !Object.keys(conflict).length };
+    }
+
+    function tapCell(idx) {
+      var pid = window.myPid, s = window.room;
+      if ((s.givens || [])[idx] >= 0) return;             // case-indice : verrouillée
+      if (assist && s.status === 'playing' && !doneOf(s, pid)) assist.record();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        if ((cur.givens || [])[idx] >= 0) return cur;
+        var m = marksOf(cur, pid).slice(); var v = m[idx] != null ? m[idx] : -1; m[idx] = v === -1 ? 0 : v === 0 ? 1 : -1; cur.players[pid].marks = m;  // vide→☀️→🌙→vide
+        var res = analyze(effective(cur, pid), cur.cons);
+        if (res.complete) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' résout en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+    }
+
+    /* ━━ Aide au joueur (Annuler / Indice) ━━ */
+    // Indice : on RÉSOUT depuis les indices + contraintes (6×6) côté client — la
+    // solution n'est jamais stockée dans le salon (pas de triche via la console).
+    function solveTango(givens, cons) {
+      var g = givens.slice(), res = null;
+      function ok(g, i, v) {
+        if (!okFull(g, i, v)) return false;
+        for (var k = 0; k < cons.length; k++) { var cc = cons[k]; var o = cc.a === i ? cc.b : cc.b === i ? cc.a : -1; if (o < 0 || g[o] === -1) continue; if (cc.eq && g[o] !== v) return false; if (!cc.eq && g[o] === v) return false; }
+        return true;
+      }
+      (function rec() { if (res) return; var i = g.indexOf(-1); if (i < 0) { res = g.slice(); return; } for (var v = 0; v < 2; v++) { if (ok(g, i, v)) { g[i] = v; rec(); g[i] = -1; if (res) return; } } })();
+      return res;
+    }
+    function assistCanEdit() { var s = window.room; return !!(s && s.status === 'playing' && !doneOf(s, window.myPid)); }
+    function assistSnap() { return marksOf(window.room, window.myPid).slice(); }
+    function assistRestore(prev) {
+      var pid = window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        cur.players[pid].marks = (prev || []).slice();
+        return cur;
+      });
+    }
+    function hintMove() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      var pid = window.myPid, sol = solveTango(s.givens || [], s.cons || []); if (!sol) return;
+      var m = marksOf(s, pid), giv = s.givens || [], cand = [];
+      for (var i = 0; i < N * N; i++) if (giv[i] < 0 && m[i] !== sol[i]) cand.push(i);
+      if (!cand.length) return;
+      var idx = cand[Math.floor(Math.random() * cand.length)];
+      if (assist) assist.record();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        if ((cur.givens || [])[idx] >= 0) return cur;
+        var mm = marksOf(cur, pid).slice(); mm[idx] = sol[idx]; cur.players[pid].marks = mm;
+        var res = analyze(effective(cur, pid), cur.cons);
+        if (res.complete) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' résout en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+      render(window.room);
+    }
+    var assist = Puzzle.assist({ mount: 'tg-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var me = window.myPid, order = state.order || [], giv = state.givens || [], eff = effective(state, me);
+      setHTML('tg-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        return '<div class="tg-opp' + (doneOf(state, pid) ? ' done' : '') + '"><span class="tg-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : filledCount(state, pid) + '/' + (N * N)) + '</span></div>';
+      }).join(''));
+      setText('tg-banner', state.banner || '');
+
+      var res = analyze(eff, state.cons), html = '';
+      for (var i = 0; i < N * N; i++) {
+        var v = eff[i], given = giv[i] >= 0;
+        var cls = 'tg-cell' + (given ? ' given' : '') + (res.conflict[i] ? ' bad' : '');
+        html += '<div class="' + cls + '" onclick="tapCell(' + i + ')">' + (v >= 0 ? SYM[v] : '') + '</div>';
+      }
+      var grid = document.getElementById('tg-grid');
+      grid.style.gridTemplateColumns = 'repeat(' + N + ', 1fr)';
+      grid.style.gridTemplateRows = 'repeat(' + N + ', 1fr)';
+      grid.innerHTML = html;
+      // contraintes = / ✕ posées sur les arêtes
+      var ch = '';
+      (state.cons || []).forEach(function (cc) {
+        var ra = cc.a / N | 0, ca = cc.a % N, horiz = (cc.b === cc.a + 1);
+        var x = horiz ? (ca + 1) / N * 100 : (ca + 0.5) / N * 100;
+        var y = horiz ? (ra + 0.5) / N * 100 : (ra + 1) / N * 100;
+        ch += '<div class="tg-con" style="left:' + x + '%;top:' + y + '%">' + (cc.eq ? '=' : '✕') + '</div>';
+      });
+      document.getElementById('tg-cons').innerHTML = ch;
+      if (typeof assist !== 'undefined' && assist) assist.refresh();
+    }
+
+    function showResults(state) {
+      stopTimer();
+      var winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🌙');
+      setText('res-title', winner === window.myPid ? 'Tu finis premier ! 🏆' : (winner ? Room.name(winner) + ' gagne' : 'Terminé'));
+      var order = Puzzle.rankByTime(state, filledCount);
+      setHTML('res-rank', order.map(function (pid, i) {
+        var done = doneOf(state, pid);
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + (done ? '⏱ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : filledCount(state, pid) + '/' + (N * N)) + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { stopTimer(); Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); stopTimer(); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Président 🃏" data-emoji="🤵"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .pr-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .pr-head { background: rgba(20,16,28,0.97); }
+    .pr-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .pr-head-actions { display: flex; gap: 6px; }
+
+    .pr-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 12px 12px 4px; }
+    .pr-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.82rem; font-weight: 600; border: 2px solid transparent; }
+    .pr-opp.turn { border-color: var(--terracotta); }
+    .pr-opp.passed { opacity: 0.5; }
+    .pr-opp.done { background: linear-gradient(135deg, rgba(198,152,90,0.2), rgba(196,116,90,0.15)); }
+    .pr-opp-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .pr-opp .cnt { background: var(--ink); color: var(--cream); border-radius: 20px; padding: 0 6px; font-weight: 800; font-size: 0.74rem; }
+    .pr-opp .rank-badge { font-size: 0.72rem; }
+
+    .pr-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
+
+    .pr-pile-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 12px 12px; }
+    .pr-pile-label { font-family: 'Caveat', cursive; font-size: 0.9rem; color: var(--ink-light); }
+    .pr-pile { display: flex; gap: 6px; min-height: 80px; align-items: center; justify-content: center; }
+    .pr-pile-empty { font-family: 'Caveat', cursive; color: var(--ink-light); font-size: 1.1rem; }
+
+    .card { width: 50px; height: 72px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0; position: relative; }
+    .card .rk { font-size: 1.2rem; line-height: 1; font-family: 'Playfair Display', serif; }
+    .card .st { font-size: 1rem; line-height: 1; }
+    .card.red { color: #d6584e; } .card.black { color: #2C2520; }
+    html[data-theme="dark"] .card { background: #f4efe7; }
+
+    .pr-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
+    .pr-hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 0 10px 8px; }
+    .pr-hand .card { cursor: pointer; transition: transform 0.15s; }
+    .pr-hand .card.sel { transform: translateY(-12px); box-shadow: 0 8px 18px rgba(196,116,90,0.4); border-color: var(--terracotta); }
+    .pr-hand .card.dim { opacity: 0.4; }
+    .pr-actions { display: flex; gap: 8px; padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); justify-content: center; }
+    .pr-act-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.6rem 1.4rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
+    .pr-act-btn.play { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border: none; }
+    .pr-act-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-title { font-size: 0.82rem; color: var(--gold); font-weight: 700; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/president-ai.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="pr-head">
+        <span class="pr-title-mini">Président</span>
+        <div class="pr-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="pr-opps" id="pr-opps"></div>
+      <div class="pr-banner" id="pr-banner"></div>
+      <div class="pr-pile-wrap">
+        <div class="pr-pile-label">Pli en cours</div>
+        <div class="pr-pile" id="pr-pile"></div>
+      </div>
+      <div class="pr-my-label">Tes cartes <span id="pr-my-count"></span></div>
+      <div class="pr-hand" id="pr-hand"></div>
+      <div class="pr-actions">
+        <button class="pr-act-btn" id="pr-pass-btn" onclick="passTurn()">Passer</button>
+        <button class="pr-act-btn play" id="pr-play-btn" onclick="playSelected()">Jouer</button>
+        <button class="pr-act-btn" id="pr-absent-btn" style="display:none" onclick="forceAbsent()">Sauter l'absent</button>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">👑</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Président</div>
+      <div class="modal-body">
+        <p>On distribue toutes les cartes. À ton tour, pose une <b>combinaison</b> : une carte seule, une paire, un brelan ou un carré.</p>
+        <p style="margin-top:8px">Il faut <b>autant de cartes</b> que la combinaison posée et une valeur <b>plus forte</b> — sinon tu <b>passes</b>. Ordre : 3 &lt; 4 &lt; … &lt; A &lt; <b>2</b> (la plus forte).</p>
+        <p style="margin-top:8px">Quand tout le monde passe, le dernier à avoir posé relance un nouveau pli. Le <b>premier à vider sa main</b> est Président 👑, le dernier est Trou du cul 💩.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Cartes ━━ */
+    var RANKS = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+    var SUITS = ['S', 'H', 'D', 'C'];
+    var SUIT_SYM = { S: '♠', H: '♥', D: '♦', C: '♣' };
+    function rankOf(card) { return card.slice(0, -1); }
+    function suitOf(card) { return card.slice(-1); }
+    var rankVal = window.PresidentAI.rankVal; // valeur de rang : centralisée dans president-ai.js
+    function isRed(card) { var s = suitOf(card); return s === 'H' || s === 'D'; }
+    function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    function sortHand(h) { return h.slice().sort(function (a, b) { return rankVal(a) - rankVal(b) || SUITS.indexOf(suitOf(a)) - SUITS.indexOf(suitOf(b)); }); }
+
+    var COMBO_WORD = { 1: '', 2: 'paire de ', 3: 'brelan de ', 4: 'carré de ' };
+    function comboLabel(cards) {
+      var n = cards.length, r = rankOf(cards[0]);
+      return n === 1 ? r : (COMBO_WORD[n] || (n + '× ')) + r;
+    }
+
+    /* ━━ State ━━ */
+    var prevStatus = null, selected = [];
+    function rref() { return window.roomRef; }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+    function handArr(cur, pid) { return (cur.players[pid] && cur.players[pid].hand) || []; }
+    function nextTurnAfter(cur, fromPid) {
+      var order = cur.order || [], n = order.length, i = order.indexOf(fromPid), passed = cur.passed || [];
+      for (var k = 1; k < n; k++) { var c = order[(i + k) % n]; if (handArr(cur, c).length === 0) continue; if (passed.indexOf(c) >= 0) continue; return c; }
+      return null;
+    }
+    function nextActiveAfter(cur, fromPid) {
+      var order = cur.order || [], n = order.length, i = order.indexOf(fromPid);
+      for (var k = 1; k <= n; k++) { var c = order[(i + k) % n]; if (handArr(cur, c).length > 0) return c; }
+      return null;
+    }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'president',
+      name: 'Président',
+      emoji: '🤵',
+      tagline: 'Vide ta main en premier',
+      minPlayers: 3,
+      maxPlayers: 8,
+      rules: [
+        'Pose une carte, une paire, un brelan ou un carré',
+        'Même nombre de cartes et valeur plus forte, sinon tu passes',
+        'Ordre : 3 < 4 < … < As < 2 (la plus forte)',
+        'Premier à vider sa main = Président 👑, dernier = Trou du cul 💩'
+      ],
+      offline: { solo: true, local: true },
+      bot: presBot,
+      offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
+      offlineEnter: function () { selected = []; if (window.room) render(window.room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* ━━ IA solo : mener bas, battre au moins cher en gardant les fortes, finir vite ━━ */
+    function presBot(state, pid) {
+      if (state.status !== 'playing' || state.turn !== pid) return;
+      var hand = sortHand(((state.players[pid] || {}).hand) || []);
+      if (!hand.length) return;
+      var move = presChooseMove(state, hand);
+      if (move && move.length) presBotPlay(pid, move);
+      else passTurn(); // passTurn utilise window.myPid (= pid) ; n'est appelé que si un pli existe
+    }
+    // IA : voir president-ai.js (défausse maligne, partagée avec le banc). Le tirage
+    // « facile/erreur » reste géré par window.Bots.shouldBlunder (coup légal au hasard).
+    function presChooseMove(state, hand) {
+      var pile = state.pile ? { rank: state.pile.rank, count: state.pile.count } : null;
+      if (window.Bots && window.Bots.shouldBlunder(state)) {
+        var plays = window.PresidentAI.legalPlays(pile, hand);
+        return plays.length ? plays[Math.floor(Math.random() * plays.length)] : null;
+      }
+      return window.PresidentAI.chooseMove(pile, hand, 'hard');
+    }
+    function presBotPlay(pid, cards) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
+        var hand = (cur.players[pid].hand || []).slice();
+        for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
+        var rk = rankOf(cards[0]);
+        if (!cards.every(function (c) { return rankOf(c) === rk; })) return cur;
+        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) <= cur.pile.rank) return cur; }
+        cards.forEach(function (c) { hand.splice(hand.indexOf(c), 1); });
+        cur.players[pid].hand = hand;
+        cur.pile = { by: pid, rank: rankVal(cards[0]), count: cards.length, cards: cards };
+        cur.lastPlayer = pid;
+        cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards);
+        if (hand.length === 0) { cur.finishOrder = (cur.finishOrder || []).concat([pid]); cur.banner += ' et a fini !'; }
+        resolveAfterPlay(cur, pid);
+        return cur;
+      });
+    }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var full = [];
+      SUITS.forEach(function (s) { RANKS.forEach(function (r) { full.push(r + s); }); });
+      full = shuffle(full);
+      var hands = {}; order.forEach(function (p) { hands[p] = []; });
+      full.forEach(function (card, i) { hands[order[i % order.length]].push(card); });
+      order.forEach(function (p) { cur.players[p].hand = sortHand(hands[p]); });
+      var starter = order[Math.floor(Math.random() * order.length)];
+      return {
+        turn: starter, pile: null, passed: [], lastPlayer: null, finishOrder: [],
+        banner: Room.name(starter) + ' commence — pose ce que tu veux'
+      };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { selected = []; showScreen('s-playing'); }
+        render(state);
+      } else if (status === 'ended') {
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Rendu ━━ */
+    function rankTitle(pos, total) {
+      if (pos === 0) return 'Président 👑';
+      if (pos === total - 1) return 'Trou du cul 💩';
+      if (pos === 1 && total >= 4) return 'Vice-président';
+      if (pos === total - 2 && total >= 4) return 'Vice-trou';
+      return (pos + 1) + 'ᵉ';
+    }
+    function cardHTML(card, extraClass) {
+      return '<div class="card ' + (isRed(card) ? 'red' : 'black') + (extraClass ? ' ' + extraClass : '') + '" data-card="' + card + '">' +
+        '<span class="rk">' + rankOf(card) + '</span><span class="st">' + SUIT_SYM[suitOf(card)] + '</span></div>';
+    }
+
+    function render(state) {
+      var ord = state.order || [];
+      var total = ord.length;
+      var finish = state.finishOrder || [];
+      var passed = state.passed || [];
+      var turn = state.turn, isMyTurn = turn === window.myPid;
+
+      // Adversaires
+      document.getElementById('pr-opps').innerHTML = ord.filter(function (p) { return p !== window.myPid; }).map(function (pid) {
+        var h = (state.players[pid] && state.players[pid].hand) || [];
+        var fpos = finish.indexOf(pid);
+        var done = fpos >= 0;
+        var badge = done ? '<span class="rank-badge">' + rankTitle(fpos, total) + '</span>' : '<span class="cnt">' + h.length + '</span>';
+        return '<span class="pr-opp' + (turn === pid ? ' turn' : '') + (passed.indexOf(pid) >= 0 ? ' passed' : '') + (done ? ' done' : '') + '">' +
+          '<span class="pr-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' ' + badge + '</span>';
+      }).join('');
+
+      setText('pr-banner', state.banner || '');
+
+      // Pile
+      var pileEl = document.getElementById('pr-pile');
+      if (state.pile && state.pile.cards) {
+        pileEl.innerHTML = state.pile.cards.map(function (c) { return cardHTML(c); }).join('') +
+          '<div class="pr-pile-label" style="align-self:flex-end">par ' + escapeHtml(Room.name(state.pile.by)) + '</div>';
+      } else {
+        pileEl.innerHTML = '<span class="pr-pile-empty">Nouveau pli — à ' + (isMyTurn ? 'toi' : escapeHtml(Room.name(turn))) + ' de poser</span>';
+      }
+
+      // Ma main
+      var myHand = sortHand((state.players[window.myPid] && state.players[window.myPid].hand) || []);
+      setText('pr-my-count', '(' + myHand.length + ')');
+      var selRank = selected.length ? rankOf(selected[0]) : null;
+      var cont = document.getElementById('pr-hand');
+      cont.innerHTML = myHand.map(function (card) {
+        var isSel = selected.indexOf(card) >= 0;
+        // griser les cartes d'une autre valeur quand une sélection est en cours
+        var dim = (selRank && rankOf(card) !== selRank && !isSel) ? 'dim' : '';
+        return cardHTML(card, (isSel ? 'sel ' : '') + dim);
+      }).join('');
+
+      // Boutons
+      var playBtn = document.getElementById('pr-play-btn');
+      var passBtn = document.getElementById('pr-pass-btn');
+      playBtn.disabled = !(isMyTurn && selected.length > 0);
+      passBtn.disabled = !(isMyTurn && state.pile); // on ne peut pas passer sur un nouveau pli
+
+      // Bouton « sauter l'absent » si le joueur dont c'est le tour est hors ligne
+      var absentBtn = document.getElementById('pr-absent-btn');
+      var turnOffline = turn && state.players[turn] && !state.players[turn].online && (state.players[turn].hand || []).length > 0;
+      absentBtn.style.display = (turnOffline && !isMyTurn) ? 'block' : 'none';
+      if (turnOffline && !isMyTurn) absentBtn.textContent = 'Sauter ' + Room.name(turn) + ' (absent)';
+    }
+
+    function toggleCard(card) {
+      var st = window.room || {};
+      if (st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      var i = selected.indexOf(card);
+      if (i >= 0) selected.splice(i, 1);
+      else {
+        // garder une seule valeur sélectionnée à la fois
+        if (selected.length && rankOf(selected[0]) !== rankOf(card)) selected = [];
+        selected.push(card);
+      }
+      render(st);
+    }
+
+    /* ━━ Actions ━━ */
+    function playSelected() {
+      var st = window.room || {};
+      if (st.turn !== window.myPid || !selected.length) return;
+      var cards = selected.slice();
+      var r = rankOf(cards[0]);
+      if (!cards.every(function (c) { return rankOf(c) === r; })) { lbToast('Sélectionne des cartes de même valeur'); return; }
+      if (st.pile) {
+        if (cards.length !== st.pile.count) { lbToast('Il faut ' + st.pile.count + ' carte(s)'); return; }
+        if (rankVal(cards[0]) <= st.pile.rank) { lbToast('Il faut une valeur plus forte'); return; }
+      }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        var hand = (cur.players[window.myPid].hand || []).slice();
+        for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
+        var rk = rankOf(cards[0]);
+        if (!cards.every(function (c) { return rankOf(c) === rk; })) return cur;
+        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) <= cur.pile.rank) return cur; }
+        // retirer les cartes
+        cards.forEach(function (c) { hand.splice(hand.indexOf(c), 1); });
+        cur.players[window.myPid].hand = hand;
+        cur.pile = { by: window.myPid, rank: rankVal(cards[0]), count: cards.length, cards: cards };
+        cur.lastPlayer = window.myPid;
+        cur.banner = Room.name(window.myPid) + ' joue ' + comboLabel(cards);
+        if (hand.length === 0) { cur.finishOrder = (cur.finishOrder || []).concat([window.myPid]); cur.banner += ' et a fini !'; }
+        resolveAfterPlay(cur, window.myPid);
+        return cur;
+      }, function (err, committed) { if (committed) selected = []; });
+    }
+
+    function passTurn() {
+      var st = window.room || {};
+      if (st.turn !== window.myPid || !st.pile) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || !cur.pile) return cur;
+        cur.passed = (cur.passed || []).concat([window.myPid]);
+        cur.banner = Room.name(window.myPid) + ' passe';
+        resolvePass(cur, window.myPid);
+        return cur;
+      }, function (err, committed) { if (committed) selected = []; });
+    }
+
+    function forceAbsent() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing') return cur;
+        var t = cur.turn;
+        if (!t || !cur.players[t] || cur.players[t].online) return cur;
+        var hand = (cur.players[t].hand || []).slice();
+        if (!hand.length) return cur;
+        if (cur.pile) {
+          cur.passed = (cur.passed || []).concat([t]);
+          cur.banner = Room.name(t) + ' passe (absent)';
+          resolvePass(cur, t);
+        } else {
+          // doit relancer : on pose sa plus petite carte
+          var sorted = sortHand(hand);
+          var low = sorted[0];
+          hand.splice(hand.indexOf(low), 1);
+          cur.players[t].hand = hand;
+          cur.pile = { by: t, rank: rankVal(low), count: 1, cards: [low] };
+          cur.lastPlayer = t;
+          cur.banner = Room.name(t) + ' (absent) pose ' + comboLabel([low]);
+          if (hand.length === 0) cur.finishOrder = (cur.finishOrder || []).concat([t]);
+          resolveAfterPlay(cur, t);
+        }
+        return cur;
+      });
+    }
+
+    function resolveAfterPlay(cur, pid) {
+      var order = cur.order || [];
+      var active = order.filter(function (p) { return handArr(cur, p).length > 0; });
+      if (active.length <= 1) {
+        if (active.length === 1) cur.finishOrder = (cur.finishOrder || []).concat(active);
+        cur.status = 'ended'; cur.turn = null;
+        return;
+      }
+      var nt = nextTurnAfter(cur, pid);
+      if (nt === null) { // tout le monde a passé/fini → je relance (ou la main passe si j'ai fini)
+        cur.pile = null; cur.passed = [];
+        cur.turn = handArr(cur, pid).length > 0 ? pid : nextActiveAfter(cur, pid);
+      } else cur.turn = nt;
+    }
+
+    function resolvePass(cur, pid) {
+      var nt = nextTurnAfter(cur, pid);
+      if (nt === null || nt === cur.lastPlayer) {
+        // le dernier à avoir posé remporte le pli et relance
+        var lp = cur.lastPlayer;
+        cur.pile = null; cur.passed = [];
+        cur.turn = (lp && handArr(cur, lp).length > 0) ? lp : nextActiveAfter(cur, lp || pid);
+        if (cur.turn) cur.banner = Room.name(cur.turn) + ' remporte le pli et relance';
+      } else cur.turn = nt;
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var rank = (state.finishOrder || []).slice();
+      var total = (state.order || []).length;
+      var myPos = rank.indexOf(window.myPid);
+      var pres = rank[0];
+      setText('res-emoji', myPos === 0 ? '👑' : myPos === total - 1 ? '💩' : '🎉');
+      setText('res-title', pres === window.myPid ? 'Tu es Président ! 👑' : 'Président : ' + Room.name(pres));
+      document.getElementById('res-rank').innerHTML = rank.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-title">' + rankTitle(i, total) + '</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { selected = []; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); selected = []; Lobby.resetToLobby([]); }
+
+    /* ━━ Clic main ━━ */
+    document.getElementById('pr-hand').addEventListener('click', function (e) {
+      var c = e.target.closest('.card');
+      if (c && c.dataset.card) toggleCard(c.dataset.card);
+    });
+  </script>
+</body>
+</html>

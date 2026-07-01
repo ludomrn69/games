@@ -42,7 +42,7 @@
 
     var home = document.createElement('a');
     home.className = 'nav-home';
-    home.href = 'index.html';
+    home.href = '/index.html';
     home.innerHTML = '<span class="logo">🎲</span><span>Les jeux</span>';
 
     var toggle = document.createElement('button');
@@ -57,8 +57,22 @@
       applyTheme(next); refreshIcon();
     });
 
+    // Bouton son (bip + vibration quand c'est ton tour) — mémorisé.
+    var snd = document.createElement('button');
+    snd.className = 'nav-theme'; snd.type = 'button'; snd.style.marginLeft = '6px';
+    snd.setAttribute('aria-label', 'Activer/couper le son');
+    function soundIsOn() { try { return localStorage.getItem('games.sound') !== '0'; } catch (e) { return true; } }
+    function refreshSnd() { snd.textContent = soundIsOn() ? '🔔' : '🔕'; }
+    refreshSnd();
+    snd.addEventListener('click', function () {
+      var on = (window.Lobby && Lobby.toggleSound) ? Lobby.toggleSound() : (function () { var v = !soundIsOn(); try { localStorage.setItem('games.sound', v ? '1' : '0'); } catch (e) {} return v; })();
+      refreshSnd();
+    });
+
+    var right = document.createElement('div'); right.style.display = 'flex'; right.style.alignItems = 'center';
+    right.appendChild(snd); right.appendChild(toggle);
     nav.appendChild(home);
-    nav.appendChild(toggle);
+    nav.appendChild(right);
     document.body.insertBefore(nav, document.body.firstChild);
   }
 

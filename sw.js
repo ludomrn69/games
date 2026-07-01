@@ -11,22 +11,35 @@
      quand on est en ligne, fonctionne quand même hors-ligne).
    • Scripts / styles same-origin : cache d'abord (rapide + hors-ligne), mis à jour
      en arrière-plan.
-   • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
-     hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
+   • Polices : auto-hébergées (fonts.css + fonts/*.woff2, même origine) → en cache
+     comme le reste, donc rendu identique hors-ligne.
+   • Firebase (externe) : réseau seul (pas mis en cache ; hors-ligne il échoue
+     proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v14';
+// La version est estampillée automatiquement (empreinte du contenu mis en cache)
+// par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
+var CACHE = 'jeux-354b212e8b';
 var ASSETS = [
-  './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
-  'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
-  'head.js', 'boot.js', 'p4-ai.js', 'morpion-ai.js',
-  'tu-preferes.html', 'petit-bac.html', 'puissance4.html', 'dobble-emoji.html',
-  'crack-list.html', 'lynx.html', 'pictionary.html', 'uno.html', 'skyjo.html',
-  'blokus.html', 'bataille-navale.html', 'codenames.html', 'morpion.html',
-  'undercover.html', 'president.html', 'ludo.html',
-  'juste-prix.html', 'telephone-dessine.html',
-  'monopoly.html', 'monopoly-engine.js',
-  'cluedo.html', 'cluedo-engine.js',
-  'papayoo.html', 'trio.html', 'sixnimmt.html', 'mastermind.html', 'themind.html', '2048.html', 'sudoku.html', 'millebornes.html', 'loupgarou.html', 'timesup.html'
+  './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
+  'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',
+  'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
+  'avatars.js', 'common.js', 'daily.js', 'firebase-init.js', 'head.js', 'lobby.js', 'nav.js', 'offline.js', 'presence.js', 'puzzle.js', 'sfx.js', 'stats.js',
+  'ai/aventuriers-engine.js', 'ai/bataille-navale-ai.js', 'ai/blokus-ai.js', 'ai/cluedo-engine.js', 'ai/dames-ai.js', 'ai/mastermind-ai.js', 'ai/millebornes-ai.js', 'ai/monopoly-engine.js', 'ai/morpion-ai.js', 'ai/p4-ai.js', 'ai/papayoo-ai.js', 'ai/president-ai.js', 'ai/reversi-ai.js', 'ai/sixnimmt-ai.js', 'ai/skyjo-ai.js', 'ai/trio-ai.js', 'ai/uno-ai.js',
+  'games/2048.html', 'games/aventuriers-du-rail.html', 'games/balatro.html', 'games/bataille-navale.html', 'games/blackjack.html', 'games/blokus.html',
+  'games/cluedo.html', 'games/codenames.html', 'games/crack-list.html', 'games/dames.html', 'games/diamants.html', 'games/dobble-emoji.html',
+  'games/juste-prix.html', 'games/lapaye.html', 'games/loupgarou.html', 'games/ludo.html', 'games/lynx.html', 'games/mastermind.html',
+  'games/millebornes.html', 'games/monopoly.html', 'games/morpion.html', 'games/nothanks.html', 'games/papayoo.html', 'games/patches.html',
+  'games/perudo.html', 'games/petit-bac.html', 'games/pictionary.html', 'games/playus/astro-glide.html', 'games/playus/balldrop.html', 'games/playus/balloon-pop.html',
+  'games/playus/ballracer.html', 'games/playus/balls-cups.html', 'games/playus/bloopy.html', 'games/playus/bouncy.html', 'games/playus/boxguesser.html', 'games/playus/call-me.html',
+  'games/playus/center-hit.html', 'games/playus/color-memory.html', 'games/playus/color-reflex.html', 'games/playus/count.html', 'games/playus/dangerwall.html', 'games/playus/descend.html',
+  'games/playus/drift.html', 'games/playus/flap.html', 'games/playus/grid.html', 'games/playus/jumpy.html', 'games/playus/keep-up.html', 'games/playus/kenneys-race.html',
+  'games/playus/knife-throw.html', 'games/playus/memorizer.html', 'games/playus/memory.html', 'games/playus/ninja-chop.html', 'games/playus/on-time.html', 'games/playus/perfect-shape.html',
+  'games/playus/piano.html', 'games/playus/react.html', 'games/playus/rhythm.html', 'games/playus/slicer.html', 'games/playus/snake.html', 'games/playus/speed-tap.html',
+  'games/playus/speedgolf.html', 'games/playus/swipe-fast.html', 'games/playus/sword-balance.html', 'games/playus/target-speed.html', 'games/playus/tilted.html', 'games/playus/times-up.html',
+  'games/playus/tower-stack.html', 'games/playus/trampbox.html', 'games/playus/zig.html', 'games/president.html', 'games/puissance4.html', 'games/queens.html',
+  'games/qwixx.html', 'games/reversi.html', 'games/sixnimmt.html', 'games/skyjo.html', 'games/solitaire.html', 'games/sudoku.html',
+  'games/sutom.html', 'games/tango.html', 'games/telephone-dessine.html', 'games/themind.html', 'games/timesup.html', 'games/trio.html',
+  'games/undercover.html', 'games/uno.html', 'games/zip.html'
 ];
 
 self.addEventListener('install', function (e) {
@@ -45,20 +58,48 @@ self.addEventListener('activate', function (e) {
   );
 });
 
+// ── Messages depuis la page (indicateur « prêt pour l'avion » sur l'accueil) ──
+//  • CACHE_STATUS : combien de ressources préchargées sont déjà en cache.
+//  • PRECACHE     : (re)télécharge tout ce qui manque, puis renvoie le statut.
+// La réponse revient via postMessage sur le port fourni (ou le client émetteur).
+function cacheStatus() {
+  return caches.open(CACHE).then(function (c) {
+    return Promise.all(ASSETS.map(function (u) { return c.match(u).then(function (m) { return m ? 1 : 0; }); }));
+  }).then(function (arr) {
+    var cached = arr.reduce(function (a, b) { return a + b; }, 0);
+    var games = ASSETS.filter(function (u) { return u.indexOf('games/') === 0; }).length;
+    return { cached: cached, total: ASSETS.length, games: games, ready: cached >= ASSETS.length };
+  });
+}
+self.addEventListener('message', function (e) {
+  var data = e.data || {};
+  var reply = function (msg) { if (e.ports && e.ports[0]) e.ports[0].postMessage(msg); else if (e.source) e.source.postMessage(msg); };
+  if (data.type === 'CACHE_STATUS') {
+    e.waitUntil(cacheStatus().then(function (s) { s.type = 'CACHE_STATUS'; reply(s); }));
+  } else if (data.type === 'PRECACHE') {
+    e.waitUntil(caches.open(CACHE).then(function (c) {
+      return Promise.all(ASSETS.map(function (u) { return c.match(u).then(function (m) { return m || c.add(u).catch(function () {}); }); }));
+    }).then(cacheStatus).then(function (s) { s.type = 'PRECACHE_DONE'; reply(s); }));
+  }
+});
+
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
-  if (url.origin !== location.origin) return; // externe (Firebase, fonts) → réseau natif
+  if (url.origin !== location.origin) return; // externe (Firebase) → réseau natif
 
   var isPage = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/';
   if (isPage) {
-    // réseau d'abord, repli cache
+    // réseau d'abord, repli cache. ignoreSearch : le précache contient
+    // « games/uno.html » SANS query, mais on y navigue avec « ?mode=solo » ou
+    // « ?room=CODE » — sans ce drapeau, le repli hors-ligne raterait le cache
+    // et servirait l'accueil à la place du jeu (mode avion cassé).
     e.respondWith(
       fetch(req).then(function (res) {
         var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
         return res;
-      }).catch(function () { return caches.match(req).then(function (m) { return m || caches.match('index.html'); }); })
+      }).catch(function () { return caches.match(req, { ignoreSearch: true }).then(function (m) { return m || caches.match('/index.html'); }); })
     );
   } else {
     // cache d'abord, repli réseau (et mise en cache)

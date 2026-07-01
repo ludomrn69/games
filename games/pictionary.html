@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Pictionary 🎨" data-emoji="🎨"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.5; }
+
+    .pic-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .pic-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+    .pic-set-row { display: flex; gap: 8px; justify-content: center; }
+    .pic-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .pic-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+
+    .pic-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .pic-header { background: rgba(20,16,28,0.97); }
+    .pic-round-label { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--gold); white-space: nowrap; }
+    .pic-role-badge { font-size: 0.78rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; border: 1.5px solid var(--gold-light); color: var(--ink-light); white-space: nowrap; }
+    .pic-role-badge.drawing { color: var(--terracotta); border-color: var(--terracotta); }
+    .pic-role-badge.guessing { color: #5B7EC7; border-color: #5B7EC7; }
+    .pic-header-actions { display: flex; gap: 6px; }
+
+    .pic-play-area { display: flex; flex-direction: column; padding: 12px; gap: 10px; max-width: 920px; margin: 0 auto; width: 100%; }
+    .pic-stage { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    .pic-canvas-col { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+    .pic-side-panel { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
+    .pic-word-banner, .pic-guesser-banner { text-align: center; background: var(--white); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); }
+    .pic-word-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-light); }
+    .pic-word-value { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.3rem; color: var(--terracotta); }
+    .pic-guesser-banner-text { font-family: 'Caveat', cursive; font-size: 1.15rem; color: #5B7EC7; }
+
+    .pic-scores-mini { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+    .pic-sc-chip { display: flex; align-items: center; gap: 4px; background: var(--white); border-radius: 20px; padding: 3px 9px 3px 4px; box-shadow: var(--shadow); font-size: 0.76rem; font-weight: 700; }
+    .pic-sc-chip.drawer { outline: 2px solid var(--terracotta); }
+    .pic-sc-av { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; }
+
+    .pic-timer-wrap { display: flex; align-items: center; gap: 8px; }
+    .pic-timer-bar-bg { flex: 1; height: 8px; background: var(--gold-light); border-radius: 8px; overflow: hidden; }
+    .pic-timer-bar { height: 100%; background: var(--sage); transition: width 1s linear; }
+    .pic-timer-bar.warning { background: var(--terracotta); }
+    .pic-timer-num { font-weight: 800; font-size: 0.9rem; width: 28px; text-align: right; }
+    .pic-timer-num.warning { color: var(--terracotta); }
+
+    .pic-canvas-wrap { background: #fff; border: 2px solid var(--gold-light); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+    html[data-theme="dark"] .pic-canvas-wrap { background: #fff; }
+    #pic-canvas { width: 100%; height: auto; display: block; touch-action: none; cursor: crosshair; }
+    .pic-canvas-wrap.is-guesser #pic-canvas { cursor: default; }
+
+    .pic-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--white); border-radius: 12px; padding: 8px; box-shadow: var(--shadow); }
+    .pic-toolbar.hidden { display: none; }
+    .color-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+    .color-swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+    .color-swatch.active { border-color: var(--ink); transform: scale(1.15); }
+    .toolbar-divider { width: 1px; height: 22px; background: var(--gold-light); }
+    .size-btns { display: flex; gap: 4px; }
+    .size-btn { width: 28px; height: 28px; border-radius: 8px; border: 1.5px solid var(--gold-light); background: var(--cream); cursor: pointer; font-weight: 700; }
+    .size-btn.active { background: var(--gold); color: #fff; border-color: transparent; }
+    .pic-eraser-btn, .pic-clear-btn { border: 1.5px solid var(--gold-light); background: var(--cream); border-radius: 8px; padding: 4px 8px; font-size: 0.78rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .pic-eraser-btn.active { background: var(--gold); color: #fff; border-color: transparent; }
+
+    .pic-hint-row { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; padding: 6px; background: var(--white); border-radius: 10px; box-shadow: var(--shadow); }
+    .pic-hint-letter { font-family: 'DM Mono', monospace; font-weight: 800; font-size: 1rem; min-width: 14px; text-align: center; color: var(--ink-light); border-bottom: 2px solid var(--gold-light); }
+    .pic-hint-letter.revealed { color: var(--terracotta); border-color: var(--terracotta); }
+    .pic-hint-letter.space { border: none; }
+
+    .pic-chat { background: var(--white); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; min-height: 90px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+    .pic-chat-msg { font-size: 0.85rem; }
+    .pic-chat-msg .who { font-weight: 700; margin-right: 5px; }
+    .pic-chat-msg.correct { color: var(--sage); font-weight: 700; }
+    .pic-guess-row { display: flex; gap: 8px; }
+    .pic-guess-input { flex: 1; min-width: 0; padding: 0.6rem 0.8rem; border: 1.5px solid var(--gold-light); border-radius: 10px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 0.95rem; }
+    .pic-guess-input:focus { outline: none; border-color: var(--gold); }
+    .pic-guess-submit { border: none; border-radius: 10px; padding: 0 14px; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-weight: 700; cursor: pointer; }
+
+    .pic-choosing-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 110px); padding: 30px 20px; text-align: center; }
+    .pic-choosing-panel h2 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; margin-bottom: 6px; }
+    .pic-choosing-panel .sub { color: var(--ink-light); margin-bottom: 22px; }
+    .pic-word-choices { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+    .pic-word-choice { padding: 1rem; border: 2px solid var(--gold-light); border-radius: 16px; background: var(--white); box-shadow: var(--shadow); font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.2rem; cursor: pointer; transition: transform .15s; }
+    .pic-word-choice:hover { transform: translateY(-2px); border-color: var(--gold); }
+
+    .pic-overlay { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .pic-overlay.active { display: flex; }
+    .pic-overlay-card { background: var(--white); border-radius: 22px; padding: 28px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .pic-ov-emoji { font-size: 2.6rem; }
+    .pic-ov-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.4rem; margin: 6px 0; }
+    .pic-ov-word { font-size: 1rem; color: var(--ink-light); margin-bottom: 10px; }
+    .pic-ov-word span { color: var(--terracotta); font-weight: 800; }
+    .pic-ov-score { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 16px; }
+    .pic-ov-msg { font-family: 'Caveat', cursive; color: var(--ink-light); min-height: 22px; margin-top: 8px; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.6rem; margin-bottom: 8px; }
+    .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.9rem; margin-bottom: 18px; }
+    .res-rank { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 26px; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-score { font-weight: 800; color: var(--gold); }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="pic-header">
+        <span class="pic-round-label" id="pic-round-label">Manche 1</span>
+        <span class="pic-role-badge" id="pic-role-badge">—</span>
+        <div class="pic-header-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+
+      <div id="pic-choosing-panel" class="pic-choosing-panel" style="display:none">
+        <div id="pic-choosing-content"></div>
+      </div>
+
+      <div id="pic-drawing-panel" class="pic-play-area" style="display:none">
+        <div class="pic-stage">
+          <div class="pic-canvas-col">
+            <div class="pic-word-banner" id="pic-word-banner" style="display:none">
+              <div class="pic-word-label">Ton mot à dessiner</div>
+              <div class="pic-word-value" id="pic-word-value">—</div>
+            </div>
+            <div class="pic-guesser-banner" id="pic-guesser-banner" style="display:none">
+              <div class="pic-guesser-banner-text" id="pic-guesser-text">Devine !</div>
+            </div>
+            <div class="pic-scores-mini" id="pic-scores-mini"></div>
+            <div class="pic-timer-wrap">
+              <div class="pic-timer-bar-bg"><div class="pic-timer-bar" id="pic-timer-bar" style="width:100%"></div></div>
+              <div class="pic-timer-num" id="pic-timer-num">60</div>
+            </div>
+            <div class="pic-canvas-wrap" id="pic-canvas-wrap"><canvas id="pic-canvas"></canvas></div>
+            <div class="pic-toolbar hidden" id="pic-toolbar">
+              <div class="color-swatches" id="pic-swatches"></div>
+              <div class="toolbar-divider"></div>
+              <div class="size-btns" id="pic-sizes"></div>
+              <button class="pic-eraser-btn" id="pic-eraser-btn" onclick="toggleEraser()" title="Gomme">▱ Gomme</button>
+              <button class="pic-clear-btn" onclick="clearCanvas()">Effacer</button>
+            </div>
+          </div>
+          <div class="pic-side-panel">
+            <div class="pic-hint-row" id="pic-hint-row" style="display:none"></div>
+            <div class="pic-chat" id="pic-chat"></div>
+            <div class="pic-guess-area" id="pic-guess-area" style="display:none">
+              <div class="pic-guess-row">
+                <input id="pic-guess-input" class="pic-guess-input" type="text" placeholder="Ton idée..." autocomplete="off" autocorrect="off" spellcheck="false" />
+                <button class="pic-guess-submit" onclick="submitGuess()">Envoyer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ ROUND END OVERLAY ══ -->
+  <div class="pic-overlay" id="pic-overlay">
+    <div class="pic-overlay-card">
+      <div class="pic-ov-emoji" id="pic-ov-emoji">🎉</div>
+      <div class="pic-ov-title" id="pic-ov-title">—</div>
+      <div class="pic-ov-word" id="pic-ov-word"></div>
+      <div class="pic-ov-score" id="pic-ov-score"></div>
+      <button class="btn-primary" id="btn-next-round" onclick="setNextRoundReady()">Manche suivante →</button>
+      <div class="pic-ov-msg" id="pic-ov-msg"></div>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Pictionary</div>
+      <div class="modal-body">
+        <p>Chacun son tour, un joueur <b>dessine</b> un mot secret. Les autres <b>devinent</b> en écrivant dans le chat.</p>
+        <p style="margin-top:10px">Le premier à trouver gagne <b>2 pts</b>, le dessinateur <b>1 pt</b>. Des lettres se révèlent au fil du temps.</p>
+        <p style="margin-top:10px">Après toutes les manches, le meilleur score gagne.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Constantes ━━ */
+    var WORDS = [
+      'chat','chien','cheval','lion','tigre','éléphant','girafe','pingouin','baleine','dauphin',
+      'papillon','abeille','araignée','grenouille','crocodile','tortue','perroquet','aigle','requin','pieuvre',
+      'maison','voiture','vélo','avion','bateau','train','téléphone','ordinateur','télévision','livre',
+      'guitare','piano','parapluie','lunettes','chapeau','montre','sac','clé','lampe','caméra',
+      'pizza','gâteau','glace','chocolat','baguette','croissant','pomme','banane','fraise','pastèque',
+      'sushi','burger','taco','crêpe','macaron','fromage','raisin','ananas','cerise',
+      'plage','montagne','forêt','désert','île','volcan','cascade','arc-en-ciel','étoile','lune',
+      'château','phare','pont','jardin','piscine','grotte','cactus','palmier',
+      'sommeil','natation','danse','musique','lecture','cuisine','jardinage','camping','ski','surf',
+      'pirate','sorcière','robot','vampire','fantôme','chevalier','princesse','astronaute','clown','ninja',
+      'feu d\'artifice','ballon','cadeau','trophée','couronne','baguette magique','trampoline'
+    ];
+    var COLORS_PALETTE = ['#2C2520','#7f8c8d','#e74c3c','#e67e22','#f1c40f','#27ae60','#16a085','#1abc9c','#3498db','#2c3e8f','#9b59b6','#ff6b9d','#C4745A','#8b5a2b'];
+    var SIZES = [{ w: 2, label: 'S' }, { w: 6, label: 'M' }, { w: 14, label: 'L' }];
+    var CANVAS_W = 600, CANVAS_H = 380, TIMER_DURATION = 75;
+
+    /* ━━ State ━━ */
+    var prevStatus = null;
+    var canvas = null, ctx = null, isDrawing = false, lastX = 0, lastY = 0;
+    var currentColor = '#2C2520', currentWidth = 6, lastColor = '#2C2520', isEraser = false;
+    var pendingStrokes = [], lastSentIdx = 0, strokeSyncInterval = null, strokeListener = null;
+    var timerInterval = null, timerAdvanced = false;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+    function normalize(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, ''); }
+    function pickRandom(arr, n) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a.slice(0, n); }
+    function drawerForRound(order, round) { return order[(round - 1) % order.length]; }
+    function isLastRound(state) { return (state.round || 1) >= (state.maxRounds || 6); }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'pictionary',
+      name: 'Pictionary',
+      emoji: '🎨',
+      tagline: 'Dessine, fais deviner',
+      minPlayers: 2,
+      maxPlayers: 10,
+      rules: [
+        'Chacun son tour, un joueur dessine un mot secret',
+        'Les autres devinent en écrivant dans le chat',
+        'Le premier à trouver gagne 2 pts · le dessinateur 1 pt',
+        'Le meilleur score après toutes les manches gagne'
+      ],
+      lobbyExtraHTML: lobbyExtraHTML,
+      onState: onState,
+      onStart: onStart,
+      onLeave: stopAllIntervals
+    });
+
+    function lobbyExtraHTML(room) {
+      var sel = (room && room.maxRounds) || 6;
+      var btns = [4, 6, 8].map(function (n) {
+        return '<button class="pic-set-btn' + (n === sel ? ' active' : '') + '" onclick="setMaxRounds(' + n + ')">' + n + '</button>';
+      }).join('');
+      return '<div class="pic-settings"><div class="pic-settings-label">Nombre de manches</div><div class="pic-set-row">' + btns + '</div></div>';
+    }
+    function setMaxRounds(n) { if (window.roomRef) window.roomRef.child('maxRounds').set(n); }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var scores = {};
+      players.forEach(function (p) { scores[p.pid] = 0; cur.players[p.pid].nextRoundReady = false; });
+      return {
+        status: 'choosing', round: 1, maxRounds: (cur && cur.maxRounds) || 6,
+        drawer: order[0], wordOptions: pickRandom(WORDS, 3), chosenWord: null,
+        scores: scores, guessHistory: null, guessedCorrectly: false, guessedBy: null,
+        strokes: null, timerStart: null
+      };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status !== prevStatus) {
+        prevStatus = status;
+        if (status === 'choosing') handleChoosing(state);
+        else if (status === 'drawing') handleDrawing(state);
+        else if (status === 'round-end') handleRoundEnd(state);
+        else if (status === 'finished') handleFinished(state);
+      } else {
+        if (status === 'drawing') { updateHeader(state); renderChat(state); }
+        else if (status === 'round-end') { renderChat(state); updateRoundEndMsg(state); maybeAdvanceRound(state); }
+        else if (status === 'choosing') maybeNobodyDrawer(state);
+      }
+    }
+
+    function stopAllIntervals() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      if (strokeSyncInterval) { clearInterval(strokeSyncInterval); strokeSyncInterval = null; }
+    }
+
+    /* ━━ En-tête ━━ */
+    function updateHeader(state) {
+      setText('pic-round-label', 'Manche ' + (state.round || 1) + '/' + (state.maxRounds || 6));
+      var drawer = state.drawer;
+      var badge = document.getElementById('pic-role-badge');
+      if (drawer === window.myPid) { badge.textContent = 'Tu dessines'; badge.className = 'pic-role-badge drawing'; }
+      else { badge.textContent = 'Tu devines'; badge.className = 'pic-role-badge guessing'; }
+      // mini scoreboard
+      var ord = state.order || [], scores = state.scores || {};
+      document.getElementById('pic-scores-mini').innerHTML = ord.map(function (pid) {
+        return '<span class="pic-sc-chip' + (pid === drawer ? ' drawer' : '') + '"><span class="pic-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' ' + (scores[pid] || 0) + '</span>';
+      }).join('');
+    }
+
+    /* ━━ Choosing ━━ */
+    function handleChoosing(state) {
+      stopAllIntervals();
+      document.getElementById('pic-overlay').classList.remove('active');
+      showScreen('s-playing');
+      updateHeader(state);
+      document.getElementById('pic-drawing-panel').style.display = 'none';
+      var panel = document.getElementById('pic-choosing-panel');
+      panel.style.display = 'flex';
+      var iAmDrawer = state.drawer === window.myPid;
+      var content = document.getElementById('pic-choosing-content');
+      if (iAmDrawer) {
+        var opts = (state.wordOptions || []).map(function (w) {
+          return '<button class="pic-word-choice" onclick="chooseWord(\'' + w.replace(/'/g, "\\'") + '\')">' + escapeHtml(w) + '</button>';
+        }).join('');
+        content.innerHTML = '<h2>À toi de dessiner !</h2><p class="sub">Choisis un mot</p><div class="pic-word-choices">' + opts + '</div>';
+      } else {
+        content.innerHTML = '<h2>' + escapeHtml(Room.name(state.drawer)) + ' dessine</h2><p class="sub">' + escapeHtml(Room.name(state.drawer)) + ' choisit un mot…</p>';
+      }
+    }
+    // Si le dessinateur est hors ligne pendant le choix, on passe la main.
+    function maybeNobodyDrawer(state) {
+      var drawer = state.drawer;
+      var online = (state.players && state.players[drawer] && state.players[drawer].online);
+      if (online) return;
+      // le 1er joueur en ligne fait avancer (saute ce dessinateur)
+      var ord = state.order || [];
+      var firstOnline = ord.filter(function (p) { return state.players[p] && state.players[p].online; })[0];
+      if (firstOnline !== window.myPid) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'choosing') return cur;
+        if (cur.players[cur.drawer] && cur.players[cur.drawer].online) return cur;
+        advancePatch(cur);
+        return cur;
+      });
+    }
+
+    function chooseWord(word) {
+      var st = window.room || {};
+      if (st.status !== 'choosing' || st.drawer !== window.myPid) return;
+      rref().update({ status: 'drawing', chosenWord: word, guessedCorrectly: false, guessedBy: null, strokes: null, guessHistory: null, timerStart: Date.now() });
+    }
+
+    /* ━━ Drawing ━━ */
+    function handleDrawing(state) {
+      stopAllIntervals();
+      document.getElementById('pic-overlay').classList.remove('active');
+      showScreen('s-playing');
+      updateHeader(state);
+      document.getElementById('pic-choosing-panel').style.display = 'none';
+      document.getElementById('pic-drawing-panel').style.display = 'flex';
+
+      var iAmDrawer = state.drawer === window.myPid;
+      setupCanvas(iAmDrawer);
+
+      if (iAmDrawer) {
+        document.getElementById('pic-word-banner').style.display = 'block';
+        setText('pic-word-value', state.chosenWord || '?');
+        document.getElementById('pic-guesser-banner').style.display = 'none';
+        document.getElementById('pic-toolbar').classList.remove('hidden');
+        document.getElementById('pic-guess-area').style.display = 'none';
+        document.getElementById('pic-hint-row').style.display = 'none';
+        // Reprise après un rafraîchissement de la page du dessinateur : on rejoue
+        // les traits déjà en base (sans les re-pousser) au lieu de repartir d'un
+        // canvas blanc. setupCanvas a remis le fond blanc juste avant.
+        rref().child('strokes').once('value', function (snap) {
+          snap.forEach(function (child) { var s = child.val(); if (s && !s.clear) drawStroke(s.x0, s.y0, s.x1, s.y1, s.c, s.w); });
+        });
+        startStrokeSync();
+        detachStrokeListener();
+      } else {
+        document.getElementById('pic-word-banner').style.display = 'none';
+        document.getElementById('pic-guesser-banner').style.display = 'block';
+        document.getElementById('pic-guesser-text').innerHTML = 'Devine ce que dessine <strong>' + escapeHtml(Room.name(state.drawer)) + '</strong> !';
+        document.getElementById('pic-toolbar').classList.add('hidden');
+        document.getElementById('pic-guess-area').style.display = 'block';
+        document.getElementById('pic-hint-row').style.display = 'flex';
+        document.getElementById('pic-guess-input').value = '';
+        attachStrokeListener();
+      }
+      renderChat(state);
+      renderHintRow(state, 0);
+      timerAdvanced = false;
+      startTimer(state);
+    }
+
+    function setupCanvas(isDrawer) {
+      var old = document.getElementById('pic-canvas');
+      var fresh = old.cloneNode(false);
+      old.parentNode.replaceChild(fresh, old);
+      canvas = fresh; ctx = canvas.getContext('2d');
+      canvas.width = CANVAS_W; canvas.height = CANVAS_H;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      document.getElementById('pic-canvas-wrap').classList.toggle('is-guesser', !isDrawer);
+      pendingStrokes = []; lastSentIdx = 0;
+      if (isDrawer) {
+        canvas.addEventListener('mousedown', onDown); canvas.addEventListener('mousemove', onMove);
+        canvas.addEventListener('mouseup', onUp); canvas.addEventListener('mouseleave', onUp);
+        canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+        canvas.addEventListener('touchend', onUp);
+        buildToolbar();
+      }
+    }
+    function buildToolbar() {
+      var sw = document.getElementById('pic-swatches'); sw.innerHTML = '';
+      COLORS_PALETTE.forEach(function (c, i) {
+        var b = document.createElement('button'); b.className = 'color-swatch' + (i === 0 ? ' active' : ''); b.style.background = c;
+        b.onclick = function () { currentColor = c; lastColor = c; isEraser = false; document.getElementById('pic-eraser-btn').classList.remove('active'); document.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('active'); }); b.classList.add('active'); };
+        sw.appendChild(b);
+      });
+      var sz = document.getElementById('pic-sizes'); sz.innerHTML = '';
+      SIZES.forEach(function (s, i) {
+        var b = document.createElement('button'); b.className = 'size-btn' + (i === 1 ? ' active' : ''); b.textContent = s.label;
+        b.onclick = function () { currentWidth = s.w; document.querySelectorAll('.size-btn').forEach(function (x) { x.classList.remove('active'); }); b.classList.add('active'); };
+        sz.appendChild(b);
+      });
+      currentColor = '#2C2520'; currentWidth = 6; lastColor = '#2C2520'; isEraser = false;
+    }
+    function toggleEraser() {
+      var btn = document.getElementById('pic-eraser-btn');
+      if (isEraser) { isEraser = false; currentColor = lastColor; currentWidth = 6; btn.classList.remove('active'); }
+      else { isEraser = true; currentColor = '#ffffff'; currentWidth = 24; btn.classList.add('active'); document.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('active'); }); }
+    }
+    function getPos(e) { var r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * (CANVAS_W / r.width), y: (e.clientY - r.top) * (CANVAS_H / r.height) }; }
+    function onDown(e) { isDrawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; drawStroke(p.x, p.y, p.x + 0.1, p.y + 0.1, currentColor, currentWidth); pendingStrokes.push({ x0: p.x, y0: p.y, x1: p.x + 0.1, y1: p.y + 0.1, c: currentColor, w: currentWidth }); }
+    function onMove(e) { if (!isDrawing) return; var p = getPos(e); drawStroke(lastX, lastY, p.x, p.y, currentColor, currentWidth); pendingStrokes.push({ x0: lastX, y0: lastY, x1: p.x, y1: p.y, c: currentColor, w: currentWidth }); lastX = p.x; lastY = p.y; }
+    function onUp() { isDrawing = false; }
+    function onTouchStart(e) { e.preventDefault(); var t = e.touches[0]; onDown({ clientX: t.clientX, clientY: t.clientY }); }
+    function onTouchMove(e) { e.preventDefault(); var t = e.touches[0]; onMove({ clientX: t.clientX, clientY: t.clientY }); }
+    function drawStroke(x0, y0, x1, y1, color, width) { if (!ctx) return; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); }
+    function clearCanvas() { if (!ctx) return; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H); rref().child('strokes').remove(); rref().child('strokes').push({ clear: true }); pendingStrokes = []; lastSentIdx = 0; }
+
+    function startStrokeSync() {
+      if (strokeSyncInterval) clearInterval(strokeSyncInterval);
+      strokeSyncInterval = setInterval(function () {
+        if (pendingStrokes.length <= lastSentIdx) return;
+        var batch = {}, now = Date.now();
+        pendingStrokes.slice(lastSentIdx).forEach(function (s, i) { batch[now + '_' + (lastSentIdx + i)] = s; });
+        rref().child('strokes').update(batch);
+        lastSentIdx = pendingStrokes.length;
+      }, 120);
+    }
+    function attachStrokeListener() {
+      detachStrokeListener();
+      strokeListener = rref().child('strokes').on('child_added', function (snap) {
+        var s = snap.val(); if (!s) return;
+        if (s.clear) { if (ctx) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H); } return; }
+        drawStroke(s.x0, s.y0, s.x1, s.y1, s.c, s.w);
+      });
+    }
+    function detachStrokeListener() { if (strokeListener) { rref().child('strokes').off('child_added', strokeListener); strokeListener = null; } }
+
+    /* ━━ Timer ━━ */
+    function startTimer(state) {
+      if (timerInterval) clearInterval(timerInterval);
+      timerAdvanced = false;
+      function tick() {
+        var st = window.room || {};
+        if (st.status !== 'drawing') { clearInterval(timerInterval); return; }
+        var ts = st.timerStart; if (!ts) return;
+        var elapsed = (Date.now() - ts) / 1000;
+        var remaining = Math.max(0, TIMER_DURATION - elapsed);
+        var bar = document.getElementById('pic-timer-bar'), num = document.getElementById('pic-timer-num');
+        bar.style.width = (remaining / TIMER_DURATION * 100) + '%';
+        num.textContent = Math.ceil(remaining);
+        var warn = remaining <= 15; bar.classList.toggle('warning', warn); num.classList.toggle('warning', warn);
+        renderHintRow(st, elapsed);
+        if (remaining <= 0 && !timerAdvanced) {
+          // Le dessinateur clôt la manche à 0 ; n'importe quel autre joueur en
+          // ligne prend le relais ~2,5 s plus tard si le dessinateur a disparu
+          // (filet anti-blocage). La transaction garantit un seul passage.
+          var iAmDrawer = st.drawer === window.myPid;
+          if (iAmDrawer || elapsed >= TIMER_DURATION + 2.5) {
+            timerAdvanced = true; clearInterval(timerInterval);
+            rref().transaction(function (cur) { if (cur && cur.status === 'drawing') cur.status = 'round-end'; return cur; });
+          }
+        }
+      }
+      tick(); timerInterval = setInterval(tick, 1000);
+    }
+
+    /* ━━ Guess + chat ━━ */
+    function submitGuess() {
+      var input = document.getElementById('pic-guess-input');
+      var guess = input.value;
+      if (!guess.trim()) return;
+      input.value = '';
+      var st = window.room || {};
+      if (st.status !== 'drawing' || st.drawer === window.myPid || st.guessedCorrectly) return;
+      var correct = normalize(guess) === normalize(st.chosenWord || '');
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'drawing' || cur.guessedCorrectly) return cur;
+        var hist = (cur.guessHistory || []).slice();
+        hist.push({ player: window.myPid, text: guess, correct: !!correct });
+        if (hist.length > 50) hist = hist.slice(-50);
+        cur.guessHistory = hist;
+        if (correct) {
+          cur.guessedCorrectly = true; cur.guessedBy = window.myPid;
+          cur.scores = cur.scores || {};
+          cur.scores[window.myPid] = (cur.scores[window.myPid] || 0) + 2;
+          if (cur.drawer) cur.scores[cur.drawer] = (cur.scores[cur.drawer] || 0) + 1;
+          cur.status = 'round-end';
+        }
+        return cur;
+      });
+    }
+    function renderChat(state) {
+      var box = document.getElementById('pic-chat'); if (!box) return;
+      box.innerHTML = '';
+      (state.guessHistory || []).forEach(function (g) {
+        var div = document.createElement('div');
+        div.className = 'pic-chat-msg' + (g.correct ? ' correct' : '');
+        var who = document.createElement('span'); who.className = 'who'; who.style.color = Room.color(g.player); who.textContent = Room.name(g.player) + ' :';
+        var txt = document.createElement('span'); txt.textContent = ' ' + (g.correct ? '✓ a trouvé !' : g.text);
+        div.appendChild(who); div.appendChild(txt); box.appendChild(div);
+      });
+      box.scrollTop = box.scrollHeight;
+    }
+
+    /* ━━ Indices progressifs ━━ */
+    function renderHintRow(state, elapsed) {
+      var row = document.getElementById('pic-hint-row'); if (!row) return;
+      if (state.drawer === window.myPid) { row.innerHTML = ''; row.style.display = 'none'; return; }
+      var word = state.chosenWord || ''; if (!word) { row.innerHTML = ''; return; }
+      var ratio = Math.min(1, (elapsed || 0) / TIMER_DURATION);
+      var positions = [];
+      for (var i = 0; i < word.length; i++) { var ch = word[i]; if (ch !== ' ' && ch !== '-' && ch !== "'") positions.push(i); }
+      var maxReveal = Math.max(1, Math.floor(positions.length / 3));
+      var revealCount = 0;
+      for (var k = 0; k < maxReveal; k++) { if (ratio >= 0.5 + 0.35 * k / Math.max(1, maxReveal)) revealCount++; }
+      var seed = 0; for (var s = 0; s < word.length; s++) seed = (seed * 31 + word.charCodeAt(s)) | 0;
+      function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+      var picks = positions.slice();
+      for (var p = picks.length - 1; p > 0; p--) { var j = Math.floor(Math.abs(rnd()) * (p + 1)); var t = picks[p]; picks[p] = picks[j]; picks[j] = t; }
+      var revealed = {}; for (var x = 0; x < revealCount && x < picks.length; x++) revealed[picks[x]] = true;
+      var html = '';
+      for (var c = 0; c < word.length; c++) {
+        var chr = word[c];
+        if ( chr === ' ' || chr === '-' || chr === "'") html += '<span class="pic-hint-letter space">' + (chr === ' ' ? '&nbsp;' : chr) + '</span>';
+        else html += '<span class="pic-hint-letter' + (revealed[c] ? ' revealed' : '') + '">' + (revealed[c] ? chr.toUpperCase() : '_') + '</span>';
+      }
+      row.innerHTML = html;
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      var ga = document.getElementById('pic-guess-area');
+      if (document.getElementById('s-playing').classList.contains('active') && ga && ga.style.display !== 'none') submitGuess();
+    });
+
+    /* ━━ Fin de manche ━━ */
+    function handleRoundEnd(state) {
+      stopAllIntervals(); detachStrokeListener();
+      showScreen('s-playing'); updateHeader(state);
+      document.getElementById('pic-choosing-panel').style.display = 'none';
+      document.getElementById('pic-drawing-panel').style.display = 'flex';
+      document.getElementById('pic-toolbar').classList.add('hidden');
+      document.getElementById('pic-guess-area').style.display = 'none';
+      document.getElementById('pic-word-banner').style.display = 'block';
+      setText('pic-word-value', state.chosenWord || '?');
+      document.getElementById('pic-guesser-banner').style.display = 'none';
+      renderChat(state);
+      // overlay
+      var iGuessedBy = state.guessedBy;
+      setText('pic-ov-emoji', iGuessedBy ? '🎉' : '⏰');
+      setText('pic-ov-title', iGuessedBy ? (Room.name(iGuessedBy) + ' a trouvé !') : 'Temps écoulé !');
+      document.getElementById('pic-ov-word').innerHTML = 'C\'était : <span>' + escapeHtml(state.chosenWord || '?') + '</span>';
+      var ord = state.order || [], scores = state.scores || {};
+      document.getElementById('pic-ov-score').innerHTML = ord.map(function (pid) {
+        return '<span class="pic-sc-chip"><span class="pic-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' ' + (scores[pid] || 0) + '</span>';
+      }).join('');
+      var meReady = state.players && state.players[window.myPid] && state.players[window.myPid].nextRoundReady;
+      var btn = document.getElementById('btn-next-round');
+      btn.disabled = !!meReady; btn.textContent = isLastRound(state) ? 'Voir les résultats →' : 'Manche suivante →';
+      document.getElementById('pic-overlay').classList.add('active');
+      updateRoundEndMsg(state);
+      maybeAdvanceRound(state);
+    }
+    function updateRoundEndMsg(state) {
+      var ord = state.order || [];
+      var online = ord.filter(function (p) { return state.players[p] && state.players[p].online; });
+      var ready = online.filter(function (p) { return state.players[p].nextRoundReady; });
+      var meReady = state.players && state.players[window.myPid] && state.players[window.myPid].nextRoundReady;
+      setText('pic-ov-msg', meReady ? ('En attente des autres… (' + ready.length + '/' + online.length + ')') : '');
+    }
+    function setNextRoundReady() {
+      var btn = document.getElementById('btn-next-round'); if (btn) btn.disabled = true;
+      rref().child('players/' + window.myPid + '/nextRoundReady').set(true);
+    }
+    function advancePatch(cur) {
+      // mutation commune : prépare la manche suivante OU termine
+      var ord = cur.order || [];
+      if ((cur.round || 1) >= (cur.maxRounds || 6)) { cur.status = 'finished'; return; }
+      cur.round = (cur.round || 1) + 1;
+      cur.drawer = ord[(cur.round - 1) % ord.length];
+      cur.wordOptions = pickRandom(WORDS, 3);
+      cur.chosenWord = null; cur.guessedCorrectly = false; cur.guessedBy = null;
+      cur.timerStart = null; cur.strokes = null; cur.guessHistory = null;
+      cur.status = 'choosing';
+      ord.forEach(function (pid) { if (cur.players[pid]) cur.players[pid].nextRoundReady = false; });
+    }
+    function maybeAdvanceRound(state) {
+      var ord = state.order || [];
+      var online = ord.filter(function (p) { return state.players[p] && state.players[p].online; });
+      if (!online.length || !online.every(function (p) { return state.players[p].nextRoundReady; })) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'round-end') return cur;
+        var o = (cur.order || []).filter(function (p) { return cur.players[p] && cur.players[p].online; });
+        if (!o.length || !o.every(function (p) { return cur.players[p].nextRoundReady; })) return cur;
+        advancePatch(cur);
+        return cur;
+      });
+    }
+
+    /* ━━ Résultats ━━ */
+    function handleFinished(state) {
+      stopAllIntervals(); detachStrokeListener();
+      document.getElementById('pic-overlay').classList.remove('active');
+      showScreen('s-results');
+      var ord = (state.order || []).slice();
+      var scores = state.scores || {};
+      ord.sort(function (a, b) { return (scores[b] || 0) - (scores[a] || 0); });
+      var top = scores[ord[0]] || 0;
+      var winners = ord.filter(function (p) { return (scores[p] || 0) === top; });
+      var iWon = winners.indexOf(window.myPid) >= 0;
+      setText('res-emoji', winners.length > 1 ? '🤝' : '🏆');
+      setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !'));
+      var medals = ['🥇', '🥈', '🥉'];
+      document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-score">' + (scores[pid] || 0) + ' pts</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { stopAllIntervals(); Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); document.getElementById('pic-overlay').classList.remove('active'); stopAllIntervals(); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

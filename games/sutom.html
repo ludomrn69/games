@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Sutom 🟥" data-emoji="🟥"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .st-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .st-head { background: rgba(20,16,28,0.97); }
+    .st-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .st-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+    .st-head-actions { display: flex; gap: 6px; }
+
+    .st-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
+    .st-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
+    .st-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .st-opp.fail { box-shadow: 0 0 0 2px #e05a4e, var(--shadow); }
+    .st-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+
+    .st-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
+
+    .st-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 6px 10px; }
+    .st-grid { display: grid; gap: 5px; }
+    .st-row { display: grid; gap: 5px; }
+    .st-tile { width: clamp(30px, 11vw, 48px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(1.1rem, 5.5vw, 1.7rem); border-radius: 8px; background: var(--white); border: 2px solid var(--gold-light); color: var(--ink); text-transform: uppercase; }
+    .st-tile.correct { background: #e05a4e; color: #fff; border-color: #e05a4e; }
+    .st-tile.present { background: #e8b84b; color: #2C2520; border-color: #e8b84b; border-radius: 50%; }
+    .st-tile.absent { background: #5b6b86; color: #fff; border-color: #5b6b86; }
+    .st-tile.cur { border-color: var(--terracotta); }
+
+    .st-kb { display: flex; flex-direction: column; gap: 6px; width: min(96vw, 480px); margin-top: 4px; }
+    .st-kbrow { display: flex; gap: 4px; justify-content: center; }
+    .st-key { flex: 1; max-width: 42px; padding: 0.7rem 0; border: none; border-radius: 8px; background: var(--white); box-shadow: var(--shadow); font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; color: var(--ink); }
+    .st-key.wide { max-width: 64px; font-size: 0.78rem; }
+    .st-key.correct { background: #e05a4e; color: #fff; } .st-key.present { background: #e8b84b; color: #2C2520; } .st-key.absent { background: #5b6b86; color: #fff; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/puzzle.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="st-head">
+        <span class="st-title-mini">Sutom</span>
+        <span class="st-timer" id="st-timer">⏱ 0:00</span>
+        <div class="st-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="st-opps" id="st-opps"></div>
+      <div class="st-banner" id="st-banner"></div>
+      <div class="st-stage">
+        <div class="st-grid" id="st-grid"></div>
+        <div class="st-kb" id="st-kb"></div>
+      </div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🟥</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <div class="modal-sub" id="res-word"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🟥 Sutom</div>
+      <div class="modal-body">
+        <p>• Trouve le <b>mot mystère</b> en 6 essais. La <b>1re lettre</b> est donnée.</p>
+        <p style="margin-top:6px">• <span style="color:#e05a4e;font-weight:800">🟥 rouge</span> : bonne lettre, bonne place · <span style="color:#e8b84b;font-weight:800">🟡 jaune</span> : bonne lettre, mauvaise place · <span style="color:#5b6b86;font-weight:800">bleu</span> : lettre absente.</p>
+        <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : même mot pour tous, le plus rapide gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    var MAX = 6;
+
+    // Mots-mystères français courants (sans accents, 6 à 8 lettres).
+    var WORDS = ('MAISON JARDIN SOLEIL BANANE ORANGE CERISE GARAGE VOYAGE MOUTON CANARD SOURIS GIRAFE TORTUE PYTHON SALADE TOMATE OIGNON FRAISE RAISIN MELONS PRUNES BOUTON MONTRE VALISE BUREAU CHAISE MIROIR RIDEAU ROMANS CRAYON CAHIER CLASSE ECOLES ELEVES DEVOIR VIOLON CAMERA PHOTOS IMAGES DESSIN VIOLET MARRON NOIRES VERTES ROUGES FORETS PLAGES OCEANS DESERT VOLCAN NUAGES ORAGES FUSEES ESPACE COMETE BAGAGE BATEAU AVIONS TRAINS ROUTES MARCHE HOPITAL MEDECIN MALADE REMEDE SPORTS TENNIS COURSE SAUTER LANCER GAGNER PERDRE EQUIPE JOUEUR BALLON FILETS PISCINE HOTELS CHAMBRE LITERIE REVEILS MATINEE SOIREE SECONDE MINUTES HEURES JOURNEE SEMAINE JANVIER FEVRIER AUTOMNE HIVERS SAISON FENETRE VOITURE FAMILLE ANIMAUX CHEVAL POULET BALEINE DAUPHIN REQUINS FROMAGE GATEAUX BISCUIT CAROTTE POIVRON ABRICOT CHEMISE MANTEAU ECHARPE LUNETTE ARMOIRE GRENIER JOURNAL LECTURE MUSIQUE GUITARE CHANSON THEATRE ACTEURS PEINTRE PINCEAU COULEUR ETOILES PLANETE GALAXIE SATURNE MERCURE RIVIERE MONTAGNE CHOCOLAT PANTALON NATATION FOOTBALL QUARTIER EPICERIE RAQUETTE VACANCES RACINES BRANCHE FEUILLE JOURNEE COUSSIN CUISINE').split(/\s+/);
+
+    function feedback(guess, secret) {
+      var n = secret.length, res = []; for (var i = 0; i < n; i++) res.push('absent');
+      var cnt = {}; for (var i = 0; i < n; i++) cnt[secret[i]] = (cnt[secret[i]] || 0) + 1;
+      for (var i = 0; i < n; i++) if (guess[i] === secret[i]) { res[i] = 'correct'; cnt[guess[i]]--; }
+      for (var i = 0; i < n; i++) if (res[i] !== 'correct' && cnt[guess[i]] > 0) { res[i] = 'present'; cnt[guess[i]]--; }
+      return res;
+    }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, timerInt = null, cur = '';
+    GameRoom({
+      gameKey: 'sutom', name: 'Sutom', emoji: '🟥', tagline: 'Le mot mystère en 6 essais',
+      minPlayers: 1, maxPlayers: 6,
+      rules: [
+        'Trouve le mot mystère en 6 essais (1re lettre donnée)',
+        '🟥 bonne place · 🟡 mauvaise place · bleu absente',
+        'Solo : bats ton chrono ⏱ · Salon : course entre vous',
+        'La difficulté règle la longueur du mot (6 à 8)'
+      ],
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
+      bot: function () {}, offlineTurn: function () { return null; },
+      offlineEnter: function () { if (window.room) { cur = startWord(window.room); render(window.room); } },
+      onState: onState, onStart: onStart
+    });
+
+    function lenFor(level) { return level === 'easy' ? 6 : level === 'hard' ? 8 : 7; }
+    function onStart(players, cur2) {
+      var order = players.map(function (p) { return p.pid; });
+      var level = (cur2 && cur2.difficulty) || 'normal', len = lenFor(level);
+      var pool = WORDS.filter(function (w) { return w.length === len; });
+      var rnd = Puzzle.rng(Puzzle.seed()), secret = pool[Math.floor(rnd() * pool.length)] || WORDS[0];
+      order.forEach(function (p) { cur2.players[p].guesses = []; cur2.players[p].failed = false; cur2.players[p].finishedAt = null; });
+      return { secret: secret, len: secret.length, startedAt: Date.now(), banner: 'Trouve le mot le plus vite possible !', winner: null };
+    }
+    function startWord(s) { return (s.secret || 'A')[0]; }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { cur = startWord(state); showScreen('s-playing'); } render(state); startTimer(state); }
+      else { stopTimer(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+    function startTimer(state) { stopTimer(); function tick() { setText('st-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+
+    function meP(s) { return s.players[window.myPid] || {}; }
+    function doneOf(s, pid) { return s.players[pid] && (s.players[pid].finishedAt != null || s.players[pid].failed); }
+    function progress(s, pid) { var P = s.players[pid] || {}; return P.finishedAt != null ? 100 : (P.guesses || []).length; }
+
+    function press(ch) {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      if (ch === '⌫') { if (cur.length > 1) cur = cur.slice(0, -1); render(s); return; }
+      if (ch === '↵') { submit(); return; }
+      if (cur.length < s.len) { cur += ch; render(s); }
+    }
+    function submit() {
+      var s = window.room, pid = window.myPid; if (cur.length !== s.len) { lbToast('Mot incomplet'); return; }
+      var guess = cur;
+      rref().transaction(function (c) {
+        if (!c || c.status !== 'playing' || doneOf(c, pid)) return c;
+        var P = c.players[pid]; P.guesses = (P.guesses || []).concat([guess]);
+        if (guess === c.secret) { Puzzle.finish(c, pid); c.banner = Room.name(pid) + ' trouve « ' + c.secret + ' » en ' + Puzzle.fmtTime(c.players[pid].finishedAt) + ' !'; }
+        else if (P.guesses.length >= MAX) { P.failed = true; if ((c.order || []).every(function (p) { return doneOf(c, p); })) c.status = 'ended'; }
+        return c;
+      });
+      cur = startWord(s);
+    }
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var me = window.myPid, order = state.order || [], len = state.len || 7, secret = state.secret || '', P = meP(state);
+      setHTML('st-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        var P2 = state.players[pid] || {}, cls = P2.finishedAt != null ? ' done' : (P2.failed ? ' fail' : '');
+        return '<div class="st-opp' + cls + '"><span class="st-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' · ' + (P2.finishedAt != null ? '✓ ' + Puzzle.fmtTime(P2.finishedAt) : (P2.guesses || []).length + '/' + MAX) + '</div>';
+      }).join(''));
+      setText('st-banner', state.banner || '');
+
+      var guesses = P.guesses || [], done = doneOf(state, me), html = '';
+      for (var r = 0; r < MAX; r++) {
+        html += '<div class="st-row" style="grid-template-columns:repeat(' + len + ',1fr)">';
+        var g = guesses[r], fb = g ? feedback(g, secret) : null;
+        var typing = (!done && r === guesses.length);
+        for (var c = 0; c < len; c++) {
+          var ch = g ? g[c] : (typing ? (cur[c] || '') : '');
+          var cls = 'st-tile' + (fb ? ' ' + fb[c] : (typing && c === cur.length ? ' cur' : ''));
+          html += '<div class="' + cls + '">' + ch + '</div>';
+        }
+        html += '</div>';
+      }
+      setHTML('st-grid', html);
+      renderKb(guesses, secret);
+    }
+    function renderKb(guesses, secret) {
+      var status = {};
+      guesses.forEach(function (g) { var fb = feedback(g, secret); for (var i = 0; i < g.length; i++) { var ch = g[i], s = fb[i]; var rank = { absent: 1, present: 2, correct: 3 }; if (!status[ch] || rank[s] > rank[status[ch]]) status[ch] = s; } });
+      var rows = ['AZERTYUIOP', 'QSDFGHJKLM', 'WXCVBN'];
+      var html = '';
+      rows.forEach(function (row, ri) {
+        html += '<div class="st-kbrow">';
+        if (ri === 2) html += '<button class="st-key wide" onclick="press(\'↵\')">Entrée</button>';
+        for (var i = 0; i < row.length; i++) { var ch = row[i]; html += '<button class="st-key ' + (status[ch] || '') + '" onclick="press(\'' + ch + '\')">' + ch + '</button>'; }
+        if (ri === 2) html += '<button class="st-key wide" onclick="press(\'⌫\')">⌫</button>';
+        html += '</div>';
+      });
+      setHTML('st-kb', html);
+    }
+
+    function showResults(state) {
+      stopTimer();
+      var winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🟥');
+      setText('res-title', winner === window.myPid ? 'Tu trouves en premier ! 🏆' : (winner ? Room.name(winner) + ' gagne' : 'Terminé'));
+      setText('res-word', 'Le mot était : ' + (state.secret || '—'));
+      var order = Puzzle.rankByTime(state, function (s, pid) { return progress(s, pid); });
+      setHTML('res-rank', order.map(function (pid, i) {
+        var P = state.players[pid] || {}, done = P.finishedAt != null;
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + (done ? '⏱ ' + Puzzle.fmtTime(P.finishedAt) : '✗ ' + (P.guesses || []).length + '/' + MAX) + '</span></div>';
+      }).join(''));
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (!document.getElementById('s-playing').classList.contains('active')) return;
+      var k = (e.key || '').toUpperCase();
+      if (k === 'ENTER') press('↵'); else if (k === 'BACKSPACE') press('⌫'); else if (/^[A-Z]$/.test(k)) press(k);
+    });
+
+    function handleReplay() { stopTimer(); cur = ''; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); stopTimer(); cur = ''; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

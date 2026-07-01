@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Mille Bornes 🚗" data-emoji="🚗"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .mb-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .mb-head { background: rgba(20,16,28,0.97); }
+    .mb-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .mb-head-actions { display: flex; gap: 6px; }
+
+    .mb-players { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 4px; max-width: 460px; margin: 0 auto; }
+    .mb-prow { background: var(--white); border-radius: 12px; padding: 7px 10px; box-shadow: var(--shadow); border: 2px solid transparent; }
+    .mb-prow.turn { border-color: var(--terracotta); } .mb-prow.me { background: linear-gradient(135deg, rgba(198,152,90,0.12), rgba(196,116,90,0.08)); }
+    .mb-prow.target { outline: 2px dashed var(--terracotta); cursor: pointer; }
+    .mb-prow-top { display: flex; align-items: center; gap: 8px; }
+    .mb-pav { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .mb-pname { flex: 1; font-weight: 700; font-size: 0.86rem; }
+    .mb-km { font-weight: 900; color: var(--terracotta); }
+    .mb-track { height: 8px; background: rgba(120,110,100,0.16); border-radius: 5px; margin-top: 5px; overflow: hidden; }
+    .mb-track-fill { height: 100%; background: linear-gradient(90deg, var(--sage), var(--gold)); border-radius: 5px; }
+    .mb-flags { display: flex; gap: 4px; margin-top: 4px; font-size: 0.78rem; flex-wrap: wrap; }
+    .mb-flag { background: var(--cream); border-radius: 20px; padding: 1px 7px; }
+    .mb-flag.bad { background: rgba(224,90,78,0.16); color: #c0392b; } .mb-flag.go { background: rgba(52,168,83,0.18); color: #1e7a3a; }
+
+    .mb-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
+    .mb-status { text-align: center; font-size: 0.82rem; color: var(--ink-light); padding: 0 12px 6px; }
+
+    .mb-hand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 6px 10px calc(16px + env(safe-area-inset-bottom)); }
+    .mb-card { width: 64px; min-height: 84px; border-radius: 10px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; cursor: pointer; transition: transform .14s; text-align: center; }
+    html[data-theme="dark"] .mb-card { background: #f4efe7; color: #2C2520; }
+    .mb-card:hover { transform: translateY(-6px); }
+    .mb-card.sel { border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(196,116,90,0.3); transform: translateY(-6px); }
+    .mb-card.dim { opacity: 0.4; }
+    .mb-card .ic { font-size: 1.5rem; line-height: 1; } .mb-card .lb { font-size: 0.62rem; font-weight: 700; line-height: 1.05; }
+    .mb-card .km { font-size: 1.1rem; font-weight: 900; }
+    .mb-actions { display: flex; gap: 8px; justify-content: center; padding: 0 12px 8px; }
+    .mb-act { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .mb-act.play { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border: none; } .mb-act:disabled { opacity: 0.4; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; } .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-km { font-weight: 800; color: var(--terracotta); }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; } .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/millebornes-ai.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="mb-head">
+        <span class="mb-title-mini">Mille Bornes</span>
+        <div class="mb-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="mb-players" id="mb-players"></div>
+      <div class="mb-banner" id="mb-banner"></div>
+      <div class="mb-status" id="mb-status"></div>
+      <div class="mb-actions" id="mb-actions"></div>
+      <div class="mb-hand" id="mb-hand"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏁</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🚗 Mille Bornes</div>
+      <div class="modal-body">
+        <p>• Premier à parcourir <b>1000 km</b> ! Joue des cartes <b>distance</b> (25→200).</p>
+        <p style="margin-top:6px">• Il te faut un <b>Feu vert</b> 🟢 pour rouler. Une <b>attaque</b> (feu rouge, panne, crevaison, accident, limite) bloque un adversaire.</p>
+        <p style="margin-top:6px">• La bonne <b>parade</b> te débloque ; une <b>botte</b> (carte spéciale) te rend immunisé.</p>
+        <p style="margin-top:6px">• Chaque tour : pioche 1, puis joue ou défausse 1 carte. Tu ne peux pas dépasser 1000.</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+    // ── Cartes ──────────────────────────────────────────────────────────────
+    var CARD = {
+      d25: { t: 'dist', km: 25, ic: '🚗', lb: '25' }, d50: { t: 'dist', km: 50, ic: '🚗', lb: '50' },
+      d75: { t: 'dist', km: 75, ic: '🚗', lb: '75' }, d100: { t: 'dist', km: 100, ic: '🚗', lb: '100' }, d200: { t: 'dist', km: 200, ic: '🚙', lb: '200' },
+      hStop: { t: 'haz', haz: 'stop', ic: '🔴', lb: 'Feu rouge' }, hGas: { t: 'haz', haz: 'gas', ic: '⛽', lb: 'Panne' },
+      hFlat: { t: 'haz', haz: 'flat', ic: '🛞', lb: 'Crevaison' }, hCrash: { t: 'haz', haz: 'crash', ic: '💥', lb: 'Accident' }, hLimit: { t: 'haz', haz: 'limit', ic: '🚸', lb: 'Limite 50' },
+      rGo: { t: 'rem', rem: 'stop', ic: '🟢', lb: 'Feu vert' }, rGas: { t: 'rem', rem: 'gas', ic: '⛽', lb: 'Essence' },
+      rFlat: { t: 'rem', rem: 'flat', ic: '🛞', lb: 'Roue' }, rRepair: { t: 'rem', rem: 'crash', ic: '🔧', lb: 'Réparation' }, rLimit: { t: 'rem', rem: 'limit', ic: '🏁', lb: 'Fin limite' },
+      sAce: { t: 'safe', safe: 'crash', ic: '🏎️', lb: 'As volant' }, sTank: { t: 'safe', safe: 'gas', ic: '🛢️', lb: 'Citerne' },
+      sPunc: { t: 'safe', safe: 'flat', ic: '🧤', lb: 'Increvable' }, sRoW: { t: 'safe', safe: 'row', ic: '🚦', lb: 'Prioritaire' }
+    };
+    // Deck : centralisé dans millebornes-ai.js (partagé avec le banc).
+    var buildDeck = window.MilleBornesAI.buildDeck;
+    function hasSafe(P, kind) { return (P.safeties || []).some(function (s) { return CARD[s].safe === kind || (kind !== 'limit' && CARD[s].safe === 'row' && kind === 'stop') ; }); }
+    // Immunité (bottes) : centralisé dans millebornes-ai.js.
+    var immune = window.MilleBornesAI.immune;
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, sel = -1, targeting = null;
+    GameRoom({
+      gameKey: 'millebornes',
+      name: 'Mille Bornes',
+      emoji: '🚗',
+      tagline: 'Premier à 1000 km',
+      minPlayers: 2,
+      maxPlayers: 4,
+      rules: [
+        'Premier à 1000 km gagne — joue des cartes distance (25→200)',
+        'Feu vert pour rouler ; attaques pour bloquer un adversaire',
+        'Parades pour te débloquer ; bottes pour être immunisé',
+        'Chaque tour : pioche 1, puis joue ou défausse 1 carte'
+      ],
+      offline: { solo: true, local: true },
+      bot: mbBot,
+      offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
+      offlineEnter: function () { sel = -1; targeting = null; if (window.room) render(window.room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    function freshP() { return { hand: [], dist: 0, rolling: false, hazard: null, limited: false, safeties: [] }; }
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var deck = buildDeck();
+      order.forEach(function (p) { var P = freshP(); for (var i = 0; i < 6; i++) P.hand.push(deck.pop()); cur.players[p].mb = P; });
+      var starter = order[0];
+      var base = { deck: deck, discard: [], turn: starter, winner: null, banner: Room.name(starter) + ' commence', drewThisTurn: false };
+      // le 1er joueur pioche
+      drawForTurn(Object.assign({ order: order, players: cur.players }, base), starter);
+      return base;
+    }
+    function P_(cur, pid) { return cur.players[pid].mb; }
+    function drawForTurn(cur, pid) {
+      var P = P_(cur, pid);
+      if (P.hand.length < 7 && (cur.deck || []).length) P.hand.push(cur.deck.pop());
+      else if (P.hand.length < 7 && (cur.discard || []).length) { cur.deck = shuffle(cur.discard.slice()); cur.discard = []; if (cur.deck.length) P.hand.push(cur.deck.pop()); }
+      cur.drewThisTurn = true;
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { sel = -1; targeting = null; showScreen('s-playing'); } render(state); }
+      else if (status === 'ended') showResults(state);
+      prevStatus = status;
+    }
+
+    // ── Validité d'un coup ────────────────────────────────────────────────────
+    function canPlay(cur, pid, card, targetPid) {
+      var c = CARD[card], P = P_(cur, pid);
+      if (c.t === 'dist') return P.rolling && !P.hazard && (!P.limited || c.km <= 50) && (P.dist + c.km <= 1000);
+      if (c.t === 'rem') {
+        if (c.rem === 'stop') return !P.rolling;
+        return P.hazard === c.rem || (c.rem === 'limit' && P.limited);
+      }
+      if (c.t === 'safe') return true;
+      if (c.t === 'haz') {
+        if (!targetPid || targetPid === pid) return false;
+        var T = P_(cur, targetPid); if (!T || immune(T, c.haz)) return false;
+        if (c.haz === 'stop') return T.rolling;
+        if (c.haz === 'limit') return !T.limited;
+        return T.rolling && !T.hazard; // gas/flat/crash
+      }
+      return false;
+    }
+    function anyTarget(cur, pid, card) { return (cur.order || []).some(function (p) { return p !== pid && canPlay(cur, pid, card, p); }); }
+    function hasAnyMove(cur, pid) {
+      var P = P_(cur, pid);
+      return P.hand.some(function (card) { var c = CARD[card]; if (c.t === 'haz') return anyTarget(cur, pid, card); return canPlay(cur, pid, card); });
+    }
+
+    function applyCard(cur, pid, card, targetPid) {
+      var c = CARD[card], P = P_(cur, pid);
+      var h = P.hand.slice(); var idx = h.indexOf(card); if (idx < 0) return false;
+      if (!(c.t === 'haz' ? canPlay(cur, pid, card, targetPid) : canPlay(cur, pid, card))) return false;
+      h.splice(idx, 1); P.hand = h;
+      if (c.t === 'dist') { P.dist += c.km; cur.banner = Room.name(pid) + ' roule +' + c.km + ' (' + P.dist + ' km)'; }
+      else if (c.t === 'rem') { if (c.rem === 'stop') P.rolling = true; else if (c.rem === 'limit') P.limited = false; else P.hazard = null; cur.banner = Room.name(pid) + ' : ' + c.lb; }
+      else if (c.t === 'safe') { P.safeties = (P.safeties || []).concat([card]); if (c.safe === P.hazard) P.hazard = null; if (c.safe === 'row') { P.rolling = true; P.limited = false; } cur.banner = Room.name(pid) + ' pose une botte : ' + c.lb + ' !'; }
+      else if (c.t === 'haz') { var T = P_(cur, targetPid); if (c.haz === 'stop') T.rolling = false; else if (c.haz === 'limit') T.limited = true; else T.hazard = c.haz; cur.banner = Room.name(pid) + ' attaque ' + Room.name(targetPid) + ' : ' + c.lb + ' !'; }
+      if (P.dist >= 1000) { cur.winner = pid; cur.status = 'ended'; cur.banner = '🏁 ' + Room.name(pid) + ' atteint 1000 km !'; return true; }
+      endTurn(cur, pid); return true;
+    }
+    function discardCard(cur, pid, card) {
+      var P = P_(cur, pid), h = P.hand.slice(), idx = h.indexOf(card); if (idx < 0) return false;
+      h.splice(idx, 1); P.hand = h; cur.discard = (cur.discard || []).concat([card]);
+      cur.banner = Room.name(pid) + ' défausse';
+      endTurn(cur, pid); return true;
+    }
+    function endTurn(cur, pid) {
+      var order = cur.order || [], i = order.indexOf(pid);
+      var nxt = order[(i + 1) % order.length];
+      cur.turn = nxt; cur.drewThisTurn = false;
+      drawForTurn(cur, nxt);
+    }
+
+    /* ━━ Actions joueur ━━ */
+    function play() {
+      if (sel < 0) { lbToast('Choisis une carte'); return; }
+      var card = P_(window.room, window.myPid).hand[sel];
+      var c = CARD[card];
+      if (c.t === 'haz') {
+        if (!anyTarget(window.room, window.myPid, card)) { lbToast('Aucune cible valide'); return; }
+        targeting = card; render(window.room); lbToast('Touche l\'adversaire à attaquer'); return;
+      }
+      doPlay(card, null);
+    }
+    function chooseTarget(targetPid) {
+      if (!targeting) return;
+      doPlay(targeting, targetPid);
+    }
+    function doPlay(card, targetPid) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        applyCard(cur, window.myPid, card, targetPid);
+        return cur;
+      }, function (err, committed) { if (committed) { sel = -1; targeting = null; } });
+    }
+    function discard() {
+      if (sel < 0) { lbToast('Choisis une carte à défausser'); return; }
+      var card = P_(window.room, window.myPid).hand[sel];
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        discardCard(cur, window.myPid, card);
+        return cur;
+      }, function (err, committed) { if (committed) { sel = -1; targeting = null; } });
+    }
+
+    /* ━━ IA ━━ Décision dans millebornes-ai.js (priorités finir/parer/rouler/
+       attaquer/défausser ; partagée avec le banc). On lui passe une vue épurée du
+       jeu et on exécute l'action. ━━ */
+    function mbBot(state, pid) {
+      if (state.status !== 'playing' || state.turn !== pid) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
+        var P = P_(cur, pid);
+        var me = { dist: P.dist, rolling: P.rolling, hazard: P.hazard, limited: P.limited, safeties: P.safeties || [], hand: P.hand };
+        var opponents = (cur.order || []).filter(function (p) { return p !== pid; }).map(function (p) {
+          var T = P_(cur, p); return { pid: p, dist: T.dist, rolling: T.rolling, hazard: T.hazard, limited: T.limited, safeties: T.safeties || [] };
+        });
+        var act = window.MilleBornesAI.decide({ me: me, opponents: opponents, easy: window.Bots && window.Bots.shouldBlunder(cur) });
+        if (act.type === 'play') applyCard(cur, pid, act.card, act.target || null);
+        else discardCard(cur, pid, act.card);
+        return cur;
+      });
+    }
+
+    /* ━━ Rendu ━━ */
+    function flagsHTML(P) {
+      var f = [];
+      f.push('<span class="mb-flag ' + (P.rolling ? 'go' : 'bad') + '">' + (P.rolling ? '🟢 roule' : '🔴 arrêt') + '</span>');
+      if (P.hazard) f.push('<span class="mb-flag bad">' + CARD['h' + ({ gas: 'Gas', flat: 'Flat', crash: 'Crash' }[P.hazard])].ic + ' ' + P.hazard + '</span>');
+      if (P.limited) f.push('<span class="mb-flag bad">🚸 limité</span>');
+      (P.safeties || []).forEach(function (s) { f.push('<span class="mb-flag">' + CARD[s].ic + '</span>'); });
+      return f.join('');
+    }
+    function render(state) {
+      var me = window.myPid, order = state.order || [];
+      setHTML('mb-players', order.map(function (pid) {
+        var P = P_(state, pid), isTarget = targeting && pid !== me && canPlay(state, me, targeting, pid) && state.turn === me;
+        return '<div class="mb-prow' + (state.turn === pid ? ' turn' : '') + (pid === me ? ' me' : '') + (isTarget ? ' target' : '') + '"' + (isTarget ? ' onclick="chooseTarget(\'' + pid + '\')"' : '') + '>' +
+          '<div class="mb-prow-top"><span class="mb-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="mb-pname">' + escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '</span><span class="mb-km">' + P.dist + ' km</span></div>' +
+          '<div class="mb-track"><div class="mb-track-fill" style="width:' + (P.dist / 10) + '%"></div></div>' +
+          '<div class="mb-flags">' + flagsHTML(P) + '</div></div>';
+      }).join(''));
+      setText('mb-banner', state.banner || '');
+
+      var myTurn = (state.turn === me) && !state.winner;
+      var P = P_(state, me) || { hand: [] };
+      var canMove = myTurn && hasAnyMove(state, me);
+      var statusTxt;
+      if (!myTurn) statusTxt = '⏳ En attente de ' + escapeHtml(Room.name(state.turn)) + '…';
+      else if (targeting) statusTxt = 'Touche l\'adversaire à attaquer ↑';
+      else if (!canMove) statusTxt = '🚫 Aucun coup possible — choisis une carte et défausse-la pour passer ton tour';
+      else statusTxt = 'À toi (carte piochée) : joue une carte… ou défausse-en une';
+      setText('mb-status', statusTxt);
+      setHTML('mb-actions', myTurn && !targeting ?
+        '<button class="mb-act play" onclick="play()"' + (sel < 0 || !canMove ? ' disabled' : '') + '>Jouer</button>' +
+        '<button class="mb-act' + (!canMove ? ' play' : '') + '" onclick="discard()"' + (sel < 0 ? ' disabled' : '') + '>Défausser</button>' :
+        (targeting ? '<button class="mb-act" onclick="cancelTarget()">Annuler</button>' : ''));
+      setHTML('mb-hand', (P.hand || []).map(function (card, i) {
+        var c = CARD[card];
+        var playable = myTurn && (c.t === 'haz' ? anyTarget(state, me, card) : canPlay(state, me, card));
+        var inner = '<span class="ic">' + c.ic + '</span>' + (c.t === 'dist' ? '<span class="km">' + c.km + '</span>' : '<span class="lb">' + c.lb + '</span>');
+        return '<div class="mb-card' + (sel === i ? ' sel' : '') + (myTurn && !playable ? ' dim' : '') + '" onclick="pickCard(' + i + ')">' + inner + '</div>';
+      }).join(''));
+    }
+    function pickCard(i) { sel = (sel === i ? -1 : i); targeting = null; render(window.room); }
+    function cancelTarget() { targeting = null; render(window.room); }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice().sort(function (a, b) { return P_(state, b).dist - P_(state, a).dist; });
+      var winner = state.winner || order[0];
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🏁');
+      setText('res-title', winner === window.myPid ? 'Tu gagnes la course !' : Room.name(winner) + ' gagne');
+      setHTML('res-rank', order.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span><span class="res-rank-km">' + P_(state, pid).dist + ' km</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { sel = -1; targeting = null; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

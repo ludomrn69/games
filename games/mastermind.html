@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Mastermind 🎯" data-emoji="🎯"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.45; }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .mm-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .mm-head { background: rgba(20,16,28,0.97); }
+    .mm-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .mm-head-actions { display: flex; gap: 6px; }
+
+    .mm-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 4px; }
+    .mm-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 600; border: 2px solid transparent; }
+    .mm-opp.turn { border-color: var(--terracotta); }
+    .mm-opp.cracked { background: linear-gradient(135deg, rgba(52,168,83,0.18), rgba(139,158,126,0.12)); }
+    .mm-opp-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+
+    .mm-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
+
+    .mm-board { max-width: 340px; margin: 0 auto; padding: 4px 12px; display: flex; flex-direction: column; gap: 5px; }
+    .mm-rowline { display: flex; align-items: center; gap: 8px; justify-content: center; }
+    .mm-pegs { display: flex; gap: 5px; }
+    .mm-peg { width: 30px; height: 30px; border-radius: 50%; box-shadow: inset -2px -3px 5px rgba(0,0,0,0.22), inset 2px 2px 4px rgba(255,255,255,0.4); }
+    .mm-peg.empty { background: #e7ddcb; box-shadow: inset 0 2px 5px rgba(0,0,0,0.15); }
+    html[data-theme="dark"] .mm-peg.empty { background: #2a2333; }
+    .mm-fb { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; width: 26px; }
+    .mm-fb i { width: 11px; height: 11px; border-radius: 50%; background: #d8cdb8; }
+    .mm-fb i.black { background: #2C2520; } .mm-fb i.white { background: #fff; box-shadow: 0 0 0 1px #b9a988; }
+
+    .mm-input { position: sticky; bottom: 0; background: rgba(253,246,236,0.97); backdrop-filter: blur(8px); border-top: 1px solid var(--gold-light); padding: 10px 12px calc(12px + env(safe-area-inset-bottom)); }
+    .mm-current { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+    .mm-current .mm-peg { cursor: pointer; }
+    .mm-palette { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .mm-swatch { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; box-shadow: inset -2px -3px 5px rgba(0,0,0,0.22), inset 2px 2px 4px rgba(255,255,255,0.4); border: 2px solid transparent; }
+    .mm-swatch.sel { border-color: var(--ink); transform: scale(1.08); }
+    .mm-wait { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); padding: 14px; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-code { display: flex; gap: 6px; justify-content: center; margin: 10px 0 16px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/mastermind-ai.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="mm-head">
+        <span class="mm-title-mini">Mastermind</span>
+        <div class="mm-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="mm-opps" id="mm-opps"></div>
+      <div class="mm-banner" id="mm-banner"></div>
+      <div class="mm-board" id="mm-board"></div>
+      <div class="mm-input" id="mm-input"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🎯</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-code" id="res-code"></div>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🎯 Mastermind</div>
+      <div class="modal-body">
+        <p>• Un <b>code secret</b> de 4 pions parmi 6 couleurs (répétitions possibles).</p>
+        <p style="margin-top:6px">• Chacun son tour, propose une combinaison. Indices : <b>⚫ noir</b> = bonne couleur bien placée, <b>⚪ blanc</b> = bonne couleur mal placée.</p>
+        <p style="margin-top:6px">• Tout le monde cherche le <b>même</b> code (chacun sur sa grille). Le <b>premier à le craquer gagne</b> !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    var COLORS = ['#e23b3b', '#2a6fd6', '#34a853', '#f2c200', '#e07b29', '#7e57c2']; // 6 couleurs
+    var PEGS = 4, NC = 6;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function guessesOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].guesses) || []; }
+    function shuffleInt() { return Math.floor(Math.random() * NC); }
+
+    // Indices noir/blanc d'une proposition g face au code.
+    // Indices noirs/blancs : centralisé dans mastermind-ai.js (partagé avec le banc).
+    var feedback = window.MastermindAI.feedback;
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, draft = [];
+    GameRoom({
+      gameKey: 'mastermind',
+      name: 'Mastermind',
+      emoji: '🎯',
+      tagline: 'Craque le code secret',
+      minPlayers: 1,
+      maxPlayers: 8,
+      rules: [
+        'Un code secret : 4 pions parmi 6 couleurs (répétitions possibles)',
+        '⚫ noir = bonne couleur bien placée · ⚪ blanc = bonne couleur mal placée',
+        'Tout le monde cherche le même code, chacun sa grille',
+        'Le premier à craquer le code gagne'
+      ],
+      offline: { solo: true, local: true, soloMinBots: 0 },
+      bot: mmBot,
+      offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
+      offlineEnter: function () { draft = []; if (window.room) render(window.room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var code = []; for (var i = 0; i < PEGS; i++) code.push(shuffleInt());
+      order.forEach(function (p) { cur.players[p].guesses = []; cur.players[p].cracked = false; });
+      return { code: code, turn: order[0], winner: null, banner: 'Trouve le code à 4 couleurs !' };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { draft = []; showScreen('s-playing'); } render(state); }
+      else if (status === 'ended') showResults(state);
+      prevStatus = status;
+    }
+
+    function nextTurn(cur, fromPid) {
+      var order = cur.order || [], i = order.indexOf(fromPid), n = order.length;
+      for (var k = 1; k <= n; k++) { var c = order[(i + k) % n]; if (!(cur.players[c] && cur.players[c].cracked)) return c; }
+      return fromPid;
+    }
+
+    /* ━━ Jouer une proposition ━━ */
+    function submitGuess() {
+      if (draft.length !== PEGS) { lbToast('Choisis 4 couleurs'); return; }
+      var g = draft.slice();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        applyGuess(cur, window.myPid, g);
+        return cur;
+      }, function (err, committed) { if (committed) draft = []; });
+    }
+    function applyGuess(cur, pid, g) {
+      var fb = feedback(g, cur.code);
+      var gl = guessesOf(cur, pid).slice();
+      gl.push({ g: g, black: fb.black, white: fb.white });
+      cur.players[pid].guesses = gl;
+      if (fb.black === PEGS) {
+        cur.players[pid].cracked = true; cur.winner = pid; cur.status = 'ended';
+        cur.banner = Room.name(pid) + ' a craqué le code !';
+        return;
+      }
+      cur.turn = nextTurn(cur, pid);
+      cur.banner = 'Au tour de ' + Room.name(cur.turn);
+    }
+
+    /* ━━ IA solveur ━━ Voir mastermind-ai.js : facile = au hasard, moyen = code
+       cohérent avec les indices, difficile = minimax de Knuth COMPLET (≤ 5 coups).
+       Partagé avec le banc d'essai. ━━ */
+    function mmBot(state, pid) {
+      if (state.status !== 'playing' || state.turn !== pid) return;
+      var level = window.Bots ? window.Bots.level(state) : 'normal';
+      var g = window.MastermindAI.choose(guessesOf(state, pid), level);
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
+        applyGuess(cur, pid, g);
+        return cur;
+      });
+    }
+
+    /* ━━ Rendu ━━ */
+    function pegHTML(ci, extra) { return '<div class="mm-peg' + (extra || '') + '" style="background:' + COLORS[ci] + '"></div>'; }
+    function fbHTML(black, white) {
+      var dots = ''; for (var i = 0; i < black; i++) dots += '<i class="black"></i>';
+      for (var j = 0; j < white; j++) dots += '<i class="white"></i>';
+      for (var k = black + white; k < PEGS; k++) dots += '<i></i>';
+      return '<div class="mm-fb">' + dots + '</div>';
+    }
+    function render(state) {
+      var me = window.myPid, order = state.order || [];
+      setHTML('mm-opps', order.map(function (pid) {
+        var cracked = state.players[pid] && state.players[pid].cracked;
+        return '<div class="mm-opp' + (state.turn === pid ? ' turn' : '') + (cracked ? ' cracked' : '') + '">' +
+          '<span class="mm-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + ' · ' + guessesOf(state, pid).length + (cracked ? ' ✅' : '') + '</div>';
+      }).join(''));
+      setText('mm-banner', state.banner || '');
+
+      // Ma grille (mes essais)
+      var mine = guessesOf(state, me);
+      setHTML('mm-board', mine.length ? mine.map(function (row) {
+        return '<div class="mm-rowline"><div class="mm-pegs">' + row.g.map(function (c) { return pegHTML(c); }).join('') + '</div>' + fbHTML(row.black, row.white) + '</div>';
+      }).join('') : '<div class="mm-wait">Propose ta première combinaison ↓</div>');
+
+      // Zone de saisie
+      var myTurn = (state.turn === me) && !state.winner && state.status === 'playing';
+      var inp = document.getElementById('mm-input');
+      if (!myTurn) { inp.innerHTML = '<div class="mm-wait">⏳ En attente de ' + escapeHtml(Room.name(state.turn)) + '…</div>'; return; }
+      var cur = '';
+      for (var i = 0; i < PEGS; i++) cur += (draft[i] != null) ? pegHTML(draft[i], ' filled') : '<div class="mm-peg empty" onclick="clearDraft()"></div>';
+      var pal = COLORS.map(function (col, ci) { return '<div class="mm-swatch" style="background:' + col + '" onclick="addPeg(' + ci + ')"></div>'; }).join('');
+      inp.innerHTML = '<div class="mm-current">' + cur + '</div><div class="mm-palette">' + pal + '</div>' +
+        '<button class="btn-primary" onclick="submitGuess()"' + (draft.length === PEGS ? '' : ' disabled') + '>Valider</button>';
+    }
+    function addPeg(ci) { if (draft.length < PEGS) { draft.push(ci); render(window.room); } }
+    function clearDraft() { draft = []; render(window.room); }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🎯');
+      setText('res-title', winner ? (winner === window.myPid ? 'Tu as craqué le code !' : Room.name(winner) + ' gagne') : 'Partie terminée');
+      setHTML('res-code', '<span style="font-weight:700;align-self:center">Code :</span>' + (state.code || []).map(function (c) { return pegHTML(c); }).join(''));
+      var order = (state.order || []).slice().sort(function (a, b) {
+        var ca = state.players[a] && state.players[a].cracked, cb = state.players[b] && state.players[b].cracked;
+        if (ca !== cb) return ca ? -1 : 1;
+        return guessesOf(state, a).length - guessesOf(state, b).length;
+      });
+      setHTML('res-rank', order.map(function (pid, i) {
+        var cracked = state.players[pid] && state.players[pid].cracked;
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span style="font-weight:800;color:var(--terracotta)">' + guessesOf(state, pid).length + ' essais' + (cracked ? ' ✅' : '') + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

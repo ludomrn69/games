@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Time's up! · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 25%,#123a2a,#08160f 70%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#9ef0c7;text-decoration:none;font-size:1.4rem}.score{font-size:1.6rem}
+  .barwrap{width:100%;max-width:520px;padding:0 18px}
+  .bar{height:16px;border-radius:10px;background:rgba(255,255,255,.12);overflow:hidden}
+  .bar>div{height:100%;width:100%;background:linear-gradient(90deg,#e8524a,#ffd45e,#3fb562);transition:width .05s linear;transform-origin:left}
+  #stage{flex:1;width:100%;max-width:520px;position:relative;overflow:hidden}
+  .dot{position:absolute;border-radius:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;
+    font-size:1.5rem;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+  .dot.good{background:radial-gradient(circle at 35% 30%,#c8ffdd,#3fb562 60%,#1f7a45)}
+  .dot.bad{background:radial-gradient(circle at 35% 30%,#ffd0cf,#e8524a 60%,#a51f1f)}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(8,22,15,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#9ef0c7;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#3fb562,#7ac94b);box-shadow:0 8px 24px rgba(63,181,98,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span></span></div>
+  <div class="barwrap"><div class="bar"><div id="barFill"></div></div></div>
+  <div id="stage">
+    <div class="screen" id="start">
+      <h1>⏳ Time's up!</h1>
+      <p>La jauge se vide à toute vitesse. Touche les pastilles <b>vertes</b> pour regagner du temps, évite les <b>rouges</b>&nbsp;!</p>
+      <button class="btn" id="startBtn">Jouer</button>
+    </div>
+    <div class="screen hidden" id="over">
+      <h1>Temps écoulé&nbsp;!</h1>
+      <div class="big" id="finalScore">0</div>
+      <p id="overMsg">pastilles touchées</p>
+      <button class="btn" id="replayBtn">Rejouer</button>
+    </div>
+  </div>
+<script>
+(function(){
+  var stage=document.getElementById('stage'),barFill=document.getElementById('barFill');
+  var scoreEl=document.getElementById('score');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var BEST_KEY='playus_timesup_best';var best=+localStorage.getItem(BEST_KEY)||0;
+  var state,score,time,maxTime,drain,raf,lastTs,spawnAcc,spawnEvery,dots;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function start(){
+    Array.prototype.slice.call(stage.querySelectorAll('.dot')).forEach(function(d){d.remove();});
+    score=0;maxTime=6000;time=maxTime;drain=1000;spawnEvery=620;spawnAcc=0;dots=[];lastTs=0;
+    scoreEl.textContent='0';barFill.style.width='100%';
+    state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    lastTs=performance.now();raf=requestAnimationFrame(loop);
+  }
+  function end(){state='over';cancelAnimationFrame(raf);document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST_KEY,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='pastilles touchées';
+    overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  function spawn(){
+    var W=stage.clientWidth,H=stage.clientHeight,m=48,bad=Math.random()<0.28;
+    var el=document.createElement('div');el.className='dot '+(bad?'bad':'good');el.textContent=bad?'💣':'⏱️';
+    var size=Math.min(W,H)*0.16;el.style.width=el.style.height=size+'px';
+    var x=m+Math.random()*(W-2*m),y=m+Math.random()*(H-2*m);el.style.left=x+'px';el.style.top=y+'px';
+    var d={el:el,life:1400};
+    el.addEventListener('pointerdown',function(e){e.stopPropagation();if(state!=='play')return;
+      if(bad){time-=1600;vibrate([30,40,80]);}else{score++;scoreEl.textContent=score;time=Math.min(maxTime,time+1000);
+        drain+=14;spawnEvery=Math.max(360,spawnEvery-6);vibrate(12);}
+      el.remove();dots.splice(dots.indexOf(d),1);});
+    stage.appendChild(el);dots.push(d);
+  }
+  function loop(ts){
+    raf=requestAnimationFrame(loop);var dt=ts-lastTs;lastTs=ts;if(state!=='play')return;
+    time-=drain*dt/1000;spawnAcc+=dt;
+    if(spawnAcc>=spawnEvery){spawnAcc=0;spawn();}
+    for(var i=dots.length-1;i>=0;i--){dots[i].life-=dt;if(dots[i].life<=0){dots[i].el.remove();dots.splice(i,1);}}
+    barFill.style.width=Math.max(0,time/maxTime*100)+'%';
+    if(time<=0){barFill.style.width='0%';end();}
+  }
+  document.getElementById('startBtn').onclick=start;
+  document.getElementById('replayBtn').onclick=start;
+})();
+</script>
+</body>
+</html>

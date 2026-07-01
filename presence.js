@@ -79,6 +79,15 @@
       if (!reapTimer) {
         reapTimer = setInterval(function () {
           if (!curRoom) return;
+          // Un seul reaper à la fois : l'HÔTE (sinon chaque client transactionne
+          // tout le salon toutes les 8 s — bande passante et conflits inutiles).
+          // Si l'hôte lui-même semble parti (offline ou ts périmé), tout le monde
+          // reprend la main — la transaction absorbe les courses éventuelles.
+          var r = window.room;
+          if (r && r.host && r.host !== curPid) {
+            var h = r.players && r.players[r.host];
+            if (h && h.online !== false && (serverNow() - (h.ts || 0)) <= STALE_MS) return;
+          }
           // Transaction : on traite tous les fantômes d'un coup et on SUPPRIME le
           // salon s'il ne reste plus personne (évite les coquilles vides en base).
           curRoom.transaction(function (room) {

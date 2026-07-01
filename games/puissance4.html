@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Puissance 4 🔴" data-emoji="🔴"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+
+
+    .btn-primary { display: block; width: 100%; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+
+    /* Playing */
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    .p4-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    html[data-theme="dark"] .p4-header { background: rgba(20,16,28,0.97); }
+    .p4-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .p4-turn-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .p4-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; }
+    .p4-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
+    .p4-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+
+    .p4-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; width: 100%; }
+    /* Look classique « Connect 4 » : plateau BLEU, trous crème, jetons rouge/jaune
+       (identité visuelle nette, distincte du Morpion en ✕/◯). */
+    .p4-frame { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: clamp(4px, 1.6vw, 9px); width: min(92vw, 430px); aspect-ratio: 7 / 6; background: linear-gradient(160deg, #2a6fd6, #1c4fa8); border: 3px solid #14397c; border-radius: 20px; padding: clamp(7px, 2.2vw, 12px); box-shadow: var(--shadow); }
+    .p4-cell { aspect-ratio: 1; border-radius: 50%; background: var(--cream); box-shadow: inset 0 3px 7px rgba(20,30,60,0.45); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+    html[data-theme="dark"] .p4-cell { background: #2a2433; }
+    .p4-cell.colhover { background: rgba(255,255,255,0.55); }
+    html[data-theme="dark"] .p4-cell.colhover { background: rgba(255,255,255,0.18); }
+    .p4-disc { width: 86%; height: 86%; border-radius: 50%; background-image: radial-gradient(circle at 33% 28%, rgba(255,255,255,0.5), rgba(255,255,255,0) 58%); box-shadow: inset -2px -3px 6px rgba(0,0,0,0.22), inset 2px 2px 5px rgba(255,255,255,0.35); }
+    .p4-cell.win .p4-disc { box-shadow: 0 0 0 3px var(--gold), 0 0 16px rgba(198,152,90,0.7); animation: p4pulse 0.9s ease-in-out infinite alternate; }
+    @keyframes p4pulse { from { transform: scale(1);} to { transform: scale(1.08);} }
+    @keyframes p4fall { 0% { transform: translateY(var(--fall, -600%)); } 72% { transform: translateY(0); } 84% { transform: translateY(-7%); } 100% { transform: translateY(0); } }
+    .p4-falling { animation: p4fall 0.42s cubic-bezier(0.33,0.66,0.4,1) both; }
+    .p4-hint { margin-top: 16px; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); text-align: center; min-height: 24px; }
+
+    /* Result overlay */
+    .p4-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .p4-overlay.active { display: flex; animation: fadeUp 0.3s ease both; }
+    .p4-overlay-card { background: var(--white); border-radius: 22px; padding: 30px 26px; box-shadow: var(--shadow-hover); text-align: center; max-width: 340px; width: 100%; }
+    .p4-ov-emoji { font-size: 3rem; line-height: 1; margin-bottom: 8px; }
+    .p4-ov-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; margin-bottom: 6px; }
+    .p4-ov-scores { font-size: 1.1rem; font-weight: 700; margin: 10px 0 20px; }
+    .p4-ov-scores .sep { color: var(--ink-light); margin: 0 8px; font-weight: 400; }
+
+    /* Modal */
+    .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .modal.active { display: flex; animation: fadeUp 0.25s ease both; }
+    .modal-card { background: var(--white); border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/p4-ai.js"></script>
+
+  <div class="app">
+    <!-- Écrans gérés par lobby.js -->
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="p4-header">
+        <span class="p4-turn" id="p4-turn"></span>
+        <span class="p4-scores" id="p4-scores"></span>
+        <div class="p4-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="p4-stage">
+        <div class="p4-frame" id="p4-board"></div>
+        <div class="p4-hint" id="p4-hint"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RESULT OVERLAY ══ -->
+  <div class="p4-overlay" id="p4-overlay">
+    <div class="p4-overlay-card">
+      <div class="p4-ov-emoji" id="p4-ov-emoji">🏆</div>
+      <div class="p4-ov-title" id="p4-ov-title">—</div>
+      <div class="p4-ov-scores" id="p4-ov-scores"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="peekBoard()">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ RESTART MODAL ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">Les scores repartent de 0.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RULES MODAL ══ -->
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Puissance 4</div>
+      <div class="modal-body">
+        <p>Chacun son tour, lâche un jeton dans une colonne — il tombe sur la première case libre.</p>
+        <p style="margin-top:10px">Le but : aligner <b>4 jetons</b> de ta couleur, à l'horizontale, à la verticale ou en diagonale.</p>
+        <p style="margin-top:10px">Le premier à aligner 4 remporte la manche. Le score total est gardé entre les manches.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ State ━━ */
+    var prevStatus = null;
+    var p4Anim = -2; // dernier jeton animé localement
+
+    function rref() { return window.roomRef; }
+    function emptyBoard() { return '.'.repeat(42); }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
+    function discStyle(color) { return 'background:' + color + ';'; }
+    // Couleurs FIXES du Puissance 4 par siège : joueur 1 = rouge, joueur 2 = jaune.
+    function p4Color(seat) { return seat === 0 ? '#e23b3b' : '#f2c200'; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'puissance4',
+      name: 'Puissance 4',
+      emoji: '🔴',
+      tagline: 'À distance',
+      minPlayers: 2,
+      maxPlayers: 2,
+      rules: [
+        'Chacun son tour, on lâche un jeton dans une colonne',
+        'Le jeton tombe sur la première case libre du bas',
+        'Aligne 4 jetons de ta couleur (ligne, colonne ou diagonale)',
+        'Le premier à aligner 4 gagne la manche · le score est gardé'
+      ],
+      offline: { solo: true, local: true },
+      bot: p4Bot,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* ━━ IA (mode solo / ordis en ligne) ━━ Recherche pure dans p4-ai.js (négamax
+       α-β + table de transposition + tri des coups TT/killer + approfondissement
+       itératif). Profondeur selon la difficulté (Bots.level) : facile ≈ 2 (+ coups
+       aléatoires), moyen 6, difficile 12 — la borne de nœuds décide la profondeur
+       réelle atteinte → quasi parfait (Puissance 4 est un jeu résolu). ━━ */
+    function p4Bot(state, pid) {
+      var order = state.order, me = String(order.indexOf(pid)), opp = String(1 - (+me));
+      var b = state.board || emptyBoard();
+      var vc = []; for (var c = 0; c < 7; c++) if (b[c] === '.') vc.push(c);
+      if (!vc.length) return;
+      // Facile : joue parfois au hasard → réellement battable.
+      if (window.Bots && window.Bots.shouldBlunder(state)) return dropInColumn(vc[Math.floor(Math.random() * vc.length)]);
+      var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 12 }) : 8);
+      var col = window.P4AI.bestColumn(b, me, opp, depth);
+      dropInColumn(col >= 0 ? col : vc[0]);
+    }
+
+    /* ━━ État initial d'une manche (fourni au lancement) ━━ */
+    function onStart(players) {
+      var starter = players[Math.random() < 0.5 ? 0 : 1].pid;
+      return { board: emptyBoard(), turn: starter, starter: starter, winner: null, winLine: null, lastMove: -1 };
+    }
+
+    /* ━━ Réception de l'état ━━ */
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'waiting') hideP4Result();
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') startPlayingScreen(state);
+        else renderPlaying(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Logique du plateau ━━ */
+    function lineFrom(b, idx, ch) {
+      var r = Math.floor(idx / 7), c = idx % 7;
+      var dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+      for (var d = 0; d < 4; d++) {
+        var dr = dirs[d][0], dc = dirs[d][1];
+        var cells = [idx];
+        var rr = r + dr, cc = c + dc;
+        while (rr >= 0 && rr < 6 && cc >= 0 && cc < 7 && b[rr * 7 + cc] === ch) { cells.push(rr * 7 + cc); rr += dr; cc += dc; }
+        rr = r - dr; cc = c - dc;
+        while (rr >= 0 && rr < 6 && cc >= 0 && cc < 7 && b[rr * 7 + cc] === ch) { cells.unshift(rr * 7 + cc); rr -= dr; cc -= dc; }
+        if (cells.length >= 4) return cells;
+      }
+      return null;
+    }
+
+    function dropInColumn(c) {
+      var state = window.room || {};
+      if (state.status !== 'playing' || state.winner) return;
+      if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        if (cur.turn !== window.myPid) return cur;
+        var order = cur.order || [];
+        var myMark = String(order.indexOf(window.myPid));
+        var b = (cur.board || emptyBoard()).split('');
+        while (b.length < 42) b.push('.');
+        var landing = -1;
+        for (var r = 5; r >= 0; r--) { if (b[r * 7 + c] === '.') { landing = r * 7 + c; break; } }
+        if (landing < 0) return cur; // colonne pleine
+        b[landing] = myMark;
+        cur.board = b.join('');
+        cur.lastMove = landing;
+        var line = lineFrom(b, landing, myMark);
+        if (line) {
+          cur.winner = window.myPid;
+          cur.winLine = line;
+          if (!cur.players) cur.players = {};
+          if (!cur.players[window.myPid]) cur.players[window.myPid] = {};
+          cur.players[window.myPid].wins = (cur.players[window.myPid].wins || 0) + 1;
+        } else if (b.indexOf('.') === -1) {
+          cur.winner = 'draw';
+        } else {
+          var i = order.indexOf(window.myPid);
+          cur.turn = order[(i + 1) % order.length];
+        }
+        return cur;
+      });
+    }
+
+    /* ━━ Rendu ━━ */
+    function startPlayingScreen(state) {
+      p4Anim = -2;
+      hideP4Result();
+      showScreen('s-playing');
+      renderPlaying(state);
+    }
+
+    function scoresHTML(state) {
+      var ord = state.order || [];
+      return ord.map(function (pid, seat) {
+        return '<span style="color:' + p4Color(seat) + '">⬤ ' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
+      }).join('<span class="sep">—</span>');
+    }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+
+    function renderPlaying(state) {
+      var b = state.board || emptyBoard();
+      var ord = state.order || [];
+      setHTML('p4-scores', scoresHTML(state));
+
+      var ti = document.getElementById('p4-turn');
+      if (state.winner) {
+        ti.innerHTML = '';
+        setText('p4-hint', '');
+      } else {
+        var t = state.turn;
+        ti.innerHTML = '<span class="p4-turn-dot" style="background:' + p4Color((state.order || []).indexOf(t)) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        setText('p4-hint', (t === window.myPid) ? 'Touche une colonne pour lâcher ton jeton' : 'En attente de ' + Room.name(t) + '…');
+      }
+
+      var board = document.getElementById('p4-board');
+      var win = state.winLine || [];
+      var html = '';
+      for (var i = 0; i < 42; i++) {
+        var ch = b[i];
+        var cls = 'p4-cell';
+        var disc = '';
+        if (ch !== '.' && ch !== undefined) {
+          disc = '<span class="p4-disc" style="' + discStyle(p4Color(+ch)) + '"></span>';
+        }
+        if (win.indexOf(i) >= 0) cls += ' win';
+        html += '<div class="' + cls + '" data-col="' + (i % 7) + '" data-i="' + i + '">' + disc + '</div>';
+      }
+      board.innerHTML = html;
+
+      // Animation de chute sur le tout nouveau jeton
+      if (state.lastMove != null && state.lastMove >= 0 && state.lastMove !== p4Anim) {
+        p4Anim = state.lastMove;
+        var r2 = Math.floor(state.lastMove / 7);
+        var disc2 = board.querySelector('[data-i="' + state.lastMove + '"] .p4-disc');
+        if (disc2) { disc2.style.setProperty('--fall', (-(r2 + 2) * 100) + '%'); disc2.classList.add('p4-falling'); }
+      }
+
+      if (state.winner) showP4Result(state); else hideP4Result();
+    }
+
+    function showP4Result(state) {
+      var ov = document.getElementById('p4-overlay');
+      var emoji = document.getElementById('p4-ov-emoji');
+      var title = document.getElementById('p4-ov-title');
+      if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Match nul'; }
+      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
+      setHTML('p4-ov-scores', scoresHTML(state));
+      ov.classList.add('active');
+      hidePeekBtn();
+    }
+    // « Revoir le plateau » : masque l'overlay pour voir l'alignement gagnant (surligné).
+    function peekBoard() {
+      document.getElementById('p4-overlay').classList.remove('active');
+      var b = document.getElementById('p4-peek');
+      if (!b) {
+        b = document.createElement('button'); b.id = 'p4-peek'; b.className = 'p4-peek-btn';
+        b.textContent = '↩ Voir le résultat';
+        b.onclick = function () { document.getElementById('p4-overlay').classList.add('active'); hidePeekBtn(); };
+        document.body.appendChild(b);
+      }
+      b.style.display = 'block';
+    }
+    function hidePeekBtn() { var b = document.getElementById('p4-peek'); if (b) b.style.display = 'none'; }
+    function hideP4Result() { var ov = document.getElementById('p4-overlay'); if (ov) ov.classList.remove('active'); hidePeekBtn(); }
+
+    /* « Rejouer » garde les scores ; « Nouvelle partie » (↻) repart de 0. */
+    function handleReplay() { hideP4Result(); Lobby.resetToLobby(['wins']); }
+    function doRestart() { closeModal('modal-restart'); hideP4Result(); Lobby.resetToLobby([]); }
+
+    /* ━━ Interactions plateau ━━ */
+    (function () {
+      var board = document.getElementById('p4-board');
+      if (!board) return;
+      board.addEventListener('click', function (e) {
+        var cell = e.target.closest('.p4-cell');
+        if (!cell) return;
+        dropInColumn(+cell.dataset.col);
+      });
+      function clearHover() { board.querySelectorAll('.colhover').forEach(function (x) { x.classList.remove('colhover'); }); }
+      board.addEventListener('mouseover', function (e) {
+        var cell = e.target.closest('.p4-cell');
+        clearHover();
+        var st = window.room || {};
+        if (cell && st.turn === window.myPid && !st.winner) {
+          board.querySelectorAll('[data-col="' + cell.dataset.col + '"]').forEach(function (x) { x.classList.add('colhover'); });
+        }
+      });
+      board.addEventListener('mouseleave', clearHover);
+    })();
+  </script>
+</body>
+</html>

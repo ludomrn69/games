@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Codenames 🕵️" data-emoji="🕵️"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    :root { --cn-red: #d6584e; --cn-blue: #3e7cb1; }
+
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-secondary { display: block; width: auto; margin: 10px auto 0; padding: 0.7rem 1.6rem; border: 1.5px solid var(--gold-light); border-radius: 60px; background: transparent; color: var(--gold); font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+    /* Sélection d'équipe dans le salon */
+    .cn-teams { display: flex; gap: 10px; max-width: 360px; margin: 0 auto 12px; }
+    .cn-team-col { flex: 1; background: var(--white); border-radius: 14px; padding: 10px; box-shadow: var(--shadow); border-top: 4px solid var(--c, var(--gold)); }
+    .cn-team-col.red { --c: var(--cn-red); } .cn-team-col.blue { --c: var(--cn-blue); }
+    .cn-team-title { font-weight: 800; font-size: 0.82rem; color: var(--c); margin-bottom: 6px; }
+    .cn-team-member { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; padding: 2px 0; }
+    .cn-team-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .cn-join-btn { width: 100%; margin-top: 6px; border: 1.5px solid var(--c); background: transparent; color: var(--c); border-radius: 20px; padding: 4px; font-weight: 700; cursor: pointer; font-size: 0.78rem; font-family: 'DM Sans', sans-serif; }
+    .cn-join-btn.active { background: var(--c); color: #fff; }
+    .cn-spy-toggle { display: block; margin: 0 auto 12px; border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 20px; padding: 6px 14px; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; }
+    .cn-spy-toggle.active { background: var(--gold); color: #fff; border-color: transparent; }
+    .cn-lobby-hint { font-size: 0.76rem; color: var(--ink-light); text-align: center; margin-bottom: 10px; }
+
+    .cn-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .cn-header { background: rgba(20,16,28,0.97); }
+    .cn-role-label { font-weight: 800; font-size: 0.86rem; }
+    .cn-score { font-size: 0.82rem; font-weight: 800; margin-top: 2px; }
+    .cn-score .red { color: var(--cn-red); } .cn-score .blue { color: var(--cn-blue); } .cn-score .sep { color: var(--ink-light); margin: 0 5px; }
+    .cn-header-actions { display: flex; gap: 6px; }
+    .cn-history-btn { position: relative; } .cn-history-btn .badge { position: absolute; top: -6px; right: -6px; background: var(--terracotta); color: #fff; border-radius: 20px; font-size: 0.6rem; padding: 1px 5px; }
+
+    .cn-turn { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; padding: 6px; min-height: 32px; }
+    .cn-turn.red { color: var(--cn-red); } .cn-turn.blue { color: var(--cn-blue); }
+    .cn-clue-area { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 10px 6px; }
+    .cn-clue-box { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 30px; padding: 6px 20px; box-shadow: var(--shadow); }
+    .cn-clue-word { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.3rem; letter-spacing: 1px; }
+    .cn-clue-x { color: var(--gold); font-family: 'Caveat', cursive; font-size: 1.2rem; } .cn-clue-num { font-weight: 900; font-size: 1.3rem; color: var(--terracotta); }
+    .cn-guesses-left { font-family: 'Caveat', cursive; color: var(--ink-light); }
+    .cn-waiting { text-align: center; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); padding: 8px; }
+
+    .cn-grid-wrap { display: flex; justify-content: center; padding: 6px 10px; }
+    .cn-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: min(96vw, 480px); }
+    .cn-word { aspect-ratio: 1.5; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700; font-size: clamp(0.55rem, 2.4vw, 0.85rem); padding: 2px; box-shadow: var(--shadow); border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink); word-break: break-word; }
+    .cn-word.spy-red { background: #f6d2cf; border-color: var(--cn-red); color: #8a2c24; }
+    .cn-word.spy-blue { background: #cfe0f0; border-color: var(--cn-blue); color: #234a6b; }
+    .cn-word.spy-neutral { background: #f0e6d2; border-color: #d6c39a; color: #6b5a3a; }
+    .cn-word.spy-assassin { background: #3a3340; border-color: #1a1620; color: #fff; }
+    .cn-word.revealed-red { background: var(--cn-red); color: #fff; border-color: transparent; }
+    .cn-word.revealed-blue { background: var(--cn-blue); color: #fff; border-color: transparent; }
+    .cn-word.revealed-neutral { background: #d8c39a; color: #5a4a2a; border-color: transparent; }
+    .cn-word.revealed-assassin { background: #1a1620; color: #e05a4e; border-color: transparent; }
+
+    .cn-panel { padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); text-align: center; }
+    .cn-spy-label { font-family: 'Caveat', cursive; color: var(--terracotta); margin-bottom: 6px; }
+    .cn-spy-form { display: flex; gap: 8px; justify-content: center; }
+    .cn-spy-input { flex: 1; max-width: 240px; padding: 0.6rem 0.9rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1rem; }
+    .cn-spy-num { width: 56px; padding: 0.6rem; border: 1.5px solid var(--gold-light); border-radius: 12px; text-align: center; background: var(--white); color: var(--ink); font-weight: 700; }
+    .cn-spy-submit { border: none; border-radius: 12px; padding: 0 16px; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-weight: 700; cursor: pointer; }
+    .cn-end-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.6rem 1.6rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .cn-end-btn:disabled { opacity: 0.45; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 400px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; }
+    .modal-body b { color: var(--ink); }
+    .cn-hist-list { max-height: 50vh; overflow-y: auto; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+    .cn-hist-turn { background: var(--cream); border-radius: 10px; padding: 8px 10px; }
+    .cn-hist-clue .x { color: var(--gold); } .cn-hist-clue .num { color: var(--terracotta); }
+    .cn-hist-picks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .cn-hist-pick { font-size: 0.72rem; padding: 2px 7px; border-radius: 20px; background: #d8c39a; color: #5a4a2a; }
+    .cn-hist-pick.red { background: var(--cn-red); color: #fff; } .cn-hist-pick.blue { background: var(--cn-blue); color: #fff; } .cn-hist-pick.assassin { background: #1a1620; color: #e05a4e; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.6rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.9rem; margin: 6px 0; }
+    .res-title.red { color: var(--cn-red); } .res-title.blue { color: var(--cn-blue); }
+    .res-sub { color: var(--ink-light); margin-bottom: 22px; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="cn-header">
+        <div>
+          <div class="cn-role-label" id="cn-role-label">—</div>
+          <div class="cn-score" id="cn-score"></div>
+        </div>
+        <div class="cn-header-actions">
+          <button class="game-rules-btn cn-history-btn" onclick="openModal('modal-history');renderHistory()" title="Historique">📜<span class="badge" id="cn-hist-badge" style="display:none">0</span></button>
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+
+      <div class="cn-turn" id="cn-turn"></div>
+      <div id="cn-clue-area" class="cn-clue-area" style="display:none">
+        <div class="cn-clue-box"><span class="cn-clue-word" id="cn-clue-word">—</span><span class="cn-clue-x">×</span><span class="cn-clue-num" id="cn-clue-num">0</span></div>
+        <div class="cn-guesses-left" id="cn-guesses-left"></div>
+      </div>
+      <div id="cn-waiting" class="cn-waiting" style="display:none"></div>
+
+      <div class="cn-grid-wrap"><div class="cn-grid" id="cn-grid"></div></div>
+
+      <div class="cn-panel" id="cn-spy-panel" style="display:none">
+        <div class="cn-spy-label">Donne un indice à ton équipe ✦</div>
+        <div class="cn-spy-form">
+          <input type="text" class="cn-spy-input" id="cn-spy-word" placeholder="Indice (1 mot)" maxlength="30" autocomplete="off" />
+          <input type="number" class="cn-spy-num" id="cn-spy-num" value="2" min="0" max="9" />
+          <button class="cn-spy-submit" onclick="submitClue()">Envoyer</button>
+        </div>
+      </div>
+      <div class="cn-panel" id="cn-op-panel" style="display:none">
+        <button class="cn-end-btn" id="cn-end-btn" onclick="endTurn()">Fin de tour</button>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <p class="res-sub" id="res-sub">—</p>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
+      <button class="btn-secondary" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-history">
+    <div class="modal-card">
+      <div class="modal-title">Historique des indices</div>
+      <div class="cn-hist-list" id="cn-hist-list"></div>
+      <button class="btn-primary" style="width:auto;padding:0.6rem 1.4rem;margin-top:14px" onclick="closeModal('modal-history')">Fermer</button>
+    </div>
+  </div>
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera abandonnée, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Codenames</div>
+      <div class="modal-body">
+        <p>Deux équipes (🔴 Rouge / 🔵 Bleu). Chaque équipe a un <b>maître-espion</b> (qui voit la clé) et des <b>agents</b> (qui devinent).</p>
+        <p style="margin-top:8px">À ton tour, ton maître-espion donne <b>1 indice (1 mot + 1 chiffre)</b>. Tes agents cliquent les mots de votre couleur.</p>
+        <p style="margin-top:8px">Bonne couleur = continue · neutre ou couleur adverse = tour fini · <b>assassin (noir) = défaite immédiate</b>.</p>
+        <p style="margin-top:8px">La première équipe à trouver tous ses agents gagne.</p>
+      </div>
+      <button class="btn-primary" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var WORDS = [
+      'MAISON','CHIEN','CHAT','ARBRE','EAU','FEU','TERRE','AIR','SOLEIL','LUNE',
+      'ÉTOILE','FLEUR','MER','MONTAGNE','RIVIÈRE','ROUTE','PONT','PORTE','FENÊTRE','LIVRE',
+      'STYLO','TABLE','CHAISE','LIT','CHAMBRE','CUISINE','JARDIN','VOITURE','VÉLO','TRAIN',
+      'AVION','BATEAU','TÉLÉPHONE','ORDINATEUR','TÉLÉVISION','MUSIQUE','FILM','JEU','SPORT',
+      'ÉCOLE','TRAVAIL','ARGENT','TEMPS','VIE','AMOUR','GUERRE','PAIX','PAYS','VILLE',
+      'FAMILLE','AMI','ENFANT','ROI','REINE','PRINCE','HÉROS','DRAGON','ÉPÉE','CHÂTEAU',
+      'ÎLE','FORÊT','DÉSERT','PLAGE','VOLCAN','GLACIER','OCÉAN','PLANÈTE','COMÈTE','GALAXIE',
+      'SCIENCE','MAGIE','ART','DANSE','THÉÂTRE','CINÉMA','POÉSIE','ROMAN','RÊVE','SECRET',
+      'VÉRITÉ','IDÉE','DANGER','VICTOIRE','CHANCE','PEUR','JOIE','ESPOIR','LUMIÈRE','OMBRE',
+      'VENT','PLUIE','NEIGE','ORAGE','FOUDRE','NUAGE','JUNGLE','SAVANE','GROTTE','CASCADE',
+      'LION','TIGRE','ÉLÉPHANT','GIRAFE','ZÈBRE','SINGE','GORILLE','CROCODILE','SERPENT',
+      'AIGLE','PERROQUET','PINGOUIN','BALEINE','DAUPHIN','REQUIN','PIEUVRE','PAPILLON',
+      'ABEILLE','ARAIGNÉE','FOURMI','ROSE','TULIPE','CACTUS','BAMBOU','CHÊNE','SAPIN','PALMIER',
+      'POMME','ORANGE','CITRON','FRAISE','CERISE','ANANAS','AVOCAT','PASTÈQUE','PIZZA','GÂTEAU',
+      'CHOCOLAT','GLACE','CAFÉ','THÉ','VIN','LAIT','COUTEAU','VERRE','FOUR','FRIGO',
+      'GUITARE','PIANO','VIOLON','TAMBOUR','TROMPETTE','FLÛTE','HARPE','ROUGE','BLEU','VERT',
+      'JAUNE','NOIR','BLANC','VIOLET','GRIS','CARRÉ','CERCLE','TRIANGLE','CUBE','SPHÈRE',
+      'PYRAMIDE','NORD','SUD','EST','OUEST','HAUT','BAS','MATIN','SOIR','NUIT',
+      'BAGUETTE','CROISSANT','FROMAGE','CRÊPE','MACARON','ASTRONAUTE','PILOTE','DOCTEUR',
+      'POMPIER','POLICIER','ROBOT','VAMPIRE','SORCIÈRE','FANTÔME','LICORNE','PHÉNIX',
+      'FOOTBALL','TENNIS','NATATION','CYCLISME','GOLF','RUGBY','BOXE','TÉLESCOPE','BOUSSOLE',
+      'HORLOGE','LOUPE','PISCINE','ÉCLIPSE','BOUGIE','MIROIR','CLEF','CADENAS','SABLE','ROCHER',
+      'COQUILLAGE','VAGUE','TORNADE','TSUNAMI','ESCALIER','ASCENSEUR','GRENIER','CAVE','BALCON',
+      'LABYRINTHE','COFFRE','TRÉSOR','CARTE','JUMELLES','PERLE','DIAMANT','RUBIS','ÉMERAUDE',
+      'CRISTAL','SOIE','LAINE','COTON','PLUME','ENCRE','COURONNE','TRÔNE','CAPE','MASQUE',
+      'ÉNIGME','MYSTÈRE','INDICE','PISTE','TRACE','LANTERNE','PHARE','ANCRE','VOILE','CAPITAINE',
+      'PIRATE','CORSAIRE','NAUFRAGE','GALION','FRÉGATE','SOUS-MARIN','MÉTÉORITE','CRATÈRE',
+      'SATELLITE','FUSÉE','GRAVITÉ','ORBITE','HORIZON','CANYON','VALLÉE','SOMMET','TORRENT'
+    ];
+
+    var prevStatus = null;
+    function rref() { return window.roomRef; }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function shuffle(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    function otherTeam(t) { return t === 'red' ? 'blue' : 'red'; }
+    function teamName(t) { return t === 'red' ? 'Rouge' : 'Bleu'; }
+    function teamEmoji(t) { return t === 'red' ? '🔴' : '🔵'; }
+
+    function logPick(cur, idx, colorClass) {
+      if (cur.clueLog && cur.clueLog.length) { var last = cur.clueLog[cur.clueLog.length - 1]; last.picks = (last.picks || []).concat([{ word: cur.words[idx], color: colorClass }]); cur.clueLog[cur.clueLog.length - 1] = last; }
+    }
+    function endTurnIn(cur) { cur.turn = otherTeam(cur.turn); cur.clue = null; cur.guessesLeft = 0; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'codenames', name: 'Codenames', emoji: '🕵️', tagline: '2 équipes · maîtres-espions',
+      minPlayers: 4, maxPlayers: 8,
+      rules: [
+        'Deux équipes Rouge / Bleu, chacune un maître-espion + des agents',
+        'Le maître-espion donne 1 indice (1 mot + 1 chiffre)',
+        'Les agents cliquent les mots de leur couleur',
+        'Bonne couleur = continue · assassin = défaite immédiate'
+      ],
+      lobbyExtraHTML: lobbyExtraHTML, onState: onState, onStart: onStart
+    });
+
+    /* ━━ Salon : choix d'équipe + maître-espion ━━ */
+    function lobbyExtraHTML(room) {
+      var players = (room && room.players) || {};
+      var me = players[window.myPid] || {};
+      function col(team) {
+        var members = Object.keys(players).filter(function (pid) { return players[pid].team === team; })
+          .map(function (pid) {
+            return '<div class="cn-team-member"><span class="cn-team-av" style="background:' + (players[pid].color || 'var(--gold)') + '">' + (players[pid].emoji || '?') + '</span>' + escapeHtml(players[pid].name) + (players[pid].role === 'spymaster' ? ' 🔭' : '') + '</div>';
+          }).join('') || '<div class="cn-team-member" style="opacity:0.5">personne</div>';
+        return '<div class="cn-team-col ' + team + '"><div class="cn-team-title">' + teamEmoji(team) + ' ' + teamName(team) + '</div>' + members +
+          '<button class="cn-join-btn' + (me.team === team ? ' active' : '') + '" onclick="setTeam(\'' + team + '\')">' + (me.team === team ? 'Mon équipe ✓' : 'Rejoindre') + '</button></div>';
+      }
+      return '<div class="cn-teams">' + col('red') + col('blue') + '</div>' +
+        '<button class="cn-spy-toggle' + (me.role === 'spymaster' ? ' active' : '') + '" onclick="toggleSpy()">🔭 ' + (me.role === 'spymaster' ? 'Tu es maître-espion' : 'Devenir maître-espion') + '</button>' +
+        '<div class="cn-lobby-hint">4 joueurs minimum · 1 maître-espion par équipe (sinon attribué au lancement)</div>';
+    }
+    function setTeam(t) { if (window.roomRef) window.roomRef.child('players/' + window.myPid + '/team').set(t); }
+    function toggleSpy() {
+      var me = (window.room && window.room.players && window.room.players[window.myPid]) || {};
+      if (window.roomRef) window.roomRef.child('players/' + window.myPid + '/role').set(me.role === 'spymaster' ? 'operative' : 'spymaster');
+    }
+
+    /* ━━ Mise en place ━━ */
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      // Répartition en équipes : on respecte les choix, on rééquilibre si besoin.
+      var red = [], blue = [], un = [];
+      order.forEach(function (pid) { var t = cur.players[pid].team; if (t === 'red') red.push(pid); else if (t === 'blue') blue.push(pid); else un.push(pid); });
+      un.forEach(function (pid) { (red.length <= blue.length ? red : blue).push(pid); });
+      // Si une équipe est trop petite, on répartit équitablement par siège.
+      if (red.length < 2 || blue.length < 2) { red = []; blue = []; order.forEach(function (pid, i) { (i % 2 === 0 ? red : blue).push(pid); }); }
+      function fixTeam(arr, team) {
+        var spies = arr.filter(function (pid) { return cur.players[pid].role === 'spymaster'; });
+        var spy = spies.length ? spies[0] : arr[0];
+        arr.forEach(function (pid) { cur.players[pid].team = team; cur.players[pid].role = (pid === spy ? 'spymaster' : 'operative'); });
+      }
+      fixTeam(red, 'red'); fixTeam(blue, 'blue');
+
+      // Clé : l'équipe qui commence a 9 agents, l'autre 8, + 7 neutres + 1 assassin.
+      var starting = Math.random() < 0.5 ? 'red' : 'blue';
+      var keyVals = [];
+      function push(n, v) { for (var k = 0; k < n; k++) keyVals.push(v); }
+      push(9, starting); push(8, otherTeam(starting)); push(7, 'neutral'); push(1, 'assassin');
+      keyVals = shuffle(keyVals);
+      var remaining = { red: 0, blue: 0 };
+      keyVals.forEach(function (v) { if (v === 'red') remaining.red++; else if (v === 'blue') remaining.blue++; });
+      return {
+        words: shuffle(WORDS).slice(0, 25), key: keyVals, revealed: [],
+        turn: starting, starting: starting, remaining: remaining,
+        clue: null, guessesLeft: 0, winner: null, clueLog: []
+      };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); renderPlaying(state); }
+      else if (status === 'ended') showResults(state);
+      prevStatus = status;
+    }
+
+    /* ━━ Rendu ━━ */
+    function renderPlaying(state) {
+      if (!state.words) return;
+      var words = state.words, key = state.key || [], revealed = state.revealed || [];
+      var turn = state.turn, clue = state.clue, guessesLeft = state.guessesLeft || 0;
+      var me = (state.players && state.players[window.myPid]) || {};
+      var amSpy = me.role === 'spymaster';
+      var myTeam = me.team;
+      var myTurn = turn === myTeam;
+
+      setText('cn-role-label', (amSpy ? '🔭 Maître-espion ' : '🕵️ Agent ') + teamEmoji(myTeam));
+      document.getElementById('cn-role-label').style.color = myTeam === 'red' ? 'var(--cn-red)' : 'var(--cn-blue)';
+      var rem = state.remaining || { red: 0, blue: 0 };
+      document.getElementById('cn-score').innerHTML = '<span class="red">🔴 ' + rem.red + '</span><span class="sep">·</span><span class="blue">🔵 ' + rem.blue + '</span>';
+
+      var turnEl = document.getElementById('cn-turn');
+      turnEl.className = 'cn-turn ' + turn;
+      turnEl.textContent = 'Tour de l\'équipe ' + teamName(turn) + ' ' + teamEmoji(turn);
+
+      var clueArea = document.getElementById('cn-clue-area'), waiting = document.getElementById('cn-waiting');
+      var log = state.clueLog || []; var badge = document.getElementById('cn-hist-badge');
+      if (log.length) { badge.style.display = ''; badge.textContent = log.length; } else badge.style.display = 'none';
+      if (document.getElementById('modal-history').classList.contains('active')) renderHistory();
+
+      if (clue && clue.word) {
+        clueArea.style.display = ''; waiting.style.display = 'none';
+        setText('cn-clue-word', clue.word.toUpperCase()); setText('cn-clue-num', clue.number);
+        setText('cn-guesses-left', myTurn && !amSpy ? (guessesLeft + ' devine' + (guessesLeft > 1 ? 's' : '') + ' restante' + (guessesLeft > 1 ? 's' : '')) : 'Indice de ' + teamName(turn));
+      } else {
+        clueArea.style.display = 'none';
+        waiting.style.display = '';
+        waiting.textContent = (amSpy && myTurn) ? 'À toi de donner un indice…' : ('En attente de l\'indice du maître-espion ' + teamEmoji(turn) + '…');
+      }
+
+      var spyPanel = document.getElementById('cn-spy-panel'), opPanel = document.getElementById('cn-op-panel');
+      spyPanel.style.display = (amSpy && myTurn && !clue) ? '' : 'none';
+      opPanel.style.display = (!amSpy && myTurn && clue) ? '' : 'none';
+      if (!amSpy && myTurn && clue) document.getElementById('cn-end-btn').disabled = false;
+
+      var grid = document.getElementById('cn-grid'); grid.innerHTML = '';
+      words.forEach(function (word, idx) {
+        var tok = revealed[idx];
+        var btn = document.createElement('div'); btn.textContent = word;
+        if (tok) btn.className = 'cn-word revealed-' + tok;
+        else if (amSpy) btn.className = 'cn-word spy-' + key[idx];
+        else {
+          btn.className = 'cn-word';
+          if (myTurn && clue && clue.word && guessesLeft > 0) { btn.style.cursor = 'pointer'; btn.onclick = (function (i) { return function () { onWordClick(i); }; })(idx); }
+        }
+        grid.appendChild(btn);
+      });
+    }
+
+    /* ━━ Actions ━━ */
+    function submitClue() {
+      var st = window.room || {};
+      var me = (st.players && st.players[window.myPid]) || {};
+      if (st.status !== 'playing' || me.role !== 'spymaster' || st.turn !== me.team || (st.clue && st.clue.word)) return;
+      var word = (document.getElementById('cn-spy-word').value || '').trim().toUpperCase();
+      var num = parseInt(document.getElementById('cn-spy-num').value, 10);
+      if (!word) { lbToast('Écris un indice'); return; }
+      if (isNaN(num) || num < 0 || num > 9) { lbToast('Nombre entre 0 et 9'); return; }
+      rref().transaction(function (cur) {
+        var m = cur.players[window.myPid] || {};
+        if (!cur || cur.status !== 'playing' || m.role !== 'spymaster' || cur.turn !== m.team || (cur.clue && cur.clue.word)) return cur;
+        cur.clue = { word: word, number: num };
+        cur.guessesLeft = num + 1; // bonus +1 (classique)
+        cur.clueLog = (cur.clueLog || []).concat([{ team: cur.turn, giver: window.myPid, word: word, number: num, picks: [] }]);
+        return cur;
+      }, function (err, committed) { if (committed) { document.getElementById('cn-spy-word').value = ''; document.getElementById('cn-spy-num').value = '2'; } });
+    }
+
+    function onWordClick(idx) {
+      var st = window.room || {};
+      var me = (st.players && st.players[window.myPid]) || {};
+      if (st.status !== 'playing' || me.role === 'spymaster' || st.turn !== me.team) return;
+      if (!st.clue || !st.clue.word || (st.guessesLeft || 0) <= 0) return;
+      if (st.revealed && st.revealed[idx]) return;
+      rref().transaction(function (cur) {
+        var m = cur.players[window.myPid] || {};
+        if (!cur || cur.status !== 'playing' || m.role === 'spymaster' || cur.turn !== m.team) return cur;
+        if (!cur.clue || (cur.guessesLeft || 0) <= 0) return cur;
+        if (!cur.revealed) cur.revealed = [];
+        if (cur.revealed[idx]) return cur;
+        var color = (cur.key || [])[idx];
+        cur.revealed[idx] = color;
+        if (color === 'assassin') { logPick(cur, idx, 'assassin'); cur.winner = otherTeam(cur.turn); cur.status = 'ended'; return cur; }
+        logPick(cur, idx, color);
+        if (color === 'red' || color === 'blue') {
+          cur.remaining[color] = Math.max(0, (cur.remaining[color] || 0) - 1);
+          if (cur.remaining[color] === 0) { cur.winner = color; cur.status = 'ended'; return cur; }
+        }
+        if (color === cur.turn) { cur.guessesLeft = (cur.guessesLeft || 1) - 1; if (cur.guessesLeft <= 0) endTurnIn(cur); }
+        else endTurnIn(cur); // neutre ou couleur adverse → fin de tour
+        return cur;
+      });
+    }
+
+    function endTurn() {
+      var st = window.room || {};
+      var me = (st.players && st.players[window.myPid]) || {};
+      if (st.status !== 'playing' || me.role === 'spymaster' || st.turn !== me.team || !st.clue) return;
+      rref().transaction(function (cur) {
+        var m = cur.players[window.myPid] || {};
+        if (!cur || cur.status !== 'playing' || m.role === 'spymaster' || cur.turn !== m.team || !cur.clue) return cur;
+        endTurnIn(cur); return cur;
+      });
+    }
+
+    function renderHistory() {
+      var log = (window.room && window.room.clueLog) || [];
+      var listEl = document.getElementById('cn-hist-list');
+      if (!log.length) { listEl.innerHTML = '<div style="color:var(--ink-light)">Aucun indice pour le moment</div>'; return; }
+      listEl.innerHTML = log.map(function (t) {
+        var picks = (t.picks || []).map(function (p) { return '<span class="cn-hist-pick ' + (p.color || 'neutral') + '">' + escapeHtml(p.word || '') + '</span>'; }).join('');
+        if (!(t.picks || []).length) picks = '<span class="cn-hist-pick" style="opacity:0.6">…en cours</span>';
+        return '<div class="cn-hist-turn"><div>' + teamEmoji(t.team) + ' <span class="cn-hist-clue">' + escapeHtml(t.word || '') + ' <span class="x">×</span> <span class="num">' + (t.number || '?') + '</span></span></div><div class="cn-hist-picks">' + picks + '</div></div>';
+      }).join('');
+    }
+
+    function showResults(state) {
+      showScreen('s-results');
+      var win = state.winner;
+      var me = (state.players && state.players[window.myPid]) || {};
+      var iWon = me.team === win;
+      setText('res-emoji', iWon ? '🏆' : '💥');
+      var t = document.getElementById('res-title'); t.textContent = 'L\'équipe ' + teamName(win) + ' gagne !'; t.className = 'res-title ' + win;
+      // a-t-on perdu via l'assassin ?
+      var assassinHit = (state.revealed || []).indexOf('assassin') >= 0;
+      setText('res-sub', assassinHit ? 'L\'assassin a été démasqué…' : (iWon ? 'Bien joué !' : 'La prochaine sera la bonne !'));
+    }
+
+    function handleReplay() { Lobby.resetToLobby(['team', 'role']); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby(['team', 'role']); }
+
+    document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && document.activeElement && document.activeElement.id === 'cn-spy-word') submitClue(); });
+  </script>
+</body>
+</html>

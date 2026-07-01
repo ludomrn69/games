@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Patches 🧩" data-emoji="🧩"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .pt-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .pt-head { background: rgba(20,16,28,0.97); }
+    .pt-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .pt-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+    .pt-head-actions { display: flex; gap: 6px; }
+
+    .pt-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
+    .pt-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
+    .pt-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .pt-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .pt-opp .pc { color: var(--sage); }
+    .pt-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
+
+    .pt-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 10px; }
+    .pt-wrap { position: relative; width: min(92vw, 430px); aspect-ratio: 1; touch-action: none; }
+    .pt-grid { width: 100%; height: 100%; display: grid; border: 2px solid #2C2520; border-radius: 10px; overflow: hidden; background: var(--cream); }
+    html[data-theme="dark"] .pt-grid { background: #221a2e; }
+    .pt-cell { position: relative; display: flex; align-items: center; justify-content: center; user-select: none; box-sizing: border-box; font-size: clamp(0.6rem, 2.7vw, 1rem); }
+    .pt-clue { display: flex; align-items: center; justify-content: center; border: 2px solid #2C2520; background: rgba(255,255,255,0.9); color: #2C2520; font-weight: 800; font-size: 0.92em; border-radius: 4px; z-index: 3; }
+    .pt-sq { width: 1.55em; height: 1.55em; } .pt-tall { width: 1.12em; height: 1.7em; } .pt-wide { width: 1.7em; height: 1.12em; }
+    .pt-any { width: 1.55em; height: 1.55em; border-style: dashed; }
+    .pt-prev { position: absolute; border: 2.5px dashed var(--terracotta); border-radius: 8px; background: rgba(196,116,90,0.12); pointer-events: none; z-index: 4; display: none; }
+
+    .pt-tools { display: flex; gap: 8px; justify-content: center; }
+    .pt-tool { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.42rem 1.2rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--ink); }
+    .pt-tool:disabled { opacity: 0.45; cursor: default; }
+    .pt-legend { background: var(--white); border-radius: 14px; box-shadow: var(--shadow); padding: 10px 14px; max-width: 360px; font-size: 0.8rem; color: var(--ink-light); }
+    .pt-legend-title { text-align: center; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+    .pt-legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+    .pt-legend-row { display: flex; align-items: center; gap: 7px; }
+    .pt-lm { border: 2px solid #2C2520; border-radius: 3px; flex: none; }
+    .pt-legend-note { text-align: center; margin-top: 8px; font-size: 0.76rem; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/puzzle.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="pt-head">
+        <span class="pt-title-mini">Patches</span>
+        <span class="pt-timer" id="pt-timer">⏱ 0:00</span>
+        <div class="pt-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="pt-opps" id="pt-opps"></div>
+      <div class="pt-banner" id="pt-banner"></div>
+      <div class="pt-stage">
+        <div class="pt-wrap" id="pt-wrap"><div class="pt-grid" id="pt-grid"></div><div class="pt-prev" id="pt-prev"></div></div>
+        <div class="pt-tools">
+          <button class="pt-tool" id="pt-undo" onclick="undo()">↩ Annuler</button>
+          <button class="pt-tool" id="pt-hint" onclick="hint()">💡 Indice</button>
+        </div>
+        <div class="pt-legend">
+          <div class="pt-legend-title">Complète chaque forme pour remplir la grille</div>
+          <div class="pt-legend-grid">
+            <div class="pt-legend-row"><span class="pt-lm" style="width:15px;height:15px"></span> Carré</div>
+            <div class="pt-legend-row"><span class="pt-lm" style="width:11px;height:17px"></span> Rectangle haut</div>
+            <div class="pt-legend-row"><span class="pt-lm" style="width:17px;height:11px"></span> Rectangle large</div>
+            <div class="pt-legend-row"><span class="pt-lm" style="width:15px;height:15px;border-style:dashed"></span> N'importe</div>
+          </div>
+          <div class="pt-legend-note">Si une forme a un <b>numéro</b>, elle doit faire ce nombre de cases. Glisse pour entourer un patch.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🧩</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🧩 Patches</div>
+      <div class="modal-body">
+        <p>• Découpe toute la grille en <b>patchs rectangulaires</b> : un patch par indice, et chaque case appartient à un seul patch.</p>
+        <p style="margin-top:6px">• Chaque patch doit respecter la <b>forme</b> de son indice : carré, rectangle haut, rectangle large… ou n'importe.</p>
+        <p style="margin-top:6px">• Si l'indice a un <b>numéro</b>, le patch doit faire exactement ce nombre de cases.</p>
+        <p style="margin-top:6px">• <b>Glisse</b> pour entourer un patch (il doit contenir 1 seul indice). Touche un patch pour l'effacer.</p>
+        <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : même grille pour tous, le plus rapide gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    var PALETTE = ['#cf9f3e', '#d8453b', '#3a9d9b', '#7c5cdb', '#e08a3c', '#4aa3e0', '#5aa85a', '#d86a9b', '#a9744f', '#5a6fd8', '#3fb8a0', '#c0556e'];
+
+    /* ━━ Générateur ━━ Partition « guillotine » (toujours pavable) : on découpe
+       récursivement la grille en rectangles, puis on pose un indice par rectangle
+       (forme déduite des dimensions, + parfois un numéro = aire). Le joueur doit
+       retrouver UN pavage où chaque patch respecte l'indice qu'il contient. ━━ */
+    function genPatches(level, seed) {
+      var N = level === 'easy' ? 5 : level === 'hard' ? 7 : 6, rnd = Puzzle.rng(seed);
+      var maxLeaf = level === 'hard' ? 10 : level === 'easy' ? 8 : 9;
+      var regions;
+      function build() {
+        regions = [];
+        (function split(x, y, w, h) {
+          var area = w * h, canV = w > 1, canH = h > 1;
+          if (!canV && !canH) { regions.push({ x: x, y: y, w: w, h: h }); return; }
+          if (area <= maxLeaf) { var pStop = area <= 2 ? 0.92 : area <= 4 ? 0.78 : area <= 6 ? 0.62 : 0.5; if (rnd() < pStop) { regions.push({ x: x, y: y, w: w, h: h }); return; } }
+          var vert;
+          if (canV && canH) vert = w > h ? rnd() < 0.72 : (w < h ? rnd() < 0.28 : rnd() < 0.5);
+          else vert = canV;
+          if (vert) { var cv = 1 + Math.floor(rnd() * (w - 1)); split(x, y, cv, h); split(x + cv, y, w - cv, h); }
+          else { var ch = 1 + Math.floor(rnd() * (h - 1)); split(x, y, w, ch); split(x, y + ch, w, h - ch); }
+        })(0, 0, N, N);
+      }
+      var tries = 0, loCap = Math.max(4, N - 1), hiCap = Math.round(1.7 * N);
+      do { build(); tries++; } while ((regions.length < loCap || regions.length > hiCap) && tries < 60);
+
+      var clues = regions.map(function (r, i) {
+        var shape = r.w === r.h ? 'sq' : (r.h > r.w ? 'tall' : 'wide');
+        var cx = r.x + Math.floor(rnd() * r.w), cy = r.y + Math.floor(rnd() * r.h);
+        var num = null, sh = shape;
+        if (level === 'easy') { num = r.w * r.h; }
+        else if (level === 'normal') { if (rnd() < 0.5) num = r.w * r.h; }
+        else { if (rnd() < 0.18) num = r.w * r.h; if (rnd() < 0.22) sh = 'any'; }
+        return { cx: cx, cy: cy, shape: sh, num: num, color: PALETTE[i % PALETTE.length], sx: r.x, sy: r.y, sw: r.w, sh: r.h };
+      });
+      return { N: N, clues: clues };
+    }
+
+    // Évalue un placement : {win, covered, bad:[idx de rectangles fautifs]}.
+    function evalPlacement(N, clues, placed) {
+      var owner = []; for (var z = 0; z < N * N; z++) owner.push(-1);
+      var overlap = false;
+      for (var pi = 0; pi < placed.length; pi++) {
+        var p = placed[pi];
+        for (var yy = p.y; yy < p.y + p.h; yy++) for (var xx = p.x; xx < p.x + p.w; xx++) {
+          var idx = yy * N + xx; if (owner[idx] !== -1) overlap = true; else owner[idx] = pi;
+        }
+      }
+      var covered = 0; for (var k = 0; k < N * N; k++) if (owner[k] !== -1) covered++;
+      var bad = [], clueUse = {};
+      placed.forEach(function (p, pi) {
+        var inside = clues.filter(function (c) { return c.cx >= p.x && c.cx < p.x + p.w && c.cy >= p.y && c.cy < p.y + p.h; });
+        var bad1 = inside.length !== 1;
+        if (inside.length === 1) {
+          var ci = clues.indexOf(inside[0]); clueUse[ci] = (clueUse[ci] || 0) + 1; var c = inside[0];
+          var shapeOk = c.shape === 'any' || (c.shape === 'sq' ? p.w === p.h : c.shape === 'tall' ? p.h > p.w : p.w > p.h);
+          var numOk = c.num == null || p.w * p.h === c.num;
+          if (!shapeOk || !numOk) bad1 = true;
+        }
+        if (bad1) bad.push(pi);
+      });
+      var eachOnce = clues.every(function (_, ci) { return clueUse[ci] === 1; });
+      return { win: !overlap && covered === N * N && placed.length === clues.length && bad.length === 0 && eachOnce, covered: covered, bad: bad };
+    }
+    function clueIn(clues, x, y, w, h) { var r = []; clues.forEach(function (c, i) { if (c.cx >= x && c.cx < x + w && c.cy >= y && c.cy < y + h) r.push(i); }); return r; }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, timerInt = null, drag = null;
+    GameRoom({
+      gameKey: 'patches', name: 'Patches', emoji: '🧩', tagline: 'Découpe la grille en patchs',
+      minPlayers: 1, maxPlayers: 6,
+      rules: [
+        'Découpe la grille en patchs rectangulaires (1 indice par patch)',
+        'Respecte la forme de l\'indice (carré / haut / large / n\'importe)',
+        'Un numéro impose le nombre de cases du patch',
+        'Solo : bats ton chrono ⏱ · Salon : course entre vous'
+      ],
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
+      bot: function () {}, offlineTurn: function () { return null; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var level = (cur && cur.difficulty) || 'normal', P = genPatches(level, Puzzle.seed());
+      order.forEach(function (p) { cur.players[p].placed = []; cur.players[p].finishedAt = null; });
+      return { N: P.N, clues: P.clues, startedAt: Date.now(), banner: 'Découpe la grille le plus vite possible !', winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { drag = null; showScreen('s-playing'); bindDrag(); } render(state); startTimer(state); }
+      else { stopTimer(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+    function startTimer(state) { stopTimer(); function tick() { setText('pt-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+
+    function NS() { return (window.room && window.room.N) || 6; }
+    function clues() { return (window.room && window.room.clues) || []; }
+    function placedOf(s, pid) { return (s.players[pid] && s.players[pid].placed) || []; }
+    function coverOf(s, pid) { var pl = placedOf(s, pid), n = 0; pl.forEach(function (p) { n += p.w * p.h; }); return Math.min(n, NS() * NS()); }
+    function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
+
+    /* ── Actions (transaction sur MA grille) ── */
+    function withPlaced(fn) {
+      var pid = window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        var pl = (cur.players[pid].placed || []).slice();
+        var next = fn(pl); if (next === false) return cur;
+        cur.players[pid].placed = next;
+        var ev = evalPlacement(cur.N, cur.clues, next);
+        if (ev.win) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' termine en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+    }
+    function placeRect(x, y, w, h) {
+      var ins = clueIn(clues(), x, y, w, h);
+      if (ins.length !== 1) { setText('pt-banner', 'Un patch doit contenir exactement 1 indice'); return; }
+      withPlaced(function (pl) {
+        // retire les patchs qui chevauchent le nouveau, puis ajoute
+        var kept = pl.filter(function (p) { return x + w <= p.x || p.x + p.w <= x || y + h <= p.y || p.y + p.h <= y; });
+        kept.push({ x: x, y: y, w: w, h: h, ci: ins[0] });
+        return kept;
+      });
+    }
+    function eraseAt(x, y) { withPlaced(function (pl) { var k = pl.filter(function (p) { return !(x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h); }); return k.length === pl.length ? false : k; }); }
+    function undo() { withPlaced(function (pl) { if (!pl.length) return false; pl = pl.slice(); pl.pop(); return pl; }); }
+    function hint() {
+      var cs = clues(), pl = placedOf(window.room, window.myPid);
+      // cherche un indice pas encore correctement entouré, et pose sa solution
+      for (var i = 0; i < cs.length; i++) {
+        var c = cs[i], good = pl.some(function (p) { return p.x === c.sx && p.y === c.sy && p.w === c.sw && p.h === c.sh; });
+        if (!good) { placeRect(c.sx, c.sy, c.sw, c.sh); setText('pt-banner', '💡 Un patch posé pour toi'); return; }
+      }
+    }
+
+    /* ── Glisser pour entourer ── */
+    var dragBound = false;
+    function bindDrag() {
+      if (dragBound) return; dragBound = true;
+      var wrap = document.getElementById('pt-wrap');
+      function cellAt(x, y) { var el = document.elementFromPoint(x, y); var c = el && el.closest && el.closest('.pt-cell'); return c ? { x: +c.dataset.x, y: +c.dataset.y } : null; }
+      wrap.addEventListener('pointerdown', function (e) { var c = cellAt(e.clientX, e.clientY); if (!c) return; drag = { ax: c.x, ay: c.y, bx: c.x, by: c.y }; showPrev(); e.preventDefault(); });
+      wrap.addEventListener('pointermove', function (e) { if (!drag) return; var c = cellAt(e.clientX, e.clientY); if (c) { drag.bx = c.x; drag.by = c.y; showPrev(); } e.preventDefault(); });
+      window.addEventListener('pointerup', function () {
+        if (!drag) return;
+        var x = Math.min(drag.ax, drag.bx), y = Math.min(drag.ay, drag.by), w = Math.abs(drag.ax - drag.bx) + 1, h = Math.abs(drag.ay - drag.by) + 1;
+        var single = w === 1 && h === 1;
+        drag = null; document.getElementById('pt-prev').style.display = 'none';
+        if (single) { // case seule : efface le patch dessous, sinon tente un patch 1×1 (carré de 1 case)
+          var pl = placedOf(window.room, window.myPid), owned = pl.some(function (p) { return x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h; });
+          if (owned) { eraseAt(x, y); return; }
+        }
+        placeRect(x, y, w, h);
+      });
+    }
+    function showPrev() {
+      if (!drag) return;
+      var N = NS(), u = 100 / N, prev = document.getElementById('pt-prev');
+      var x = Math.min(drag.ax, drag.bx), y = Math.min(drag.ay, drag.by), w = Math.abs(drag.ax - drag.bx) + 1, h = Math.abs(drag.ay - drag.by) + 1;
+      prev.style.left = (x * u) + '%'; prev.style.top = (y * u) + '%'; prev.style.width = (w * u) + '%'; prev.style.height = (h * u) + '%'; prev.style.display = 'block';
+    }
+
+    /* ━━ Rendu ━━ */
+    function shapeBox(c) { var cls = c.shape === 'tall' ? 'pt-tall' : c.shape === 'wide' ? 'pt-wide' : c.shape === 'any' ? 'pt-any' : 'pt-sq'; return '<div class="pt-clue ' + cls + '">' + (c.num != null ? c.num : '') + '</div>'; }
+    function render(state) {
+      var me = window.myPid, order = state.order || [], N = state.N || 6, cs = state.clues || [], pl = placedOf(state, me);
+      setHTML('pt-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        return '<div class="pt-opp' + (doneOf(state, pid) ? ' done' : '') + '"><span class="pt-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : coverOf(state, pid) + '/' + (N * N)) + '</span></div>';
+      }).join(''));
+      setText('pt-banner', state.banner || '');
+
+      var owner = []; for (var z = 0; z < N * N; z++) owner.push(-1);
+      pl.forEach(function (p, pi) { for (var yy = p.y; yy < p.y + p.h; yy++) for (var xx = p.x; xx < p.x + p.w; xx++) owner[yy * N + xx] = pi; });
+      var ev = evalPlacement(N, cs, pl), badRect = {}; ev.bad.forEach(function (i) { badRect[i] = 1; });
+      var clueAt = {}; cs.forEach(function (c) { clueAt[c.cy * N + c.cx] = c; });
+
+      var html = '';
+      for (var i = 0; i < N * N; i++) {
+        var x = i % N, y = i / N | 0, o = owner[i], col = o >= 0 ? cs[pl[o].ci].color : null;
+        var bad = o >= 0 && badRect[o];
+        var bg = col ? (bad ? 'rgba(216,69,59,0.22)' : hexA(col, 0.5)) : 'transparent';
+        var edge = bad ? '#d8453b' : '#2C2520', faint = 'rgba(44,37,32,0.10)';
+        function side(nx, ny) { var ni = ny * N + nx; var diff = (nx < 0 || ny < 0 || nx >= N || ny >= N) ? false : owner[ni] !== o; return (nx < 0 || ny < 0 || nx >= N || ny >= N) ? '0' : (diff ? '2px solid ' + edge : '1px solid ' + faint); }
+        var bt = (y === 0) ? '0' : side(x, y - 1), bl = (x === 0) ? '0' : side(x - 1, y), br = (x === N - 1) ? '0' : side(x + 1, y), bb = (y === N - 1) ? '0' : side(x, y + 1);
+        var st = 'background:' + bg + ';border-top:' + bt + ';border-left:' + bl + ';border-right:' + br + ';border-bottom:' + bb;
+        html += '<div class="pt-cell" data-x="' + x + '" data-y="' + y + '" style="' + st + '">' + (clueAt[i] ? shapeBox(clueAt[i]) : '') + '</div>';
+      }
+      var grid = document.getElementById('pt-grid');
+      grid.style.gridTemplateColumns = 'repeat(' + N + ', 1fr)';
+      grid.style.gridTemplateRows = 'repeat(' + N + ', 1fr)';
+      grid.innerHTML = html;
+      var undoBtn = document.getElementById('pt-undo'); if (undoBtn) undoBtn.disabled = !pl.length;
+    }
+    function hexA(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; }
+
+    function showResults(state) {
+      stopTimer();
+      var N = state.N || 6, winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🧩');
+      setText('res-title', winner === window.myPid ? 'Tu finis premier ! 🏆' : (winner ? Room.name(winner) + ' gagne' : 'Terminé'));
+      var order = Puzzle.rankByTime(state, function (s, pid) { return coverOf(s, pid); });
+      setHTML('res-rank', order.map(function (pid, i) {
+        var done = doneOf(state, pid);
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + (done ? '⏱ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : coverOf(state, pid) + '/' + (N * N)) + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { stopTimer(); drag = null; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); stopTimer(); drag = null; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

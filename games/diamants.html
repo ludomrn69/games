@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Diamants 💎" data-emoji="💎"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.5; }
+
+    .dm-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .dm-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .dm-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .dm-head { background: rgba(20,16,28,0.97); }
+    .dm-round-label { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--gold); white-space: nowrap; }
+    .dm-head-actions { display: flex; gap: 6px; }
+    .dm-scores { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+    .dm-sc-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--cream); border-radius: 20px; padding: 3px 9px 3px 4px; font-size: 0.8rem; font-weight: 700; }
+    .dm-sc-av { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; }
+
+    .dm-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.25rem; color: var(--terracotta); min-height: 28px; padding: 8px 12px 2px; }
+    .dm-pathwrap { padding: 4px 10px; }
+    .dm-path { display: flex; gap: 6px; overflow-x: auto; padding: 6px 2px; scrollbar-width: thin; }
+    .dm-card { flex: 0 0 auto; width: 46px; height: 62px; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 2px 8px rgba(0,0,0,0.16); border: 2px solid rgba(0,0,0,0.06); }
+    .dm-card.t { background: linear-gradient(135deg, #7fd0c8, #2fa8a0); color: #05312e; }
+    .dm-card.r { background: linear-gradient(135deg, #e6c15a, #c99a2e); color: #3a2a05; }
+    .dm-card.h { background: linear-gradient(135deg, #e79a92, #cf5347); color: #fff; }
+    .dm-card .big { font-size: 1.3rem; line-height: 1; }
+    .dm-card .lbl { font-size: 0.56rem; font-weight: 700; opacity: 0.85; margin-top: 2px; }
+
+    .dm-info { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 6px 10px; }
+    .dm-pot { background: var(--white); border-radius: 14px; padding: 6px 14px; box-shadow: var(--shadow); font-weight: 800; color: var(--terracotta); }
+    .dm-haz { display: flex; gap: 4px; align-items: center; background: var(--white); border-radius: 14px; padding: 6px 12px; box-shadow: var(--shadow); }
+    .dm-haz span { font-size: 0.95rem; position: relative; }
+    .dm-haz span.seen { filter: none; }
+    .dm-haz span.unseen { opacity: 0.28; }
+    .dm-haz .c { font-size: 0.62rem; font-weight: 800; color: var(--terracotta); }
+
+    .dm-explorers { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px; }
+    .dm-exp { display: flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 4px 12px 4px 5px; box-shadow: var(--shadow); font-size: 0.82rem; font-weight: 700; border: 2px solid transparent; }
+    .dm-exp.out { opacity: 0.55; }
+    .dm-exp.decided { border-color: var(--sage); }
+    .dm-exp-av { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
+    .dm-exp .gem { color: var(--gold); font-weight: 800; }
+    .dm-exp .st { font-size: 0.72rem; color: var(--ink-light); }
+
+    .dm-mypanel { max-width: 420px; margin: 10px auto; padding: 0 14px calc(18px + env(safe-area-inset-bottom)); text-align: center; }
+    .dm-onhand { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--ink-light); margin-bottom: 8px; }
+    .dm-onhand b { color: var(--gold); }
+    .dm-choices { display: flex; gap: 10px; }
+    .dm-choice { flex: 1; border: none; border-radius: 16px; padding: 0.9rem 0.6rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: var(--shadow); line-height: 1.2; }
+    .dm-choice small { display: block; font-weight: 600; font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+    .dm-choice.leave { background: linear-gradient(135deg, #7fd0c8, #2fa8a0); color: #05312e; }
+    .dm-choice.stay { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .dm-choice:disabled { opacity: 0.5; cursor: default; }
+    .dm-wait { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); padding: 14px; }
+
+    .dm-overlay, .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .dm-overlay.active, .modal.active { display: flex; }
+    .dm-overlay-card, .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .dm-ov-emoji { font-size: 2.6rem; } .dm-ov-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.4rem; margin: 6px 0; }
+    .dm-ov-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 12px; }
+    .dm-ov-score { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 16px; }
+    .dm-ov-msg { font-family: 'Caveat', cursive; color: var(--ink-light); min-height: 20px; margin-top: 8px; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+
+    .res-rank { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 8px; margin: 8px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--cream); border-radius: 14px; padding: 9px 12px; }
+    .res-rank-pos { font-weight: 800; width: 26px; } .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="dm-head">
+        <span class="dm-round-label" id="dm-round-label">Expédition 1/5</span>
+        <div class="dm-scores" id="dm-scores"></div>
+        <div class="dm-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="dm-banner" id="dm-banner"></div>
+      <div class="dm-pathwrap"><div class="dm-path" id="dm-path"></div></div>
+      <div class="dm-info" id="dm-info"></div>
+      <div class="dm-explorers" id="dm-explorers"></div>
+      <div class="dm-mypanel" id="dm-mypanel"></div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">💎</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ ROUND-END OVERLAY ══ -->
+  <div class="dm-overlay" id="dm-overlay">
+    <div class="dm-overlay-card">
+      <div class="dm-ov-emoji" id="dm-ov-emoji">⛏️</div>
+      <div class="dm-ov-title" id="dm-ov-title">—</div>
+      <div class="dm-ov-sub" id="dm-ov-sub"></div>
+      <div class="dm-ov-score" id="dm-ov-score"></div>
+      <button class="btn-primary" id="dm-next-btn" onclick="setNextReady()">Expédition suivante →</button>
+      <div class="dm-ov-msg" id="dm-ov-msg"></div>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">💎 Diamants</div>
+      <div class="modal-body">
+        <p>5 <b>expéditions</b> dans la mine. À chaque carte retournée, vous décidez <b>tous en même temps</b> : <b>continuer</b> ⛏️ ou <b>sortir</b> 🏕️.</p>
+        <p style="margin-top:8px">• <b>Trésor</b> : sa valeur est partagée entre les explorateurs encore présents (le reste tombe au sol).</p>
+        <p style="margin-top:6px">• <b>Danger</b> 🐍🕷️🪨🔥☠️ : au <b>2ᵉ danger du même type</b>, l'expédition s'effondre — ceux encore dedans perdent tout le butin de la manche.</p>
+        <p style="margin-top:6px">• En <b>sortant</b>, tu ramasses les diamants restés au sol (partagés entre les sortants) et tu mets ton butin <b>en sécurité</b>. Une <b>relique</b> 🏺 ne va qu'à un explorateur qui sort <b>seul</b>.</p>
+        <p style="margin-top:6px">• Après 5 expéditions, le plus riche gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+
+    /* ━━ Constantes ━━ */
+    var ROUNDS = 5;
+    var TREASURES = [1, 2, 3, 4, 5, 5, 7, 7, 9, 11, 11, 13, 14, 15, 17];
+    var HAZARDS = [
+      { k: 'snake', e: '🐍', n: 'Serpent' }, { k: 'spider', e: '🕷️', n: 'Araignée' },
+      { k: 'rock', e: '🪨', n: 'Éboulement' }, { k: 'fire', e: '🔥', n: 'Flammes' }, { k: 'gas', e: '☠️', n: 'Gaz toxique' }
+    ];
+    function HAZ(k) { for (var i = 0; i < HAZARDS.length; i++) if (HAZARDS[i].k === k) return HAZARDS[i]; return { e: '❓', n: '?' }; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    var prevStatus = null, prevPhase = null;
+    GameRoom({
+      gameKey: 'diamants', name: 'Diamants', emoji: '💎', tagline: 'Stop ou encore dans la mine',
+      minPlayers: 2, maxPlayers: 8,
+      rules: [
+        '5 expéditions : à chaque carte, continuer ⛏️ ou sortir 🏕️ (tous en même temps)',
+        'Trésor partagé entre les présents · le 2ᵉ danger d\'un même type fait tout perdre',
+        'En sortant, tu ramasses le sol et sécurises ton butin',
+        'Le plus riche après 5 expéditions gagne'
+      ],
+      offline: { solo: true },
+      bot: diamBot,
+      offlineTurn: offlineTurn,
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    /* ━━ Qui doit « agir » (moteur hors-ligne / pilote d'ordis en ligne) ━━ */
+    function offlineTurn(r) {
+      if (!r || r.status !== 'playing') return null;
+      var order = r.order || [];
+      if (r.phase === 'roundEnd') {
+        for (var i = 0; i < order.length; i++) { var p = order[i]; if (r.players[p] && r.players[p].isBot && !r.players[p].nextReady) return p; }
+        return null;
+      }
+      if (r.phase === 'decide') {
+        for (var j = 0; j < order.length; j++) {
+          var q = order[j];
+          if (r.inCave && r.inCave[q] && r.players[q] && r.players[q].isBot && !(r.decisions && q in r.decisions)) return q;
+        }
+      }
+      return null;
+    }
+
+    /* ━━ Helpers d'état ━━ */
+    function pidsIn(cur) { var o = cur.order || []; return o.filter(function (p) { return cur.inCave && cur.inCave[p]; }); }
+    function nIn(cur) { return pidsIn(cur).length; }
+    function sum(arr) { return arr.reduce(function (a, b) { return a + b; }, 0); }
+
+    /* ━━ Construction du paquet d'une expédition ━━ */
+    function buildDeck(round) {
+      var deck = TREASURES.map(function (v) { return { t: 'T', v: v }; });
+      HAZARDS.forEach(function (h) { for (var i = 0; i < 3; i++) deck.push({ t: 'H', h: h.k }); });
+      deck.push({ t: 'R', v: round <= 3 ? 5 : 10 }); // une relique par expédition (5 puis 10)
+      return shuffle(deck);
+    }
+
+    /* ━━ Déroulé d'une expédition (tout en transaction) ━━ */
+    function startRound(cur) {
+      cur.deck = buildDeck(cur.round || 1);
+      cur.path = []; cur.pot = 0; cur.relics = []; cur.hazSeen = {};
+      cur.inCave = {}; cur.roundGems = {};
+      (cur.order || []).forEach(function (p) { cur.inCave[p] = true; cur.roundGems[p] = 0; if (cur.players[p]) cur.players[p].nextReady = false; });
+      cur.decisions = {};
+      revealNext(cur); // retourne la 1ʳᵉ carte puis passe en phase « decide »
+    }
+
+    function revealNext(cur) {
+      if (!cur.deck || !cur.deck.length) { safeExit(cur); return; }
+      var card = cur.deck.shift();
+      cur.path = (cur.path || []).concat([card]);
+      if (card.t === 'T') {
+        var n = nIn(cur), share = n ? Math.floor(card.v / n) : 0, rem = n ? (card.v % n) : card.v;
+        if (n) pidsIn(cur).forEach(function (p) { cur.roundGems[p] += share; });
+        cur.pot += rem;
+        cur.banner = '💎 Trésor ' + card.v + ' : +' + share + ' chacun' + (rem ? ' · ' + rem + ' au sol' : '');
+        askDecision(cur);
+      } else if (card.t === 'R') {
+        cur.relics = (cur.relics || []).concat([card.v]);
+        cur.banner = '🏺 Relique (' + card.v + ') — pour qui sort SEUL';
+        askDecision(cur);
+      } else {
+        cur.hazSeen[card.h] = (cur.hazSeen[card.h] || 0) + 1;
+        var info = HAZ(card.h);
+        if (cur.hazSeen[card.h] >= 2) {
+          cur.banner = info.e + info.e + ' ' + info.n + ' ! Effondrement — butin perdu.';
+          pidsIn(cur).forEach(function (p) { cur.roundGems[p] = 0; });
+          cur.pot = 0; cur.relics = []; cur.inCave = {};
+          cur.lastDisaster = card.h;
+          endRoundOrGame(cur, true);
+        } else {
+          cur.banner = info.e + ' ' + info.n + ' — prudence…';
+          askDecision(cur);
+        }
+      }
+    }
+
+    function askDecision(cur) {
+      if (nIn(cur) === 0) { endRoundOrGame(cur, false); return; }
+      cur.phase = 'decide'; cur.decisions = {};
+    }
+
+    function resolveDecisions(cur) {
+      var inCave = pidsIn(cur);
+      if (!inCave.every(function (p) { return cur.decisions && (p in cur.decisions); })) return; // pas tous décidés
+      var leavers = inCave.filter(function (p) { return cur.decisions[p] === 'leave'; });
+      var stayers = inCave.filter(function (p) { return cur.decisions[p] === 'stay'; });
+      if (leavers.length) {
+        var n = leavers.length, share = Math.floor((cur.pot || 0) / n);
+        leavers.forEach(function (p) { cur.roundGems[p] += share; });
+        cur.pot = (cur.pot || 0) % n; // le reste indivisible demeure au sol
+        if (n === 1 && cur.relics && cur.relics.length) { cur.roundGems[leavers[0]] += sum(cur.relics); cur.relics = []; }
+        leavers.forEach(function (p) { cur.banked[p] = (cur.banked[p] || 0) + cur.roundGems[p]; cur.roundGems[p] = 0; delete cur.inCave[p]; });
+        cur.banner = leavers.length === 1
+          ? (Room.name(leavers[0]) + ' sort avec son butin 🏕️')
+          : (leavers.length + ' explorateurs sortent 🏕️');
+      }
+      cur.decisions = {};
+      if (!stayers.length) { endRoundOrGame(cur, false); return; }
+      if (!cur.deck || !cur.deck.length) { safeExit(cur); return; }
+      revealNext(cur);
+    }
+
+    // Sortie « propre » (paquet épuisé) : les présents sécurisent leur butin.
+    function safeExit(cur) {
+      pidsIn(cur).forEach(function (p) { cur.banked[p] = (cur.banked[p] || 0) + cur.roundGems[p]; cur.roundGems[p] = 0; });
+      cur.inCave = {};
+      endRoundOrGame(cur, false);
+    }
+
+    function endRoundOrGame(cur, disaster) {
+      if ((cur.round || 1) >= ROUNDS) {
+        cur.status = 'ended';
+        var order = cur.order || [], best = order[0];
+        order.forEach(function (p) { if ((cur.banked[p] || 0) > (cur.banked[best] || 0)) best = p; });
+        cur.winner = best;
+        return;
+      }
+      cur.phase = 'roundEnd';
+      cur.roundEndDisaster = !!disaster;
+      (cur.order || []).forEach(function (p) { if (cur.players[p]) cur.players[p].nextReady = false; });
+    }
+
+    /* ━━ Actions joueur ━━ */
+    function decide(choice) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'decide') return cur;
+        var me = window.myPid;
+        if (!cur.inCave || !cur.inCave[me]) return cur;
+        if (cur.decisions && (me in cur.decisions)) return cur;
+        cur.decisions = cur.decisions || {}; cur.decisions[me] = choice;
+        resolveDecisions(cur);
+        return cur;
+      });
+    }
+    function setNextReady() { rref().child('players/' + window.myPid + '/nextReady').set(true); }
+
+    function maybeAdvance(state) {
+      var order = state.order || [];
+      var online = order.filter(function (p) { return state.players[p] && state.players[p].online; });
+      if (!online.length || !online.every(function (p) { return state.players[p].nextReady; })) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'roundEnd') return cur;
+        var on = (cur.order || []).filter(function (p) { return cur.players[p] && cur.players[p].online; });
+        if (!on.length || !on.every(function (p) { return cur.players[p].nextReady; })) return cur;
+        cur.round = (cur.round || 1) + 1;
+        startRound(cur);
+        return cur;
+      });
+    }
+
+    /* ━━ IA : heuristique de risque (stop-ou-encore) ━━ */
+    function diamBot(state, pid) {
+      if (state.status !== 'playing') return;
+      if (state.phase === 'roundEnd') { if (!((state.players[pid] || {}).nextReady)) setNextReady(); return; }
+      if (state.phase !== 'decide') return;
+      if (!state.inCave || !state.inCave[pid]) return;
+      if (state.decisions && (pid in state.decisions)) return;
+      decide(botDecision(state, pid));
+    }
+    function botDecision(state, pid) {
+      var gems = (state.roundGems || {})[pid] || 0;
+      if (gems <= 0) return 'stay'; // rien à perdre → on avance
+      // Nombre de types de danger déjà vus UNE fois : chacun menace un effondrement.
+      var hs = state.hazSeen || {}, seenOnce = 0;
+      for (var k in hs) if (hs[k] === 1) seenOnce++;
+      var deckLeft = (state.deck || []).length || 1;
+      // ~2 cartes dangereuses restantes par type déjà vu une fois.
+      var pDisaster = Math.min(0.85, (seenOnce * 2) / deckLeft);
+      var n = Math.max(1, nIn(state));
+      var potShare = (state.pot || 0) / n;
+      // Espérance : rester = un peu de butin ; perte = pDisaster × gems.
+      var greed = window.Bots ? window.Bots.pick(state, { easy: 1.7, normal: 1.1, hard: 0.85 }) : 1.1;
+      var leave = (pDisaster * gems) > greed * (potShare + 2.5);
+      if (window.Bots && window.Bots.shouldBlunder(state)) leave = Math.random() < 0.5; // niveau facile : parfois au pif
+      return leave ? 'leave' : 'stay';
+    }
+
+    /* ━━ onStart / onState ━━ */
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      cur.banked = {}; order.forEach(function (p) { cur.banked[p] = 0; cur.players[p].nextReady = false; });
+      cur.round = 1; cur.winner = null;
+      startRound(cur);
+      return { winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { showScreen('s-playing'); document.getElementById('dm-overlay').classList.remove('active'); }
+        render(state);
+        if (state.phase === 'roundEnd') { showRoundEnd(state); maybeAdvance(state); }
+        else document.getElementById('dm-overlay').classList.remove('active');
+      } else if (status === 'ended') {
+        document.getElementById('dm-overlay').classList.remove('active');
+        showResults(state);
+      }
+      prevStatus = status; prevPhase = state.phase;
+    }
+
+    /* ━━ Rendu ━━ */
+    function cardHTML(card) {
+      if (card.t === 'T') return '<div class="dm-card t"><span class="big">' + card.v + '</span><span class="lbl">💎</span></div>';
+      if (card.t === 'R') return '<div class="dm-card r"><span class="big">🏺</span><span class="lbl">' + card.v + '</span></div>';
+      var h = HAZ(card.h); return '<div class="dm-card h"><span class="big">' + h.e + '</span></div>';
+    }
+    function render(state) {
+      var order = state.order || [], me = window.myPid, banked = state.banked || {};
+      setText('dm-round-label', 'Expédition ' + (state.round || 1) + '/' + ROUNDS);
+      setHTML('dm-scores', order.map(function (pid) {
+        return '<span class="dm-sc-chip"><span class="dm-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + (banked[pid] || 0) + '</span>';
+      }).join(''));
+      setText('dm-banner', state.banner || '');
+
+      var path = state.path || [];
+      setHTML('dm-path', path.map(cardHTML).join('') || '<span class="dm-wait">La mine vous attend…</span>');
+      var scroll = document.getElementById('dm-path'); if (scroll) scroll.scrollLeft = scroll.scrollWidth;
+
+      var hazHTML = HAZARDS.map(function (h) {
+        var c = (state.hazSeen || {})[h.k] || 0;
+        return '<span class="' + (c ? 'seen' : 'unseen') + '">' + h.e + (c ? '<span class="c">×' + c + '</span>' : '') + '</span>';
+      }).join('');
+      setHTML('dm-info', '<div class="dm-pot">💎 au sol : ' + (state.pot || 0) + (state.relics && state.relics.length ? ' · 🏺×' + state.relics.length : '') + '</div>' +
+        '<div class="dm-haz">' + hazHTML + '</div>');
+
+      setHTML('dm-explorers', order.map(function (pid) {
+        var inCave = state.inCave && state.inCave[pid];
+        var decided = state.decisions && (pid in state.decisions);
+        var gems = (state.roundGems || {})[pid] || 0;
+        var st = inCave ? (decided ? 'décidé' : '⛏️ dans la mine') : '🏕️ sorti·e';
+        return '<div class="dm-exp' + (inCave ? '' : ' out') + (inCave && decided ? ' decided' : '') + '">' +
+          '<span class="dm-exp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') +
+          (inCave ? ' <span class="gem">' + gems + '💎</span>' : '') + ' <span class="st">' + st + '</span></div>';
+      }).join(''));
+
+      // Panneau perso
+      var host = document.getElementById('dm-mypanel');
+      var iIn = state.inCave && state.inCave[me];
+      var iDecided = state.decisions && (me in state.decisions);
+      var myGems = (state.roundGems || {})[me] || 0;
+      if (state.phase !== 'decide') { host.innerHTML = ''; return; }
+      if (!iIn) { host.innerHTML = '<div class="dm-wait">🏕️ Tu es sorti·e — butin en sécurité. On regarde les autres…</div>'; return; }
+      if (iDecided) { host.innerHTML = '<div class="dm-wait">Choix enregistré — en attente des autres explorateurs…</div>'; return; }
+      var n = Math.max(1, nIn(state));
+      var potShare = Math.floor((state.pot || 0) / n);
+      host.innerHTML = '<div class="dm-onhand">Dans ta besace : <b>' + myGems + ' 💎</b></div>' +
+        '<div class="dm-choices">' +
+          '<button class="dm-choice leave" onclick="decide(\'leave\')">🏕️ Sortir<small>sécurise ' + myGems + '💎 + le sol partagé</small></button>' +
+          '<button class="dm-choice stay" onclick="decide(\'stay\')">⛏️ Continuer<small>plus de trésors… mais du danger</small></button>' +
+        '</div>';
+    }
+
+    function showRoundEnd(state) {
+      var ov = document.getElementById('dm-overlay');
+      var disaster = state.roundEndDisaster;
+      setText('dm-ov-emoji', disaster ? '💥' : '⛏️');
+      setText('dm-ov-title', 'Expédition ' + (state.round || 1) + '/' + ROUNDS + (disaster ? ' — effondrement !' : ' terminée'));
+      setText('dm-ov-sub', disaster ? 'Les explorateurs encore dans la mine repartent les mains vides.' : 'Butin sécurisé. En route pour la suivante.');
+      var order = state.order || [], banked = state.banked || {};
+      setHTML('dm-ov-score', order.slice().sort(function (a, b) { return (banked[b] || 0) - (banked[a] || 0); }).map(function (pid) {
+        return '<span class="dm-sc-chip"><span class="dm-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' ' + (banked[pid] || 0) + '</span>';
+      }).join(''));
+      var meReady = state.players && state.players[window.myPid] && state.players[window.myPid].nextReady;
+      var btn = document.getElementById('dm-next-btn'); btn.disabled = !!meReady; btn.textContent = meReady ? 'En attente…' : 'Expédition suivante →';
+      var online = order.filter(function (p) { return state.players[p] && state.players[p].online; });
+      var ready = online.filter(function (p) { return state.players[p].nextReady; });
+      setText('dm-ov-msg', meReady ? ('En attente des autres… (' + ready.length + '/' + online.length + ')') : '');
+      ov.classList.add('active');
+    }
+
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice(), banked = state.banked || {};
+      order.sort(function (a, b) { return (banked[b] || 0) - (banked[a] || 0); });
+      var top = banked[order[0]] || 0;
+      var winners = order.filter(function (p) { return (banked[p] || 0) === top; });
+      var iWon = winners.indexOf(window.myPid) >= 0;
+      setText('res-emoji', winners.length > 1 ? '🤝' : (iWon ? '🏆' : '💎'));
+      setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu es le plus riche ! 🏆' : Room.name(order[0]) + ' gagne !'));
+      var medals = ['🥇', '🥈', '🥉'];
+      setHTML('res-rank', order.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-score">' + (banked[pid] || 0) + ' 💎</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { document.getElementById('dm-overlay').classList.remove('active'); Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); document.getElementById('dm-overlay').classList.remove('active'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

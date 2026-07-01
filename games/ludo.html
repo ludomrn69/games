@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Petits chevaux 🐴" data-emoji="🐴"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    :root { --lu-R: #e05a4e; --lu-B: #3e7cb1; --lu-G: #34a853; --lu-Y: #e6b800; }
+
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .lu-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .lu-head { background: rgba(20,16,28,0.97); }
+    .lu-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .lu-head-actions { display: flex; gap: 6px; }
+
+    .lu-legend { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 10px 12px 4px; }
+    .lu-chip { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 600; border: 2px solid transparent; }
+    .lu-chip.turn { border-color: var(--terracotta); }
+    .lu-chip-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.74rem; }
+    .lu-chip .sw { width: 12px; height: 12px; border-radius: 3px; }
+    .lu-chip .home { font-size: 0.72rem; color: var(--ink-light); }
+
+    .lu-board-wrap { display: flex; justify-content: center; padding: 6px 8px; }
+    .lu-board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(15, minmax(0, 1fr)); width: min(96vw, 460px); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
+    .lu-cell { aspect-ratio: 1; border: 0.5px solid rgba(120,110,100,0.12); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1px; position: relative; }
+    .lu-cell.blank { border-color: transparent; }
+    .lu-cell.track { background: #fbf6ec; }
+    html[data-theme="dark"] .lu-cell.track { background: #2a2336; }
+    .lu-cell.yR { background: rgba(224,90,78,0.16); } .lu-cell.yB { background: rgba(62,124,177,0.16); }
+    .lu-cell.yG { background: rgba(52,168,83,0.16); } .lu-cell.yY { background: rgba(230,184,0,0.18); }
+    .lu-cell.slot { box-shadow: inset 0 0 0 2px rgba(120,110,100,0.35); border-radius: 50%; }
+    .lu-cell.hR, .lu-cell.sR { background: var(--lu-R); } .lu-cell.hB, .lu-cell.sB { background: var(--lu-B); }
+    .lu-cell.hG, .lu-cell.sG { background: var(--lu-G); } .lu-cell.hY, .lu-cell.sY { background: var(--lu-Y); }
+    .lu-cell.hR, .lu-cell.hB, .lu-cell.hG, .lu-cell.hY { opacity: 0.78; }
+    .lu-cell.center { background: linear-gradient(135deg, var(--gold-light), var(--gold)); }
+    .lu-cell.center-mark { font-size: clamp(0.7rem, 3vw, 1.1rem); }
+
+    .lu-token { width: 70%; height: 70%; min-width: 10px; min-height: 10px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.9);
+      background-image: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.55), rgba(255,255,255,0) 55%);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset -1px -2px 4px rgba(0,0,0,0.25);
+      display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.96);
+      font-size: clamp(7px, 2.4vw, 14px); line-height: 1; text-shadow: 0 1px 1px rgba(0,0,0,0.4); }
+    .lu-token.movable { cursor: pointer; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--terracotta); animation: luPulse 0.9s infinite; }
+    @keyframes luPulse { 50% { transform: scale(1.12); } }
+    .lu-token.done { opacity: 0.85; }
+
+    .lu-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
+    .lu-controls { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 14px calc(16px + env(safe-area-inset-bottom)); }
+    .lu-turn-txt { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.95rem; }
+    .lu-dice { display: flex; align-items: center; gap: 12px; }
+    .lu-die { width: 56px; height: 56px; border-radius: 14px; background: var(--white); border: 2px solid var(--gold-light); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; color: var(--ink); }
+    .lu-die.rolling { animation: dieShake 0.5s ease; }
+    @keyframes dieShake { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-12deg) scale(1.05); } 75% { transform: rotate(12deg) scale(1.05); } }
+    .lu-roll-btn { border: none; border-radius: 30px; padding: 0.7rem 1.6rem; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 1rem; cursor: pointer; box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
+    .lu-roll-btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+    .lu-skip-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.5rem 1.1rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 26px; }
+    .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-score { font-weight: 800; color: var(--gold); }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="lu-head">
+        <span class="lu-title-mini">Petits chevaux</span>
+        <div class="lu-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="lu-legend" id="lu-legend"></div>
+      <div class="lu-board-wrap"><div class="lu-board" id="lu-board"></div></div>
+      <div class="lu-banner" id="lu-banner"></div>
+      <div class="lu-controls">
+        <div class="lu-turn-txt" id="lu-turn-txt"></div>
+        <div class="lu-dice">
+          <div class="lu-die" id="lu-die">🎲</div>
+          <button class="lu-roll-btn" id="lu-roll-btn" onclick="rollDice()">Lancer le dé</button>
+          <button class="lu-skip-btn" id="lu-skip-btn" style="display:none" onclick="forceAbsent()">Sauter l'absent</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Petits chevaux</div>
+      <div class="modal-body">
+        <p>Chacun a <b>4 chevaux</b> dans son écurie. Lance le dé : il faut un <b>6</b> pour sortir un cheval sur la piste.</p>
+        <p style="margin-top:8px">Avance tes chevaux dans le sens des aiguilles d'une montre. Tomber sur un cheval adverse le <b>renvoie à l'écurie</b> (sauf sur les cases de départ colorées, qui sont sûres).</p>
+        <p style="margin-top:8px">Un <b>6</b> te fait <b>rejouer</b>. Ramène tes 4 chevaux au centre par ta ligne colorée. Le premier à rentrer ses 4 chevaux gagne !</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Géométrie du plateau (grille 15×15) ━━ */
+    var LOOP = [
+      [6,1],[6,2],[6,3],[6,4],[6,5],
+      [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
+      [0,7],
+      [0,8],[1,8],[2,8],[3,8],[4,8],[5,8],
+      [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],
+      [7,14],
+      [8,14],[8,13],[8,12],[8,11],[8,10],[8,9],
+      [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],
+      [14,7],
+      [14,6],[13,6],[12,6],[11,6],[10,6],[9,6],
+      [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],
+      [7,0],
+      [6,0]
+    ]; // 52 cases
+    var SAFE = { 0: 1, 13: 1, 26: 1, 39: 1 }; // cases de départ = sûres
+    var COLOR_INFO = {
+      R: { start: 0,  home: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]], yard: [[1,1],[1,4],[4,1],[4,4]],     hex: 'var(--lu-R)', name: 'Rouge' },
+      B: { start: 13, home: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]], yard: [[1,10],[1,13],[4,10],[4,13]], hex: 'var(--lu-B)', name: 'Bleu' },
+      G: { start: 26, home: [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]], yard: [[10,10],[10,13],[13,10],[13,13]], hex: 'var(--lu-G)', name: 'Vert' },
+      Y: { start: 39, home: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]], yard: [[10,1],[10,4],[13,1],[13,4]], hex: 'var(--lu-Y)', name: 'Jaune' }
+    };
+    var COLORS_BY_N = { 2: ['R', 'G'], 3: ['R', 'B', 'G'], 4: ['R', 'B', 'G', 'Y'] };
+    var GOAL = 56; // 0..50 piste, 51..56 ligne maison (56 = arrivée)
+
+    /* ━━ State ━━ */
+    var prevStatus = null, boardBuilt = false, lastDieShown = null;
+    function rref() { return window.roomRef; }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+    function myColor(state) { return (state.colorOf || {})[window.myPid] || null; }
+    function pidOfColor(state, color) { var co = state.colorOf || {}; for (var k in co) if (co[k] === color) return k; return null; }
+    function nextPid(cur, fromPid) { var o = cur.order || []; var i = o.indexOf(fromPid); return o[(i + 1) % o.length]; }
+    function homeCount(state, color) { var t = (state.tokens && state.tokens[color]) || []; return t.filter(function (p) { return p === GOAL; }).length; }
+
+    // y a-t-il un coup légal pour `color` avec le dé `d` ?
+    function hasLegal(cur, color, d) {
+      var arr = (cur.tokens && cur.tokens[color]) || [];
+      for (var t = 0; t < arr.length; t++) { var p = arr[t]; if (p === -1) { if (d === 6) return true; } else if (p >= 0 && p < GOAL && p + d <= GOAL) return true; }
+      return false;
+    }
+    // cible légale d'un pion donné (ou null)
+    function targetOf(p, d) {
+      if (p === -1) return d === 6 ? 0 : null;
+      if (p >= 0 && p < GOAL && p + d <= GOAL) return p + d;
+      return null;
+    }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'ludo',
+      name: 'Petits chevaux',
+      emoji: '🐴',
+      tagline: 'Sors tes chevaux et fonce',
+      minPlayers: 2,
+      maxPlayers: 4,
+      rules: [
+        'Il faut un 6 pour sortir un cheval de l\'écurie',
+        'Avance tes 4 chevaux dans le sens horaire',
+        'Tomber sur un adversaire le renvoie à l\'écurie (cases colorées = sûres)',
+        'Un 6 fait rejouer · ramène tes 4 chevaux au centre pour gagner'
+      ],
+      offline: { solo: true, local: true },
+      bot: ludoBot,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* ━━ IA (mode solo hors-ligne) ━━ */
+    function ludoScoreMove(state, color, fromP, target) {
+      var sc = target; // base : avancement
+      if (target <= 50) {
+        var li = (COLOR_INFO[color].start + target) % 52;
+        if (!SAFE[li]) {
+          var cap = false;
+          Object.keys(state.tokens).forEach(function (oc) {
+            if (oc === color) return;
+            (state.tokens[oc] || []).forEach(function (op) { if (op >= 0 && op <= 50 && (COLOR_INFO[oc].start + op) % 52 === li) cap = true; });
+          });
+          if (cap) sc += 1000; // manger un adversaire : prioritaire
+        }
+      }
+      if (target === GOAL) sc += 800;        // rentrer un pion au centre
+      else if (target > 50) sc += 300;       // progresser dans la ligne maison
+      if (fromP === -1) sc += 250;           // sortir un pion de l'écurie
+      return sc;
+    }
+    function ludoBot(state, pid) {
+      var color = state.colorOf[pid];
+      if (state.die == null) { rollDice(); return; }
+      var legal = legalMap(state, color, state.die);
+      var keys = Object.keys(legal);
+      if (!keys.length) return; // rollDice() aura déjà passé le tour
+      // Facile : déplace un pion au hasard parmi les coups légaux.
+      if (window.Bots && window.Bots.shouldBlunder(state)) { moveToken(color, +keys[Math.floor(Math.random() * keys.length)]); return; }
+      var best = keys[0], bestSc = -1e9;
+      keys.forEach(function (tk) {
+        var t = +tk, sc = ludoScoreMove(state, color, state.tokens[color][t], legal[tk]);
+        if (sc > bestSc) { bestSc = sc; best = tk; }
+      });
+      moveToken(color, +best);
+    }
+
+    function onStart(players) {
+      var order = players.map(function (p) { return p.pid; });
+      var colors = COLORS_BY_N[order.length] || COLORS_BY_N[4];
+      var colorOf = {}, tokens = {}, playColors = [];
+      order.forEach(function (pid, i) { var c = colors[i]; colorOf[pid] = c; tokens[c] = [-1, -1, -1, -1]; playColors.push(c); });
+      var starter = order[Math.floor(Math.random() * order.length)];
+      return { turn: starter, die: null, tokens: tokens, colorOf: colorOf, playColors: playColors, winner: null, lastRoll: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { showScreen('s-playing'); buildBoard(); lastDieShown = null; }
+        render(state);
+      } else if (status === 'ended') {
+        showResults(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Construction du plateau (une fois) ━━ */
+    function buildBoard() {
+      var board = document.getElementById('lu-board');
+      if (boardBuilt && board.children.length === 225) return;
+      var loopIdx = {}; LOOP.forEach(function (c, i) { loopIdx[c[0] + '-' + c[1]] = i; });
+      var homeAt = {}, slotAt = {};
+      Object.keys(COLOR_INFO).forEach(function (col) {
+        COLOR_INFO[col].home.forEach(function (c) { homeAt[c[0] + '-' + c[1]] = col; });
+        COLOR_INFO[col].yard.forEach(function (c) { slotAt[c[0] + '-' + c[1]] = col; });
+      });
+      function yardColor(r, c) {
+        if (r <= 5 && c <= 5) return 'R'; if (r <= 5 && c >= 9) return 'B';
+        if (r >= 9 && c >= 9) return 'G'; if (r >= 9 && c <= 5) return 'Y'; return null;
+      }
+      var html = '';
+      for (var r = 0; r < 15; r++) for (var c = 0; c < 15; c++) {
+        var key = r + '-' + c, cls = 'lu-cell', mark = '';
+        if (homeAt[key]) cls += ' h' + homeAt[key];
+        else if (loopIdx[key] != null) { cls += ' track'; if (SAFE[loopIdx[key]] != null) cls += ' s' + colorOfStart(loopIdx[key]); }
+        else if (r >= 6 && r <= 8 && c >= 6 && c <= 8) { if (r === 7 && c === 7) { cls += ' center center-mark'; mark = '🏁'; } else cls += ' center'; }
+        else { var yc = yardColor(r, c); if (yc) { cls += ' y' + yc; if (slotAt[key]) cls += ' slot'; } else cls += ' blank'; }
+        html += '<div class="' + cls + '" id="cell-' + r + '-' + c + '">' + mark + '</div>';
+      }
+      board.innerHTML = html;
+      board.addEventListener('click', onBoardClick);
+      boardBuilt = true;
+    }
+    function colorOfStart(idx) { return idx === 0 ? 'R' : idx === 13 ? 'B' : idx === 26 ? 'G' : 'Y'; }
+
+    /* ━━ Rendu ━━ */
+    function coordOf(color, p) {
+      if (p === -1) return null;
+      if (p <= 50) return LOOP[(COLOR_INFO[color].start + p) % 52];
+      return COLOR_INFO[color].home[p - 51];
+    }
+
+    function render(state) {
+      var colors = state.playColors || [];
+      var turn = state.turn, myCol = myColor(state), isMyTurn = turn === window.myPid;
+
+      // Légende
+      document.getElementById('lu-legend').innerHTML = (state.order || []).map(function (pid) {
+        var col = (state.colorOf || {})[pid];
+        return '<span class="lu-chip' + (turn === pid ? ' turn' : '') + '">' +
+          '<span class="sw" style="background:' + COLOR_INFO[col].hex + '"></span>' +
+          '<span class="lu-chip-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="home">🏠' + homeCount(state, col) + '/4</span></span>';
+      }).join('');
+
+      // Pions
+      document.querySelectorAll('.lu-token').forEach(function (el) { el.remove(); });
+      var legal = (isMyTurn && state.die != null && myCol) ? legalMap(state, myCol, state.die) : {};
+      colors.forEach(function (color) {
+        var arr = (state.tokens && state.tokens[color]) || [-1, -1, -1, -1];
+        arr.forEach(function (p, t) {
+          var coord = (p === -1) ? COLOR_INFO[color].yard[t] : coordOf(color, p);
+          if (!coord) return;
+          var cell = document.getElementById('cell-' + coord[0] + '-' + coord[1]);
+          if (!cell) return;
+          var movable = (color === myCol && legal[t] != null);
+          var el = document.createElement('div');
+          el.className = 'lu-token' + (movable ? ' movable' : '') + (p === GOAL ? ' done' : '');
+          el.style.backgroundColor = COLOR_INFO[color].hex;
+          el.textContent = '♞';
+          if (movable) { el.dataset.color = color; el.dataset.tok = String(t); }
+          cell.appendChild(el);
+        });
+      });
+
+      // Bandeau dernier lancer
+      var banner = document.getElementById('lu-banner');
+      if (state.lastRoll) {
+        var lr = state.lastRoll;
+        var who = lr.pid === window.myPid ? 'Tu fais' : (Room.name(lr.pid) + ' fait');
+        banner.textContent = '🎲 ' + who + ' ' + lr.die + (lr.moved === false ? ' — aucun coup possible' : '');
+      } else banner.textContent = '';
+
+      // Dé + contrôles
+      var dieEl = document.getElementById('lu-die');
+      if (state.die != null) {
+        if (lastDieShown !== state.die) { dieEl.classList.remove('rolling'); void dieEl.offsetWidth; dieEl.classList.add('rolling'); }
+        dieEl.textContent = state.die;
+      } else { dieEl.textContent = '🎲'; }
+      lastDieShown = state.die;
+
+      setText('lu-turn-txt', isMyTurn ? ('À toi ! (' + COLOR_INFO[myCol].name + ')') : ('Au tour de ' + Room.name(turn) + ' (' + COLOR_INFO[(state.colorOf || {})[turn]].name + ')'));
+      var rollBtn = document.getElementById('lu-roll-btn');
+      rollBtn.disabled = !(isMyTurn && state.die == null);
+      rollBtn.textContent = (isMyTurn && state.die != null) ? 'Choisis un pion ↑' : 'Lancer le dé';
+
+      // Bouton « sauter l'absent »
+      var skip = document.getElementById('lu-skip-btn');
+      var turnOffline = turn && state.players && state.players[turn] && !state.players[turn].online;
+      skip.style.display = (turnOffline && !isMyTurn) ? 'inline-block' : 'none';
+    }
+
+    function legalMap(state, color, d) {
+      var arr = (state.tokens && state.tokens[color]) || [];
+      var m = {};
+      arr.forEach(function (p, t) { var tg = targetOf(p, d); if (tg != null) m[t] = tg; });
+      return m;
+    }
+
+    /* ━━ Actions ━━ */
+    function rollDice() {
+      var st = window.room || {};
+      if (st.turn !== window.myPid || st.die != null) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.die != null) return cur;
+        var d = 1 + Math.floor(Math.random() * 6);
+        var color = cur.colorOf[window.myPid];
+        if (!hasLegal(cur, color, d)) {
+          cur.lastRoll = { pid: window.myPid, die: d, moved: false };
+          cur.die = null;
+          cur.turn = nextPid(cur, window.myPid); // 6 sans coup possible = on passe
+        } else {
+          cur.die = d;
+          cur.lastRoll = { pid: window.myPid, die: d, moved: null };
+        }
+        return cur;
+      });
+    }
+
+    function moveToken(color, t) {
+      var st = window.room || {};
+      if (st.turn !== window.myPid || st.die == null) return;
+      if (myColor(st) !== color) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.die == null) return cur;
+        if (cur.colorOf[window.myPid] !== color) return cur;
+        var d = cur.die, arr = (cur.tokens[color] || []).slice(), p = arr[t];
+        var target = targetOf(p, d);
+        if (target == null) return cur;
+        arr[t] = target; cur.tokens[color] = arr;
+        // capture sur la piste (hors cases sûres)
+        if (target <= 50) {
+          var li = (COLOR_INFO[color].start + target) % 52;
+          if (!SAFE[li]) {
+            Object.keys(cur.tokens).forEach(function (oc) {
+              if (oc === color) return;
+              var oa = (cur.tokens[oc] || []).slice(), changed = false;
+              for (var k = 0; k < oa.length; k++) {
+                var op = oa[k];
+                if (op >= 0 && op <= 50 && (COLOR_INFO[oc].start + op) % 52 === li) { oa[k] = -1; changed = true; }
+              }
+              if (changed) cur.tokens[oc] = oa;
+            });
+          }
+        }
+        cur.lastRoll = { pid: window.myPid, die: d, moved: true };
+        if (arr.every(function (x) { return x === GOAL; })) { cur.winner = window.myPid; cur.status = 'ended'; return cur; }
+        if (d === 6) { cur.die = null; } // rejoue
+        else { cur.die = null; cur.turn = nextPid(cur, window.myPid); }
+        return cur;
+      });
+    }
+
+    function forceAbsent() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        var t = cur.turn;
+        if (!t || !cur.players[t] || cur.players[t].online) return cur;
+        // on lance pour l'absent et on joue automatiquement (ou on passe), sans relancer sur un 6
+        var color = cur.colorOf[t];
+        var d = cur.die != null ? cur.die : (1 + Math.floor(Math.random() * 6));
+        var arr = (cur.tokens[color] || []).slice();
+        // choisir un pion jouable : priorité au plus avancé
+        var bestT = -1, bestTarget = -1;
+        arr.forEach(function (p, i) { var tg = targetOf(p, d); if (tg != null && tg > bestTarget) { bestTarget = tg; bestT = i; } });
+        if (bestT < 0) { cur.lastRoll = { pid: t, die: d, moved: false }; cur.die = null; cur.turn = nextPid(cur, t); return cur; }
+        arr[bestT] = bestTarget; cur.tokens[color] = arr;
+        if (bestTarget <= 50) {
+          var li = (COLOR_INFO[color].start + bestTarget) % 52;
+          if (!SAFE[li]) Object.keys(cur.tokens).forEach(function (oc) {
+            if (oc === color) return;
+            var oa = (cur.tokens[oc] || []).slice(), ch = false;
+            for (var k = 0; k < oa.length; k++) { var op = oa[k]; if (op >= 0 && op <= 50 && (COLOR_INFO[oc].start + op) % 52 === li) { oa[k] = -1; ch = true; } }
+            if (ch) cur.tokens[oc] = oa;
+          });
+        }
+        cur.lastRoll = { pid: t, die: d, moved: true };
+        if (arr.every(function (x) { return x === GOAL; })) { cur.winner = t; cur.status = 'ended'; return cur; }
+        cur.die = null; cur.turn = nextPid(cur, t); // pas de relance auto pour l'absent
+        return cur;
+      });
+    }
+
+    function onBoardClick(e) {
+      var tok = e.target.closest('.lu-token.movable');
+      if (tok && tok.dataset.color) moveToken(tok.dataset.color, +tok.dataset.tok);
+    }
+
+    /* ━━ Résultats ━━ */
+    function showResults(state) {
+      showScreen('s-results');
+      var ord = (state.order || []).slice();
+      ord.sort(function (a, b) { return homeCount(state, state.colorOf[b]) - homeCount(state, state.colorOf[a]); });
+      var win = state.winner;
+      setText('res-emoji', win === window.myPid ? '🏆' : '🐴');
+      setText('res-title', win === window.myPid ? 'Tu gagnes la course !' : Room.name(win) + ' gagne !');
+      var medals = ['🥇', '🥈', '🥉'];
+      document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
+        var col = state.colorOf[pid];
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-score">🏠 ' + homeCount(state, col) + '/4</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

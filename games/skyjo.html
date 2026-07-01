@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Skyjo 🎴" data-emoji="🎴"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-primary:disabled { opacity: 0.5; }
+
+    .sk-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .sk-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+    .sk-set-row { display: flex; gap: 8px; justify-content: center; }
+    .sk-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .sk-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+
+    #s-playing { min-height: calc(100vh - 52px); }
+    .sk-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .sk-header { background: rgba(20,16,28,0.97); }
+    .sk-round { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--gold); white-space: nowrap; }
+    .sk-head-actions { display: flex; gap: 6px; }
+
+    .sk-opps { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 10px 12px 4px; }
+    .sk-opp { background: var(--white); border-radius: 12px; padding: 7px 9px; box-shadow: var(--shadow); border: 2px solid transparent; }
+    .sk-opp.turn { border-color: var(--terracotta); }
+    .sk-opp-name { font-size: 0.72rem; font-weight: 700; text-align: center; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; justify-content: center; }
+    .sk-opp-av { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; }
+    .sk-mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+    .sk-mini-cell { width: 16px; height: 22px; border-radius: 3px; font-size: 0.6rem; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+    .sk-center { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 8px; }
+    .sk-pile-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .sk-pile-label { font-family: 'Caveat', cursive; font-size: 0.8rem; color: var(--ink-light); }
+    .sk-card { width: 46px; height: 64px; border-radius: 8px; font-weight: 900; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
+    .sk-card.back { background: linear-gradient(135deg, var(--ink), #4a3f37); color: #fff; cursor: pointer; }
+    .sk-card.candidate { box-shadow: 0 0 0 3px var(--terracotta); }
+    .v-neg { background: #5b8dd6; color: #fff; } .v-zero { background: #c9c2b8; color: #2C2520; }
+    .v-low { background: #6ab04c; color: #fff; } .v-mid { background: #f0c419; color: #2C2520; } .v-high { background: #e05a4e; color: #fff; }
+    .sk-empty { background: transparent; border: 2px dashed var(--gold-light); box-shadow: none; }
+
+    .sk-status { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 26px; padding: 0 14px; }
+    .sk-my-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 12px 12px; }
+    .sk-my-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .sk-cell { width: 56px; height: 76px; border-radius: 9px; font-weight: 900; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.14); cursor: default; transition: transform .12s; }
+    .sk-cell.tappable { cursor: pointer; }
+    .sk-cell.tappable:hover { transform: translateY(-3px); }
+    .sk-cell.back { background: linear-gradient(135deg, var(--ink), #4a3f37); color: #fff; }
+    @media (max-width: 380px) { .sk-cell { width: 48px; height: 66px; font-size: 1.2rem; } }
+    .sk-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
+    .sk-act-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.45rem 0.9rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+
+    .sk-overlay, .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .sk-overlay.active, .modal.active { display: flex; }
+    .sk-overlay-card, .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .sk-ov-emoji { font-size: 2.6rem; } .sk-ov-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.3rem; margin: 6px 0 14px; }
+    .sk-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .sk-row { display: flex; align-items: center; justify-content: space-between; background: var(--cream); border-radius: 10px; padding: 6px 12px; }
+    .sk-row .pts.doubled { color: var(--terracotta); font-weight: 800; }
+    .sk-ov-msg { font-family: 'Caveat', cursive; color: var(--ink-light); min-height: 22px; margin-top: 8px; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 8px; margin: 8px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 9px 12px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 26px; } .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/skyjo-ai.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="sk-header">
+        <span class="sk-round" id="sk-round">Manche 1</span>
+        <span id="sk-totals" style="font-size:0.8rem"></span>
+        <div class="sk-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="sk-opps" id="sk-opps"></div>
+      <div class="sk-center">
+        <div class="sk-pile-col">
+          <div class="sk-pile-label">Pioche (<span id="sk-pile-count">0</span>)</div>
+          <div class="sk-card back" id="sk-draw-pile" onclick="onDrawPileTap()">🂠</div>
+        </div>
+        <div class="sk-pile-col">
+          <div class="sk-pile-label">Défausse</div>
+          <div id="sk-discard-wrap"></div>
+        </div>
+      </div>
+      <div class="sk-status" id="sk-status"></div>
+      <div class="sk-my-wrap">
+        <div class="sk-my-grid" id="sk-my-grid"></div>
+        <div class="sk-actions" id="sk-actions"></div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="document.getElementById('sk-overlay').classList.remove('active');Lobby.peekBoard(function(){document.getElementById('sk-overlay').classList.add('active');})">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ ROUND-END OVERLAY ══ -->
+  <div class="sk-overlay" id="sk-overlay">
+    <div class="sk-overlay-card">
+      <div class="sk-ov-emoji" id="sk-ov-emoji">📒</div>
+      <div class="sk-ov-title" id="sk-ov-title">Manche terminée</div>
+      <div class="sk-rows" id="sk-ov-rows"></div>
+      <button class="btn-primary" id="btn-next-round" onclick="setNextReady()">Manche suivante →</button>
+      <div class="sk-ov-msg" id="sk-ov-msg"></div>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Skyjo</div>
+      <div class="modal-body">
+        <p>Chacun a une grille de 12 cartes face cachée. Au début, retourne-en 2.</p>
+        <p style="margin-top:10px">À ton tour : pioche une carte (ou prends celle de la défausse), puis <b>échange-la</b> avec une de tes cartes, ou <b>défausse-la et retourne</b> une carte cachée.</p>
+        <p style="margin-top:10px">3 cartes identiques dans une <b>colonne</b> = colonne retirée. Quand quelqu'un a tout retourné, chacun joue un dernier tour. On compte les points (le but : le moins possible). Celui qui finit voit ses points <b>doublés</b> s'il n'est pas le plus bas. La partie s'arrête quand quelqu'un dépasse le seuil.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Constantes ━━ */
+    // Deck : centralisé dans skyjo-ai.js (partagé avec le banc).
+    var buildDeck = window.SkyjoAI.buildDeck;
+    function shuffle(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    function valueClass(v) { if (v < 0) return 'v-neg'; if (v === 0) return 'v-zero'; if (v <= 4) return 'v-low'; if (v <= 8) return 'v-mid'; return 'v-high'; }
+    function fillArray(n, v) { var a = []; for (var i = 0; i < n; i++) a.push(v); return a; }
+    function hasDrawn(state) { return state.drawnCard !== null && state.drawnCard !== undefined; }
+    function step(order, fromPid, count) { var n = order.length, i = order.indexOf(fromPid); return order[(((i + count) % n) + n) % n]; }
+
+    /* ━━ State ━━ */
+    var prevStatus = null, localMode = 'idle';
+    function rref() { return window.roomRef; }
+    var escapeHtml = window.esc;  // mutualisé dans lobby.js
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+    /* ━━ Enregistrement du salon ━━ */
+    GameRoom({
+      gameKey: 'skyjo', name: 'Skyjo', emoji: '🎴', tagline: 'Le moins de points gagne',
+      minPlayers: 2, maxPlayers: 8,
+      rules: [
+        'Chacun a 12 cartes face cachée, on en retourne 2 au début',
+        'À ton tour : pioche/prends la défausse, puis échange ou retourne',
+        '3 cartes identiques en colonne = colonne retirée',
+        'Le moins de points à la fin gagne (seuil = fin de partie)'
+      ],
+      offline: { solo: true, local: true },
+      bot: skyjoBot,
+      offlineTurn: function (r) {
+        if (r.status === 'ended') return null;
+        if (r.status === 'roundEnd') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
+        if (r.phase === 'flip2') { var o2 = r.order || []; for (var j = 0; j < o2.length; j++) if (flippedCount(r.players[o2[j]] || {}) < 2) return o2[j]; return o2[0]; }
+        return r.turn;
+      },
+      offlineEnter: function () { localMode = 'idle'; if (window.room) renderPlaying(window.room); },
+      lobbyExtraHTML: lobbyExtraHTML, onState: onState, onStart: onStart,
+      beforeJoin: function () { localMode = 'idle'; }
+    });
+
+    /* ━━ IA solo : minimise la valeur visible, vise les éliminations de colonnes ━━ */
+    // IA : la DÉCISION vit dans skyjo-ai.js (action abstraite) ; ici on l'exécute.
+    function skyjoBot(state, pid) {
+      if (state.status === 'roundEnd') { if (!((state.players[pid] || {}).nextReady)) setNextReady(); return; }
+      if (state.status !== 'playing') return;
+      var p = state.players[pid] || {};
+      if (state.phase === 'flip2') {
+        if (flippedCount(p) >= 2) return;
+        var fa = window.SkyjoAI.decide({ phase: 'flip2', grid: p.grid || [], flipped: p.flipped || [], removed: p.removed || [] });
+        if (fa && fa.type === 'flip') initialFlip(fa.idx);
+        return;
+      }
+      if (state.turn !== pid) return;
+      var oppMin = Infinity;
+      (state.order || []).forEach(function (q) { if (q !== pid) { var sv = sumVisible(state.players[q] || {}); if (sv < oppMin) oppMin = sv; } });
+      var disc = state.discardPile || [];
+      var act = window.SkyjoAI.decide({
+        phase: 'turn', grid: p.grid || [], flipped: p.flipped || [], removed: p.removed || [],
+        discardTop: disc.length ? disc[disc.length - 1] : null,
+        drawnCard: (state.drawnCard != null) ? state.drawnCard : null,
+        drawnFrom: state.drawnFrom || null, oppMinVisibleSum: oppMin
+      }, window.Bots ? window.Bots.level(state) : 'normal');
+      if (!act) return;
+      if (act.type === 'drawPile') onDrawPileTap();
+      else if (act.type === 'takeDiscard') takeFromDiscard();
+      else if (act.type === 'replace') replaceCell(act.idx);
+      else if (act.type === 'discardFlip') discardAndFlip(act.idx);
+    }
+
+    function lobbyExtraHTML(room) {
+      var sel = (room && room.maxScore) || 100;
+      var btns = [50, 100, 150].map(function (n) { return '<button class="sk-set-btn' + (n === sel ? ' active' : '') + '" onclick="setMaxScore(' + n + ')">' + n + '</button>'; }).join('');
+      return '<div class="sk-settings"><div class="sk-settings-label">Seuil de fin (points)</div><div class="sk-set-row">' + btns + '</div></div>';
+    }
+    function setMaxScore(n) { if (window.roomRef) window.roomRef.child('maxScore').set(n); }
+
+    function dealRound(order, cur) {
+      var deck = shuffle(buildDeck());
+      order.forEach(function (pid) {
+        var grid = []; for (var i = 0; i < 12; i++) grid.push(deck.pop());
+        cur.players[pid].grid = grid;
+        cur.players[pid].flipped = fillArray(12, false);
+        cur.players[pid].removed = fillArray(12, false);
+        cur.players[pid].lastRoundScore = 0;
+        cur.players[pid].lastRoundDoubled = false;
+        cur.players[pid].nextReady = false;
+      });
+      cur.drawPile = deck;
+      cur.discardPile = [deck.pop()];
+      cur.phase = 'flip2'; cur.turn = null; cur.drawnCard = null; cur.drawnFrom = null; cur.finisher = null;
+    }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      players.forEach(function (p) { cur.players[p.pid].totalScore = 0; });
+      dealRound(order, cur);
+      return { maxScore: (cur && cur.maxScore) || 100, round: 1 };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { document.getElementById('sk-overlay').classList.remove('active'); localMode = 'idle'; showScreen('s-playing'); }
+        renderPlaying(state);
+      } else if (status === 'roundEnd') {
+        showRoundEnd(state);
+      } else if (status === 'ended') {
+        document.getElementById('sk-overlay').classList.remove('active');
+        showResults(state);
+      }
+      prevStatus = status;
+      if (window.Lobby && Lobby.absentBanner) {
+        var h = (status === 'playing' && (state.phase === 'main' || state.phase === 'lastTurn')) ? state.turn : null;
+        Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
+          rref().transaction(function (cur) {
+            if (!cur || cur.status !== 'playing' || !(cur.phase === 'main' || cur.phase === 'lastTurn') || !Lobby.isOffline(cur, cur.turn)) return cur;
+            cur.drawnCard = null; cur.drawnFrom = null; cur.drewThisTurn = false;
+            finalizeTurn(cur, cur.turn); // fait avancer le tour (gère lastTurn/fin de manche)
+            return cur;
+          });
+        });
+      }
+    }
+
+    /* ━━ Helpers ━━ */
+    function sumVisible(p) { var s = 0, g = p.grid || [], fl = p.flipped || [], rm = p.removed || []; for (var i = 0; i < 12; i++) if (fl[i] && !rm[i]) s += (g[i] || 0); return s; }
+    function flippedCount(p) { return (p.flipped || []).filter(function (x) { return x; }).length; }
+    function isPlayerDone(p) { var fl = p.flipped || [], rm = p.removed || []; for (var i = 0; i < 12; i++) { if (rm[i]) continue; if (!fl[i]) return false; } return true; }
+
+    /* ━━ Rendu ━━ */
+    function miniGrid(p) {
+      var g = p.grid || [], fl = p.flipped || [], rm = p.removed || [];
+      var h = '';
+      for (var i = 0; i < 12; i++) {
+        if (rm[i]) h += '<div class="sk-mini-cell sk-empty"></div>';
+        else if (fl[i]) h += '<div class="sk-mini-cell ' + valueClass(g[i]) + '">' + g[i] + '</div>';
+        else h += '<div class="sk-mini-cell back" style="background:linear-gradient(135deg,#2C2520,#4a3f37)"></div>';
+      }
+      return h;
+    }
+
+    function renderPlaying(state) {
+      var ord = state.order || [];
+      setText('sk-round', 'Manche ' + (state.round || 1) + ' · seuil ' + (state.maxScore || 100));
+      document.getElementById('sk-totals').innerHTML = ord.map(function (pid) {
+        var t = (state.players[pid] && state.players[pid].totalScore) || 0;
+        return '<span style="color:' + Room.color(pid) + ';font-weight:700">' + t + '</span>';
+      }).join(' · ');
+
+      // Adversaires
+      document.getElementById('sk-opps').innerHTML = ord.filter(function (p) { return p !== window.myPid; }).map(function (pid) {
+        var p = state.players[pid] || {};
+        return '<div class="sk-opp' + (state.turn === pid ? ' turn' : '') + '"><div class="sk-opp-name"><span class="sk-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' · ' + sumVisible(p) + '</div><div class="sk-mini-grid">' + miniGrid(p) + '</div></div>';
+      }).join('');
+
+      // Piles
+      setText('sk-pile-count', (state.drawPile || []).length);
+      var isMyTurn = state.turn === window.myPid;
+      var drew = hasDrawn(state);
+      var dw = document.getElementById('sk-discard-wrap'); dw.innerHTML = '';
+      var discard = state.discardPile || [];
+      // Carte affichée sur la défausse : si j'ai pris une carte, c'est la candidate (mise en avant), sinon le dessus.
+      var showCandidate = drew && isMyTurn;
+      var topVal = showCandidate ? state.drawnCard : (discard.length ? discard[discard.length - 1] : null);
+      if (topVal !== null && topVal !== undefined) {
+        var c = document.createElement('div');
+        c.className = 'sk-card ' + valueClass(topVal) + (showCandidate ? ' candidate' : '');
+        c.textContent = topVal;
+        if (isMyTurn && !drew) c.onclick = takeFromDiscard;
+        dw.appendChild(c);
+      } else {
+        var e = document.createElement('div'); e.className = 'sk-card sk-empty'; dw.appendChild(e);
+      }
+      var drawPileEl = document.getElementById('sk-draw-pile');
+      var canDraw = isMyTurn && !drew && state.phase !== 'flip2';
+      drawPileEl.style.opacity = canDraw ? '1' : '0.5';
+
+      // Ma grille
+      renderMyGrid(state);
+      renderStatus(state);
+    }
+
+    function renderMyGrid(state) {
+      var me = state.players[window.myPid] || {};
+      var g = me.grid || [], fl = me.flipped || [], rm = me.removed || [];
+      var isMyTurn = state.turn === window.myPid;
+      var drew = hasDrawn(state);
+      var grid = document.getElementById('sk-my-grid'); grid.innerHTML = '';
+      for (var i = 0; i < 12; i++) {
+        (function (i) {
+          var cell = document.createElement('div');
+          if (rm[i]) { cell.className = 'sk-cell sk-empty'; grid.appendChild(cell); return; }
+          var faceUp = fl[i];
+          cell.className = 'sk-cell ' + (faceUp ? valueClass(g[i]) : 'back');
+          cell.textContent = faceUp ? g[i] : '';
+          // Interactivité
+          var tappable = false;
+          if (state.phase === 'flip2' && !faceUp && flippedCount(me) < 2) { tappable = true; cell.onclick = function () { initialFlip(i); }; }
+          else if ((state.phase === 'main' || state.phase === 'lastTurn') && isMyTurn && drew) {
+            if (localMode === 'flip' && state.drawnFrom === 'pile' && !faceUp) { tappable = true; cell.onclick = function () { discardAndFlip(i); }; }
+            else if (localMode !== 'flip') { tappable = true; cell.onclick = function () { replaceCell(i); }; }
+          }
+          if (tappable) cell.classList.add('tappable');
+          grid.appendChild(cell);
+        })(i);
+      }
+    }
+
+    function renderStatus(state) {
+      var isMyTurn = state.turn === window.myPid;
+      var drew = hasDrawn(state);
+      var st = document.getElementById('sk-status');
+      var act = document.getElementById('sk-actions'); act.innerHTML = '';
+      if (state.phase === 'flip2') {
+        var me = state.players[window.myPid] || {};
+        st.textContent = flippedCount(me) < 2 ? 'Retourne ' + (2 - flippedCount(me)) + ' carte(s) pour commencer' : 'En attente des autres joueurs…';
+        return;
+      }
+      if (!isMyTurn) { st.textContent = 'Au tour de ' + Room.name(state.turn) + '…'; return; }
+      if (!drew) { st.textContent = 'Pioche une carte ou prends celle de la défausse'; return; }
+      // J'ai une carte en main
+      if (state.drawnFrom === 'pile') {
+        if (localMode === 'flip') { st.textContent = 'Touche une carte cachée à retourner'; act.innerHTML = '<button class="sk-act-btn" onclick="cancelFlipMode()">↩ Échanger plutôt</button>'; }
+        else { st.textContent = 'Touche une carte à échanger…'; act.innerHTML = '<button class="sk-act-btn" onclick="enterFlipMode()">Défausser & retourner</button>'; }
+      } else { // discard
+        st.textContent = 'Touche une carte à échanger'; act.innerHTML = '<button class="sk-act-btn" onclick="cancelDiscardTake()">↩ Annuler</button>';
+      }
+    }
+    function enterFlipMode() { localMode = 'flip'; renderPlaying(window.room); }
+    function cancelFlipMode() { localMode = 'idle'; renderPlaying(window.room); }
+
+    /* ━━ Actions ━━ */
+    function initialFlip(idx) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'flip2') return cur;
+        var me = window.myPid, p = cur.players[me];
+        var fl = (p.flipped || fillArray(12, false)).slice();
+        if (fl.filter(function (x) { return x; }).length >= 2 || fl[idx]) return cur;
+        fl[idx] = true; cur.players[me].flipped = fl;
+        // Tous ont 2 cartes retournées ? → phase main, le plus haut visible commence
+        var order = cur.order || [];
+        var allReady = order.every(function (pid) { return (cur.players[pid].flipped || []).filter(function (x) { return x; }).length >= 2; });
+        if (allReady) {
+          var best = null, bestSum = -Infinity;
+          order.forEach(function (pid) { var s = sumVisible(cur.players[pid]); if (s > bestSum) { bestSum = s; best = pid; } });
+          cur.phase = 'main'; cur.turn = best;
+        }
+        return cur;
+      });
+    }
+    function onDrawPileTap() {
+      var st = window.room || {};
+      if (st.status !== 'playing' || st.phase === 'flip2' || st.turn !== window.myPid || hasDrawn(st) || localMode === 'flip') return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || hasDrawn(cur)) return cur;
+        var pile = (cur.drawPile || []).slice();
+        if (!pile.length) { var disc = (cur.discardPile || []).slice(); if (disc.length <= 1) return cur; var top = disc.pop(); pile = shuffle(disc); cur.discardPile = [top]; }
+        cur.drawnCard = pile.pop(); cur.drawnFrom = 'pile'; cur.drawPile = pile;
+        return cur;
+      });
+    }
+    function takeFromDiscard() {
+      var st = window.room || {};
+      if (st.status !== 'playing' || st.turn !== window.myPid || hasDrawn(st)) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || hasDrawn(cur)) return cur;
+        var disc = (cur.discardPile || []).slice(); if (!disc.length) return cur;
+        cur.drawnCard = disc.pop(); cur.drawnFrom = 'discard'; cur.discardPile = disc;
+        return cur;
+      });
+    }
+    function cancelDiscardTake() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || cur.drawnFrom !== 'discard' || !hasDrawn(cur)) return cur;
+        cur.discardPile = (cur.discardPile || []).concat([cur.drawnCard]); cur.drawnCard = null; cur.drawnFrom = null;
+        return cur;
+      });
+    }
+    function replaceCell(idx) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || !hasDrawn(cur)) return cur;
+        var me = window.myPid, p = cur.players[me];
+        var grid = (p.grid || []).slice(), flipped = (p.flipped || fillArray(12, false)).slice(), removed = (p.removed || fillArray(12, false)).slice();
+        if (removed[idx]) return cur;
+        var oldVal = grid[idx]; grid[idx] = cur.drawnCard; flipped[idx] = true;
+        cur.discardPile = (cur.discardPile || []).concat([oldVal]);
+        cur.drawnCard = null; cur.drawnFrom = null;
+        cur.players[me].grid = grid; cur.players[me].flipped = flipped;
+        applyColumnElimination(cur, me); finalizeTurn(cur, me);
+        return cur;
+      }, function () { localMode = 'idle'; });
+    }
+    function discardAndFlip(idx) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || cur.drawnFrom !== 'pile' || !hasDrawn(cur)) return cur;
+        var me = window.myPid, p = cur.players[me];
+        var flipped = (p.flipped || fillArray(12, false)).slice(), removed = (p.removed || fillArray(12, false)).slice();
+        if (removed[idx] || flipped[idx]) return cur;
+        cur.discardPile = (cur.discardPile || []).concat([cur.drawnCard]);
+        flipped[idx] = true; cur.players[me].flipped = flipped;
+        cur.drawnCard = null; cur.drawnFrom = null;
+        applyColumnElimination(cur, me); finalizeTurn(cur, me);
+        return cur;
+      }, function () { localMode = 'idle'; });
+    }
+
+    function applyColumnElimination(cur, pid) {
+      var p = cur.players[pid];
+      var g = (p.grid || []).slice(), fl = (p.flipped || fillArray(12, false)).slice(), rm = (p.removed || fillArray(12, false)).slice();
+      var disc = (cur.discardPile || []).slice();
+      for (var col = 0; col < 4; col++) {
+        var idx = [col, col + 4, col + 8];
+        if (rm[idx[0]]) continue;
+        if (!fl[idx[0]] || !fl[idx[1]] || !fl[idx[2]]) continue;
+        if (g[idx[0]] === g[idx[1]] && g[idx[1]] === g[idx[2]]) {
+          rm[idx[0]] = rm[idx[1]] = rm[idx[2]] = true;
+          disc.push(g[idx[0]]); disc.push(g[idx[1]]); disc.push(g[idx[2]]);
+        }
+      }
+      cur.players[pid].removed = rm; cur.discardPile = disc;
+    }
+
+    function finalizeTurn(cur, me) {
+      var order = cur.order || [];
+      if (cur.phase === 'main') {
+        if (isPlayerDone(cur.players[me]) && !cur.finisher) { cur.finisher = me; cur.phase = 'lastTurn'; cur.turn = step(order, me, 1); return; }
+        cur.turn = step(order, me, 1);
+      } else if (cur.phase === 'lastTurn') {
+        var nxt = step(order, me, 1);
+        if (nxt === cur.finisher) endRound(cur); else cur.turn = nxt;
+      }
+    }
+
+    function endRound(cur) {
+      var order = cur.order || [];
+      var scores = {};
+      order.forEach(function (pid) {
+        var p = cur.players[pid];
+        var fl = (p.flipped || fillArray(12, false)).slice(), rm = p.removed || [];
+        for (var i = 0; i < 12; i++) if (!rm[i]) fl[i] = true;
+        cur.players[pid].flipped = fl;
+        var s = 0, g = p.grid || []; for (var k = 0; k < 12; k++) if (!rm[k]) s += (g[k] || 0);
+        scores[pid] = s;
+      });
+      var f = cur.finisher;
+      if (f) {
+        var othersMin = Infinity;
+        order.forEach(function (pid) { if (pid !== f) othersMin = Math.min(othersMin, scores[pid]); });
+        if (scores[f] > 0 && scores[f] >= othersMin) { scores[f] = scores[f] * 2; cur.players[f].lastRoundDoubled = true; }
+        else cur.players[f].lastRoundDoubled = false;
+      }
+      order.forEach(function (pid) {
+        cur.players[pid].lastRoundScore = scores[pid];
+        cur.players[pid].totalScore = (cur.players[pid].totalScore || 0) + scores[pid];
+      });
+      var maxScore = cur.maxScore || 100;
+      var reached = order.some(function (pid) { return cur.players[pid].totalScore >= maxScore; });
+      if (reached) cur.status = 'ended';
+      else { cur.status = 'roundEnd'; order.forEach(function (pid) { cur.players[pid].nextReady = false; }); }
+    }
+
+    /* ━━ Fin de manche / résultats ━━ */
+    function showRoundEnd(state) {
+      if (!document.getElementById('s-playing').classList.contains('active')) showScreen('s-playing');
+      renderPlaying(state);
+      var ord = state.order || [];
+      document.getElementById('sk-ov-rows').innerHTML = ord.map(function (pid) {
+        var p = state.players[pid] || {};
+        return '<div class="sk-row"><span style="color:' + Room.color(pid) + ';font-weight:700">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span><span class="pts' + (p.lastRoundDoubled ? ' doubled' : '') + '">+' + (p.lastRoundScore || 0) + (p.lastRoundDoubled ? ' (×2)' : '') + '</span> → <b>' + (p.totalScore || 0) + '</b></span></div>';
+      }).join('');
+      setText('sk-ov-title', state.finisher ? (Room.name(state.finisher) + ' a fini la manche') : 'Manche terminée');
+      var meReady = state.players && state.players[window.myPid] && state.players[window.myPid].nextReady;
+      var btn = document.getElementById('btn-next-round'); btn.disabled = !!meReady; btn.textContent = meReady ? 'En attente…' : 'Manche suivante →';
+      var online = ord.filter(function (p) { return state.players[p] && state.players[p].online; });
+      var ready = online.filter(function (p) { return state.players[p].nextReady; });
+      setText('sk-ov-msg', meReady ? ('En attente des autres… (' + ready.length + '/' + online.length + ')') : '');
+      document.getElementById('sk-overlay').classList.add('active');
+      maybeNextRound(state);
+    }
+    function setNextReady() { rref().child('players/' + window.myPid + '/nextReady').set(true); }
+    function maybeNextRound(state) {
+      var ord = state.order || [];
+      var online = ord.filter(function (p) { return state.players[p] && state.players[p].online; });
+      if (!online.length || !online.every(function (p) { return state.players[p].nextReady; })) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'roundEnd') return cur;
+        var order = cur.order || [];
+        var o = order.filter(function (p) { return cur.players[p] && cur.players[p].online; });
+        if (!o.length || !o.every(function (p) { return cur.players[p].nextReady; })) return cur;
+        cur.round = (cur.round || 1) + 1; cur.status = 'playing';
+        dealRound(order, cur);
+        return cur;
+      });
+    }
+
+    function showResults(state) {
+      showScreen('s-results');
+      var ord = (state.order || []).slice();
+      function tot(pid) { return (state.players[pid] && state.players[pid].totalScore) || 0; }
+      ord.sort(function (a, b) { return tot(a) - tot(b); }); // le plus bas gagne
+      var low = tot(ord[0]);
+      var winners = ord.filter(function (p) { return tot(p) === low; });
+      var iWon = winners.indexOf(window.myPid) >= 0;
+      setText('res-emoji', winners.length > 1 ? '🤝' : '🏆');
+      setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !'));
+      var medals = ['🥇', '🥈', '🥉'];
+      document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-score">' + tot(pid) + ' pts</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { localMode = 'idle'; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); document.getElementById('sk-overlay').classList.remove('active'); localMode = 'idle'; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

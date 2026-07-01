@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Reversi ⚫" data-emoji="⚫"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .btn-primary { display: block; width: 100%; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    .ot-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    html[data-theme="dark"] .ot-header { background: rgba(20,16,28,0.97); }
+    .ot-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .ot-turn-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
+    .ot-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; display: flex; align-items: center; gap: 10px; }
+    .ot-score-chip { display: inline-flex; align-items: center; gap: 5px; }
+    .ot-mini { width: 15px; height: 15px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
+    .ot-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+
+    .ot-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 14px; width: 100%; }
+    .ot-frame { display: grid; grid-template-columns: repeat(8, 1fr); gap: clamp(2px, 0.9vw, 5px); width: min(94vw, 460px); aspect-ratio: 1; background: linear-gradient(160deg, #1f7a4d, #176039); border: 4px solid #0e4427; border-radius: 14px; padding: clamp(5px, 1.6vw, 9px); box-shadow: var(--shadow); }
+    .ot-cell { position: relative; aspect-ratio: 1; border-radius: 6px; background: #2a8d5c; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .ot-cell.playable::after { content: ''; width: 30%; height: 30%; border-radius: 50%; background: rgba(255,255,255,0.35); }
+    .ot-cell.playable:hover::after { background: rgba(255,255,255,0.6); }
+    .ot-disc { width: 82%; height: 82%; border-radius: 50%; background-image: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.55), rgba(255,255,255,0) 55%); box-shadow: inset -2px -3px 6px rgba(0,0,0,0.3), inset 2px 2px 5px rgba(255,255,255,0.35); transition: transform .25s; }
+    .ot-disc.b { background-color: #20232b; }
+    .ot-disc.w { background-color: #f4efe6; }
+    .ot-cell.last { box-shadow: inset 0 0 0 2px var(--gold); }
+    .ot-cell.flip .ot-disc { animation: otflip .4s ease both; }
+    @keyframes otflip { 0% { transform: rotateY(0); } 50% { transform: rotateY(90deg); } 100% { transform: rotateY(0); } }
+    .ot-hint { margin-top: 16px; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); text-align: center; min-height: 24px; }
+
+    .ot-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .ot-overlay.active { display: flex; animation: fadeUp 0.3s ease both; }
+    .ot-overlay-card { background: var(--white); border-radius: 22px; padding: 30px 26px; box-shadow: var(--shadow-hover); text-align: center; max-width: 340px; width: 100%; }
+    .ot-ov-emoji { font-size: 3rem; line-height: 1; margin-bottom: 8px; }
+    .ot-ov-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; margin-bottom: 6px; }
+    .ot-ov-scores { font-size: 1.1rem; font-weight: 700; margin: 10px 0 20px; }
+
+    .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
+    .modal.active { display: flex; animation: fadeUp 0.25s ease both; }
+    .modal-card { background: var(--white); border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/ai/reversi-ai.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="ot-header">
+        <span class="ot-turn" id="ot-turn"></span>
+        <span class="ot-scores" id="ot-scores"></span>
+        <div class="ot-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="ot-stage">
+        <div class="ot-frame" id="ot-board"></div>
+        <div class="ot-hint" id="ot-hint"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ot-overlay" id="ot-overlay">
+    <div class="ot-overlay-card">
+      <div class="ot-ov-emoji" id="ot-ov-emoji">🏆</div>
+      <div class="ot-ov-title" id="ot-ov-title">—</div>
+      <div class="ot-ov-scores" id="ot-ov-scores"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="peekBoard()">🔍 Revoir le plateau</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">Les scores repartent de 0.</div>
+      <div class="modal-btns">
+        <button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">Reversi</div>
+      <div class="modal-body">
+        <p>Chacun son tour, on pose un pion de sa couleur de façon à <b>encadrer</b> une ou plusieurs lignes de pions adverses (horizontale, verticale ou diagonale).</p>
+        <p style="margin-top:10px">Tous les pions adverses encadrés sont <b>retournés</b> à ta couleur. On ne peut jouer que sur une case qui retourne au moins un pion.</p>
+        <p style="margin-top:10px">Si on ne peut pas jouer, on <b>passe</b>. Quand plus personne ne peut jouer, celui qui a le <b>plus de pions</b> gagne.</p>
+      </div>
+      <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    /* ━━ Reversi / Reversi — 2 joueurs, en ligne + hors-ligne (solo/local) ━━ */
+    var prevStatus = null;
+    var flipAnim = {};       // index -> signature du dernier coup (anti-rejeu d'anim)
+    var lastSeen = -2;
+
+    function rref() { return window.roomRef; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    var escapeHtml = window.esc;
+    function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
+    // Siège 0 = NOIR (commence), siège 1 = BLANC.
+    function markOf(state, pid) { return String((state.order || []).indexOf(pid)); }
+
+    function startBoard() {
+      var a = '.'.repeat(64).split('');
+      a[27] = '1'; a[28] = '0'; a[35] = '0'; a[36] = '1'; // d4=blanc,e4=noir,d5=noir,e5=blanc
+      return a.join('');
+    }
+    function count(b, m) { var n = 0; for (var i = 0; i < 64; i++) if (b[i] === m) n++; return n; }
+
+    GameRoom({
+      gameKey: 'reversi',
+      name: 'Reversi',
+      emoji: '⚫',
+      tagline: 'Reversi',
+      minPlayers: 2,
+      maxPlayers: 2,
+      rules: [
+        'Pose un pion en encadrant des pions adverses (ligne, colonne, diagonale)',
+        'Tous les pions encadrés sont retournés à ta couleur',
+        'On ne joue que sur une case qui retourne au moins un pion',
+        'Pas de coup possible → on passe · plus de pions à la fin = gagné'
+      ],
+      offline: { solo: true, local: true },
+      bot: reversiBot,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* ━━ IA : recherche pure dans reversi-ai.js (négamax α-β + table positionnelle
+       + mobilité). Profondeur selon la difficulté. Facile blunder parfois. ━━ */
+    function reversiBot(state, pid) {
+      var b = state.board || startBoard();
+      var me = markOf(state, pid), opp = (me === '0' ? '1' : '0');
+      var legal = window.ReversiAI.legalMoves(b, me);
+      if (!legal.length) { passMove(); return; }
+      var idx;
+      if (window.Bots && window.Bots.shouldBlunder(state)) {
+        idx = legal[Math.floor(Math.random() * legal.length)];
+      } else {
+        var depth = (window.Bots ? window.Bots.pick(state, { easy: 1, normal: 4, hard: 8 }) : 4);
+        idx = window.ReversiAI.bestMove(b, me, opp, depth);
+        if (idx < 0 || legal.indexOf(idx) < 0) idx = legal[0];
+      }
+      playAt(idx);
+    }
+
+    function onStart(players) {
+      var starter = players[0].pid; // siège 0 = noir = commence
+      return { board: startBoard(), turn: starter, starter: starter, winner: null, lastMove: -1, lastFlips: '', passed: false };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'waiting') hideResult();
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') startPlayingScreen(state);
+        else renderPlaying(state);
+      }
+      prevStatus = status;
+    }
+
+    /* ━━ Coups ━━ */
+    function playAt(idx) {
+      var state = window.room || {};
+      if (state.status !== 'playing' || state.winner) return;
+      if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      var AI = window.ReversiAI;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        if (cur.turn !== window.myPid) return cur;
+        var order = cur.order || [];
+        var me = String(order.indexOf(window.myPid)), opp = (me === '0' ? '1' : '0');
+        var b = cur.board || startBoard();
+        var flips = AI.wouldFlip(b, idx, me);
+        if (!flips.length) return cur; // coup illégal
+        cur.board = AI.applyMove(b, idx, me);
+        cur.lastMove = idx;
+        cur.lastFlips = flips.join(',');
+        cur.passed = false;
+        advance(cur, order, me, opp);
+        return cur;
+      });
+    }
+
+    // L'actif ne peut pas jouer : on passe (et si l'autre non plus → fin).
+    function passMove() {
+      var state = window.room || {};
+      if (state.status !== 'playing' || state.winner) return;
+      if (state.turn !== window.myPid) return;
+      var AI = window.ReversiAI;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        if (cur.turn !== window.myPid) return cur;
+        var order = cur.order || [];
+        var me = String(order.indexOf(window.myPid)), opp = (me === '0' ? '1' : '0');
+        var b = cur.board || startBoard();
+        if (AI.legalMoves(b, me).length) return cur; // a en fait un coup → on n'autorise pas le pass
+        cur.lastMove = -1; cur.lastFlips = '';
+        advanceAfterPass(cur, order, me, opp);
+        return cur;
+      });
+    }
+
+    // Après un coup : si l'adversaire a un coup → à lui ; sinon si moi j'en ai encore
+    // un → je rejoue ; sinon → fin de partie.
+    function advance(cur, order, me, opp) {
+      var AI = window.ReversiAI, b = cur.board;
+      if (AI.legalMoves(b, opp).length) { cur.turn = order[+opp]; return; }
+      if (AI.legalMoves(b, me).length) { cur.turn = order[+me]; return; } // adversaire passe, je rejoue
+      finish(cur, order);
+    }
+    function advanceAfterPass(cur, order, me, opp) {
+      var AI = window.ReversiAI, b = cur.board;
+      if (AI.legalMoves(b, opp).length) { cur.turn = order[+opp]; return; }
+      finish(cur, order); // ni l'un ni l'autre ne peut jouer
+    }
+    function finish(cur, order) {
+      var b = cur.board, n0 = count(b, '0'), n1 = count(b, '1');
+      if (n0 === n1) { cur.winner = 'draw'; }
+      else {
+        var wseat = n0 > n1 ? 0 : 1, wpid = order[wseat];
+        cur.winner = wpid;
+        if (!cur.players) cur.players = {};
+        if (!cur.players[wpid]) cur.players[wpid] = {};
+        cur.players[wpid].wins = (cur.players[wpid].wins || 0) + 1;
+      }
+    }
+
+    /* ━━ Rendu ━━ */
+    function startPlayingScreen(state) { lastSeen = -2; flipAnim = {}; hideResult(); showScreen('s-playing'); renderPlaying(state); }
+
+    function discClass(mark) { return mark === '0' ? 'b' : 'w'; }
+    function seatColor(seat) { return seat === 0 ? '#20232b' : '#f4efe6'; }
+
+    function scoresHTML(state) {
+      var b = state.board || startBoard(), ord = state.order || [];
+      return ord.map(function (pid, seat) {
+        var cnt = count(b, String(seat));
+        return '<span class="ot-score-chip"><span class="ot-mini" style="background:' + seatColor(seat) + '"></span>' +
+          escapeHtml(Room.name(pid)) + ' ' + cnt + ' <span style="color:var(--ink-light);font-weight:400">(' + winsOf(state, pid) + ')</span></span>';
+      }).join('<span style="color:var(--ink-light)">·</span>');
+    }
+
+    function renderPlaying(state) {
+      var b = state.board || startBoard();
+      var ord = state.order || [];
+      setHTML('ot-scores', scoresHTML(state));
+
+      var myMark = markOf(state, window.myPid);
+      var myTurn = (state.turn === window.myPid) && !state.winner;
+      var legalForMe = myTurn ? window.ReversiAI.legalMoves(b, myMark) : [];
+
+      var ti = document.getElementById('ot-turn');
+      if (state.winner) { ti.innerHTML = ''; setText('ot-hint', ''); }
+      else {
+        var t = state.turn, seat = ord.indexOf(t);
+        ti.innerHTML = '<span class="ot-turn-dot" style="background:' + seatColor(seat) + '"></span>' +
+          (t === window.myPid ? 'À toi' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        if (myTurn && !legalForMe.length) setText('ot-hint', 'Aucun coup possible — tu passes…');
+        else setText('ot-hint', myTurn ? 'Touche une case en surbrillance' : 'En attente de ' + Room.name(t) + '…');
+      }
+
+      var board = document.getElementById('ot-board');
+      var last = state.lastMove, flips = (state.lastFlips || '').split(',');
+      var sig = last + '|' + state.lastFlips;
+      var html = '';
+      for (var i = 0; i < 64; i++) {
+        var ch = b[i], cls = 'ot-cell';
+        if (i === last && last >= 0) cls += ' last';
+        if (legalForMe.indexOf(i) >= 0) cls += ' playable';
+        var disc = (ch === '0' || ch === '1') ? '<span class="ot-disc ' + discClass(ch) + '"></span>' : '';
+        html += '<div class="' + cls + '" data-i="' + i + '">' + disc + '</div>';
+      }
+      board.innerHTML = html;
+
+      // Animation de retournement sur les pions retournés par le DERNIER coup.
+      if (sig !== flipAnim.sig && last >= 0) {
+        flipAnim = { sig: sig };
+        flips.forEach(function (s) { var el = board.querySelector('[data-i="' + s + '"] .ot-disc'); if (el) el.parentNode.classList.add('flip'); });
+      }
+
+      // Auto-pass : si c'est mon tour et que je n'ai aucun coup, on enchaîne tout seul.
+      if (myTurn && !legalForMe.length) setTimeout(function () { if ((window.room || {}).turn === window.myPid) passMove(); }, 700);
+
+      if (state.winner) showResult(state); else hideResult();
+    }
+
+    function showResult(state) {
+      var ov = document.getElementById('ot-overlay');
+      var emoji = document.getElementById('ot-ov-emoji'), title = document.getElementById('ot-ov-title');
+      if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Égalité'; }
+      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
+      setHTML('ot-ov-scores', scoresHTML(state));
+      ov.classList.add('active'); hidePeekBtn();
+    }
+    function peekBoard() {
+      document.getElementById('ot-overlay').classList.remove('active');
+      var b = document.getElementById('ot-peek');
+      if (!b) {
+        b = document.createElement('button'); b.id = 'ot-peek'; b.className = 'p4-peek-btn';
+        b.textContent = '↩ Voir le résultat';
+        b.onclick = function () { document.getElementById('ot-overlay').classList.add('active'); hidePeekBtn(); };
+        document.body.appendChild(b);
+      }
+      b.style.display = 'block';
+    }
+    function hidePeekBtn() { var b = document.getElementById('ot-peek'); if (b) b.style.display = 'none'; }
+    function hideResult() { var ov = document.getElementById('ot-overlay'); if (ov) ov.classList.remove('active'); hidePeekBtn(); }
+
+    function handleReplay() { hideResult(); Lobby.resetToLobby(['wins']); }
+    function doRestart() { closeModal('modal-restart'); hideResult(); Lobby.resetToLobby([]); }
+
+    /* ━━ Clic plateau ━━ */
+    (function () {
+      var board = document.getElementById('ot-board');
+      if (!board) return;
+      board.addEventListener('click', function (e) {
+        var cell = e.target.closest('.ot-cell');
+        if (!cell) return;
+        playAt(+cell.dataset.i);
+      });
+    })();
+  </script>
+</body>
+</html>

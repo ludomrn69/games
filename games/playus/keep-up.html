@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Keep up! · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 20%,#1a1a22,#050507 75%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#bbb;text-decoration:none;font-size:1.4rem}.score{font-size:1.7rem}.best{font-size:.8rem;color:#999}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(5,5,7,.82);backdrop-filter:blur(6px)}
+  .screen.hidden{display:none}.screen h1{font-size:2.2rem;font-weight:900}.screen p{color:#bbb;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#f0f0f0,#a0a0a0);color:#111;box-shadow:0 8px 24px rgba(255,255,255,.2);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="screen" id="start"><h1>⚪ Keep up!</h1><p>Tape la balle pour la renvoyer en l'air. Ne la laisse jamais tomber en bas&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Tombée&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">jongles</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  var BEST='playus_keepup_best',best=+localStorage.getItem(BEST)||0;
+  function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
+  var state,score,x,y,vx,vy,r,g;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function start(){resize();score=0;r=Math.max(20,W*0.06);x=W/2;y=H*0.4;vx=0;vy=0;g=Math.max(0.35,H*0.0006);
+    scoreEl.textContent='0';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');}
+  function end(){state='over';document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='jongles';showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  stage.addEventListener('pointerdown',function(e){if(state!=='play')return;
+    var rect=cv.getBoundingClientRect(),px=e.clientX-rect.left,py=e.clientY-rect.top;
+    if((px-x)*(px-x)+(py-y)*(py-y)<(r*1.7)*(r*1.7)){
+      vy=-Math.max(9,H*0.015);vx+=(x-px)*0.14;vx=Math.max(-9,Math.min(9,vx));
+      score++;scoreEl.textContent=score;vibrate(10);}
+  });
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);
+    if(state==='play'){vy+=g;x+=vx;y+=vy;
+      if(x<r){x=r;vx=Math.abs(vx);}if(x>W-r){x=W-r;vx=-Math.abs(vx);}
+      if(y<r){y=r;vy=Math.abs(vy)*0.6;}
+      if(y>H+r)end();}
+    // sol
+    ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(0,H-6,W,6);
+    ctx.beginPath();ctx.arc(x,y,r,0,7);
+    var grd=ctx.createRadialGradient(x-r*0.3,y-r*0.3,r*0.2,x,y,r);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#c94b9e');
+    ctx.fillStyle=grd;ctx.fill();
+  }
+  resize();frame();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Queens 👑" data-emoji="👑"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .qz-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .qz-head { background: rgba(20,16,28,0.97); }
+    .qz-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .qz-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+    .qz-head-actions { display: flex; gap: 6px; }
+
+    .qz-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
+    .qz-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
+    .qz-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .qz-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .qz-opp .pc { color: var(--sage); }
+
+    .qz-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
+
+    .qz-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 10px; }
+    .qz-grid { width: min(94vw, 440px); aspect-ratio: 1; display: grid; gap: 0; border: 3px solid #2C2520; border-radius: 6px; overflow: hidden; touch-action: manipulation; }
+    .qz-cell { display: flex; align-items: center; justify-content: center; font-size: clamp(1.1rem, 6vw, 1.8rem); cursor: pointer; user-select: none; position: relative; box-sizing: border-box; border: 0.5px solid rgba(44,37,32,0.12); }
+    .qz-cell.bt { border-top: 3px solid #2C2520; } .qz-cell.bl { border-left: 3px solid #2C2520; }
+    .qz-cell.br { border-right: 3px solid #2C2520; } .qz-cell.bb { border-bottom: 3px solid #2C2520; }
+    .qz-cell.bad { box-shadow: inset 0 0 0 3px #e05a4e; }
+    .qz-mark { opacity: 0.55; font-size: 0.7em; }
+
+    .qz-hint { font-size: 0.82rem; color: var(--ink-light); text-align: center; padding: 0 12px; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/puzzle.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="qz-head">
+        <span class="qz-title-mini">Queens</span>
+        <span class="qz-timer" id="qz-timer">⏱ 0:00</span>
+        <div class="qz-head-actions" id="qz-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="qz-opps" id="qz-opps"></div>
+      <div class="qz-banner" id="qz-banner"></div>
+      <div class="qz-stage">
+        <div class="qz-grid" id="qz-grid"></div>
+        <div class="qz-hint">Touche : vide → ❌ → 👑 → vide. Une 👑 par ligne, colonne et couleur, sans qu'elles se touchent.</div>
+      </div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">👑</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">👑 Queens</div>
+      <div class="modal-body">
+        <p>• Place exactement <b>une 👑 par ligne</b>, <b>une par colonne</b> et <b>une par couleur</b>.</p>
+        <p style="margin-top:6px">• Deux reines ne peuvent <b>jamais se toucher</b> — même en diagonale.</p>
+        <p style="margin-top:6px">• Touche une case pour cycler : vide → <b>❌</b> (note « pas ici ») → <b>👑</b> → vide.</p>
+        <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : même grille pour tous, le plus rapide gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+
+    // Palette de couleurs des régions (jusqu'à 8).
+    var REGION_COLORS = ['#e9a6a0', '#a9c8e8', '#bfe0b2', '#f1d79a', '#cdb4e0', '#9fd9d2', '#f0b27a', '#c7c7b0'];
+
+    /* ━━ Générateur (taille N) ━━ Place une solution valide (1 reine/ligne/colonne,
+       pas de diagonale adjacente), puis découpe le plateau en N régions contiguës,
+       une par reine. On gagne sur TOUTE pose valide (pas besoin d'unicité). ━━ */
+    function neighbors(idx, N) { var r = idx / N | 0, c = idx % N, a = []; if (r > 0) a.push(idx - N); if (r < N - 1) a.push(idx + N); if (c > 0) a.push(idx - 1); if (c < N - 1) a.push(idx + 1); return a; }
+    function countSol(region, N, cap) {
+      var colU = {}, regU = {}, placed = [], cnt = 0;
+      (function rec(row) {
+        if (cnt >= cap) return; if (row === N) { cnt++; return; }
+        for (var c = 0; c < N; c++) { if (colU[c]) continue; var rg = region[row * N + c]; if (regU[rg]) continue; if (row > 0 && Math.abs(placed[row - 1] - c) === 1) continue; colU[c] = 1; regU[rg] = 1; placed[row] = c; rec(row + 1); colU[c] = 0; regU[rg] = 0; if (cnt >= cap) return; }
+      })(0);
+      return cnt;
+    }
+    function regionsOnce(N, rnd) {
+      var perm = null;
+      for (var att = 0; att < 3000; att++) { var cols = []; for (var i = 0; i < N; i++) cols.push(i); Puzzle.shuffle(cols, rnd); var ok = true; for (var r = 1; r < N; r++) if (Math.abs(cols[r] - cols[r - 1]) === 1) { ok = false; break; } if (ok) { perm = cols; break; } }
+      if (!perm) return null;
+      var queens = []; for (var r = 0; r < N; r++) queens.push(r * N + perm[r]);
+      var region = []; for (var i = 0; i < N * N; i++) region.push(-1);
+      queens.forEach(function (q, i) { region[q] = i; });
+      var cellsByReg = queens.map(function (q) { return [q]; }), remaining = N * N - N, guard = 0;
+      while (remaining > 0 && guard++ < N * N * 20) {
+        var rid = Math.floor(rnd() * N), reg = cellsByReg[rid], opts = [];
+        reg.forEach(function (cell) { neighbors(cell, N).forEach(function (nb) { if (region[nb] === -1) opts.push(nb); }); });
+        if (!opts.length) continue;
+        var pick = opts[Math.floor(rnd() * opts.length)]; region[pick] = rid; reg.push(pick); remaining--;
+      }
+      for (var j = 0; j < N * N; j++) if (region[j] === -1) { var nbs = neighbors(j, N); for (var k = 0; k < nbs.length; k++) if (region[nbs[k]] >= 0) { region[j] = region[nbs[k]]; break; } if (region[j] === -1) region[j] = 0; }
+      return { region: region, queens: queens };
+    }
+    function genQueens(N, seed) {
+      var rnd = Puzzle.rng(seed), best = null;
+      for (var t = 0; t < 80; t++) { var R = regionsOnce(N, rnd); if (!R) continue; if (!best) best = R; if (countSol(R.region, N, 2) === 1) return R; }
+      return best || regionsOnce(N, Puzzle.rng(seed + 12345));
+    }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, timerInt = null;
+    GameRoom({
+      gameKey: 'queens', name: 'Queens', emoji: '👑', tagline: 'Une reine par ligne, colonne et couleur',
+      minPlayers: 1, maxPlayers: 6,
+      rules: [
+        'Une 👑 par ligne, par colonne et par couleur',
+        'Deux reines ne se touchent jamais (même en diagonale)',
+        'Touche : vide → ❌ → 👑 → vide',
+        'Solo : bats ton chrono ⏱ · Salon : course entre vous'
+      ],
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
+      bot: function () {}, offlineTurn: function () { return null; },
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    function sizeFor(level) { return level === 'easy' ? 6 : level === 'hard' ? 8 : 7; }
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var level = (cur && cur.difficulty) || 'normal', N = sizeFor(level);
+      var P = genQueens(N, Puzzle.seed());
+      order.forEach(function (p) { cur.players[p].marks = []; for (var i = 0; i < N * N; i++) cur.players[p].marks.push(0); cur.players[p].finishedAt = null; });
+      return { size: N, region: P.region, startedAt: Date.now(), banner: 'Place les ' + N + ' reines le plus vite possible !', winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
+      else { stopTimer(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+    function startTimer(state) { stopTimer(); function tick() { setText('qz-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+
+    function N() { return (window.room && window.room.size) || 7; }
+    function marksOf(s, pid) { return (s.players[pid] && s.players[pid].marks) || []; }
+    function queensCount(s, pid) { var m = marksOf(s, pid), n = 0; for (var i = 0; i < m.length; i++) if (m[i] === 2) n++; return n; }
+    function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
+
+    // Analyse une pose : reines en conflit (ligne/colonne/couleur/contact) + complétude.
+    function analyze(marks, region, n) {
+      var queens = []; for (var i = 0; i < n * n; i++) if (marks[i] === 2) queens.push(i);
+      var conflict = {}, byRow = {}, byCol = {}, byReg = {};
+      queens.forEach(function (q) { var r = q / n | 0, c = q % n, rg = region[q]; (byRow[r] = byRow[r] || []).push(q); (byCol[c] = byCol[c] || []).push(q); (byReg[rg] = byReg[rg] || []).push(q); });
+      function flag(arr) { if (arr.length > 1) arr.forEach(function (q) { conflict[q] = 1; }); }
+      [byRow, byCol, byReg].forEach(function (m) { Object.keys(m).forEach(function (k) { flag(m[k]); }); });
+      for (var a = 0; a < queens.length; a++) for (var b = a + 1; b < queens.length; b++) {
+        var q1 = queens[a], q2 = queens[b]; if (Math.abs((q1 / n | 0) - (q2 / n | 0)) <= 1 && Math.abs((q1 % n) - (q2 % n)) <= 1) { conflict[q1] = 1; conflict[q2] = 1; }
+      }
+      var complete = queens.length === n && !Object.keys(conflict).length && Object.keys(byRow).length === n && Object.keys(byCol).length === n && Object.keys(byReg).length === n;
+      return { queens: queens, conflict: conflict, complete: complete };
+    }
+
+    function tapCell(idx) {
+      var pid = window.myPid, s = window.room;
+      if (assist && s && s.status === 'playing' && !doneOf(s, pid)) assist.record();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        var m = marksOf(cur, pid).slice(); m[idx] = (m[idx] + 1) % 3; cur.players[pid].marks = m; // vide→❌→👑→vide
+        var res = analyze(m, cur.region, cur.size);
+        if (res.complete) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' résout en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+    }
+
+    /* ━━ Aide au joueur (Annuler / Indice) ━━ */
+    // Indice : on RÉSOUT depuis les régions (N≤8) côté client — la solution n'est
+    // jamais stockée dans le salon (pas de triche possible via la console).
+    function solveQueens(region, n) {
+      var placed = [], res = null;
+      (function rec(row, colU, regU) {
+        if (res || row === n) { if (row === n && !res) res = placed.slice(); return; }
+        for (var c = 0; c < n; c++) {
+          if (colU[c]) continue; var rg = region[row * n + c]; if (regU[rg]) continue;
+          if (row > 0 && Math.abs(placed[row - 1] - c) === 1) continue;
+          colU[c] = 1; regU[rg] = 1; placed[row] = c; rec(row + 1, colU, regU); colU[c] = 0; regU[rg] = 0; if (res) return;
+        }
+      })(0, {}, {});
+      if (!res) return null;
+      var idx = []; for (var r = 0; r < n; r++) idx.push(r * n + res[r]); return idx;
+    }
+    function assistCanEdit() { var s = window.room; return !!(s && s.status === 'playing' && !doneOf(s, window.myPid)); }
+    function assistSnap() { return marksOf(window.room, window.myPid).slice(); }
+    function assistRestore(prev) {
+      var pid = window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        cur.players[pid].marks = (prev || []).slice();
+        return cur;
+      });
+    }
+    function hintMove() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      var pid = window.myPid, sol = solveQueens(s.region || [], s.size || 7); if (!sol) return;
+      var m = marksOf(s, pid), cand = sol.filter(function (i) { return m[i] !== 2; });
+      if (!cand.length) return;
+      var idx = cand[Math.floor(Math.random() * cand.length)];
+      if (assist) assist.record();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        var mm = marksOf(cur, pid).slice(); mm[idx] = 2; cur.players[pid].marks = mm;
+        var res = analyze(mm, cur.region, cur.size);
+        if (res.complete) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' résout en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+      render(window.room);
+    }
+    var assist = Puzzle.assist({ mount: 'qz-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var me = window.myPid, order = state.order || [], n = state.size || 7, region = state.region || [], m = marksOf(state, me);
+      setHTML('qz-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        return '<div class="qz-opp' + (doneOf(state, pid) ? ' done' : '') + '"><span class="qz-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : queensCount(state, pid) + '/' + n) + '</span></div>';
+      }).join(''));
+      setText('qz-banner', state.banner || '');
+
+      var res = analyze(m, region, n), html = '';
+      for (var i = 0; i < n * n; i++) {
+        var r = i / n | 0, c = i % n, rg = region[i];
+        var cls = 'qz-cell';
+        if (res.conflict[i]) cls += ' bad';
+        if (r === 0) cls += ' bt'; if (c === 0) cls += ' bl';
+        if (c === n - 1 || region[i + 1] !== rg) cls += ' br';
+        if (r === n - 1 || region[i + n] !== rg) cls += ' bb';
+        var glyph = m[i] === 2 ? '👑' : (m[i] === 1 ? '<span class="qz-mark">❌</span>' : '');
+        html += '<div class="' + cls + '" style="background:' + (REGION_COLORS[rg % REGION_COLORS.length]) + '" onclick="tapCell(' + i + ')">' + glyph + '</div>';
+      }
+      var grid = document.getElementById('qz-grid');
+      grid.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+      grid.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
+      grid.innerHTML = html;
+      if (typeof assist !== 'undefined' && assist) assist.refresh();
+    }
+
+    function showResults(state) {
+      stopTimer();
+      var n = state.size || 7, winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '👑');
+      setText('res-title', winner === window.myPid ? 'Tu finis premier ! 🏆' : (winner ? Room.name(winner) + ' gagne' : 'Terminé'));
+      var order = Puzzle.rankByTime(state, queensCount);
+      setHTML('res-rank', order.map(function (pid, i) {
+        var done = doneOf(state, pid);
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + (done ? '⏱ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : queensCount(state, pid) + '/' + n) + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { stopTimer(); Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); stopTimer(); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

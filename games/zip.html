@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Zip 🔗" data-emoji="🔗"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .zp-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .zp-head { background: rgba(20,16,28,0.97); }
+    .zp-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .zp-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+    .zp-head-actions { display: flex; gap: 6px; }
+
+    .zp-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
+    .zp-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
+    .zp-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
+    .zp-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .zp-opp .pc { color: var(--sage); }
+
+    .zp-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
+
+    .zp-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 10px; }
+    .zp-wrap { position: relative; width: min(92vw, 420px); aspect-ratio: 1; touch-action: none; }
+    .zp-grid { width: 100%; height: 100%; display: grid; gap: 2px; background: var(--gold-light); border: 3px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
+    .zp-cell { background: var(--cream); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(0.9rem, 4.5vw, 1.3rem); user-select: none; position: relative; z-index: 2; }
+    html[data-theme="dark"] .zp-cell { background: #221a2e; color: #e8dcc8; }
+    .zp-cell .num { width: 1.7em; height: 1.7em; border-radius: 50%; background: #2C2520; color: #fff; display: flex; align-items: center; justify-content: center; }
+    .zp-cell.on { background: rgba(196,116,90,0.18); }
+    .zp-path { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+    .zp-seg { position: absolute; background: var(--terracotta); border-radius: 6px; transform: translate(-50%, -50%); }
+    .zp-dot { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--terracotta); transform: translate(-50%, -50%); }
+
+    .zp-hint { font-size: 0.82rem; color: var(--ink-light); text-align: center; padding: 0 12px; }
+    .zp-clear { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.4rem 1.1rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--ink); }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
+    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
+    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+  <script src="/puzzle.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="zp-head">
+        <span class="zp-title-mini">Zip</span>
+        <span class="zp-timer" id="zp-timer">⏱ 0:00</span>
+        <div class="zp-head-actions">
+          <button class="game-restart-btn" onclick="undoPath()" title="Annuler">↩</button>
+          <button class="game-rules-btn" onclick="hintPath()" title="Indice">💡</button>
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="zp-opps" id="zp-opps"></div>
+      <div class="zp-banner" id="zp-banner"></div>
+      <div class="zp-stage">
+        <div class="zp-wrap" id="zp-wrap"><div class="zp-path" id="zp-path"></div><div class="zp-grid" id="zp-grid"></div></div>
+        <button class="zp-clear" onclick="clearPath()">↺ Effacer le tracé</button>
+        <div class="zp-hint">Glisse de <b>1</b> à <b>2</b>… jusqu'au bout, en passant par <b>toutes</b> les cases une seule fois.</div>
+      </div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🔗</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🔗 Zip</div>
+      <div class="modal-body">
+        <p>• Trace un <b>seul chemin</b> qui relie les nombres dans l'ordre : <b>1 → 2 → 3 → …</b></p>
+        <p style="margin-top:6px">• Le chemin doit passer par <b>TOUTES les cases</b>, une seule fois (sans diagonale).</p>
+        <p style="margin-top:6px">• <b>Glisse</b> ton doigt/la souris. Reviens en arrière pour effacer une portion.</p>
+        <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : même grille pour tous, le plus rapide gagne !</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+
+    /* ━━ Générateur ━━ Chemin hamiltonien (couvre tout) via « backbite », puis on
+       place les numéros 1..K à intervalles le long du chemin. Le joueur reconstruit
+       un tracé qui couvre tout en passant par les numéros dans l'ordre. ━━ */
+    function neighbors(idx, N) { var r = idx / N | 0, c = idx % N, a = []; if (r > 0) a.push(idx - N); if (r < N - 1) a.push(idx + N); if (c > 0) a.push(idx - 1); if (c < N - 1) a.push(idx + 1); return a; }
+    function adjacent(a, b, N) { return Math.abs((a / N | 0) - (b / N | 0)) + Math.abs((a % N) - (b % N)) === 1; }
+    function snake(N) { var p = []; for (var r = 0; r < N; r++) { if (r % 2 === 0) for (var c = 0; c < N; c++) p.push(r * N + c); else for (var c2 = N - 1; c2 >= 0; c2--) p.push(r * N + c2); } return p; }
+    function backbite(path, N, rnd) {
+      var head = rnd() < 0.5, p = head ? path.slice().reverse() : path;
+      var tail = p[p.length - 1], nbs = neighbors(tail, N), q = nbs[Math.floor(rnd() * nbs.length)];
+      var k = p.indexOf(q); if (k < 0 || k === p.length - 2) return path;
+      var np = p.slice(0, k + 1).concat(p.slice(k + 1).reverse());
+      return head ? np.reverse() : np;
+    }
+    function genZip(level, seed) {
+      var N = level === 'easy' ? 5 : level === 'hard' ? 7 : 6, rnd = Puzzle.rng(seed);
+      var p = snake(N); for (var i = 0; i < N * N * 30; i++) p = backbite(p, N, rnd);
+      var K = Math.min(9, Math.max(5, N + 1)), numbers = {};
+      for (var w = 0; w < K; w++) { var pos = Math.round(w * (p.length - 1) / (K - 1)); numbers[p[pos]] = w + 1; }
+      return { size: N, numbers: numbers, K: K, path: p };
+    }
+
+    /* ━━ Enregistrement ━━ */
+    var prevStatus = null, timerInt = null, localPath = [], dragging = false;
+    GameRoom({
+      gameKey: 'zip', name: 'Zip', emoji: '🔗', tagline: 'Relie 1, 2, 3… en couvrant tout',
+      minPlayers: 1, maxPlayers: 6,
+      rules: [
+        'Relie les nombres dans l\'ordre : 1 → 2 → 3 → …',
+        'Passe par TOUTES les cases, une seule fois (sans diagonale)',
+        'Glisse pour tracer · reviens en arrière pour effacer',
+        'Solo : bats ton chrono ⏱ · Salon : course entre vous'
+      ],
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
+      bot: function () {}, offlineTurn: function () { return null; },
+      offlineEnter: function () { if (window.room) { localPath = (window.room.players[window.myPid] || {}).path || []; render(window.room); } },
+      onState: onState, onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var level = (cur && cur.difficulty) || 'normal', P = genZip(level, Puzzle.seed());
+      order.forEach(function (p) { cur.players[p].path = []; cur.players[p].finishedAt = null; });
+      return { size: P.size, numbers: P.numbers, K: P.K, solution: P.path, startedAt: Date.now(), banner: 'Trace ton chemin le plus vite possible !', winner: null };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') { localPath = (state.players[window.myPid] || {}).path || []; showScreen('s-playing'); bindDrag(); } render(state); startTimer(state); }
+      else { stopTimer(); if (status === 'ended') showResults(state); }
+      prevStatus = status;
+    }
+    function startTimer(state) { stopTimer(); function tick() { setText('zp-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
+
+    function NS() { return (window.room && window.room.size) || 6; }
+    function pathOf(s, pid) { return (s.players[pid] && s.players[pid].path) || []; }
+    function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
+
+    // Complétude : couvre toutes les cases + numéros visités dans l'ordre.
+    function analyze(path, numbers, N) {
+      if (path.length !== N * N) return { complete: false };
+      var seq = []; path.forEach(function (cell) { if (numbers[cell]) seq.push(numbers[cell]); });
+      for (var i = 0; i < seq.length; i++) if (seq[i] !== i + 1) return { complete: false };
+      return { complete: path[0] != null && numbers[path[0]] === 1 };
+    }
+
+    /* ── Tracé (glisser) ── */
+    function visit(i) {
+      var N = NS(), s = window.room;
+      if (!localPath.length) { if (s.numbers[i] === 1) { localPath = [i]; renderLocal(); } return; }
+      var pos = localPath.indexOf(i);
+      if (pos >= 0) { if (pos < localPath.length - 1) { localPath = localPath.slice(0, pos + 1); renderLocal(); } return; } // retour en arrière
+      if (adjacent(i, localPath[localPath.length - 1], N)) { localPath.push(i); renderLocal(); }
+    }
+    function commitPath() {
+      var pid = window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        cur.players[pid].path = localPath.slice();
+        var res = analyze(localPath, cur.numbers, cur.size);
+        if (res.complete) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' termine en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+    }
+    function clearPath() { localPath = []; renderLocal(); commitPath(); }
+    // Annuler : retire la dernière case du tracé.
+    function undoPath() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      if (!localPath.length) return;
+      localPath = localPath.slice(0, -1); renderLocal(); commitPath();
+    }
+    // Indice : avance d'une case le long de la solution stockée (rogne un tracé divergent).
+    function hintPath() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      var sol = s.solution || []; if (!sol.length) return;
+      var k = 0; while (k < localPath.length && k < sol.length && localPath[k] === sol[k]) k++;
+      localPath = sol.slice(0, Math.min(sol.length, k + 1));
+      renderLocal(); commitPath(); setText('zp-banner', '💡 Indice');
+    }
+    var dragBound = false;
+    function bindDrag() {
+      if (dragBound) return; dragBound = true;
+      var wrap = document.getElementById('zp-wrap');
+      function cellAt(x, y) { var el = document.elementFromPoint(x, y); var c = el && el.closest && el.closest('.zp-cell'); return c ? +c.dataset.i : -1; }
+      wrap.addEventListener('pointerdown', function (e) { var i = cellAt(e.clientX, e.clientY); if (i < 0) return; dragging = true; visit(i); e.preventDefault(); });
+      wrap.addEventListener('pointermove', function (e) { if (!dragging) return; var i = cellAt(e.clientX, e.clientY); if (i >= 0) visit(i); e.preventDefault(); });
+      window.addEventListener('pointerup', function () { if (dragging) { dragging = false; commitPath(); } });
+    }
+
+    /* ━━ Rendu ━━ */
+    function render(state) {
+      var me = window.myPid, order = state.order || [], n = state.size || 6, numbers = state.numbers || {};
+      setHTML('zp-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+        return '<div class="zp-opp' + (doneOf(state, pid) ? ' done' : '') + '"><span class="zp-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : pathOf(state, pid).length + '/' + (n * n)) + '</span></div>';
+      }).join(''));
+      setText('zp-banner', state.banner || '');
+      buildGrid(n, numbers);
+      renderLocal();
+    }
+    function buildGrid(n, numbers) {
+      var html = '';
+      for (var i = 0; i < n * n; i++) { var num = numbers[i]; html += '<div class="zp-cell" data-i="' + i + '">' + (num ? '<span class="num">' + num + '</span>' : '') + '</div>'; }
+      var grid = document.getElementById('zp-grid');
+      grid.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+      grid.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
+      grid.innerHTML = html;
+    }
+    function renderLocal() {
+      var n = NS();
+      // surligne les cases du tracé
+      var cells = document.querySelectorAll('#zp-grid .zp-cell');
+      var inPath = {}; localPath.forEach(function (c) { inPath[c] = 1; });
+      cells.forEach(function (el) { el.classList.toggle('on', !!inPath[+el.dataset.i]); });
+      // dessine les segments
+      var sz = 100 / n, th = Math.max(6, 46 / n), ph = '';
+      function cx(i) { return ((i % n) + 0.5) * sz; } function cy(i) { return ((i / n | 0) + 0.5) * sz; }
+      for (var k = 0; k < localPath.length - 1; k++) {
+        var a = localPath[k], b = localPath[k + 1], horiz = (a % n) !== (b % n);
+        var x = (cx(a) + cx(b)) / 2, y = (cy(a) + cy(b)) / 2;
+        var w = horiz ? sz : th, h = horiz ? th : sz;
+        ph += '<div class="zp-seg" style="left:' + x + '%;top:' + y + '%;width:' + (horiz ? w + '%' : th + 'px') + ';height:' + (horiz ? th + 'px' : h + '%') + '"></div>';
+      }
+      if (localPath.length) ph += '<div class="zp-dot" style="left:' + cx(localPath[0]) + '%;top:' + cy(localPath[0]) + '%"></div>';
+      document.getElementById('zp-path').innerHTML = ph;
+    }
+
+    function showResults(state) {
+      stopTimer();
+      var n = state.size || 6, winner = state.winner;
+      setText('res-emoji', winner === window.myPid ? '🏆' : '🔗');
+      setText('res-title', winner === window.myPid ? 'Tu finis premier ! 🏆' : (winner ? Room.name(winner) + ' gagne' : 'Terminé'));
+      var order = Puzzle.rankByTime(state, function (s, pid) { return pathOf(s, pid).length; });
+      setHTML('res-rank', order.map(function (pid, i) {
+        var done = doneOf(state, pid);
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="res-rank-sc">' + (done ? '⏱ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : pathOf(state, pid).length + '/' + (n * n)) + '</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { stopTimer(); localPath = []; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); stopTimer(); localPath = []; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

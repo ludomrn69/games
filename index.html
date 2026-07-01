@@ -27,7 +27,20 @@
       box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
     .join-bar button:hover { transform: translateY(-2px); }
 
+    .search-bar { position: relative; max-width: 460px; margin: 0 auto 30px; }
+    .search-bar input { width: 100%; padding: 0.8rem 2.6rem 0.8rem 2.6rem; border: 1.5px solid var(--gold-light); border-radius: 14px;
+      background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1rem; }
+    .search-bar input:focus { outline: none; border-color: var(--gold); }
+    .search-bar .s-icon { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); font-size: 1rem; pointer-events: none; opacity: 0.7; }
+    .search-bar .s-clear { position: absolute; right: 0.55rem; top: 50%; transform: translateY(-50%); border: none; background: none;
+      cursor: pointer; font-size: 1.2rem; color: var(--ink-light); line-height: 1; padding: 4px 6px; display: none; }
+    .search-bar.has-value .s-clear { display: block; }
+    .search-empty { text-align: center; color: var(--ink-light); font-size: 0.95rem; margin: 10px 0 4px; display: none; }
+
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+    .cat-title { grid-column: 1 / -1; font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; color: var(--ink);
+      margin: 18px 2px 2px; padding-bottom: 6px; border-bottom: 1.5px solid var(--gold-light); display: flex; align-items: center; gap: 8px; }
+    .cat-title:first-child { margin-top: 0; }
     .card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none;
       background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; padding: 22px 14px 18px; color: var(--ink);
       box-shadow: var(--shadow); transition: transform .22s cubic-bezier(0.34,1.56,0.64,1), box-shadow .22s; }
@@ -41,6 +54,33 @@
     .card .off-badge { position: absolute; top: 7px; left: 8px; font-size: 0.85rem; line-height: 1; }
     .offline-note { text-align: center; color: var(--ink-light); font-size: 0.82rem; margin-top: 24px; line-height: 1.5; }
     .offline-note b { color: var(--ink); }
+
+    .plane-check { display: flex; align-items: center; gap: 12px; max-width: 470px; margin: 16px auto 0; padding: 12px 16px;
+      border-radius: 16px; border: 1.5px solid var(--gold-light); background: var(--white); box-shadow: var(--shadow); text-align: left; }
+    .plane-check.ready { border-color: #7fb069; }
+    .plane-check .pc-icon { font-size: 1.5rem; line-height: 1; }
+    .plane-check .pc-text { flex: 1; }
+    .plane-check .pc-title { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+    .plane-check .pc-sub { font-size: 0.78rem; color: var(--ink-light); margin-top: 2px; }
+    .plane-check .pc-btn { border: none; border-radius: 12px; padding: 0.55rem 0.95rem; font-weight: 700; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-size: 0.85rem; white-space: nowrap; }
+    .plane-check .pc-btn[disabled] { opacity: 0.55; cursor: default; }
+
+    /* ── Mode Playus Arena : mini-jeux réflexes façon appli mobile ── */
+    .playus-section { margin-top: 46px; }
+    .playus-banner { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-radius: 24px; margin-bottom: 18px;
+      background: linear-gradient(135deg, #5b4bdb 0%, #8b3fd6 55%, #c94b9e 100%); color: #fff;
+      box-shadow: 0 12px 34px rgba(91,75,219,0.38); position: relative; overflow: hidden; }
+    .playus-banner::after { content: ''; position: absolute; inset: 0; background:
+      radial-gradient(circle at 85% 20%, rgba(255,255,255,0.22), transparent 40%); pointer-events: none; }
+    .playus-banner .pb-emoji { font-size: 2.6rem; line-height: 1; }
+    .playus-banner .pb-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.45rem; }
+    .playus-banner .pb-sub { font-size: 0.82rem; opacity: 0.92; margin-top: 3px; }
+    .card.playus { background: linear-gradient(160deg, #2a2350, #17132e); border: 1px solid #3a3170; color: #fff; }
+    .card.playus:hover { box-shadow: 0 14px 30px rgba(139,63,214,0.35); }
+    .card.playus .name { color: #fff; }
+    .card.playus .players { color: #b3aae6; }
+    .card.playus .off-badge { filter: grayscale(0.2); }
   </style>
 </head>
 <body>
@@ -52,86 +92,326 @@
     </div>
 
     <div class="join-bar">
-      <input id="join-code" maxlength="4" placeholder="CODE" autocomplete="off" inputmode="text" aria-label="Code du salon">
+      <input id="join-code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text" aria-label="Code du salon">
       <button onclick="joinByCode()">Rejoindre une partie</button>
+    </div>
+
+    <div class="search-bar" id="search-bar">
+      <span class="s-icon">🔍</span>
+      <input id="game-search" type="search" placeholder="Rechercher un jeu…" autocomplete="off" aria-label="Rechercher un jeu">
+      <button class="s-clear" id="search-clear" type="button" aria-label="Effacer">✕</button>
     </div>
 
     <div class="grid" id="grid"></div>
 
+    <p class="search-empty" id="search-empty">Aucun jeu ne correspond à ta recherche.</p>
+
+    <section class="playus-section">
+      <div class="playus-banner">
+        <span class="pb-emoji">🕹️</span>
+        <div>
+          <div class="pb-title">Mode Playus Arena</div>
+          <div class="pb-sub">Mini-jeux de réflexes façon appli mobile · solo · hors-ligne · une partie = quelques secondes</div>
+        </div>
+      </div>
+      <div class="grid" id="playus-grid"></div>
+    </section>
+
     <p class="offline-note">✈️ = jouable <b>hors-ligne</b> (solo contre l'ordi ou en local sur un seul appareil).<br>Ouvre le site une fois avec connexion, puis il fonctionne <b>sans réseau</b> (idéal en avion).</p>
+
+    <div class="plane-check" id="plane-check" hidden>
+      <span class="pc-icon" id="pc-icon">✈️</span>
+      <div class="pc-text">
+        <div class="pc-title" id="pc-title">Vérification du mode hors-ligne…</div>
+        <div class="pc-sub" id="pc-sub"></div>
+      </div>
+      <button class="pc-btn" id="pc-btn" hidden onclick="preparePlane()">Préparer</button>
+    </div>
   </div>
 
   <div class="lb-toast" id="lb-toast"></div>
 
   <script>
-    var GAMES = [
-      { key: 'tu-preferes',     name: 'Tu préfères',     emoji: '🤔', players: '2–12', on: true },
-      { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true },
-      { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true },
-      { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true },
-      { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true },
-      { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true },
-      { key: 'pictionary',      name: 'Pictionary',      emoji: '🎨', players: '2–12', on: true },
-      { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true },
-      { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true },
-      { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true },
-      { key: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', players: '2',    on: true, offline: true },
-      { key: 'codenames',       name: 'Codenames',       emoji: '🕵️', players: '4–8',  on: true },
-      { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true },
-      { key: 'undercover',      name: 'Undercover',      emoji: '🕵️‍♂️', players: '3–12', on: true },
-      { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true },
-      { key: 'ludo',            name: 'Ludo',             emoji: '🐴', players: '2–4',  on: true, offline: true },
-      { key: 'juste-prix',      name: 'Le juste prix',   emoji: '💰', players: '2–8',  on: true, offline: true },
-      { key: 'telephone-dessine', name: 'Télé-dessiné',  emoji: '🖍️', players: '3–10', on: true },
-      { key: 'monopoly',        name: 'Monopoly',        emoji: '🏠', players: '2–6',  on: true, offline: true },
-      { key: 'cluedo',          name: 'Cluedo',          emoji: '🔎', players: '2–6',  on: true, offline: true },
-      { key: 'papayoo',         name: 'Papayoo',         emoji: '🐔', players: '3–6',  on: true, offline: true },
-      { key: 'trio',            name: 'Trio',            emoji: '🔢', players: '3–6',  on: true, offline: true },
-      { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true },
-      { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true },
-      { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true },
-      { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true },
-      { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true },
-      { key: 'millebornes',     name: 'Mille Bornes',    emoji: '🚗', players: '2–4',  on: true, offline: true },
-      { key: 'loupgarou',       name: 'Loup-Garou',      emoji: '🐺', players: '4–12', on: true, offline: true },
-      { key: 'timesup',         name: "Time's Up",       emoji: '⏱️', players: '1–12', on: true, offline: true }
+    var GAMES = [      { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true, type: 'mots' },
+      { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'reversi',         name: 'Reversi',         emoji: '⚫', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'dames',           name: 'Dames',           emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true, type: 'rapidité' },
+      { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true, type: 'mots' },
+      { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true, type: 'observation' },
+      { key: 'pictionary',      name: 'Pictionary',      emoji: '🎨', players: '2–12', on: true, type: 'dessin' },
+      { key: 'blackjack',       name: 'Blackjack',       emoji: '🂡', players: '1–6',  on: true, offline: true, type: 'cartes / 21' },
+      { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true, type: 'cartes' },
+      { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true, type: 'cartes' },
+      { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true, type: 'placement' },
+      { key: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', players: '2',    on: true, offline: true, type: 'déduction' },
+      { key: 'codenames',       name: 'Codenames',       emoji: '🕵️', players: '4–8',  on: true, type: 'mots / équipes' },
+      { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true, type: 'réflexion' },
+      { key: 'undercover',      name: 'Undercover',      emoji: '🕵️‍♂️', players: '3–12', on: true, type: 'déduction sociale' },
+      { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true, type: 'cartes' },
+      { key: 'ludo',            name: 'Petits chevaux',   emoji: '🐴', players: '2–4',  on: true, offline: true, type: 'plateau / dés' },
+      { key: 'juste-prix',      name: 'Le juste prix',   emoji: '💰', players: '2–8',  on: true, offline: true, type: 'déduction' },
+      { key: 'telephone-dessine', name: 'Télé-dessiné',  emoji: '🖍️', players: '3–10', on: true, type: 'dessin' },
+      { key: 'monopoly',        name: 'Monopoly',        emoji: '🏠', players: '2–6',  on: true, offline: true, type: 'plateau' },
+      { key: 'cluedo',          name: 'Cluedo',          emoji: '🔎', players: '2–6',  on: true, offline: true, type: 'déduction (plateau)' },
+      { key: 'papayoo',         name: 'Papayoo',         emoji: '🐔', players: '3–6',  on: true, offline: true, type: 'plis' },
+      { key: 'trio',            name: 'Trio',            emoji: '🔢', players: '3–6',  on: true, offline: true, type: 'mémoire' },
+      { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true, type: 'cartes simultanées' },
+      { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true, type: 'déduction (IA solveur)' },
+      { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true, type: 'coopératif / timing' },
+      { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true, type: 'puzzle / course (IA)' },
+      { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'queens',          name: 'Queens',          emoji: '👑', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'tango',           name: 'Tango',           emoji: '🌙', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'zip',             name: 'Zip',             emoji: '🔗', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'patches',         name: 'Patches',         emoji: '🧩', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
+      { key: 'sutom',           name: 'Sutom',           emoji: '🟥', players: '1–6',  on: true, offline: true, type: 'mot mystère (chrono)' },
+      { key: 'solitaire',       name: 'Solitaire',       emoji: '🃏', players: '1–6',  on: true, offline: true, type: 'cartes solo (chrono)' },
+      { key: 'balatro',         name: 'Balatro',         emoji: '🃏', players: '1',    on: true, offline: true, type: 'roguelike poker (solo)' },
+      { key: 'millebornes',     name: 'Mille Bornes',    emoji: '🚗', players: '2–4',  on: true, offline: true, type: 'cartes / course' },
+      { key: 'loupgarou',       name: 'Loup-Garou',      emoji: '🐺', players: '4–12', on: true, offline: true, type: 'déduction sociale (IA)' },
+      { key: 'timesup',         name: "Time's Up",       emoji: '⏱️', players: '1–12', on: true, offline: true, type: 'équipes (+ solo chrono)' },
+      { key: 'lapaye',          name: 'La Bonne Paye',   emoji: '💰', players: '2–6',  on: true, offline: true, type: 'gestion / cartes' },
+      { key: 'diamants',        name: 'Diamants',        emoji: '💎', players: '2–8',  on: true, offline: true, type: 'stop-ou-encore' },
+      { key: 'perudo',          name: 'Perudo',          emoji: '🎲', players: '2–6',  on: true, offline: true, type: 'dés / bluff' },
+      { key: 'aventuriers-du-rail', name: 'Aventuriers du Rail', emoji: '🚂', players: '2–5', on: true, offline: true, type: 'plateau / réseau' },
+      { key: 'nothanks',        name: 'No Thanks!',       emoji: '🙅', players: '2–7',  on: true, offline: true, type: 'stop-ou-encore' },
+      { key: 'qwixx',           name: 'Qwixx',           emoji: '🎲', players: '1–5',  on: true, offline: true, type: 'dés / roll-and-write' }
     ];
-    var grid = document.getElementById('grid');
-    grid.innerHTML = GAMES.map(function (g) {
+    // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
+    // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
+    var CATS = [
+      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'reversi', 'dames', 'morpion', 'mastermind', 'sudoku', 'queens', 'tango', 'zip', 'patches', '2048', 'qwixx'] },
+      { title: 'Cartes',              emoji: '🃏', keys: ['solitaire', 'balatro', 'blackjack', 'uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye', 'nothanks'] },
+      { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale', 'diamants', 'perudo'] },
+      { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'sutom', 'crack-list', 'pictionary', 'telephone-dessine'] },
+      { title: 'Observation & ambiance', emoji: '⚡', keys: ['dobble-emoji', 'lynx', 'timesup', 'themind'] },
+      { title: 'Plateau',             emoji: '🎲', keys: ['monopoly', 'ludo', 'blokus', 'aventuriers-du-rail'] }
+    ];
+    var byKey = {}; GAMES.forEach(function (g) { byKey[g.key] = g; });
+    var placed = {};
+    function cardHTML(g) {
       var cls = 'card' + (g.on ? '' : ' soon');
       var inner = (g.offline ? '<span class="off-badge" title="Jouable hors-ligne (solo / local)">✈️</span>' : '') +
         '<div class="emoji">' + g.emoji + '</div><div class="name">' + g.name + '</div><div class="players">' + g.players + ' joueurs</div>';
-      return g.on ? '<a class="' + cls + '" href="' + g.key + '.html">' + inner + '</a>'
+      return g.on ? '<a class="' + cls + '" href="games/' + g.key + '.html">' + inner + '</a>'
                   : '<div class="' + cls + '">' + inner + '</div>';
-    }).join('');
+    }
+    function sectionHTML(title, emoji, list) {
+      if (!list.length) return '';
+      return '<h2 class="cat-title">' + emoji + ' ' + title + '</h2>' + list.map(cardHTML).join('');
+    }
+    var grid = document.getElementById('grid');
+    var html = '';
+    CATS.forEach(function (cat) {
+      var list = cat.keys.map(function (k) { placed[k] = true; return byKey[k]; }).filter(Boolean);
+      html += sectionHTML(cat.title, cat.emoji, list);
+    });
+    var others = GAMES.filter(function (g) { return !placed[g.key]; });
+    html += sectionHTML('Autres', '🎯', others);
+    grid.innerHTML = html;
+
+    // ── Catalogue « Playus Arena » ────────────────────────────────────────────
+    // Mini-jeux réflexes autonomes rangés dans games/playus/. On utilise « s: »
+    // (slug) et non « key: » pour ne pas entrer en conflit avec la vérif de
+    // cohérence (tools/check.js n'attend ces pages qu'en sous-dossier).
+    var PLAYUS = [
+      // Groupe 1 — Timing & précision
+      { s: 'center-hit',   name: 'Center Hit',   emoji: '🎯', tag: 'Précision' },
+      { s: 'knife-throw',  name: 'Knife Throw',  emoji: '🔪', tag: 'Précision' },
+      { s: 'color-reflex', name: 'Color Reflex', emoji: '🟩', tag: 'Réflexe' },
+      { s: 'on-time',      name: 'On Time!',     emoji: '⏱️', tag: 'Timing' },
+      { s: 'perfect-shape',name: 'Perfect Shape',emoji: '🔵', tag: 'Timing' },
+      { s: 'target-speed', name: 'Target Speed', emoji: '◎',  tag: 'Vitesse' },
+      { s: 'times-up',     name: "Time's up!",   emoji: '⏳', tag: 'Survie' },
+      // Groupe 2 — Physique arcade
+      { s: 'flap',         name: 'Flap',         emoji: '🐤', tag: 'Arcade' },
+      { s: 'keep-up',      name: 'Keep up!',     emoji: '⚪', tag: 'Arcade' },
+      { s: 'descend',      name: 'Descend',      emoji: '🔵', tag: 'Arcade' },
+      { s: 'bloopy',       name: 'Bloopy',       emoji: '🟪', tag: 'Saut' },
+      { s: 'bouncy',       name: 'Bouncy',       emoji: '🔴', tag: 'Casse-brique' },
+      { s: 'trampbox',     name: 'Trampbox',     emoji: '📦', tag: 'Rebond' },
+      { s: 'balldrop',     name: 'Balldrop',     emoji: '🌀', tag: 'Chute' },
+      { s: 'ballracer',    name: 'Ballracer',    emoji: '🟡', tag: 'Esquive' },
+      // Groupe 3 — Vitesse & réflexes
+      { s: 'grid',         name: 'Grid',         emoji: '🟦', tag: 'Réflexe' },
+      { s: 'speed-tap',    name: 'Speed Tap',    emoji: '👆', tag: 'Vitesse' },
+      { s: 'swipe-fast',   name: 'Swipe Fast!',  emoji: '➡️', tag: 'Swipe' },
+      { s: 'react',        name: 'React!',       emoji: '⚡', tag: 'Réflexe' },
+      { s: 'count',        name: 'Count!',       emoji: '🔢', tag: 'Vitesse' },
+      { s: 'call-me',      name: 'Call me',      emoji: '🔗', tag: 'Tracé' },
+      { s: 'slicer',       name: 'Slicer',       emoji: '🔪', tag: 'Swipe' },
+      { s: 'balloon-pop',  name: 'Balloon Pop',  emoji: '🎈', tag: 'Réflexe' },
+      // Groupe 4 — Conduite & adresse
+      { s: 'drift',        name: 'Drift!',       emoji: '🏎️', tag: 'Conduite' },
+      { s: 'zig',          name: 'Zig',          emoji: '⚡', tag: 'Conduite' },
+      { s: 'kenneys-race', name: 'Kenneys Race', emoji: '🏁', tag: 'Course' },
+      { s: 'tilted',       name: 'Tilted',       emoji: '⚖️', tag: 'Équilibre' },
+      { s: 'sword-balance',name: 'Sword Balance',emoji: '⚔️', tag: 'Équilibre' },
+      { s: 'tower-stack',  name: 'Tower Stack',  emoji: '🗼', tag: 'Adresse' },
+      { s: 'ninja-chop',   name: 'Ninja Chop',   emoji: '🥷', tag: 'Rapidité' },
+      { s: 'dangerwall',   name: 'Dangerwall',   emoji: '🧊', tag: 'Esquive' },
+      { s: 'astro-glide',  name: 'Astro Glide',  emoji: '🚀', tag: 'Esquive' },
+      { s: 'jumpy',        name: 'Jumpy',        emoji: '🐸', tag: 'Esquive' },
+      { s: 'speedgolf',    name: 'Speedgolf',    emoji: '⛳', tag: 'Adresse' },
+      // Groupe 5 — Mémoire & logique
+      { s: 'color-memory', name: 'Color Memory', emoji: '🎨', tag: 'Mémoire' },
+      { s: 'memorizer',    name: 'Memorizer',    emoji: '✖️', tag: 'Mémoire' },
+      { s: 'memory',       name: 'Memory',       emoji: '🧠', tag: 'Mémoire' },
+      { s: 'balls-cups',   name: 'Balls & Cups', emoji: '🥤', tag: 'Observation' },
+      { s: 'boxguesser',   name: 'Boxguesser',   emoji: '📦', tag: 'Logique' },
+      { s: 'snake',        name: 'Snake',        emoji: '🐍', tag: 'Classique' },
+      { s: 'piano',        name: 'Piano',        emoji: '🎹', tag: 'Rythme' },
+      { s: 'rhythm',       name: 'Rhythm',       emoji: '🥁', tag: 'Rythme' }
+    ];
+    var pg = document.getElementById('playus-grid');
+    if (pg) {
+      pg.innerHTML = PLAYUS.map(function (g) {
+        return '<a class="card playus" href="games/playus/' + g.s + '.html">' +
+          '<span class="off-badge" title="Jouable hors-ligne">✈️</span>' +
+          '<div class="emoji">' + g.emoji + '</div>' +
+          '<div class="name">' + g.name + '</div>' +
+          '<div class="players">' + g.tag + '</div></a>';
+      }).join('');
+    }
+
+    // ── Recherche de jeu ──────────────────────────────────────────────────────
+    // Filtre en direct les cartes (jeux classiques + Playus Arena) par nom.
+    // Masque les titres de catégorie vides et la section Playus si rien ne matche.
+    (function setupSearch() {
+      var search = document.getElementById('game-search');
+      var clearBtn = document.getElementById('search-clear');
+      var bar = document.getElementById('search-bar');
+      var emptyMsg = document.getElementById('search-empty');
+      var gridEl = document.getElementById('grid');
+      var playusGrid = document.getElementById('playus-grid');
+      var playusSection = document.querySelector('.playus-section');
+      if (!search || !gridEl) return;
+      function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+      function nameOf(el) { var n = el.querySelector('.name'); return norm(n ? n.textContent : ''); }
+      function apply() {
+        var q = norm(search.value.trim());
+        bar.classList.toggle('has-value', !!search.value);
+        var anyVisible = false;
+        // Grille principale : parcours en gardant le titre de catégorie courant.
+        var currentTitle = null, groupHasVisible = false;
+        function closeGroup() { if (currentTitle) currentTitle.style.display = groupHasVisible ? '' : 'none'; }
+        Array.prototype.forEach.call(gridEl.children, function (el) {
+          if (el.classList.contains('cat-title')) { closeGroup(); currentTitle = el; groupHasVisible = false; return; }
+          var show = !q || nameOf(el).indexOf(q) !== -1;
+          el.style.display = show ? '' : 'none';
+          if (show) { groupHasVisible = true; anyVisible = true; }
+        });
+        closeGroup();
+        // Grille Playus Arena.
+        var playusVisible = false;
+        if (playusGrid) Array.prototype.forEach.call(playusGrid.children, function (el) {
+          var show = !q || nameOf(el).indexOf(q) !== -1;
+          el.style.display = show ? '' : 'none';
+          if (show) { playusVisible = true; anyVisible = true; }
+        });
+        if (playusSection) playusSection.style.display = playusVisible ? '' : 'none';
+        emptyMsg.style.display = (q && !anyVisible) ? 'block' : 'none';
+      }
+      search.addEventListener('input', apply);
+      if (clearBtn) clearBtn.addEventListener('click', function () { search.value = ''; apply(); search.focus(); });
+    })();
 
     var input = document.getElementById('join-code');
-    input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^A-Z]/g, ''); });
+    input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
 
     function toast(m) { var t = document.getElementById('lb-toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('show'); }, 2200); }
 
+    // Les règles strictes exigent une session authentifiée : on attend l'uid (auth
+    // anonyme) avant toute lecture/écriture de la base. Repli immédiat si l'auth est
+    // désactivée (règles permissives) ou déjà prête.
+    function whenReady(cb) {
+      if (window.GAMES_UID) return cb();
+      if (window.GAMES_USE_AUTH && window.whenGamesAuth) return window.whenGamesAuth(cb);
+      cb();
+    }
+
     function joinByCode() {
       var code = (input.value || '').trim().toUpperCase();
-      if (code.length < 4) { toast('Entre les 4 lettres du code'); return; }
-      firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms/' + code).once('value').then(function (snap) {
-        var room = snap.val();
-        if (!room || !room.game) { toast('Salon introuvable'); return; }
-        location.href = room.game + '.html?room=' + code;
-      }).catch(function () { toast('Connexion impossible'); });
+      if (code.length < 5) { toast('Entre les 5 caractères du code'); return; }
+      whenReady(function () {
+        firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms/' + code).once('value').then(function (snap) {
+          var room = snap.val();
+          if (!room || !room.game) { toast('Salon introuvable'); return; }
+          location.href = '/games/' + room.game + '.html?room=' + code;
+        }).catch(function () { toast('Connexion impossible'); });
+      });
     }
 
     // Nettoyage best-effort des vieux salons abandonnés (> 12 h). Borné à 20
-    // suppressions par visite. Nécessite l'index « createdAt » côté règles.
-    (function sweepOldRooms() {
+    // suppressions par visite. Nécessite l'index « createdAt » côté règles et une
+    // session authentifiée (le remove() est refusé sans auth sous règles strictes).
+    whenReady(function sweepOldRooms() {
       try {
         var maxAge = 12 * 60 * 60 * 1000;
         firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms')
           .orderByChild('createdAt').endAt(Date.now() - maxAge).limitToFirst(20)
           .once('value', function (snap) {
-            snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
+            snap.forEach(function (child) {
+              var v = child.val() || {};
+              // partie encore EN COURS (soirée marathon) → épargnée jusqu'à 48 h
+              if (v.status === 'playing' && (v.createdAt || 0) > Date.now() - 48 * 60 * 60 * 1000) return;
+              try { child.ref.remove(); } catch (e) {}
+            });
           });
       } catch (e) {}
+    });
+  </script>
+
+  <script>
+    // ── Indicateur « Prêt pour l'avion » ──────────────────────────────────────
+    // Dialogue avec le service worker (sw.js) pour savoir si toutes les pages/
+    // scripts/polices sont en cache, et propose de forcer le préchargement.
+    (function planeCheck() {
+      var box = document.getElementById('plane-check');
+      var icon = document.getElementById('pc-icon'), title = document.getElementById('pc-title');
+      var sub = document.getElementById('pc-sub'), btn = document.getElementById('pc-btn');
+      if (!('serviceWorker' in navigator)) return; // navigateur sans hors-ligne → on n'affiche rien
+
+      // Envoie un message au SW actif et attend sa réponse (canal dédié).
+      function ask(type) {
+        return navigator.serviceWorker.ready.then(function (reg) {
+          var w = reg.active || navigator.serviceWorker.controller;
+          if (!w) return null;
+          return new Promise(function (res) {
+            var ch = new MessageChannel();
+            var done = false;
+            ch.port1.onmessage = function (ev) { done = true; res(ev.data); };
+            setTimeout(function () { if (!done) res(null); }, 8000);
+            w.postMessage({ type: type }, [ch.port2]);
+          });
+        }).catch(function () { return null; });
+      }
+
+      function render(s) {
+        box.hidden = false;
+        if (!s) { icon.textContent = '✈️'; title.textContent = 'Mode hors-ligne'; sub.textContent = 'Statut indisponible — recharge la page une fois en ligne.'; btn.hidden = true; return; }
+        if (s.ready) {
+          box.classList.add('ready'); icon.textContent = '✅';
+          title.textContent = 'Prêt pour l\'avion';
+          sub.textContent = s.games + ' jeux + polices en cache — jouable sans réseau.';
+          btn.hidden = true;
+        } else {
+          box.classList.remove('ready'); icon.textContent = '✈️';
+          title.textContent = 'Préparer le mode hors-ligne';
+          sub.textContent = 'En cache : ' + s.cached + '/' + s.total + ' fichiers. Fais-le tant que tu as du réseau.';
+          btn.hidden = false; btn.disabled = false; btn.textContent = 'Préparer';
+        }
+      }
+
+      window.preparePlane = function () {
+        btn.disabled = true; btn.textContent = 'Préchargement…';
+        title.textContent = 'Téléchargement en cours…'; sub.textContent = 'Garde la page ouverte quelques secondes.';
+        ask('PRECACHE').then(render);
+      };
+
+      ask('CACHE_STATUS').then(render);
     })();
   </script>
 </body>

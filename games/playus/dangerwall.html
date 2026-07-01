@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Dangerwall · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 40%,#2a1050,#0a0418 75%);display:flex;flex-direction:column;align-items:center;touch-action:none}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#c9a8ff;text-decoration:none;font-size:1.4rem}.score{font-size:1.7rem}.best{font-size:.8rem;color:#a98cd6}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:absolute;bottom:20px;left:0;right:0;text-align:center;color:#c9a8ff;font-weight:700;font-size:.9rem;pointer-events:none}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(12,4,26,.85);backdrop-filter:blur(6px)}
+  .screen.hidden{display:none}.screen h1{font-size:2.2rem;font-weight:900}.screen p{color:#c9a8ff;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#8b3fd6,#c94b9e);box-shadow:0 8px 24px rgba(139,63,214,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint">Glisse pour déplacer le cube</div>
+    <div class="screen" id="start"><h1>🧊 Dangerwall</h1><p>Ton cube fonce dans le tunnel. Déplace-le pour passer par le trou des murs qui arrivent&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Écrasé&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">murs franchis</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  var BEST='playus_dangerwall_best',best=+localStorage.getItem(BEST)||0;
+  function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
+  // Le cube est en bas ; des murs descendent avec un trou ; on aligne le cube.
+  var state,score,cubeX=0,walls=[],speed,spawnAcc,cubeSz=0;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function mkWall(){var slots=4,hole=Math.floor(Math.random()*slots);return {y:-30,hole:hole,slots:slots,scored:false};}
+  function start(){resize();score=0;cubeX=W/2;walls=[mkWall()];speed=Math.max(3,H*0.005);spawnAcc=0;cubeSz=Math.max(30,W*0.09);
+    state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');}
+  function end(){state='over';document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='murs franchis';showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  function at(e){var rect=cv.getBoundingClientRect();return e.clientX-rect.left;}
+  stage.addEventListener('pointerdown',function(e){if(state==='play')cubeX=at(e);});
+  stage.addEventListener('pointermove',function(e){if(state==='play')cubeX=at(e);});
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);var cubeY=H-100;
+    cubeX=Math.max(cubeSz/2,Math.min(W-cubeSz/2,cubeX));
+    if(state==='play'){speed+=0.0018;spawnAcc+=speed;
+      if(spawnAcc>Math.max(160,340-score*3)){spawnAcc=0;walls.push(mkWall());}
+      walls.forEach(function(w){w.y+=speed;});
+      walls=walls.filter(function(w){
+        if(Math.abs(w.y-cubeY)<12+cubeSz/2){var slotW=W/w.slots,holeMin=w.hole*slotW,holeMax=holeMin+slotW;
+          if(cubeX-cubeSz/2<holeMin+6||cubeX+cubeSz/2>holeMax-6){end();return false;}}
+        if(w.y>cubeY+40){if(!w.scored){w.scored=true;score++;scoreEl.textContent=score;vibrate(8);}}
+        return w.y<H+40;});
+    }
+    // murs
+    walls.forEach(function(w){var slotW=W/w.slots;for(var s=0;s<w.slots;s++){if(s===w.hole)continue;
+      ctx.fillStyle='#8b3fd6';ctx.fillRect(s*slotW,w.y-14,slotW,28);ctx.fillStyle='#c94b9e';ctx.fillRect(s*slotW,w.y-14,slotW,5);}});
+    // cube
+    ctx.save();ctx.translate(cubeX,cubeY);ctx.fillStyle='#ffd45e';ctx.fillRect(-cubeSz/2,-cubeSz/2,cubeSz,cubeSz);
+    ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(-cubeSz/2,-cubeSz/2,cubeSz,6);
+    ctx.strokeStyle='#d98a10';ctx.lineWidth=3;ctx.strokeRect(-cubeSz/2,-cubeSz/2,cubeSz,cubeSz);ctx.restore();
+  }
+  resize();frame();
+})();
+</script>
+</body>
+</html>
