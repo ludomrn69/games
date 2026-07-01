@@ -40,7 +40,7 @@
   var BEST='playus_ballscups_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
   // 3 gobelets à positions 0,1,2. cups[k] = index de slot pour le gobelet k.
-  var state,score,cups,ballCup,lift,phase,shuffleLeft,anim;
+  var state,score,cups=[],ballCup,lift,phase,shuffleLeft,anim;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function slotX(s){return W*(0.28+s*0.22);}
   function start(){resize();score=0;scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');newRound();}

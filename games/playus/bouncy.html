@@ -39,7 +39,7 @@
   addEventListener('resize',resize);
   var BEST='playus_bouncy_best',best=+localStorage.getItem(BEST)||0;
   var PAL=['#ffd45e','#4ec97a','#4bc9c0','#ff9838','#ff7ad6'];
-  var state,score,lives,ball,r,g,targets,finger,fingerOn,px,py,ppx,ppy;
+  var state,score,lives,ball={x:0,y:0,vx:0,vy:0},r=0,g,targets,finger,fingerOn,px,py,ppx,ppy;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function spawnTargets(){targets=[];var n=5,m=44;for(var i=0;i<n;i++)targets.push({x:m+Math.random()*(W-2*m),y:H*0.14+Math.random()*H*0.22,r:Math.max(20,W*0.055),c:PAL[i%PAL.length]});}
   function start(){resize();score=0;lives=3;r=Math.max(15,W*0.045);g=Math.max(0.3,H*0.0006);

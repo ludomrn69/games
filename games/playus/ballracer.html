@@ -40,7 +40,7 @@
   var BEST='playus_ballracer_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
   // 3 couloirs, obstacles descendent, bille en bas.
-  var state,score,lane,obs,speed,acc,dist,dir;
+  var state,score,lane,obs=[],speed,acc,dist,dir;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function laneX(l){return W*(0.25+l*0.25);}
   function start(){resize();score=0;lane=1;obs=[];speed=Math.max(4,H*0.007);acc=0;dist=0;dir=0;

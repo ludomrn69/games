@@ -41,7 +41,7 @@
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
   // Vue 2D "déroulée" : la balle tombe verticalement au centre. Des anneaux
   // (plateformes) montent ; chacun a une ouverture (angle) + éventuel segment danger.
-  var state,score,rings,rot,by,vy,ringGap,dragX;
+  var state,score,rings=[],rot=0,by,vy,ringGap,dragX;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function mkRing(y){var open=Math.random()*6.283,danger=Math.random()<0.35;return {y:y,open:open,danger:danger,scored:false};}
   function start(){resize();score=0;rings=[];rot=0;by=90;vy=0;ringGap=H*0.24;dragX=null;

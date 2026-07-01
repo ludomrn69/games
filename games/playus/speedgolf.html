@@ -39,7 +39,7 @@
   addEventListener('resize',resize);
   var BEST='playus_speedgolf_best',best=+localStorage.getItem(BEST)||0;
   // Phases : aim (angle oscille) -> power (jauge oscille) -> shot (balle vole).
-  var state,score,timeLeft,tickT,phase,angle,angDir,power,powDir,ball,hole,ballV;
+  var state,score,timeLeft,tickT,phase,angle,angDir,power,powDir,ball={x:0,y:0},hole={x:0,y:0,r:0},ballV;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function newHole(){hole={x:W*(0.25+Math.random()*0.5),y:H*0.18+Math.random()*H*0.12,r:Math.max(16,W*0.05)};
     ball={x:W/2,y:H-70};ballV=null;angle=Math.PI/2;angDir=1;power=0.2;powDir=1;phase='aim';hint.textContent='Tape pour figer l\'ANGLE';}

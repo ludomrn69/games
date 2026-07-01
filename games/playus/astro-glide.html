@@ -39,7 +39,7 @@
   addEventListener('resize',resize);
   var BEST='playus_astroglide_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
-  var state,score,shipX,shipY,rocks,stars,speed,spawnAcc,dist;
+  var state,score,shipX,shipY,rocks=[],stars=[],speed,spawnAcc,dist;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function start(){resize();score=0;dist=0;shipX=W/2;shipY=H-110;rocks=[];speed=Math.max(3,H*0.006);spawnAcc=0;
     stars=[];for(var i=0;i<60;i++)stars.push({x:Math.random()*W,y:Math.random()*H,s:Math.random()*2+0.5});

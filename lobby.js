@@ -745,7 +745,7 @@
   // ── Nettoyage TTL des vieux salons (best-effort, appelé depuis l'accueil) ──
   // Supprime les salons abandonnés (créés il y a plus de maxAgeMs). Borné à
   // quelques suppressions par passage pour rester léger. Nécessite l'index
-  // « createdAt » côté règles Firebase (voir database.rules.example.json).
+  // « createdAt » côté règles Firebase (voir database.rules.json).
   function sweepOldRooms(maxAgeMs) {
     maxAgeMs = maxAgeMs || 12 * 60 * 60 * 1000; // 12 h par défaut
     if (typeof firebase === 'undefined' || !firebase.database) return;

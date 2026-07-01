@@ -46,7 +46,7 @@
   var BEST='playus_ninjachop_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
   // Pile de segments de tronc, chacun avec branche à gauche/droite/aucune.
-  var state,score,side,segs,time,maxTime,chopAnim;
+  var state,score,side,segs=[],time,maxTime,chopAnim=0;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function mkSeg(prevBranch){var b=Math.random()<0.45?(Math.random()<0.5?'L':'R'):'';
     // évite branche du même côté que la précédente immédiate pour rester jouable

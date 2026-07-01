@@ -37,7 +37,7 @@
   addEventListener('resize',resize);
   var BEST='playus_balloonpop_best',best=+localStorage.getItem(BEST)||0;
   var PAL=['#e8524a','#ffb020','#4ec97a','#c94bd6','#4bc9c0','#ff7ad6'];
-  var state,score,missed,timeLeft,tickT,balloons,spawnAcc,lastTs,pops;
+  var state,score,missed,timeLeft,tickT,balloons=[],spawnAcc,lastTs,pops=[];
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function start(){resize();score=0;missed=0;timeLeft=30;balloons=[];pops=[];spawnAcc=0;lastTs=performance.now();
     scoreEl.textContent='0';timerEl.textContent='30';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');

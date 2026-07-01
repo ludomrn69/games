@@ -37,7 +37,7 @@
   addEventListener('resize',resize);
   var BEST='playus_slicer_best',best=+localStorage.getItem(BEST)||0;
   var PAL=['#e8524a','#ffb020','#ffd45e','#4ec97a','#4bc9c0','#c94bd6'];
-  var state,score,lives,objs,trail,spawnAcc,g,lastTs;
+  var state,score,lives,objs=[],trail=[],spawnAcc,g,lastTs;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function start(){resize();score=0;lives=3;objs=[];trail=[];spawnAcc=0;g=Math.max(0.28,H*0.0005);lastTs=0;
     scoreEl.textContent='0';livesEl.textContent='❤️❤️❤️';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');

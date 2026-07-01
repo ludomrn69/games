@@ -87,15 +87,25 @@ la synchro temps réel.
 
 ## Mise en route (une seule fois)
 
-### 1. Ouvrir la branche `games` dans Firebase
-Le site réutilise le projet Firebase **flechettes-d54b1** (déjà sans login).
+### 1. Activer l'authentification anonyme
+Le site réutilise le projet Firebase **flechettes-d54b1**. Les salons en ligne
+exigent désormais un `auth.uid` (anonyme, invisible pour le joueur) : il faut donc
+activer l'authentification anonyme, sinon **toutes les écritures en ligne sont
+refusées** par les règles.
+
+- Console Firebase → **Authentication** → **Sign-in method** → activer **Anonyme**.
+
+L'UX reste « sans login » : la connexion anonyme se fait automatiquement au
+chargement. Le mode hors-ligne (avion) n'est jamais concerné.
+
+### 2. Ouvrir la branche `games` dans Firebase
 Il faut autoriser la lecture/écriture sous la branche `games` :
 
 - Console Firebase → **Realtime Database** → onglet **Règles**
-- Ajouter le bloc `games` (voir [`database.rules.example.json`](database.rules.example.json))
-  à côté des règles existantes, puis **Publier**.
+- Publier le bloc `games` (voir [`database.rules.json`](database.rules.json))
+  à côté des règles existantes.
 
-### 2. Tester en local
+### 3. Tester en local
 ```bash
 cd ~/Downloads/games
 python3 -m http.server 8000
@@ -103,7 +113,7 @@ python3 -m http.server 8000
 Ouvrir http://localhost:8000 dans **2 ou 3 onglets** pour simuler plusieurs
 joueurs.
 
-### 3. Déployer (Netlify)
+### 4. Déployer (Netlify)
 Glisser le dossier sur Netlify (ou `netlify deploy`). Aucun build.
 
 ## Architecture
@@ -144,6 +154,7 @@ node tools/check.js          # syntaxe + cohérence (rapide, lancé en CI)
 node tools/gen-readme.js     # régénère le tableau des jeux depuis index.html
 node tools/bench.js          # banc d'essai des IA (~1 min)
 node tools/bench.js --full   # plus de parties, profondeur de jeu réelle
+node tools/bench-playus.js   # smoke test des mini-jeux Playus (charge + démarre)
 ```
 Le tableau « Les jeux » ci-dessus est **généré** depuis le catalogue `GAMES` de
 `index.html` (source unique). Ne l'édite pas à la main : modifie `index.html` puis
@@ -152,29 +163,36 @@ Le benchmark vérifie que les bots « difficile » écrasent l'aléatoire/facile
 perdent jamais au morpion — garde-fou contre les régressions d'IA.
 
 ## Sécurité (modèle & limites)
-Le site est **sans authentification** par choix (on partage un code, on joue). La
-sécurité repose donc entièrement sur les **règles de la base** (voir
-[`database.rules.example.json`](database.rules.example.json)).
+Le site est **sans login visible** par choix (on partage un code, on joue). Sous le
+capot, chaque appareil obtient un `auth.uid` **anonyme** (connexion automatique et
+invisible) : c'est le mode **nominal** (`GAMES_USE_AUTH = true` dans
+[`firebase-init.js`](firebase-init.js)). La sécurité repose sur les **règles de la
+base** (voir [`database.rules.json`](database.rules.json)), qui exigent `auth != null`.
+
+**Prérequis :** l'auth anonyme doit être **activée** dans la console Firebase
+(voir « Mise en route » plus haut), sinon les écritures en ligne sont refusées.
 
 **Ce que les règles protègent :**
-- écriture limitée à `games/rooms/*` (aucune donnée parasite ailleurs sous `games`) ;
+- lecture/écriture réservées aux sessions authentifiées (`auth != null`) — bloque le
+  vandalisme par script anonyme ;
+- écriture limitée à `games/rooms/*` (aucune donnée parasite ailleurs sous `games`,
+  via `$other: false`) ;
 - longueurs bornées des codes de salon, pseudos, émojis et couleurs (anti-spam / anti-gonflement de la base) ;
+- chemins privés par joueur sous `games/private/<code>/<uid>` (lisibles/écrivables
+  seulement par leur propriétaire) ;
 - index `createdAt` pour le nettoyage des vieux salons.
 
 **Limites assumées (inhérentes au « sans login ») :**
 - un joueur **déjà dans un salon** peut lire l'état complet du salon — donc, pour les
   jeux à information cachée (Cluedo, Uno, Skyjo, Président, Papayoo, Trio, 6 qui
-  prend, Codenames…), un joueur curieux peut techniquement **tricher** en lisant la base ;
-- quelqu'un qui **devine un code** à 4 lettres peut écrire dans ce salon (pas d'anti-grief).
+  prend, Codenames…), un joueur curieux peut techniquement **tricher** en lisant la base
+  (sauf pour les données passées par les chemins privés) ;
+- l'auth anonyme n'exige aucune preuve d'identité : quelqu'un qui **devine un code**
+  à 4 lettres peut toujours rejoindre et écrire dans ce salon (pas d'anti-grief fort).
 
-**Vrai durcissement (optionnel) — auth anonyme Firebase :**
-Activer l'**authentification anonyme** (Console Firebase → Authentication → Sign-in
-method → Anonyme) garde l'UX « sans login » (connexion automatique et invisible) mais
-donne à chaque appareil un `auth.uid`. On peut alors exiger `auth != null` pour écrire,
-et lier `players/<pid>` à son `auth.uid` pour empêcher d'écrire à la place des autres.
-Cela ne masque pas les mains aux co-joueurs (il faudrait des chemins privés par joueur),
-mais bloque le vandalisme par script et l'usurpation. Non activé par défaut pour rester
-zéro-config.
+**Durcissement possible :** lier chaque `players/<pid>` à son `auth.uid` dans les
+règles pour empêcher d'écrire à la place des autres, et étendre l'usage des chemins
+privés (`games/private/*`) pour masquer les mains aux co-joueurs.
 
 ## Idées de jeux à ajouter
 Des jeux qui collent au format (multi sans login, mobile, parties courtes, IA possible) :

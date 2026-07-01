@@ -42,7 +42,7 @@
     var o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.type='triangle';o.connect(g);g.connect(ac.destination);
     g.gain.setValueAtTime(0.0001,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.3,ac.currentTime+0.01);
     g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.25);o.start();o.stop(ac.currentTime+0.27);}catch(e){}}
-  var state,tiles,score,speed,spawnAcc,lastTs,rowH;
+  var state,tiles=[],score,speed,spawnAcc,lastTs,rowH;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function start(){resize();tiles=[];score=0;speed=Math.max(3,H*0.006);spawnAcc=999;lastTs=performance.now();rowH=H*0.24;si=0;
     try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();}catch(e){}

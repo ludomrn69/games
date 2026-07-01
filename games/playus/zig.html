@@ -41,7 +41,7 @@
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
   // La bille se déplace en diagonale ; le monde défile en bas-gauche. Le chemin est
   // une suite de segments qui zigzaguent. On garde la bille dessus.
-  var state,score,dir,path,camX,camY,speed,ballWX,ballWY,tileW;
+  var state,score,dir,path=[],camX,camY,speed,ballWX=0,ballWY=0,tileW;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function extendPath(){var last=path[path.length-1];var nd=Math.random()<0.5?1:-1;
     // ajoute quelques tuiles dans la direction courante puis tourne

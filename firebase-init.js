@@ -6,10 +6,11 @@
   Database, isolées du reste (flechettes, quiz crémaillère…).
 
   La clé API web est publique par design : la sécurité repose sur les règles de
-  la base (voir database.rules.example.json — il faut ouvrir la branche `games`
+  la base (voir database.rules.json — il faut ouvrir la branche `games`
   en lecture/écriture dans la console Firebase).
 
-  Pas d'authentification : n'importe qui ayant le lien peut jouer.
+  Auth anonyme ACTIVE (invisible) : chaque appareil obtient un auth.uid, exigé par
+  les règles. UX toujours « sans login » (aucun formulaire). Voir plus bas.
 */
 (function () {
   var config = {
@@ -28,13 +29,15 @@
     firebase.initializeApp(config);
   }
 
-  // ── Auth anonyme (SecOps) — DORMANTE par défaut ─────────────────────────────
-  // Attribue un uid cryptographique par session, à lier à la présence et aux
-  // règles strictes. Passe GAMES_USE_AUTH à true UNIQUEMENT après avoir :
-  //   1. activé « Anonymous » dans Firebase Console → Authentication ;
-  //   2. déployé database.rules.json (règles strictes basées sur auth).
-  // Tant que c'est false : RIEN ne change (identité = pid localStorage, règles
-  // actuelles), et le mode hors-ligne (avion) n'est jamais concerné.
+  // ── Auth anonyme (SecOps) — ACTIVE (mode nominal) ───────────────────────────
+  // Attribue un uid cryptographique par session, lié à la présence et aux règles
+  // strictes (database.rules.json exige auth != null). PRÉREQUIS côté console :
+  //   1. « Anonymous » activé dans Firebase Console → Authentication ;
+  //   2. database.rules.json déployées (règles strictes basées sur auth).
+  // Si ces prérequis manquent, les écritures EN LIGNE sont refusées (le mode
+  // hors-ligne / avion n'est jamais concerné). Repasser à false RÉTABLIT l'ancien
+  // modèle sans auth (identité = pid localStorage) — pense alors à assouplir les
+  // règles en conséquence, sinon plus rien ne peut écrire.
   window.GAMES_USE_AUTH = true;
   window.GAMES_UID = null;
   var authWaiters = [];

@@ -40,7 +40,7 @@
   var BEST='playus_dangerwall_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
   // Le cube est en bas ; des murs descendent avec un trou ; on aligne le cube.
-  var state,score,cubeX,walls,speed,spawnAcc,cubeSz;
+  var state,score,cubeX=0,walls=[],speed,spawnAcc,cubeSz=0;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function mkWall(){var slots=4,hole=Math.floor(Math.random()*slots);return {y:-30,hole:hole,slots:slots,scored:false};}
   function start(){resize();score=0;cubeX=W/2;walls=[mkWall()];speed=Math.max(3,H*0.005);spawnAcc=0;cubeSz=Math.max(30,W*0.09);

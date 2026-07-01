@@ -37,7 +37,7 @@
   addEventListener('resize',resize);
   var BEST='playus_flap_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
-  var state,score,by,vy,pipes,gap,pw,speed,spawnX;
+  var state,score,by,vy,pipes=[],gap,pw,speed,spawnX;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function start(){resize();score=0;by=H*0.4;vy=0;pipes=[];gap=Math.max(150,H*0.30);pw=64;speed=2.6;spawnX=0;
     scoreEl.textContent='0';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');addPipe(W+80);addPipe(W+80+(W*0.62));}

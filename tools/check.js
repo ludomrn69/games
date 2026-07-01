@@ -91,9 +91,8 @@ gameHtmls.forEach(function (f) {
   else if (sw.indexOf("'" + eng + "'") < 0) err(eng + ' (moteur de games/' + f + ') absent du cache service worker (sw.js)');
 });
 
-// 4) JSON (on valide les fichiers présents ; les règles peuvent exister en version
-// permissive .example et/ou en version stricte database.rules.json)
-['manifest.webmanifest', 'database.rules.example.json', 'database.rules.json']
+// 4) JSON (on valide les fichiers présents)
+['manifest.webmanifest', 'database.rules.json']
   .filter(function (f) { return fs.existsSync(path.join(ROOT, f)); })
   .forEach(function (f) {
     try { JSON.parse(read(f)); } catch (e) { err('JSON invalide : ' + f + ' — ' + e.message); }

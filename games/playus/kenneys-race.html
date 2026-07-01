@@ -42,7 +42,7 @@
   var BEST='playus_kenneysrace_best',best=+localStorage.getItem(BEST)||0;
   // Voiture avec position + cap. Elle avance toujours. Portes réparties dans un
   // grand monde ; caméra suit la voiture. Toucher une porte = +1 & nouvelle porte.
-  var state,score,carX,carY,heading,steer,timeLeft,tickT,gate,speed;
+  var state,score,carX=0,carY=0,heading,steer,timeLeft,tickT,gate={x:0,y:0},speed;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function newGate(){gate={x:carX+(Math.random()-0.5)*W*1.6,y:carY+(Math.random()-0.5)*H*1.6};}
   function start(){resize();score=0;carX=0;carY=0;heading=0;steer=0;speed=Math.max(3.2,H*0.006);timeLeft=40;

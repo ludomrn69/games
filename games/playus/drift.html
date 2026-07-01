@@ -42,7 +42,7 @@
   // Mécanique "pivot / twist" : la voiture avance droit. En maintenant, elle
   // s'accroche au plot cible et tourne en cercle autour. En relâchant, elle
   // repart en ligne droite (tangente). Il faut relâcher pour viser le plot suivant.
-  var state,score,car,heading,mode,pegs,cur,pegR,orbitR,orbitA,orbitDir,speed,holding,trail;
+  var state,score,car={x:0,y:0},heading,mode,pegs=[],cur,pegR,orbitR,orbitA,orbitDir,speed,holding,trail=[];
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function addPeg(){var last=pegs[pegs.length-1];var side=(pegs.length%2===0)?1:-1;
     pegs.push({x:last.x+side*(W*0.26),y:last.y-(H*0.30)});}
