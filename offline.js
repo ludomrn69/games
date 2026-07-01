@@ -58,7 +58,13 @@
       child: function (sub) { return childRef(parts.concat(String(sub).split('/'))); },
       onDisconnect: function () { return noDisc; },
       on: function () {}, off: function () {},
-      once: function (cb) { if (typeof cb === 'function') cb({ val: function () { return clone(getPath(parts)); } }); return Promise.resolve({ val: function () { return clone(getPath(parts)); } }); }
+      // Signature Firebase : once('value', cb) — on tolère aussi once(cb).
+      once: function (ev, cb) {
+        var f = (typeof ev === 'function') ? ev : cb;
+        var s = { val: function () { return clone(getPath(parts)); } };
+        if (typeof f === 'function') f(s);
+        return Promise.resolve(s);
+      }
     };
   }
 
@@ -74,7 +80,8 @@
     child: function (path) { return childRef(String(path).split('/')); },
     onDisconnect: function () { return noDisc; },
     on: function () {}, off: function () {},
-    once: function (cb) { if (typeof cb === 'function') cb(snap()); return Promise.resolve(snap()); }
+    // Signature Firebase : once('value', cb) — on tolère aussi once(cb).
+    once: function (ev, cb) { var f = (typeof ev === 'function') ? ev : cb; if (typeof f === 'function') f(snap()); return Promise.resolve(snap()); }
   };
 
   // ── Lobby factice ────────────────────────────────────────────────────────────

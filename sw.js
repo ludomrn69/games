@@ -18,10 +18,11 @@
 */
 // La version est estampillée automatiquement (empreinte du contenu mis en cache)
 // par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
-var CACHE = 'jeux-06cf811612';
+var CACHE = 'jeux-354b212e8b';
 var ASSETS = [
   './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
   'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',
+  'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
   'avatars.js', 'common.js', 'daily.js', 'firebase-init.js', 'head.js', 'lobby.js', 'nav.js', 'offline.js', 'presence.js', 'puzzle.js', 'sfx.js', 'stats.js',
   'ai/aventuriers-engine.js', 'ai/bataille-navale-ai.js', 'ai/blokus-ai.js', 'ai/cluedo-engine.js', 'ai/dames-ai.js', 'ai/mastermind-ai.js', 'ai/millebornes-ai.js', 'ai/monopoly-engine.js', 'ai/morpion-ai.js', 'ai/p4-ai.js', 'ai/papayoo-ai.js', 'ai/president-ai.js', 'ai/reversi-ai.js', 'ai/sixnimmt-ai.js', 'ai/skyjo-ai.js', 'ai/trio-ai.js', 'ai/uno-ai.js',
   'games/2048.html', 'games/aventuriers-du-rail.html', 'games/balatro.html', 'games/bataille-navale.html', 'games/blackjack.html', 'games/blokus.html',
@@ -90,12 +91,15 @@ self.addEventListener('fetch', function (e) {
 
   var isPage = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/';
   if (isPage) {
-    // réseau d'abord, repli cache
+    // réseau d'abord, repli cache. ignoreSearch : le précache contient
+    // « games/uno.html » SANS query, mais on y navigue avec « ?mode=solo » ou
+    // « ?room=CODE » — sans ce drapeau, le repli hors-ligne raterait le cache
+    // et servirait l'accueil à la place du jeu (mode avion cassé).
     e.respondWith(
       fetch(req).then(function (res) {
         var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
         return res;
-      }).catch(function () { return caches.match(req).then(function (m) { return m || caches.match('/index.html'); }); })
+      }).catch(function () { return caches.match(req, { ignoreSearch: true }).then(function (m) { return m || caches.match('/index.html'); }); })
     );
   } else {
     // cache d'abord, repli réseau (et mise en cache)

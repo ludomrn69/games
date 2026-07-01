@@ -54,26 +54,28 @@ function scanAssets() {
   var rootJs = ls('', endsWith('.js')).filter(function (f) { return f !== 'sw.js'; });
   var rootCss = ls('', endsWith('.css'));      // theme, game, fonts
   var fonts = ls('fonts', endsWith('.woff2')); // polices auto-hébergées
+  var icons = ls('icons', endsWith('.png'));   // icônes PWA (manifest + apple-touch)
   var ai = ls('ai', endsWith('.js'));          // moteurs / IA partagés
   var games = lsRec('games', endsWith('.html')); // toutes les pages de jeu (+ sous-dossiers, ex : games/playus/)
 
   // './' est l'alias de index.html (racine servie sans nom de fichier).
   var head = ['./', 'index.html'];
   var meta = fs.existsSync(path.join(ROOT, 'manifest.webmanifest')) ? ['manifest.webmanifest'] : [];
-  return head.concat(rootCss, meta, fonts, rootJs, ai, games);
+  return head.concat(rootCss, meta, fonts, icons, rootJs, ai, games);
 }
 
 // Sérialise ASSETS en un bloc lisible, regroupé par famille (une famille par ligne
 // logique), pour garder un diff propre dans sw.js.
 function serializeAssets(assets) {
   var groups = {
-    head:  [], css: [], meta: [], fonts: [], js: [], ai: [], games: []
+    head:  [], css: [], meta: [], fonts: [], icons: [], js: [], ai: [], games: []
   };
   assets.forEach(function (a) {
     if (a === './' || a === 'index.html') groups.head.push(a);
     else if (a === 'manifest.webmanifest') groups.meta.push(a);
     else if (a.endsWith('.css')) groups.css.push(a);
     else if (a.indexOf('fonts/') === 0) groups.fonts.push(a);
+    else if (a.indexOf('icons/') === 0) groups.icons.push(a);
     else if (a.indexOf('ai/') === 0) groups.ai.push(a);
     else if (a.indexOf('games/') === 0) groups.games.push(a);
     else if (a.endsWith('.js')) groups.js.push(a);
@@ -83,6 +85,7 @@ function serializeAssets(assets) {
   var lines = [];
   lines.push('  ' + q(groups.head.concat(groups.css, groups.meta)) + ',');
   if (groups.fonts.length) lines.push('  ' + q(groups.fonts) + ',');
+  if (groups.icons.length) lines.push('  ' + q(groups.icons) + ',');
   if (groups.js.length) lines.push('  ' + q(groups.js) + ',');
   if (groups.ai.length) lines.push('  ' + q(groups.ai) + ',');
   // Les pages de jeu : plusieurs par ligne pour rester compact mais lisible.

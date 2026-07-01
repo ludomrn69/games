@@ -21,6 +21,9 @@
   document.title = (title || '').replace(/[^\p{L}\p{N}!?'’.()\- ]+$/u, '').replace(/\s+$/, '') || title;
   add('meta', { name: 'robots', content: 'noindex, nofollow' });
   add('link', { rel: 'icon', href: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>" + emoji + "</text></svg>" });
+  // iOS ignore les icônes du manifest : l'« Ajouter à l'écran d'accueil » a besoin
+  // d'un apple-touch-icon en PNG (sinon icône blanche). Voir icons/.
+  add('link', { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' });
   add('link', { rel: 'stylesheet', href: '/fonts.css' });
   add('link', { rel: 'stylesheet', href: '/theme.css' });
   add('link', { rel: 'stylesheet', href: '/game.css' });

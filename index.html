@@ -353,7 +353,12 @@
         firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms')
           .orderByChild('createdAt').endAt(Date.now() - maxAge).limitToFirst(20)
           .once('value', function (snap) {
-            snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
+            snap.forEach(function (child) {
+              var v = child.val() || {};
+              // partie encore EN COURS (soirée marathon) → épargnée jusqu'à 48 h
+              if (v.status === 'playing' && (v.createdAt || 0) > Date.now() - 48 * 60 * 60 * 1000) return;
+              try { child.ref.remove(); } catch (e) {}
+            });
           });
       } catch (e) {}
     });

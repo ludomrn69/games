@@ -121,6 +121,7 @@
   function soundOn() { try { return localStorage.getItem('games.sound') !== '0'; } catch (e) { return true; } }
   function beep() {
     if (!soundOn()) return;
+    if (window.Sfx) return Sfx.play('turn'); // même son, synthèse mutualisée (sfx.js)
     try {
       _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
       if (_audioCtx.state === 'suspended') _audioCtx.resume();
@@ -135,7 +136,7 @@
   window.Lobby.soundOn = soundOn;
   window.Lobby.turnAlertFor = function (room) {
     var mine = !!(room && room.status === 'playing' && !room.winner && room.turn === window.myPid);
-    if (mine && !_lastMine) { if (window.Sfx) Sfx.play('turn'); else beep(); try { if (soundOn() && navigator.vibrate) navigator.vibrate(180); } catch (e) {} }
+    if (mine && !_lastMine) { beep(); try { if (soundOn() && navigator.vibrate) navigator.vibrate(180); } catch (e) {} }
     _lastMine = mine;
     updateTurnClock(room);
   };
@@ -341,7 +342,10 @@
         location.href = '/games/' + room.game + '.html?room=' + code; return;
       }
       var players = room.players || {};
-      var iAmIn = !!players[window.myPid];
+      // « déjà dedans » : présent dans players, OU membre de la manche en cours
+      // (room.order) — couvre la reconnexion après une coupure qui aurait effacé
+      // le nœud joueur (on peut alors revenir au lieu d'être exclu).
+      var iAmIn = !!players[window.myPid] || (room.order || []).indexOf(window.myPid) >= 0;
       var onlineCount = Object.keys(players).filter(function (k) { return players[k].online; }).length;
       var max = cfg().maxPlayers || 8;
       if (!iAmIn && room.status !== 'waiting') { lbToast('La partie a déjà commencé'); if (fromUrl) window.showScreen('s-home'); return; }
@@ -407,6 +411,27 @@
     }
   }
 
+  // ── Garde « anti-fantôme » (salle d'attente SEULEMENT) ────────────────────
+  // En attente : si on ferme l'onglet, notre nœud joueur disparaît (liste nette).
+  // En PARTIE : surtout pas — le nœud joueur porte l'état du jeu (main, score…) ;
+  // une coupure réseau le détruirait et exclurait le joueur définitivement. On
+  // annule donc le remove() au démarrage, et presence.js se contente de basculer
+  // online=false à la déconnexion. (cancel() annule aussi les onDisconnect des
+  // chemins ENFANTS → on ré-arme celui de presence juste après.)
+  var _ghostArmed = false;
+  function armGhostGuard() {
+    if (_ghostArmed || !window.roomRef || !window.myPid) return;
+    try { window.roomRef.child('players/' + window.myPid).onDisconnect().remove(); _ghostArmed = true; } catch (e) {}
+  }
+  function disarmGhostGuard() {
+    if (!_ghostArmed || !window.roomRef || !window.myPid) return;
+    _ghostArmed = false;
+    try {
+      window.roomRef.child('players/' + window.myPid).onDisconnect().cancel();
+      window.roomRef.child('players/' + window.myPid + '/online').onDisconnect().set(false);
+    } catch (e) {}
+  }
+
   // ── Entrer dans la salle d'attente ────────────────────────────────────────
   function enterRoom() {
     var c = cfg();
@@ -425,12 +450,12 @@
       };
       return cur;
     }, function (err, committed, snap) {
-      // anti-fantôme : si on ferme l'onglet pendant l'attente, on disparaît.
-      try { window.roomRef.child('players/' + window.myPid).onDisconnect().remove(); } catch (e) {}
+      var status = (snap && snap.val() && snap.val().status) || 'waiting';
+      // anti-fantôme : seulement tant qu'on ATTEND (voir armGhostGuard).
+      if (status === 'waiting') armGhostGuard();
       if (window.GamePresence) GamePresence.start(window.roomRef, window.myPid);
       // Si la partie n'a pas (encore) commencé, on montre la salle d'attente ;
       // sinon on laisse le jeu router vers son écran de jeu (reconnexion en cours).
-      var status = (snap && snap.val() && snap.val().status) || 'waiting';
       if (status === 'waiting') window.showScreen('s-lobby');
       if (!window.listenersOn) { window.roomRef.on('value', masterOnState); window.listenersOn = true; }
       if (c.afterJoin) try { c.afterJoin(); } catch (e) {}
@@ -448,9 +473,12 @@
     if (status === 'waiting') {
       // En attente : la salle d'attente est gérée ici. On y revient si on était
       // sur l'écran de jeu (fin de partie) ou encore sur l'accueil (auto-join).
+      armGhostGuard(); // retour au lobby (rejouer) → la garde anti-fantôme reprend
       if (isActive('s-playing') || isActive('s-home')) window.showScreen('s-lobby');
       if (isActive('s-lobby')) renderLobby(room);
       maybeAutoStart(room);
+    } else {
+      disarmGhostGuard(); // partie lancée : le nœud joueur ne doit plus s'effacer
     }
     // Dans tous les cas on laisse le jeu réagir (il gère son écran 's-playing').
     if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
@@ -753,7 +781,13 @@
     try {
       db().ref(ROOT + '/rooms').orderByChild('createdAt').endAt(Date.now() - maxAgeMs).limitToFirst(20)
         .once('value', function (snap) {
-          snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
+          snap.forEach(function (child) {
+            var v = child.val() || {};
+            // partie encore EN COURS (createdAt figé à la création : une soirée
+            // marathon dépasse 12 h) → épargnée jusqu'à 48 h.
+            if (v.status === 'playing' && (v.createdAt || 0) > Date.now() - 48 * 60 * 60 * 1000) return;
+            try { child.ref.remove(); } catch (e) {}
+          });
         });
     } catch (e) {}
   }
@@ -761,6 +795,7 @@
   function leaveRoom() {
     var c = cfg();
     if (window.roomRef && window.myPid) {
+      _ghostArmed = false;
       try { window.roomRef.child('players/' + window.myPid).onDisconnect().cancel(); } catch (e) {}
       // On se retire ; si on était le dernier, le salon est supprimé (pas de
       // coquille vide qui traîne dans la base).
@@ -806,7 +841,10 @@
   }
 
   // ── API publique appelée par les onclick injectés et par les jeux ─────────
-  window.Lobby = {
+  // FUSION (surtout pas d'écrasement) : window.Lobby porte déjà toggleSound,
+  // soundOn et turnAlertFor, posés plus haut — un objet littéral les perdrait
+  // (bip de tour, chrono et coup automatique sur timeout morts en silence).
+  Object.assign(window.Lobby, {
     createRoom: createRoom,
     joinRoomByCode: joinRoomByCode,
     joinFromInput: joinFromInput,
@@ -826,5 +864,5 @@
     sweepOldRooms: sweepOldRooms,
     isOffline: isOffline,
     absentBanner: absentBanner
-  };
+  });
 })();
