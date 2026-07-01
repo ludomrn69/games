@@ -136,10 +136,23 @@
     updateTurnClock(room);
   };
 
-  // ── Chrono de tour (visuel) — pastille flottante, par jeu au tour par tour ────
-  // Compte à rebours local depuis le dernier changement de `turn`. Purement
-  // informatif (urgence) ; ne saute pas le tour automatiquement.
-  var _clockTurn = null, _clockStart = 0, _clockInt = null, TURN_SECONDS = 60;
+  // ── Chrono de tour — pastille flottante, jeux EN LIGNE au tour par tour ───────
+  // Compte à rebours local depuis le dernier changement de `turn`. À zéro, si un
+  // JOUEUR HUMAIN traîne (ou s'est déconnecté), l'HÔTE joue un coup légal à sa
+  // place via l'IA du jeu (cfg.bot) — la partie ne reste jamais bloquée.
+  //   • EN LIGNE uniquement : en solo/local (mode avion) le chrono est masqué et
+  //     rien n'est joué automatiquement → le hors-ligne n'est pas touché.
+  //   • Réutilise le mécanisme « l'hôte pilote les ordis » : aucun double coup.
+  var _clockTurn = null, _clockStart = 0, _clockInt = null, _timedOutTurn = null;
+  var TURN_SECONDS_DEFAULT = 40;
+  // Temps adapté à chaque jeu (secondes). Un jeu peut surcharger via cfg.turnSeconds.
+  var TURN_SECONDS_BY_GAME = {
+    morpion: 20, puissance4: 25, reversi: 35, dames: 45, mastermind: 40,
+    uno: 30, skyjo: 35, president: 35, papayoo: 40, millebornes: 40, trio: 25, blackjack: 25,
+    blokus: 45, ludo: 25, monopoly: 60, cluedo: 45, 'bataille-navale': 30
+  };
+  function turnSecondsFor() { var c = cfg() || {}; return c.turnSeconds || TURN_SECONDS_BY_GAME[c.gameKey] || TURN_SECONDS_DEFAULT; }
+  function isOfflineMode() { try { var m = new URLSearchParams(location.search).get('mode'); return m === 'solo' || m === 'local'; } catch (e) { return false; } }
   function turnClockEl() {
     var el = document.getElementById('lb-turnclock');
     if (!el) { el = document.createElement('div'); el.id = 'lb-turnclock'; el.className = 'lb-turnclock'; document.body.appendChild(el); }
@@ -147,20 +160,38 @@
   }
   function updateTurnClock(room) {
     var active = room && room.status === 'playing' && !room.winner && room.turn;
-    // Salon solo/local (un seul humain présent) : pas de chrono utile.
-    var online = room && room.players && Object.keys(room.players).filter(function (k) { return room.players[k].online && !room.players[k].isBot; }).length > 1;
-    if (!active || !online) { if (_clockInt) { clearInterval(_clockInt); _clockInt = null; } var e = document.getElementById('lb-turnclock'); if (e) e.style.display = 'none'; _clockTurn = null; return; }
-    if (room.turn !== _clockTurn) { _clockTurn = room.turn; _clockStart = Date.now(); }
+    // Au moins 2 HUMAINS dans la manche (exclut solo + ordis) et jeu EN LIGNE.
+    var humans = active && room.order ? room.order.filter(function (pid) { return room.players[pid] && !room.players[pid].isBot; }) : [];
+    var multi = humans.length >= 2 && !isOfflineMode();
+    if (!active || !multi) { if (_clockInt) { clearInterval(_clockInt); _clockInt = null; } var e = document.getElementById('lb-turnclock'); if (e) e.style.display = 'none'; _clockTurn = null; return; }
+    if (room.turn !== _clockTurn) { _clockTurn = room.turn; _clockStart = Date.now(); _timedOutTurn = null; }
     if (_clockInt) clearInterval(_clockInt);
+    var total = turnSecondsFor();
     var render = function () {
-      var left = Math.max(0, TURN_SECONDS - Math.floor((Date.now() - _clockStart) / 1000));
+      var left = Math.max(0, total - Math.floor((Date.now() - _clockStart) / 1000));
       var el = turnClockEl(); el.style.display = 'block';
       var mine = room.turn === window.myPid;
       el.textContent = '⏱ ' + left + 's' + (mine ? ' — à toi' : '');
       el.className = 'lb-turnclock' + (left <= 10 ? ' urgent' : '') + (mine ? ' mine' : '');
-      if (left <= 0) { clearInterval(_clockInt); _clockInt = null; }
+      if (left <= 0) {
+        clearInterval(_clockInt); _clockInt = null;
+        if (_timedOutTurn !== _clockTurn) { _timedOutTurn = _clockTurn; timeoutActivePlayer(window.room); }
+      }
     };
     render(); _clockInt = setInterval(render, 1000);
+  }
+  // Joue un coup pour le joueur actif humain qui a dépassé le temps (hôte seulement).
+  function timeoutActivePlayer(room) {
+    var c = cfg();
+    if (!c || !c.bot || !room || room.status !== 'playing' || room.winner) return;
+    if (room.host !== window.myPid) return;              // seul l'hôte pilote (comme les ordis)
+    if (isOfflineMode()) return;                          // sécurité : jamais en mode avion
+    var pid = botActivePid(room), p = pid && room.players && room.players[pid];
+    if (!p || p.isBot) return;                            // uniquement à la place d'un HUMAIN
+    var saved = window.myPid; window.myPid = pid;
+    try { c.bot(JSON.parse(JSON.stringify(room)), pid); }
+    catch (e) { console.error('timeout autoplay', e); }
+    finally { window.myPid = saved; }
   }
 
   // ── Difficulté des ordis (partagée par tous les jeux) ─────────────────────
