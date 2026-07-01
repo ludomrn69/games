@@ -17,6 +17,8 @@ jobs:
         run: node tools/check.js
       - name: README à jour avec le catalogue index.html
         run: node tools/gen-readme.js --check
+      - name: Version du cache (sw.js) à jour avec le contenu préchargé
+        run: node tools/gen-sw-version.js --check
       - name: Banc d'essai des IA de recherche (taux de victoire attendus)
         run: node tools/bench.js
       - name: Banc d'essai des IA des jeux (légalité + force vs aléatoire)

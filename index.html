@@ -44,6 +44,17 @@
     .card .off-badge { position: absolute; top: 7px; left: 8px; font-size: 0.85rem; line-height: 1; }
     .offline-note { text-align: center; color: var(--ink-light); font-size: 0.82rem; margin-top: 24px; line-height: 1.5; }
     .offline-note b { color: var(--ink); }
+
+    .plane-check { display: flex; align-items: center; gap: 12px; max-width: 470px; margin: 16px auto 0; padding: 12px 16px;
+      border-radius: 16px; border: 1.5px solid var(--gold-light); background: var(--white); box-shadow: var(--shadow); text-align: left; }
+    .plane-check.ready { border-color: #7fb069; }
+    .plane-check .pc-icon { font-size: 1.5rem; line-height: 1; }
+    .plane-check .pc-text { flex: 1; }
+    .plane-check .pc-title { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+    .plane-check .pc-sub { font-size: 0.78rem; color: var(--ink-light); margin-top: 2px; }
+    .plane-check .pc-btn { border: none; border-radius: 12px; padding: 0.55rem 0.95rem; font-weight: 700; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-size: 0.85rem; white-space: nowrap; }
+    .plane-check .pc-btn[disabled] { opacity: 0.55; cursor: default; }
   </style>
 </head>
 <body>
@@ -62,6 +73,15 @@
     <div class="grid" id="grid"></div>
 
     <p class="offline-note">✈️ = jouable <b>hors-ligne</b> (solo contre l'ordi ou en local sur un seul appareil).<br>Ouvre le site une fois avec connexion, puis il fonctionne <b>sans réseau</b> (idéal en avion).</p>
+
+    <div class="plane-check" id="plane-check" hidden>
+      <span class="pc-icon" id="pc-icon">✈️</span>
+      <div class="pc-text">
+        <div class="pc-title" id="pc-title">Vérification du mode hors-ligne…</div>
+        <div class="pc-sub" id="pc-sub"></div>
+      </div>
+      <button class="pc-btn" id="pc-btn" hidden onclick="preparePlane()">Préparer</button>
+    </div>
   </div>
 
   <div class="lb-toast" id="lb-toast"></div>
@@ -168,6 +188,57 @@
             snap.forEach(function (child) { try { child.ref.remove(); } catch (e) {} });
           });
       } catch (e) {}
+    })();
+  </script>
+
+  <script>
+    // ── Indicateur « Prêt pour l'avion » ──────────────────────────────────────
+    // Dialogue avec le service worker (sw.js) pour savoir si toutes les pages/
+    // scripts/polices sont en cache, et propose de forcer le préchargement.
+    (function planeCheck() {
+      var box = document.getElementById('plane-check');
+      var icon = document.getElementById('pc-icon'), title = document.getElementById('pc-title');
+      var sub = document.getElementById('pc-sub'), btn = document.getElementById('pc-btn');
+      if (!('serviceWorker' in navigator)) return; // navigateur sans hors-ligne → on n'affiche rien
+
+      // Envoie un message au SW actif et attend sa réponse (canal dédié).
+      function ask(type) {
+        return navigator.serviceWorker.ready.then(function (reg) {
+          var w = reg.active || navigator.serviceWorker.controller;
+          if (!w) return null;
+          return new Promise(function (res) {
+            var ch = new MessageChannel();
+            var done = false;
+            ch.port1.onmessage = function (ev) { done = true; res(ev.data); };
+            setTimeout(function () { if (!done) res(null); }, 8000);
+            w.postMessage({ type: type }, [ch.port2]);
+          });
+        }).catch(function () { return null; });
+      }
+
+      function render(s) {
+        box.hidden = false;
+        if (!s) { icon.textContent = '✈️'; title.textContent = 'Mode hors-ligne'; sub.textContent = 'Statut indisponible — recharge la page une fois en ligne.'; btn.hidden = true; return; }
+        if (s.ready) {
+          box.classList.add('ready'); icon.textContent = '✅';
+          title.textContent = 'Prêt pour l\'avion';
+          sub.textContent = s.games + ' jeux + polices en cache — jouable sans réseau.';
+          btn.hidden = true;
+        } else {
+          box.classList.remove('ready'); icon.textContent = '✈️';
+          title.textContent = 'Préparer le mode hors-ligne';
+          sub.textContent = 'En cache : ' + s.cached + '/' + s.total + ' fichiers. Fais-le tant que tu as du réseau.';
+          btn.hidden = false; btn.disabled = false; btn.textContent = 'Préparer';
+        }
+      }
+
+      window.preparePlane = function () {
+        btn.disabled = true; btn.textContent = 'Préchargement…';
+        title.textContent = 'Téléchargement en cours…'; sub.textContent = 'Garde la page ouverte quelques secondes.';
+        ask('PRECACHE').then(render);
+      };
+
+      ask('CACHE_STATUS').then(render);
     })();
   </script>
 </body>

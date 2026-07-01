@@ -11,12 +11,19 @@
      quand on est en ligne, fonctionne quand même hors-ligne).
    • Scripts / styles same-origin : cache d'abord (rapide + hors-ligne), mis à jour
      en arrière-plan.
-   • Ressources externes (Firebase, Google Fonts) : réseau seul (pas mises en cache ;
-     hors-ligne elles échouent proprement, le mode hors-ligne ne s'en sert pas).
+   • Polices : auto-hébergées (fonts.css + fonts/*.woff2, même origine) → en cache
+     comme le reste, donc rendu identique hors-ligne.
+   • Firebase (externe) : réseau seul (pas mis en cache ; hors-ligne il échoue
+     proprement, le mode hors-ligne ne s'en sert pas).
 */
-var CACHE = 'jeux-v26';
+// La version est estampillée automatiquement (empreinte du contenu mis en cache)
+// par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
+var CACHE = 'jeux-4930e47fc2';
 var ASSETS = [
-  './', 'index.html', 'theme.css', 'game.css', 'manifest.webmanifest',
+  './', 'index.html', 'theme.css', 'game.css', 'fonts.css', 'manifest.webmanifest',
+  'fonts/playfairdisplay-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2',
+  'fonts/dmsans-latin.woff2', 'fonts/dmsans-latin-ext.woff2',
+  'fonts/caveat-latin.woff2', 'fonts/caveat-latin-ext.woff2',
   'nav.js', 'avatars.js', 'lobby.js', 'presence.js', 'offline.js', 'firebase-init.js',
   'head.js', 'boot.js', 'puzzle.js', 'daily.js', 'sfx.js', 'ai/p4-ai.js', 'ai/morpion-ai.js', 'ai/reversi-ai.js', 'ai/dames-ai.js',
   'ai/monopoly-engine.js', 'ai/cluedo-engine.js',
@@ -47,11 +54,36 @@ self.addEventListener('activate', function (e) {
   );
 });
 
+// ── Messages depuis la page (indicateur « prêt pour l'avion » sur l'accueil) ──
+//  • CACHE_STATUS : combien de ressources préchargées sont déjà en cache.
+//  • PRECACHE     : (re)télécharge tout ce qui manque, puis renvoie le statut.
+// La réponse revient via postMessage sur le port fourni (ou le client émetteur).
+function cacheStatus() {
+  return caches.open(CACHE).then(function (c) {
+    return Promise.all(ASSETS.map(function (u) { return c.match(u).then(function (m) { return m ? 1 : 0; }); }));
+  }).then(function (arr) {
+    var cached = arr.reduce(function (a, b) { return a + b; }, 0);
+    var games = ASSETS.filter(function (u) { return u.indexOf('games/') === 0; }).length;
+    return { cached: cached, total: ASSETS.length, games: games, ready: cached >= ASSETS.length };
+  });
+}
+self.addEventListener('message', function (e) {
+  var data = e.data || {};
+  var reply = function (msg) { if (e.ports && e.ports[0]) e.ports[0].postMessage(msg); else if (e.source) e.source.postMessage(msg); };
+  if (data.type === 'CACHE_STATUS') {
+    e.waitUntil(cacheStatus().then(function (s) { s.type = 'CACHE_STATUS'; reply(s); }));
+  } else if (data.type === 'PRECACHE') {
+    e.waitUntil(caches.open(CACHE).then(function (c) {
+      return Promise.all(ASSETS.map(function (u) { return c.match(u).then(function (m) { return m || c.add(u).catch(function () {}); }); }));
+    }).then(cacheStatus).then(function (s) { s.type = 'PRECACHE_DONE'; reply(s); }));
+  }
+});
+
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
-  if (url.origin !== location.origin) return; // externe (Firebase, fonts) → réseau natif
+  if (url.origin !== location.origin) return; // externe (Firebase) → réseau natif
 
   var isPage = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/';
   if (isPage) {
