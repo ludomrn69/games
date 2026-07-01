@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Color Memory · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 20%,#241852,#0c0820 75%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#c8b8ff;text-decoration:none;font-size:1.4rem}.score{font-size:1.6rem}.best{font-size:.8rem;color:#a898e0}
+  #stage{flex:1;width:100%;max-width:520px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:20px}
+  #status{font-weight:800;font-size:1.1rem;min-height:1.4em;color:#c8b8ff}
+  #pad{width:min(84vw,360px);aspect-ratio:1;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .q{border-radius:20px;opacity:.5;transition:opacity .12s,transform .1s;cursor:pointer}
+  .q.on{opacity:1;transform:scale(1.03)}
+  #q0{background:#3fb562}#q1{background:#e8524a}#q2{background:#ffb020}#q3{background:#4a7de8}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(12,8,32,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#c8b8ff;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#8b3fd6,#c94b9e);box-shadow:0 8px 24px rgba(139,63,214,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
+  <div id="stage">
+    <div id="status">Observe…</div>
+    <div id="pad"><div class="q" id="q0" data-i="0"></div><div class="q" id="q1" data-i="1"></div><div class="q" id="q2" data-i="2"></div><div class="q" id="q3" data-i="3"></div></div>
+    <div class="screen" id="start"><h1>🎨 Color Memory</h1><p>Mémorise la séquence lumineuse et sonore, puis reproduis-la. Elle s'allonge à chaque tour&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Raté&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">tours réussis</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var pad=document.getElementById('pad'),status=document.getElementById('status');
+  var scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var qs=[0,1,2,3].map(function(i){return document.getElementById('q'+i);});
+  var BEST='playus_colormemory_best',best=+localStorage.getItem(BEST)||0;
+  function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
+  var FREQ=[329.63,261.63,392.00,220.00],ac;
+  function tone(i,dur){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();
+    o.frequency.value=FREQ[i];o.type='sine';o.connect(g);g.connect(ac.destination);g.gain.setValueAtTime(0.001,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.25,ac.currentTime+0.02);g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+dur/1000);
+    o.start();o.stop(ac.currentTime+dur/1000+0.02);}catch(e){}}
+  var state,seq,pos,canPlay;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function flash(i,dur){qs[i].classList.add('on');tone(i,dur);setTimeout(function(){qs[i].classList.remove('on');},dur*0.8);}
+  function playSeq(){canPlay=false;status.textContent='Observe…';var d=Math.max(260,520-seq.length*14);
+    seq.forEach(function(i,k){setTimeout(function(){flash(i,d*0.75);},k*d);});
+    setTimeout(function(){canPlay=true;pos=0;status.textContent='À toi de jouer !';},seq.length*d+200);}
+  function add(){seq.push(Math.floor(Math.random()*4));scoreEl.textContent=seq.length-1;playSeq();}
+  function start(){seq=[];state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();}catch(e){}setTimeout(add,500);}
+  function end(){state='over';document.getElementById('finalScore').textContent=seq.length-1;
+    if(seq.length-1>best){best=seq.length-1;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='tours réussis';showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  pad.addEventListener('pointerdown',function(e){if(state!=='play'||!canPlay)return;var q=e.target.closest('.q');if(!q)return;
+    var i=+q.dataset.i;flash(i,220);
+    if(i===seq[pos]){pos++;vibrate(6);if(pos>=seq.length){canPlay=false;setTimeout(add,700);}}
+    else{end();}
+  });
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+})();
+</script>
+</body>
+</html>

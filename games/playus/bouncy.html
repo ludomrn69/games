@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Bouncy · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:linear-gradient(180deg,#5b3fd6,#2a1a6c);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#ddd4ff;text-decoration:none;font-size:1.4rem}.score{font-size:1.7rem}.best{font-size:.8rem;color:#c5b8f5}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:absolute;bottom:16px;left:0;right:0;text-align:center;color:#ddd4ff;font-weight:700;font-size:.9rem;pointer-events:none}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(30,18,80,.8);backdrop-filter:blur(6px)}
+  .screen.hidden{display:none}.screen h1{font-size:2.2rem;font-weight:900}.screen p{color:#ddd4ff;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#e8524a,#c94b9e);box-shadow:0 8px 24px rgba(232,82,74,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint">Glisse pour déplacer la raquette</div>
+    <div class="screen" id="start"><h1>🔴 Bouncy</h1><p>Casse toutes les briques. Déplace la raquette pour renvoyer la balle et ne la laisse pas tomber&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1 id="overTitle">Perdu&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">briques cassées</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  var BEST='playus_bouncy_best',best=+localStorage.getItem(BEST)||0;
+  function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
+  var state,score,bx,by,vx,vy,r,px,pw,ph,bricks,cols,rows,bw,bh,top;
+  var PAL=['#e8524a','#ffb020','#ffd45e','#4ec97a','#4bc9c0','#4a7de8'];
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function build(){bricks=[];cols=6;rows=4;var pad=6;bw=(W-pad*(cols+1))/cols;bh=Math.max(18,H*0.03);top=70;
+    for(var r2=0;r2<rows;r2++)for(var c=0;c<cols;c++)bricks.push({x:pad+c*(bw+pad),y:top+r2*(bh+pad),c:PAL[r2%PAL.length],alive:true});}
+  function start(){resize();score=0;r=Math.max(8,W*0.022);pw=Math.max(74,W*0.24);ph=14;px=W/2-pw/2;
+    bx=W/2;by=H*0.62;var sp=Math.max(4.5,H*0.008);vx=sp*(Math.random()<0.5?-1:1);vy=-sp;build();
+    scoreEl.textContent='0';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');}
+  function end(win){state='over';document.getElementById('overTitle').textContent=win?'Terrain nettoyé ! 🎉':'Perdu !';
+    document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='briques cassées';showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  function move(e){if(state!=='play')return;var rect=cv.getBoundingClientRect();px=e.clientX-rect.left-pw/2;px=Math.max(0,Math.min(W-pw,px));}
+  stage.addEventListener('pointerdown',move);stage.addEventListener('pointermove',function(e){if(e.buttons||e.pointerType==='touch')move(e);});
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);var py=H-40;
+    if(state==='play'){bx+=vx;by+=vy;
+      if(bx<r){bx=r;vx=Math.abs(vx);}if(bx>W-r){bx=W-r;vx=-Math.abs(vx);}
+      if(by<r){by=r;vy=Math.abs(vy);}
+      if(by+r>=py&&by+r<=py+ph+10&&bx>px&&bx<px+pw&&vy>0){vy=-Math.abs(vy);var hitp=(bx-(px+pw/2))/(pw/2);vx=hitp*Math.max(5,H*0.009);vibrate(8);}
+      if(by-r>H)end(false);
+      for(var i=0;i<bricks.length;i++){var b=bricks[i];if(!b.alive)continue;
+        if(bx+r>b.x&&bx-r<b.x+bw&&by+r>b.y&&by-r<b.y+bh){b.alive=false;score++;scoreEl.textContent=score;vy=-vy;vibrate(10);
+          if(!bricks.some(function(k){return k.alive;}))end(true);break;}}
+    }
+    bricks.forEach(function(b){if(b.alive){ctx.fillStyle=b.c;ctx.fillRect(b.x,b.y,bw,bh);ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(b.x,b.y,bw,4);}});
+    ctx.fillStyle='#fff';ctx.fillRect(px,py,pw,ph);
+    ctx.beginPath();ctx.arc(bx,by,r,0,7);ctx.fillStyle='#ffd45e';ctx.fill();
+  }
+  resize();frame();
+})();
+</script>
+</body>
+</html>

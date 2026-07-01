@@ -32,6 +32,20 @@ function ls(dir, filter) {
   if (!fs.existsSync(abs)) return [];
   return fs.readdirSync(abs).filter(filter).sort().map(function (f) { return (dir ? dir + '/' : '') + f; });
 }
+// Liste récursive des fichiers correspondant au filtre (utilisée pour games/ qui
+// contient désormais des sous-dossiers, ex : games/playus/). Chemins relatifs à ROOT.
+function lsRec(dir, filter) {
+  var abs = path.join(ROOT, dir);
+  if (!fs.existsSync(abs)) return [];
+  var out = [];
+  fs.readdirSync(abs).sort().forEach(function (name) {
+    var rel = dir ? dir + '/' + name : name;
+    var st = fs.statSync(path.join(ROOT, rel));
+    if (st.isDirectory()) out = out.concat(lsRec(rel, filter));
+    else if (filter(name)) out.push(rel);
+  });
+  return out;
+}
 function endsWith(ext) { return function (f) { return f.endsWith(ext); }; }
 
 function scanAssets() {
@@ -41,7 +55,7 @@ function scanAssets() {
   var rootCss = ls('', endsWith('.css'));      // theme, game, fonts
   var fonts = ls('fonts', endsWith('.woff2')); // polices auto-hébergées
   var ai = ls('ai', endsWith('.js'));          // moteurs / IA partagés
-  var games = ls('games', endsWith('.html'));  // toutes les pages de jeu
+  var games = lsRec('games', endsWith('.html')); // toutes les pages de jeu (+ sous-dossiers, ex : games/playus/)
 
   // './' est l'alias de index.html (racine servie sans nom de fichier).
   var head = ['./', 'index.html'];

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Target Speed · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 25%,#0e3a4a,#06161f 70%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#9ee0f0;text-decoration:none;font-size:1.4rem}.score{font-size:1.6rem}.timer{font-size:1.2rem;color:#ffd45e}
+  #stage{flex:1;width:100%;max-width:520px;position:relative;overflow:hidden}
+  .target{position:absolute;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#e8524a 55%,#a51f1f);
+    box-shadow:0 4px 16px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);will-change:width,height}
+  .target::after{content:'';width:34%;height:34%;border-radius:50%;background:#fff;opacity:.85}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(6,22,31,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#9ee0f0;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#3fb5c9,#4b9ed6);box-shadow:0 8px 24px rgba(63,181,201,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="timer" id="timer">30</span></div>
+  <div id="stage">
+    <div class="screen" id="start">
+      <h1>◎ Target Speed</h1>
+      <p>Des cibles apparaissent et rétrécissent. Tape-les le plus vite possible avant qu'elles ne disparaissent&nbsp;!</p>
+      <button class="btn" id="startBtn">Jouer</button>
+    </div>
+    <div class="screen hidden" id="over">
+      <h1 id="overTitle">Temps écoulé&nbsp;!</h1>
+      <div class="big" id="finalScore">0</div>
+      <p id="overMsg">cibles touchées</p>
+      <button class="btn" id="replayBtn">Rejouer</button>
+    </div>
+  </div>
+<script>
+(function(){
+  var stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),timerEl=document.getElementById('timer');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var BEST_KEY='playus_targetspeed_best';var best=+localStorage.getItem(BEST_KEY)||0;
+  var state,score,missed,timeLeft,tickT,raf,targets,life,spawnAcc,spawnEvery,lastTs;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function start(){
+    Array.prototype.slice.call(stage.querySelectorAll('.target')).forEach(function(t){t.remove();});
+    score=0;missed=0;timeLeft=30;life=3;spawnAcc=0;spawnEvery=850;lastTs=0;targets=[];
+    scoreEl.textContent='0';timerEl.textContent='30';
+    state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    clearInterval(tickT);tickT=setInterval(function(){timeLeft--;timerEl.textContent=timeLeft;if(timeLeft<=0)end(false);},1000);
+    lastTs=performance.now();raf=requestAnimationFrame(loop);
+  }
+  function end(byMiss){
+    state='over';clearInterval(tickT);cancelAnimationFrame(raf);
+    document.getElementById('overTitle').textContent=byMiss?'Trop de cibles ratées !':'Temps écoulé !';
+    document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST_KEY,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='cibles touchées';
+    overScr.classList.remove('hidden');vibrate([40,60,120]);
+  }
+  function spawn(){
+    var W=stage.clientWidth,H=stage.clientHeight,m=60;
+    var el=document.createElement('div');el.className='target';
+    var t={el:el,x:m+Math.random()*(W-2*m),y:m+Math.random()*(H-2*m),size:Math.min(W,H)*0.24,life:Math.max(650,1500-score*22)};
+    el.style.left=t.x+'px';el.style.top=t.y+'px';el.style.width=el.style.height=t.size+'px';
+    el.addEventListener('pointerdown',function(e){e.stopPropagation();if(state!=='play')return;
+      score++;scoreEl.textContent=score;vibrate(12);t.el.remove();targets.splice(targets.indexOf(t),1);
+      spawnEvery=Math.max(380,spawnEvery-8);});
+    stage.appendChild(el);targets.push(t);
+  }
+  function loop(ts){
+    raf=requestAnimationFrame(loop);var dt=ts-lastTs;lastTs=ts;if(state!=='play')return;
+    spawnAcc+=dt;if(spawnAcc>=spawnEvery){spawnAcc=0;spawn();}
+    for(var i=targets.length-1;i>=0;i--){var t=targets[i];t.life-=dt;
+      var f=Math.max(0,t.life)/Math.max(650,1500-score*22);var s=t.size*(0.35+0.65*f);
+      t.el.style.width=t.el.style.height=s+'px';
+      if(t.life<=0){t.el.remove();targets.splice(i,1);missed++;life--;vibrate(20);
+        if(life<=0){end(true);return;}}
+    }
+  }
+  document.getElementById('startBtn').onclick=start;
+  document.getElementById('replayBtn').onclick=start;
+})();
+</script>
+</body>
+</html>

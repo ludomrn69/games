@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Grid · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 20%,#12306a,#050c1e 75%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#9ec7f0;text-decoration:none;font-size:1.4rem}.score{font-size:1.6rem}.timer{font-size:1.2rem;color:#ffd45e}
+  #stage{flex:1;width:100%;max-width:520px;position:relative;display:flex;align-items:center;justify-content:center;padding:18px}
+  #board{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:min(88vw,380px);aspect-ratio:1}
+  .cell{border-radius:16px;background:#1c2b4a;box-shadow:inset 0 -4px 0 rgba(0,0,0,.3);transition:background .06s,transform .06s;
+    display:flex;align-items:center;justify-content:center;font-size:2rem}
+  .cell.on{background:radial-gradient(circle at 40% 35%,#a8ff9e,#3fb562)}
+  .cell.bomb{background:radial-gradient(circle at 40% 35%,#ffb0af,#e8524a)}
+  .cell:active{transform:scale(.94)}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(5,12,30,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#9ec7f0;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#3f8fd6,#4bc9c0);box-shadow:0 8px 24px rgba(63,143,214,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="timer" id="timer">30</span></div>
+  <div id="stage">
+    <div id="board"></div>
+    <div class="screen" id="start"><h1>🟦 Grid</h1><p>Tape les cases <b>vertes</b> le plus vite possible. Ne touche jamais une <b>bombe</b> 💣&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1 id="overTitle">Temps écoulé&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">cases touchées</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var board=document.getElementById('board');
+  var scoreEl=document.getElementById('score'),timerEl=document.getElementById('timer');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var BEST='playus_grid_best',best=+localStorage.getItem(BEST)||0;
+  var cells=[];for(var i=0;i<9;i++){var c=document.createElement('div');c.className='cell';c.dataset.i=i;board.appendChild(c);cells.push(c);}
+  var state,score,timeLeft,tickT,spawnT,litSet,interval;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function clearCell(c){c.className='cell';c.textContent='';}
+  function litUp(){
+    // éteint tout, allume 1-2 verts + parfois une bombe
+    cells.forEach(clearCell);litSet={};
+    var idxs=[0,1,2,3,4,5,6,7,8].sort(function(){return Math.random()-0.5;});
+    var n=1+Math.floor(Math.random()*2);
+    for(var k=0;k<n;k++){cells[idxs[k]].classList.add('on');litSet[idxs[k]]='on';}
+    if(Math.random()<0.6){cells[idxs[n]].classList.add('bomb');cells[idxs[n]].textContent='💣';litSet[idxs[n]]='bomb';}
+    spawnT=setTimeout(litUp,interval);
+  }
+  function start(){score=0;timeLeft=30;interval=900;scoreEl.textContent='0';timerEl.textContent='30';
+    state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    clearTimeout(spawnT);litUp();
+    clearInterval(tickT);tickT=setInterval(function(){timeLeft--;timerEl.textContent=timeLeft;if(timeLeft<=0)end(false);},1000);
+  }
+  function end(bomb){state='over';clearInterval(tickT);clearTimeout(spawnT);
+    document.getElementById('overTitle').textContent=bomb?'Bombe ! 💥':'Temps écoulé !';
+    document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='cases touchées';
+    overScr.classList.remove('hidden');vibrate(bomb?[40,60,120]:[30]);
+  }
+  board.addEventListener('pointerdown',function(e){if(state!=='play')return;var c=e.target.closest('.cell');if(!c)return;
+    var i=c.dataset.i;
+    if(litSet[i]==='bomb'){end(true);}
+    else if(litSet[i]==='on'){score++;scoreEl.textContent=score;delete litSet[i];clearCell(c);
+      interval=Math.max(420,interval-12);vibrate(10);}
+  });
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+})();
+</script>
+</body>
+</html>

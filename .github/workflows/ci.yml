@@ -29,5 +29,5 @@ jobs:
         run: node tools/bench-generators.js
       - name: Mode hors-ligne / avion (solo + défi du jour sans réseau)
         run: node tools/bench-offline.js
-      - name: Aventuriers du Rail (moteur : plus long chemin, scoring, parties complètes)
+      - name: "Aventuriers du Rail (moteur : plus long chemin, scoring, parties complètes)"
         run: node tools/bench-aventuriers.js

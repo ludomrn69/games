@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Count! · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 20%,#5b2fd6,#1e0c40 75%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#d4c4ff;text-decoration:none;font-size:1.4rem}.score{font-size:1.4rem}.timer{font-size:1.2rem;color:#ffd45e}
+  #stage{flex:1;width:100%;max-width:520px;position:relative;display:flex;align-items:center;justify-content:center;padding:16px}
+  #board{display:grid;gap:10px;width:min(90vw,420px)}
+  .num{aspect-ratio:1;border-radius:14px;background:linear-gradient(160deg,#3a2a7a,#241852);display:flex;align-items:center;justify-content:center;
+    font-size:1.5rem;font-weight:900;cursor:pointer;transition:transform .06s,opacity .2s,background .1s}
+  .num:active{transform:scale(.93)}
+  .num.done{opacity:.18;pointer-events:none}
+  .num.bad{background:#e8524a}
+  .next{position:absolute;top:6px;left:0;right:0;text-align:center;color:#d4c4ff;font-weight:700}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(20,8,40,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#d4c4ff;max-width:280px;line-height:1.4}
+  .big{font-size:3rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#7a3fd6,#c94b9e);box-shadow:0 8px 24px rgba(122,63,214,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">1 / 20</span><span class="timer" id="timer">0.0</span></div>
+  <div id="stage">
+    <div class="next" id="nextTxt"></div>
+    <div id="board"></div>
+    <div class="screen" id="start"><h1>🔢 Count!</h1><p>Tape les nombres dans l'ordre croissant, de 1 à 20, le plus vite possible&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1 id="overTitle">Terminé&nbsp;!</h1><div class="big" id="finalScore">0.0s</div><p id="overMsg"></p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var board=document.getElementById('board'),nextTxt=document.getElementById('nextTxt');
+  var scoreEl=document.getElementById('score'),timerEl=document.getElementById('timer');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var BEST='playus_count_best',best=+localStorage.getItem(BEST)||0;
+  var N=20,state,next,t0,raf;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function build(){board.innerHTML='';board.style.gridTemplateColumns='repeat(4,1fr)';
+    var arr=[];for(var i=1;i<=N;i++)arr.push(i);arr.sort(function(){return Math.random()-0.5;});
+    arr.forEach(function(n){var d=document.createElement('div');d.className='num';d.textContent=n;d.dataset.n=n;board.appendChild(d);});
+  }
+  function start(){build();next=1;state='play';scoreEl.textContent='1 / '+N;nextTxt.textContent='Cherche le 1';
+    startScr.classList.add('hidden');overScr.classList.add('hidden');t0=performance.now();raf=requestAnimationFrame(loop);}
+  function loop(){raf=requestAnimationFrame(loop);timerEl.textContent=((performance.now()-t0)/1000).toFixed(1);}
+  function end(){state='over';cancelAnimationFrame(raf);var t=(performance.now()-t0)/1000;
+    document.getElementById('finalScore').textContent=t.toFixed(2)+'s';
+    if(!best||t<best){best=t;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='🏆 Nouveau record !';}
+    else document.getElementById('overMsg').textContent='Record : '+best.toFixed(2)+'s';
+    overScr.classList.remove('hidden');vibrate([15,25,15]);
+  }
+  board.addEventListener('pointerdown',function(e){if(state!=='play')return;var d=e.target.closest('.num');if(!d||d.classList.contains('done'))return;
+    var n=+d.dataset.n;
+    if(n===next){d.classList.add('done');next++;scoreEl.textContent=Math.min(next,N)+' / '+N;nextTxt.textContent=next<=N?'Cherche le '+next:'';vibrate(8);
+      if(next>N)end();}
+    else{d.classList.add('bad');vibrate([20,30,60]);setTimeout(function(){d.classList.remove('bad');},200);}
+  });
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+})();
+</script>
+</body>
+</html>

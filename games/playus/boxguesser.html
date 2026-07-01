@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Boxguesser · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:radial-gradient(circle at 50% 25%,#1f5a7a,#08202e 75%);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#a8e0f0;text-decoration:none;font-size:1.4rem}.score{font-size:1.6rem}.lives{font-size:1.2rem}
+  #stage{flex:1;width:100%;max-width:520px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px}
+  canvas{background:transparent;max-width:90vw}
+  #status{font-weight:800;font-size:1.05rem;min-height:1.3em;color:#a8e0f0}
+  #choices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(84vw,320px)}
+  .choice{padding:16px 0;border-radius:14px;background:#1e4a5e;font-size:1.4rem;font-weight:800;cursor:pointer;text-align:center;transition:transform .08s,background .1s}
+  .choice:active{transform:scale(.94)}.choice.good{background:#3fb562}.choice.bad{background:#e8524a}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(8,24,34,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#a8e0f0;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#3fb5c9,#4b9ed6);box-shadow:0 8px 24px rgba(63,181,201,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="lives" id="lives">❤️❤️❤️</span></div>
+  <div id="stage">
+    <canvas id="cv" width="300" height="260"></canvas>
+    <div id="status">Combien de cubes ?</div>
+    <div id="choices"></div>
+    <div class="screen" id="start"><h1>📦 Boxguesser</h1><p>Observe la structure de cubes, puis devine combien il y en a au total&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Fini&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">bonnes réponses</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),status=document.getElementById('status'),choicesEl=document.getElementById('choices');
+  var scoreEl=document.getElementById('score'),livesEl=document.getElementById('lives');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var BEST='playus_boxguesser_best',best=+localStorage.getItem(BEST)||0;
+  var state,score,lives,answer;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  // Dessine une pile isométrique de cubes sur une base X*Y avec hauteurs variables.
+  function cube(cx,cy,s){var h=s*0.5;
+    ctx.fillStyle='#ffd45e';ctx.beginPath();ctx.moveTo(cx,cy-h);ctx.lineTo(cx+s,cy-h*0.5);ctx.lineTo(cx,cy);ctx.lineTo(cx-s,cy-h*0.5);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#d9a520';ctx.beginPath();ctx.moveTo(cx-s,cy-h*0.5);ctx.lineTo(cx,cy);ctx.lineTo(cx,cy+h);ctx.lineTo(cx-s,cy+h*0.5);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#b8880f';ctx.beginPath();ctx.moveTo(cx+s,cy-h*0.5);ctx.lineTo(cx,cy);ctx.lineTo(cx,cy+h);ctx.lineTo(cx+s,cy+h*0.5);ctx.closePath();ctx.fill();}
+  function draw(cols,rows,heights){ctx.clearRect(0,0,cv.width,cv.height);var s=26,ox=cv.width/2,oy=150;var total=0;
+    for(var y=0;y<rows;y++)for(var x=0;x<cols;x++){var hgt=heights[y*cols+x];total+=hgt;
+      for(var z=0;z<hgt;z++){var cx=ox+(x-y)*s,cy=oy+(x+y)*s*0.5-z*s;cube(cx,cy,s);}}
+    return total;}
+  function round(){var cols=1+Math.floor(Math.random()*3),rows=1+Math.floor(Math.random()*3);var heights=[];
+    for(var i=0;i<cols*rows;i++)heights.push(1+Math.floor(Math.random()*3));
+    answer=draw(cols,rows,heights);
+    // 3 choix contenant la bonne réponse
+    var opts=[answer];while(opts.length<3){var d=answer+(Math.floor(Math.random()*7)-3);if(d>0&&opts.indexOf(d)<0)opts.push(d);}
+    opts.sort(function(){return Math.random()-0.5;});choicesEl.innerHTML='';
+    opts.forEach(function(o){var b=document.createElement('div');b.className='choice';b.textContent=o;b.dataset.v=o;choicesEl.appendChild(b);});
+    status.textContent='Combien de cubes ?';
+  }
+  function start(){score=0;lives=3;state='play';scoreEl.textContent='0';livesEl.textContent='❤️❤️❤️';
+    startScr.classList.add('hidden');overScr.classList.add('hidden');round();}
+  function end(){state='over';document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='bonnes réponses';overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  choicesEl.addEventListener('pointerdown',function(e){if(state!=='play')return;var b=e.target.closest('.choice');if(!b)return;
+    if(+b.dataset.v===answer){b.classList.add('good');score++;scoreEl.textContent=score;vibrate(8);setTimeout(round,500);}
+    else{b.classList.add('bad');lives--;livesEl.textContent='❤️'.repeat(Math.max(0,lives))+'🖤'.repeat(3-Math.max(0,lives));vibrate([30,40,80]);
+      status.textContent='C\'était '+answer;if(lives<=0)setTimeout(end,700);else setTimeout(round,900);}
+  });
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+})();
+</script>
+</body>
+</html>

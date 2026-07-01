@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Balldrop · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:linear-gradient(180deg,#1f6b45,#0c2c1c);display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#b8f0cf;text-decoration:none;font-size:1.4rem}.score{font-size:1.7rem}.best{font-size:.8rem;color:#8fd9ab}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:absolute;bottom:16px;left:0;right:0;text-align:center;color:#b8f0cf;font-weight:700;font-size:.9rem;pointer-events:none}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(8,30,20,.82);backdrop-filter:blur(6px)}
+  .screen.hidden{display:none}.screen h1{font-size:2.2rem;font-weight:900}.screen p{color:#b8f0cf;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#3fb562,#7ac94b);box-shadow:0 8px 24px rgba(63,181,98,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint">Glisse pour faire tourner la tour</div>
+    <div class="screen" id="start"><h1>🌀 Balldrop</h1><p>Fais pivoter la tour pour guider la balle dans les ouvertures. Évite les segments rouges&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Aïe&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">étages franchis</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  var BEST='playus_balldrop_best',best=+localStorage.getItem(BEST)||0;
+  function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
+  // Vue 2D "déroulée" : la balle tombe verticalement au centre. Des anneaux
+  // (plateformes) montent ; chacun a une ouverture (angle) + éventuel segment danger.
+  var state,score,rings,rot,by,vy,ringGap,dragX;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function mkRing(y){var open=Math.random()*6.283,danger=Math.random()<0.35;return {y:y,open:open,danger:danger,scored:false};}
+  function start(){resize();score=0;rings=[];rot=0;by=90;vy=0;ringGap=H*0.24;dragX=null;
+    for(var i=0;i<6;i++)rings.push(mkRing(H*0.4+i*ringGap));
+    scoreEl.textContent='0';state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');}
+  function end(){state='over';document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='étages franchis';showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);}
+  stage.addEventListener('pointerdown',function(e){dragX=e.clientX;});
+  stage.addEventListener('pointermove',function(e){if(dragX==null||state!=='play')return;rot+=(e.clientX-dragX)*0.012;dragX=e.clientX;});
+  stage.addEventListener('pointerup',function(){dragX=null;});stage.addEventListener('pointercancel',function(){dragX=null;});
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  var openHalf=0.55; // demi-largeur angulaire de l'ouverture
+  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);var cx=W/2,rad=Math.min(W*0.34,120),bx=cx;
+    if(state==='play'){vy+=Math.max(0.35,H*0.0006);by+=vy;
+      rings.forEach(function(r){r.y-=2.0;});
+      if(rings[0].y<40){rings.shift();rings.push(mkRing(rings[rings.length-1].y+ringGap));}
+      // collision avec l'anneau le plus proche sous la balle
+      rings.forEach(function(r){
+        if(by+12>r.y-6&&by-12<r.y+6){
+          // angle d'entrée = bas (PI/2) - rotation
+          var a=((Math.PI/2 - rot)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+          var d=Math.abs(((a-r.open)+Math.PI)%(2*Math.PI)-Math.PI);
+          var through=d<openHalf;
+          if(through&&r.danger){ // ouverture piégée si segment danger juste là -> ici open est sûr
+          }
+          if(!through){ // touche l'anneau
+            if(r.danger){end();return;}
+            by=r.y-12;vy=0;
+            if(!r.scored){r.scored=true;score++;scoreEl.textContent=score;vibrate(8);}
+          } else {
+            if(!r.scored){r.scored=true;score++;scoreEl.textContent=score;vy=Math.max(vy,4);vibrate(6);}
+          }
+        }
+      });
+      if(by>H)by=H; if(by<0)end();
+    }
+    // anneaux
+    rings.forEach(function(r){
+      for(var seg=0;seg<48;seg++){var a0=seg/48*6.283+rot,a1=(seg+1)/48*6.283+rot;
+        var mid=(seg+0.5)/48*6.283;var d=Math.abs(((mid-r.open)+Math.PI)%(2*Math.PI)-Math.PI);
+        if(d<openHalf)continue; // ouverture
+        ctx.beginPath();ctx.arc(cx,r.y,rad,a0,a1);ctx.lineWidth=12;
+        ctx.strokeStyle=r.danger?'#e8524a':'#7ac94b';ctx.stroke();
+      }
+    });
+    // balle
+    ctx.beginPath();ctx.arc(bx,by,12,0,7);var grd=ctx.createRadialGradient(bx-4,by-4,3,bx,by,12);
+    grd.addColorStop(0,'#fff');grd.addColorStop(1,'#ffd45e');ctx.fillStyle=grd;ctx.fill();
+  }
+  resize();frame();
+})();
+</script>
+</body>
+</html>

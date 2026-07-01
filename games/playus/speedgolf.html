@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Speedgolf · Playus Arena</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;overflow:hidden;user-select:none;
+    background:#3a9a4a;display:flex;flex-direction:column;align-items:center;touch-action:manipulation}
+  .hud{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800}
+  .hud a{color:#e0ffe0;text-decoration:none;font-size:1.4rem}.score{font-size:1.6rem}.timer{font-size:1.2rem;color:#ffd45e}
+  #stage{flex:1;width:100%;max-width:520px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:absolute;bottom:20px;left:0;right:0;text-align:center;color:#e0ffe0;font-weight:700;font-size:.95rem;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;text-align:center;padding:24px;background:rgba(20,60,25,.85);backdrop-filter:blur(6px);z-index:10}
+  .screen.hidden{display:none}.screen h1{font-size:2rem;font-weight:900}.screen p{color:#e0ffe0;max-width:280px;line-height:1.4}
+  .big{font-size:3.4rem;font-weight:900;color:#ffd45e}
+  .btn{border:none;border-radius:16px;padding:16px 40px;font-size:1.15rem;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#3fb562,#7ac94b);box-shadow:0 8px 24px rgba(63,181,98,.45);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+  <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="timer" id="timer">45</span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint" id="hint">Tape pour figer l'ANGLE</div>
+    <div class="screen" id="start"><h1>⛳ Speedgolf</h1><p>Tape pour figer l'angle, puis la puissance. Enchaîne un max de trous avant la fin du chrono&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Temps écoulé&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">trous réussis</p><button class="btn" id="replayBtn">Rejouer</button></div>
+  </div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage'),hint=document.getElementById('hint');
+  var scoreEl=document.getElementById('score'),timerEl=document.getElementById('timer');
+  var startScr=document.getElementById('start'),overScr=document.getElementById('over');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  var BEST='playus_speedgolf_best',best=+localStorage.getItem(BEST)||0;
+  // Phases : aim (angle oscille) -> power (jauge oscille) -> shot (balle vole).
+  var state,score,timeLeft,tickT,phase,angle,angDir,power,powDir,ball,hole,ballV;
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function newHole(){hole={x:W*(0.25+Math.random()*0.5),y:H*0.18+Math.random()*H*0.12,r:Math.max(16,W*0.05)};
+    ball={x:W/2,y:H-70};ballV=null;angle=Math.PI/2;angDir=1;power=0.2;powDir=1;phase='aim';hint.textContent='Tape pour figer l\'ANGLE';}
+  function start(){resize();score=0;timeLeft=45;scoreEl.textContent='0';timerEl.textContent='45';
+    newHole();state='play';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    clearInterval(tickT);tickT=setInterval(function(){timeLeft--;timerEl.textContent=timeLeft;if(timeLeft<=0)end();},1000);}
+  function end(){state='over';clearInterval(tickT);document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='trous réussis';overScr.classList.remove('hidden');vibrate([30,40,80]);}
+  stage.addEventListener('pointerdown',function(){if(state!=='play')return;
+    if(phase==='aim'){phase='power';hint.textContent='Tape pour figer la PUISSANCE';vibrate(6);}
+    else if(phase==='power'){phase='shot';hint.textContent='';
+      var sp=power*Math.max(15,H*0.03);ballV={x:Math.cos(-Math.PI/2+ (angle-Math.PI/2))*0,y:0};
+      ballV={x:Math.sin(angle-Math.PI/2)*sp*0+Math.cos(angle)*sp,y:-Math.sin(angle)*sp};vibrate(10);}
+  });
+  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
+  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);
+    // green
+    ctx.fillStyle='#2f8a3f';ctx.beginPath();ctx.ellipse(W/2,H*0.5,W*0.42,H*0.42,0,0,7);ctx.fill();
+    if(state==='play'){
+      if(phase==='aim'){angle+=angDir*0.03;if(angle>Math.PI*0.9||angle<Math.PI*0.1)angDir*=-1;}
+      else if(phase==='power'){power+=powDir*0.02;if(power>1||power<0.1)powDir*=-1;}
+      else if(phase==='shot'&&ballV){ball.x+=ballV.x;ball.y+=ballV.y;ballV.x*=0.985;ballV.y*=0.985;
+        var dx=ball.x-hole.x,dy=ball.y-hole.y;
+        if(dx*dx+dy*dy<hole.r*hole.r){score++;scoreEl.textContent=score;timeLeft=Math.min(60,timeLeft+3);vibrate([15,25,15]);newHole();}
+        else if(Math.abs(ballV.x)<0.4&&Math.abs(ballV.y)<0.4){ // arrêtée hors du trou
+          if(score>0)score=score;newHole();vibrate([20,30,60]);}
+        if(ball.x<0||ball.x>W||ball.y<0){newHole();}
+      }
+    }
+    // trou
+    ctx.fillStyle='#111';ctx.beginPath();ctx.arc(hole.x,hole.y,hole.r,0,7);ctx.fill();
+    ctx.strokeStyle='#e8524a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(hole.x,hole.y);ctx.lineTo(hole.x,hole.y-46);ctx.stroke();
+    ctx.fillStyle='#e8524a';ctx.beginPath();ctx.moveTo(hole.x,hole.y-46);ctx.lineTo(hole.x+22,hole.y-40);ctx.lineTo(hole.x,hole.y-34);ctx.fill();
+    // balle
+    ctx.beginPath();ctx.arc(ball.x,ball.y,8,0,7);ctx.fillStyle='#fff';ctx.fill();
+    // viseur / jauge
+    if(state==='play'&&phase!=='shot'){
+      var len=70+power*90;ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=4;ctx.beginPath();
+      ctx.moveTo(ball.x,ball.y);ctx.lineTo(ball.x+Math.cos(angle)*len,ball.y-Math.sin(angle)*len);ctx.stroke();
+      if(phase==='power'){ctx.fillStyle='#ffd45e';ctx.fillRect(W/2-80,H-40,160*power,12);ctx.strokeStyle='#fff';ctx.strokeRect(W/2-80,H-40,160,12);}
+    }
+  }
+  resize();frame();
+})();
+</script>
+</body>
+</html>

@@ -43,6 +43,22 @@ function checkInline(code, label) {
 }
 checkInline(read('index.html'), 'index.html');
 gameHtmls.forEach(function (f) { checkInline(read(path.join('games', f)), 'games/' + f); });
+// Pages de jeu dans des sous-dossiers (ex : games/playus/) : on vérifie au moins la
+// syntaxe de leur JS inline. Ces pages autonomes ne sont pas listées dans le
+// catalogue `key:` d'index.html, leur mise en cache est garantie par gen-sw-version.
+var subGames = [];
+if (fs.existsSync(gamesDir)) {
+  fs.readdirSync(gamesDir).forEach(function (d) {
+    var abs = path.join(gamesDir, d);
+    if (fs.statSync(abs).isDirectory()) {
+      fs.readdirSync(abs).filter(function (f) { return f.endsWith('.html'); }).forEach(function (f) {
+        var rel = 'games/' + d + '/' + f;
+        subGames.push(rel);
+        checkInline(read(rel), rel);
+      });
+    }
+  });
+}
 
 // 3) cohérence index.html / sw.js / fichiers
 var index = read('index.html');
