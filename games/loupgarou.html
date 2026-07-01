@@ -291,7 +291,9 @@
           // révèle un loup trouvé (accusation) puis vote dessus
           var knownWolf = Object.keys(P(state, me).knows || {}).filter(function (t) { return P(state, me).knows[t] && P(state, t).alive; })[0];
           if (knownWolf) {
-            if (!(state.claims || {})[knownWolf]) { rref().child('claims/' + knownWolf).set(me); }
+            // Transaction : « réclame » ce loup seulement s'il n'est pas déjà réclamé
+            // (évite qu'une accusation simultanée n'écrase la première).
+            rref().child('claims/' + knownWolf).transaction(function (cur) { return cur == null ? me : undefined; });
             actVote(knownWolf); return;
           }
           actVote(randomOther(state, me)); return;

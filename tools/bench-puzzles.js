@@ -66,6 +66,35 @@ console.log('🧩 puzzle.js (brique puzzle-course)');
   if (eq(rank, ['b', 'a', 'c'])) ok('rankByTime : b(4s) < a(8s) < c(non fini)'); else bad('rankByTime mauvais ordre : ' + rank.join(','));
 })();
 
+// 6) Aide au joueur : la pile Annuler empile l'état d'avant et le restaure (LIFO).
+(function () {
+  // Faux DOM minimal (le helper pose deux boutons dans un conteneur d'en-tête).
+  var btns = [];
+  var mount = { firstChild: null, insertBefore: function (el) { btns.unshift(el); this.firstChild = el; } };
+  global.document = { getElementById: function (id) { return id === 'm' ? mount : null; },
+    createElement: function () { return { style: {}, setAttribute: function () {} }; } };
+
+  var state = [1, 2, 3];                          // « grille » courante (état éditable)
+  var A = P.assist({ mount: 'm', canEdit: function () { return true; },
+    snapshot: function () { return state.slice(); },
+    restore: function (snap) { state = snap.slice(); },
+    hint: function () {} });
+  function undo() { btns.filter(function (b) { return b.title === 'Annuler'; })[0].onclick(); }
+
+  if (btns.length === 2) ok('assist pose 2 boutons (Annuler + Indice)'); else bad('assist : boutons non posés (' + btns.length + ')');
+
+  A.record(); state = [1, 9, 3];                 // coup 1 (état d'avant empilé)
+  A.record(); state = [7, 9, 3];                 // coup 2 (état d'avant empilé)
+  undo();
+  if (eq(state, [1, 9, 3])) ok('Annuler restaure l\'état précédent (LIFO #1)'); else bad('Annuler #1 : ' + JSON.stringify(state));
+  undo();
+  if (eq(state, [1, 2, 3])) ok('Annuler restaure l\'état initial (LIFO #2)'); else bad('Annuler #2 : ' + JSON.stringify(state));
+  undo(); // pile vide → sans effet
+  if (eq(state, [1, 2, 3])) ok('Annuler sur pile vide = sans effet'); else bad('Annuler pile vide : ' + JSON.stringify(state));
+
+  delete global.document;
+})();
+
 console.log('');
 if (fails.length) { console.error('❌ ' + fails.length + ' test(s) puzzle.js échoué(s) :'); fails.forEach(function (f) { console.error('   - ' + f); }); process.exit(1); }
-console.log('✅ puzzle.js OK : RNG déterministe, course et classement corrects.');
+console.log('✅ puzzle.js OK : RNG déterministe, course, classement et aide (annuler/indice) corrects.');

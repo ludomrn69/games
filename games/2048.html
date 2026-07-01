@@ -66,6 +66,7 @@
       <div class="tw-head">
         <span class="tw-title-mini">2048</span>
         <div class="tw-head-actions">
+          <button class="game-restart-btn" onclick="undoMove()" title="Annuler le dernier coup">↩</button>
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
         </div>
@@ -168,7 +169,7 @@
     function newBoard() { var b = []; for (var i = 0; i < 16; i++) b.push(0); addRandom(b); addRandom(b); return b; }
 
     /* ━━ Enregistrement ━━ */
-    var prevStatus = null, botTimers = {};
+    var prevStatus = null, botTimers = {}, undoStack = [];
     GameRoom({
       gameKey: '2048',
       name: '2048',
@@ -199,7 +200,7 @@
     function onState(snap) {
       var state = snap.val() || {};
       var status = state.status || 'waiting';
-      if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); render(state); scheduleBots(state); }
+      if (status === 'playing') { if (prevStatus !== 'playing') { showScreen('s-playing'); undoStack = []; } render(state); scheduleBots(state); }
       else { clearBots(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
@@ -220,7 +221,26 @@
       }
     }
     function human(dir) {
+      // Annuler : empile l'état d'AVANT le coup seulement s'il change vraiment la grille.
+      var me = window.myPid, s = window.room, P = s && s.players && s.players[me];
+      if (P && !P.over && !P.won && s.status === 'playing' && move(P.board || [], dir).moved) {
+        undoStack.push({ board: (P.board || []).slice(), score: P.score || 0, over: !!P.over });
+        if (undoStack.length > 200) undoStack.shift();
+      }
       rref().transaction(function (cur) { if (!cur || cur.status !== 'playing') return cur; applyMove(cur, window.myPid, dir); return cur; });
+    }
+    // Annuler le dernier coup (sur MA grille) : restaure le plateau d'avant (tuile aléatoire comprise).
+    function undoMove() {
+      var s = window.room; if (!s || s.status !== 'playing' || !undoStack.length) return;
+      var me = window.myPid, P = s.players && s.players[me]; if (!P || P.won) return;
+      var snap = undoStack.pop();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing') return cur;
+        var pp = cur.players[me]; if (!pp) return cur;
+        pp.board = snap.board.slice(); pp.score = snap.score; pp.over = false;
+        if (cur.banner && /bloqu/.test(cur.banner)) cur.banner = '';
+        return cur;
+      });
     }
 
     /* ━━ IA expectimax ━━ Profondeur selon la difficulté (facile 1, moyen 3, dur 5).

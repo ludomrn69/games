@@ -71,6 +71,8 @@
         <span class="zp-title-mini">Zip</span>
         <span class="zp-timer" id="zp-timer">⏱ 0:00</span>
         <div class="zp-head-actions">
+          <button class="game-restart-btn" onclick="undoPath()" title="Annuler">↩</button>
+          <button class="game-rules-btn" onclick="hintPath()" title="Indice">💡</button>
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
         </div>
@@ -138,7 +140,7 @@
       var p = snake(N); for (var i = 0; i < N * N * 30; i++) p = backbite(p, N, rnd);
       var K = Math.min(9, Math.max(5, N + 1)), numbers = {};
       for (var w = 0; w < K; w++) { var pos = Math.round(w * (p.length - 1) / (K - 1)); numbers[p[pos]] = w + 1; }
-      return { size: N, numbers: numbers, K: K };
+      return { size: N, numbers: numbers, K: K, path: p };
     }
 
     /* ━━ Enregistrement ━━ */
@@ -162,7 +164,7 @@
       var order = players.map(function (p) { return p.pid; });
       var level = (cur && cur.difficulty) || 'normal', P = genZip(level, Puzzle.seed());
       order.forEach(function (p) { cur.players[p].path = []; cur.players[p].finishedAt = null; });
-      return { size: P.size, numbers: P.numbers, K: P.K, startedAt: Date.now(), banner: 'Trace ton chemin le plus vite possible !', winner: null };
+      return { size: P.size, numbers: P.numbers, K: P.K, solution: P.path, startedAt: Date.now(), banner: 'Trace ton chemin le plus vite possible !', winner: null };
     }
 
     function onState(snap) {
@@ -206,6 +208,20 @@
       });
     }
     function clearPath() { localPath = []; renderLocal(); commitPath(); }
+    // Annuler : retire la dernière case du tracé.
+    function undoPath() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      if (!localPath.length) return;
+      localPath = localPath.slice(0, -1); renderLocal(); commitPath();
+    }
+    // Indice : avance d'une case le long de la solution stockée (rogne un tracé divergent).
+    function hintPath() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      var sol = s.solution || []; if (!sol.length) return;
+      var k = 0; while (k < localPath.length && k < sol.length && localPath[k] === sol[k]) k++;
+      localPath = sol.slice(0, Math.min(sol.length, k + 1));
+      renderLocal(); commitPath(); setText('zp-banner', '💡 Indice');
+    }
     var dragBound = false;
     function bindDrag() {
       if (dragBound) return; dragBound = true;

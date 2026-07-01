@@ -39,6 +39,9 @@
 
   // ── Identité de l'appareil ────────────────────────────────────────────────
   function getPid() {
+    // Auth anonyme active → l'uid cryptographique fait office d'identité (impossible
+    // à usurper dans la console). Sinon, identité stable localStorage (comportement actuel).
+    if (window.GAMES_UID) return window.GAMES_UID;
     var p = null;
     try { p = localStorage.getItem(PID_KEY); } catch (e) {}
     if (!p) {
@@ -232,10 +235,19 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   window.GameRoom = function (config) {
     window.ROOM = config || {};
-    window.myPid = getPid();
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', init, { once: true });
-    } else { init(); }
+    function begin() {
+      window.myPid = getPid();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init, { once: true });
+      } else { init(); }
+    }
+    // Auth anonyme active mais uid pas encore prêt : on attend l'uid pour que le
+    // salon soit créé/rejoint sous la bonne identité (repli 2,5 s si l'auth traîne).
+    if (window.GAMES_USE_AUTH && !window.GAMES_UID && window.whenGamesAuth) {
+      var done = false, go = function () { if (done) return; done = true; begin(); };
+      window.whenGamesAuth(go);
+      setTimeout(go, 2500);
+    } else { begin(); }
   };
 
   function init() {
@@ -271,6 +283,7 @@
         '<h1 class="lb-title">' + esc(c.name || 'Jeu') + '</h1>' +
         '<p class="lb-sub">' + esc(c.tagline || '') + (c.tagline ? ' · ' : '') + range + '</p>' +
         ((c.offline && c.offline.daily && window.Daily) ? dailyHomeHTML(c) : '') +
+        (window.GameStats ? GameStats.summaryHTML(c.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
         '<button class="lb-btn" onclick="Lobby.createRoom()">Créer une partie</button>' +
         '<div style="margin:18px 0 8px;color:var(--ink-light);font-size:0.85rem">ou rejoindre avec un code</div>' +
         '<input id="lb-join-code" class="lb-input code" maxlength="4" placeholder="CODE" autocomplete="off" inputmode="text">' +
@@ -443,6 +456,19 @@
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
     try { window.Lobby.turnAlertFor(room); } catch (e) {}
+    try { recordStatsFor(room); } catch (e) {}
+  }
+
+  // ── Stats par jeu (localStorage) : enregistrées une fois par partie terminée ──
+  var _statsEndRecorded = false;
+  function recordStatsFor(room) {
+    if (!window.GameStats) return;
+    var ended = room.status === 'ended' || room.status === 'finished' || !!room.winner;
+    if (!ended) { _statsEndRecorded = false; return; }
+    if (_statsEndRecorded) return;
+    _statsEndRecorded = true;
+    var me = room.players && room.players[window.myPid];
+    GameStats.record(cfg().gameKey, { won: room.winner === window.myPid, timeMs: (me && me.finishedAt) || null });
   }
   function isActive(id) { var el = document.getElementById(id); return el && el.classList.contains('active'); }
 

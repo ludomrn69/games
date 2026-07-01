@@ -68,7 +68,7 @@
       <div class="tg-head">
         <span class="tg-title-mini">Tango</span>
         <span class="tg-timer" id="tg-timer">⏱ 0:00</span>
-        <div class="tg-head-actions">
+        <div class="tg-head-actions" id="tg-actions">
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
         </div>
@@ -190,7 +190,7 @@
     function onState(snap) {
       var state = snap.val() || {};
       var status = state.status || 'waiting';
-      if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); render(state); startTimer(state); }
+      if (status === 'playing') { if (prevStatus !== 'playing') { showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
       else { stopTimer(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
@@ -220,6 +220,7 @@
     function tapCell(idx) {
       var pid = window.myPid, s = window.room;
       if ((s.givens || [])[idx] >= 0) return;             // case-indice : verrouillée
+      if (assist && s.status === 'playing' && !doneOf(s, pid)) assist.record();
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
         if ((cur.givens || [])[idx] >= 0) return cur;
@@ -229,6 +230,49 @@
         return cur;
       });
     }
+
+    /* ━━ Aide au joueur (Annuler / Indice) ━━ */
+    // Indice : on RÉSOUT depuis les indices + contraintes (6×6) côté client — la
+    // solution n'est jamais stockée dans le salon (pas de triche via la console).
+    function solveTango(givens, cons) {
+      var g = givens.slice(), res = null;
+      function ok(g, i, v) {
+        if (!okFull(g, i, v)) return false;
+        for (var k = 0; k < cons.length; k++) { var cc = cons[k]; var o = cc.a === i ? cc.b : cc.b === i ? cc.a : -1; if (o < 0 || g[o] === -1) continue; if (cc.eq && g[o] !== v) return false; if (!cc.eq && g[o] === v) return false; }
+        return true;
+      }
+      (function rec() { if (res) return; var i = g.indexOf(-1); if (i < 0) { res = g.slice(); return; } for (var v = 0; v < 2; v++) { if (ok(g, i, v)) { g[i] = v; rec(); g[i] = -1; if (res) return; } } })();
+      return res;
+    }
+    function assistCanEdit() { var s = window.room; return !!(s && s.status === 'playing' && !doneOf(s, window.myPid)); }
+    function assistSnap() { return marksOf(window.room, window.myPid).slice(); }
+    function assistRestore(prev) {
+      var pid = window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        cur.players[pid].marks = (prev || []).slice();
+        return cur;
+      });
+    }
+    function hintMove() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      var pid = window.myPid, sol = solveTango(s.givens || [], s.cons || []); if (!sol) return;
+      var m = marksOf(s, pid), giv = s.givens || [], cand = [];
+      for (var i = 0; i < N * N; i++) if (giv[i] < 0 && m[i] !== sol[i]) cand.push(i);
+      if (!cand.length) return;
+      var idx = cand[Math.floor(Math.random() * cand.length)];
+      if (assist) assist.record();
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        if ((cur.givens || [])[idx] >= 0) return cur;
+        var mm = marksOf(cur, pid).slice(); mm[idx] = sol[idx]; cur.players[pid].marks = mm;
+        var res = analyze(effective(cur, pid), cur.cons);
+        if (res.complete) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' résout en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+      render(window.room);
+    }
+    var assist = Puzzle.assist({ mount: 'tg-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
 
     /* ━━ Rendu ━━ */
     function render(state) {
@@ -258,6 +302,7 @@
         ch += '<div class="tg-con" style="left:' + x + '%;top:' + y + '%">' + (cc.eq ? '=' : '✕') + '</div>';
       });
       document.getElementById('tg-cons').innerHTML = ch;
+      if (typeof assist !== 'undefined' && assist) assist.refresh();
     }
 
     function showResults(state) {

@@ -55,5 +55,56 @@
     });
   }
 
-  root.Puzzle = { rng: rng, shuffle: shuffle, seed: seed, fmtTime: fmtTime, elapsed: elapsed, finish: finish, rankByTime: rankByTime };
+  // ── Aide au joueur (puzzles) : boutons « Annuler » + « Indice » PARTAGÉS ──────
+  // Chaque jeu fournit des rappels : snapshot() (copie de SON état éditable),
+  // restore(snap) (transaction qui réécrit cet état), hint() (transaction qui révèle
+  // UN coup correct — facultatif). Le helper gère la pile d'annulation et pose deux
+  // petits boutons dans le conteneur d'en-tête `mount`. 100 % hors-ligne (aucun réseau).
+  //   var A = Puzzle.assist({ mount:'su-actions', canEdit, snapshot, restore, hint });
+  //   A.record();  // à appeler AVANT de valider un coup (empile l'état d'avant)
+  //   A.reset();   // à chaque nouvelle partie
+  function assist(opts) {
+    opts = opts || {};
+    var stack = [], undoBtn = null, hintBtn = null, built = false;
+    function canEdit() { return !opts.canEdit || !!opts.canEdit(); }
+    function build() {
+      if (built || typeof document === 'undefined') return;
+      var mount = document.getElementById(opts.mount);
+      if (!mount) return;
+      built = true;
+      undoBtn = document.createElement('button');
+      undoBtn.type = 'button'; undoBtn.className = 'game-restart-btn'; undoBtn.title = 'Annuler'; undoBtn.textContent = '↶';
+      undoBtn.onclick = doUndo;
+      mount.insertBefore(undoBtn, mount.firstChild);
+      if (opts.hint) {
+        hintBtn = document.createElement('button');
+        hintBtn.type = 'button'; hintBtn.className = 'game-rules-btn'; hintBtn.title = 'Indice'; hintBtn.textContent = '💡';
+        hintBtn.onclick = function () { if (canEdit()) { try { opts.hint(); } catch (e) {} } };
+        mount.insertBefore(hintBtn, mount.firstChild);
+      }
+      refresh();
+    }
+    function doUndo() {
+      if (!canEdit() || !stack.length) return;
+      var prev = stack.pop();
+      try { opts.restore(prev); } catch (e) {}
+      refresh();
+    }
+    function record() {
+      if (!canEdit()) return;
+      try { stack.push(opts.snapshot()); } catch (e) { return; }
+      if (stack.length > 300) stack.shift();
+      refresh();
+    }
+    function reset() { stack = []; refresh(); }
+    function refresh() {
+      build();
+      if (undoBtn) undoBtn.disabled = !stack.length || !canEdit();
+      if (hintBtn) hintBtn.disabled = !canEdit();
+    }
+    build();
+    return { record: record, reset: reset, refresh: refresh };
+  }
+
+  root.Puzzle = { rng: rng, shuffle: shuffle, seed: seed, fmtTime: fmtTime, elapsed: elapsed, finish: finish, rankByTime: rankByTime, assist: assist };
 })(typeof module !== 'undefined' && module.exports ? module.exports : (this.window = this.window || this));

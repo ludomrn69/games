@@ -29,7 +29,8 @@ function fakeEl() {
 }
 
 // Charge offline.js dans un environnement neuf pour une URL donnée (avion : pas de firebase).
-function loadOffline(search) {
+// initStore : localStorage persistant partagé entre deux « ouvertures » (test de reprise).
+function loadOffline(search, initStore) {
   var els = {};
   var win = {};
   var doc = {
@@ -40,7 +41,7 @@ function loadOffline(search) {
     querySelector: function () { return null; }, querySelectorAll: function () { return []; },
     head: { appendChild: function () {} }, body: { appendChild: function () {} }
   };
-  var store = {};
+  var store = initStore || {};
   // Puzzle minimal : seed() renvoie une valeur ALÉATOIRE (comme le vrai) — le daily doit l'écraser.
   var rndSeed = 777777;
   win.Puzzle = { seed: function () { return (rndSeed = (rndSeed * 16807) % 2147483647); }, fmtTime: function (ms) { return Math.round(ms / 1000) + 's'; },
@@ -108,6 +109,41 @@ console.log('✈️  Mode hors-ligne (avion)');
   if (cap.difficulty === D.level()) ok('difficulté imposée = difficulté du JOUR (' + D.level() + ')'); else bad('difficulté du jour non appliquée (' + cap.difficulty + ' ≠ ' + D.level() + ')');
 })();
 
+// ── 3) SAUVEGARDE / REPRISE d'une partie (le plus utile en avion) ─────────────
+// cfg d'un jeu de plateau (état durable dans `room`) — pas un puzzle-chrono.
+function boardCfg(cap) {
+  return {
+    gameKey: 'demo', name: 'Démo', minPlayers: 1, maxPlayers: 4,
+    offline: { solo: true, soloMinBots: 0 }, bot: function () {},
+    onStart: function () { cap.onStart = true; return { turn: 'p0', demo: 42, winner: null }; },
+    onState: function () { cap.onState = true; }
+  };
+}
+(function () {
+  var store = {}; // localStorage persistant entre les deux ouvertures
+  var KEY = 'games.resume.demo.solo';
+
+  // 1re ouverture : on démarre une partie → elle doit se sauvegarder toute seule.
+  var r1 = loadOffline('?mode=solo', store);
+  r1.win.GameRoom(boardCfg({}));
+  var b = r1.els['off-start']; if (b && typeof b.onclick === 'function') b.onclick();
+  if (store[KEY]) ok('partie de plateau sauvegardée automatiquement (localStorage)'); else bad('aucune sauvegarde écrite');
+  var saved = null; try { saved = JSON.parse(store[KEY]); } catch (e) {}
+  if (saved && saved.room && saved.room.demo === 42 && saved.room.status === 'playing') ok('snapshot = état complet du salon'); else bad('snapshot incomplet');
+
+  // 2e ouverture (onglet rouvert) : le bouton « Reprendre » doit être câblé et restaurer l'état.
+  var cap2 = {};
+  var r2 = loadOffline('?mode=solo', store);
+  r2.win.GameRoom(boardCfg(cap2));
+  var rb = r2.els['off-resume'];
+  if (rb && typeof rb.onclick === 'function') { rb.onclick(); } else bad('bouton « Reprendre » non proposé alors qu\'une sauvegarde existe');
+  if (cap2.onState && r2.win.room && r2.win.room.status === 'playing' && r2.win.room.demo === 42) ok('« Reprendre » restaure fidèlement la partie'); else bad('la reprise ne restaure pas l\'état');
+
+  // Fin de partie → la sauvegarde doit être purgée (pas de reprise fantôme).
+  r2.win.roomRef.transaction(function (cur) { if (!cur) return cur; cur.winner = 'p0'; cur.status = 'ended'; return cur; });
+  if (!store[KEY]) ok('sauvegarde effacée en fin de partie'); else bad('sauvegarde non purgée après la fin');
+})();
+
 console.log('');
 if (fails.length) { console.error('❌ ' + fails.length + ' test(s) hors-ligne échoué(s) :'); fails.forEach(function (f) { console.error('   - ' + f); }); process.exit(1); }
-console.log('✅ Hors-ligne OK : avion, solo et défi du jour fonctionnent sans aucune connexion.');
+console.log('✅ Hors-ligne OK : avion, solo, défi du jour et reprise de partie fonctionnent sans aucune connexion.');

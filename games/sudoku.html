@@ -73,7 +73,7 @@
       <div class="su-head">
         <span class="su-title-mini">Sudoku</span>
         <span class="su-timer" id="su-timer">⏱ 0:00</span>
-        <div class="su-head-actions">
+        <div class="su-head-actions" id="su-actions">
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
         </div>
@@ -195,7 +195,7 @@
     function onState(snap) {
       var state = snap.val() || {};
       var status = state.status || 'waiting';
-      if (status === 'playing') { if (prevStatus !== 'playing') { sel = -1; showScreen('s-playing'); } render(state); startTimer(state); }
+      if (status === 'playing') { if (prevStatus !== 'playing') { sel = -1; showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
       else { stopTimer(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
@@ -209,6 +209,9 @@
     function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
 
     function setCell(pid, idx, val) {
+      // Empile l'état d'avant pour « Annuler » seulement si le coup change vraiment la grille.
+      var s = window.room;
+      if (assist && s && s.status === 'playing' && !doneOf(s, pid) && (s.puzzle || [])[idx] === 0 && gridOf(s, pid)[idx] !== val) assist.record();
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing') return cur;
         if ((cur.puzzle || [])[idx] !== 0) return cur;             // case-indice : verrouillée
@@ -218,6 +221,29 @@
         return cur;
       });
     }
+
+    /* ━━ Aide au joueur (Annuler / Indice) ━━ */
+    function assistCanEdit() { var s = window.room; return !!(s && s.status === 'playing' && !doneOf(s, window.myPid)); }
+    function assistSnap() { return gridOf(window.room, window.myPid).slice(); }
+    function assistRestore(prev) {
+      var pid = window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        cur.players[pid].grid = (prev || []).slice();
+        return cur;
+      });
+    }
+    // Indice : révèle une case vide/fausse à partir de la solution (déjà en base pour le Sudoku).
+    function hintMove() {
+      var s = window.room; if (!s || s.status !== 'playing' || doneOf(s, window.myPid)) return;
+      var pid = window.myPid, puzzle = s.puzzle || [], sol = s.solution || [], g = gridOf(s, pid), cand = [];
+      for (var i = 0; i < sol.length; i++) if (puzzle[i] === 0 && g[i] !== sol[i]) cand.push(i);
+      if (!cand.length) return;
+      var idx = cand[Math.floor(Math.random() * cand.length)];
+      setCell(pid, idx, sol[idx]);      // setCell empile déjà l'état pour l'annulation
+      sel = idx; render(window.room);
+    }
+    var assist = Puzzle.assist({ mount: 'su-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
     function tapCell(idx) { if ((window.room.puzzle || [])[idx] !== 0) { sel = -1; render(window.room); return; } sel = (sel === idx ? -1 : idx); render(window.room); }
     function tapKey(val) { if (sel < 0) { lbToast('Choisis une case'); return; } setCell(window.myPid, sel, val); }
 
@@ -253,6 +279,7 @@
       var padEl = document.getElementById('su-pad');
       padEl.style.gridTemplateColumns = 'repeat(' + (n === 6 ? 4 : 5) + ', 1fr)';
       padEl.innerHTML = pad;
+      if (typeof assist !== 'undefined' && assist) assist.refresh();
     }
     // Validité d'une valeur posée (surlignage rouge) : on ignore la case elle-même.
     function validDisplay(g, idx, val, N, bh, bw) {

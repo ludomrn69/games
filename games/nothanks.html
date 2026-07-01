@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="No Thanks! 🙅" data-emoji="🙅"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
+    .btn-primary:hover { transform: translateY(-2px); }
+
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .nt-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .nt-head { background: rgba(20,16,28,0.97); }
+    .nt-round-label { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--gold); }
+    .nt-head-actions { display: flex; gap: 6px; }
+
+    .nt-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 28px; padding: 8px 12px 2px; }
+    .nt-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 10px; }
+    .nt-card { width: 120px; height: 160px; border-radius: 18px; background: linear-gradient(160deg, #fff, #f2e8d6); border: 3px solid var(--gold); box-shadow: var(--shadow-hover); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 3.6rem; color: #2c2520; position: relative; }
+    html[data-theme="dark"] .nt-card { background: linear-gradient(160deg,#2a2138,#201829); color: #f0e6d6; }
+    .nt-card .deckn { position: absolute; bottom: 8px; right: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.7rem; font-weight: 700; color: var(--ink-light); }
+    .nt-pot { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--gold); font-weight: 700; }
+    .nt-pot .chip { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe89a, #d9a441); border: 2px solid #b9862f; vertical-align: -3px; margin: 0 1px; }
+
+    .nt-players { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px; }
+    .nt-pl { background: var(--white); border-radius: 14px; padding: 6px 10px; box-shadow: var(--shadow); font-size: 0.78rem; min-width: 128px; border: 2px solid transparent; }
+    .nt-pl.turn { border-color: var(--terracotta); }
+    .nt-pl-top { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+    .nt-pl-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; }
+    .nt-pl-chips { margin-left: auto; color: #b9862f; font-weight: 800; }
+    .nt-cards { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 5px; }
+    .nt-mini { font-size: 0.66rem; font-weight: 800; padding: 1px 4px; border-radius: 5px; background: var(--cream); color: var(--ink); }
+    .nt-mini.run { background: var(--sage); color: #14351f; }
+
+    .nt-actions { display: flex; gap: 10px; justify-content: center; padding: 10px 14px calc(16px + env(safe-area-inset-bottom)); }
+    .nt-act { flex: 1; max-width: 200px; border: none; border-radius: 16px; padding: 0.9rem 0.6rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.98rem; cursor: pointer; box-shadow: var(--shadow); line-height: 1.15; }
+    .nt-act small { display: block; font-weight: 600; font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+    .nt-act.take { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .nt-act.pass { background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); }
+    .nt-act:disabled { opacity: 0.45; cursor: default; }
+    .nt-wait { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); padding: 12px; text-align: center; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+
+    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
+    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.7rem; margin: 6px 0; }
+    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 8px auto 22px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--cream); border-radius: 14px; padding: 9px 12px; }
+    .res-rank-pos { font-weight: 800; width: 26px; } .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--terracotta); }
+  </style>
+</head>
+<body>
+  <script src="/boot.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="nt-head">
+        <span class="nt-round-label" id="nt-round-label">No Thanks!</span>
+        <div class="nt-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="nt-players" id="nt-players"></div>
+      <div class="nt-banner" id="nt-banner"></div>
+      <div class="nt-center">
+        <div class="nt-card" id="nt-card">—<span class="deckn" id="nt-deckn"></span></div>
+        <div class="nt-pot" id="nt-pot"></div>
+      </div>
+      <div class="nt-actions" id="nt-actions"></div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🙅</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart"><div class="modal-card">
+    <div class="modal-title">Nouvelle partie ?</div>
+    <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+    <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+      <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+  </div></div>
+  <div class="modal" id="modal-rules"><div class="modal-card">
+    <div class="modal-title">🙅 No Thanks!</div>
+    <div class="modal-body">
+      <p>Une carte (3 à 35) est retournée. À ton tour : <b>la prendre</b> (avec tous les jetons posés dessus), ou <b>payer 1 jeton</b> pour la refuser et passer.</p>
+      <p style="margin-top:8px">• Sans jeton, tu es <b>obligé</b> de prendre la carte.</p>
+      <p style="margin-top:6px">• Score = somme de tes cartes, mais une <b>suite</b> de cartes consécutives ne compte que par sa <b>plus petite</b>. Chaque jeton = <b>−1</b>.</p>
+      <p style="margin-top:6px">• Le plus <b>petit</b> score gagne !</p>
+    </div>
+    <div class="modal-btns" style="margin-top:14px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+  </div></div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+    var prevStatus = null;
+
+    GameRoom({
+      gameKey: 'nothanks', name: 'No Thanks!', emoji: '🙅', tagline: 'Prends… ou paie pour refuser',
+      minPlayers: 2, maxPlayers: 7,
+      rules: [
+        'Prends la carte (+ ses jetons) ou paie 1 jeton pour la refuser',
+        'Sans jeton, tu dois prendre',
+        'Une suite ne compte que par sa plus petite carte · jeton = −1',
+        'Le plus petit score gagne'
+      ],
+      offline: { solo: true, local: true },
+      bot: ntBot,
+      offlineEnter: function () { if (window.room) render(window.room); },
+      onState: onState, onStart: onStart
+    });
+
+    function offlineTurn(r) { if (!r || r.status !== 'playing') return null; var t = r.turn; return (r.players[t] && r.players[t].isBot) ? t : null; }
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var chips = order.length <= 5 ? 11 : (order.length === 6 ? 9 : 7);
+      var deck = []; for (var v = 3; v <= 35; v++) deck.push(v); shuffle(deck); deck = deck.slice(9); // retire 9 cartes
+      order.forEach(function (p) { cur.players[p].chips = chips; cur.players[p].cards = []; });
+      var first = deck.pop();
+      return { deck: deck, current: first, pot: 0, turn: order[0], winner: null, banner: 'Carte ' + first + ' — à toi de choisir' };
+    }
+
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); render(state); }
+      else if (status === 'ended') showResults(state);
+      prevStatus = status;
+    }
+
+    /* ━━ Score : une suite ne compte que par sa plus petite carte ━━ */
+    function scoreOf(cards, chips) {
+      var set = {}; (cards || []).forEach(function (c) { set[c] = 1; });
+      var s = 0; (cards || []).forEach(function (c) { if (!set[c - 1]) s += c; });
+      return s - (chips || 0);
+    }
+    function nextPid(cur, from) { var o = cur.order || []; return o[(o.indexOf(from) + 1) % o.length]; }
+
+    /* ━━ Actions ━━ */
+    function takeCard() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || cur.current == null) return cur;
+        var me = window.myPid, P = cur.players[me];
+        P.cards = (P.cards || []).concat([cur.current]); P.chips = (P.chips || 0) + (cur.pot || 0);
+        cur.banner = Room.name(me) + ' prend le ' + cur.current + (cur.pot ? ' (+' + cur.pot + ' jetons)' : '');
+        if (!cur.deck || !cur.deck.length) { cur.current = null; cur.pot = 0; cur.status = 'ended'; finalize(cur); return cur; }
+        cur.current = cur.deck.pop(); cur.pot = 0; // même joueur enchaîne sur la nouvelle carte
+        return cur;
+      });
+    }
+    function passCard() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || cur.current == null) return cur;
+        var me = window.myPid, P = cur.players[me];
+        if ((P.chips || 0) <= 0) return cur; // sans jeton, interdit de passer
+        P.chips -= 1; cur.pot = (cur.pot || 0) + 1;
+        cur.turn = nextPid(cur, me);
+        cur.banner = Room.name(me) + ' refuse (paie 1 jeton)';
+        return cur;
+      });
+    }
+    function finalize(cur) {
+      var order = cur.order || [], best = null;
+      order.forEach(function (p) { var sc = scoreOf(cur.players[p].cards, cur.players[p].chips); cur.players[p].score = sc; if (best === null || sc < cur.players[best].score) best = p; });
+      cur.winner = best;
+    }
+
+    /* ━━ IA ━━ */
+    function ntBot(state, pid) {
+      if (state.status !== 'playing' || state.turn !== pid || state.current == null) return;
+      var P = state.players[pid], card = state.current, pot = state.pot || 0, chips = P.chips || 0;
+      if (chips <= 0) { takeCard(); return; }
+      var set = {}; (P.cards || []).forEach(function (c) { set[c] = 1; });
+      var adj = set[card - 1] || set[card + 1]; // prolonge/complète une suite → très intéressant
+      var net = card - pot; // coût réel si on prend
+      var lvl = window.Bots ? window.Bots.level(state) : 'normal';
+      var thresh = window.Bots ? window.Bots.pick(state, { easy: 5, normal: 9, hard: 11 }) : 9; // on garde des jetons si on est riche
+      var take = adj || net <= 0 || (net <= 5 && chips <= 4) || (net <= chips && net <= thresh && pot >= net - 2);
+      // si peu de jetons, on prend plus volontiers les cartes bon marché
+      if (!take && chips <= 2 && net <= 8) take = true;
+      if (window.Bots && window.Bots.shouldBlunder(state)) take = Math.random() < 0.5;
+      if (take) takeCard(); else passCard();
+    }
+
+    /* ━━ Rendu ━━ */
+    function miniCards(cards) {
+      var sorted = (cards || []).slice().sort(function (a, b) { return a - b; }); var set = {}; sorted.forEach(function (c) { set[c] = 1; });
+      return sorted.map(function (c) { return '<span class="nt-mini' + (set[c - 1] ? ' run' : '') + '">' + c + '</span>'; }).join('');
+    }
+    function render(state) {
+      var order = state.order || [], me = window.myPid;
+      setText('nt-round-label', '🙅 No Thanks!');
+      setHTML('nt-players', order.map(function (pid) {
+        var P = state.players[pid] || {};
+        return '<div class="nt-pl' + (state.turn === pid ? ' turn' : '') + '"><div class="nt-pl-top">' +
+          '<span class="nt-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '<span class="nt-pl-chips">🪙' + (P.chips || 0) + '</span></div>' +
+          '<div class="nt-cards">' + (miniCards(P.cards) || '<span style="color:var(--ink-light);font-size:.66rem">—</span>') + '</div></div>';
+      }).join(''));
+      setText('nt-banner', state.banner || '');
+      var cardEl = document.getElementById('nt-card');
+      cardEl.firstChild.nodeValue = state.current != null ? String(state.current) : '—';
+      setText('nt-deckn', (state.deck || []).length + ' à venir');
+      var pot = state.pot || 0;
+      setHTML('nt-pot', pot ? ('Sur la carte : ' + Array(pot + 1).join('<span class="chip"></span>') + ' ' + pot + ' jeton' + (pot > 1 ? 's' : '')) : 'Aucun jeton posé');
+
+      var host = document.getElementById('nt-actions');
+      if (state.turn !== me) { host.innerHTML = '<div class="nt-wait">Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>'; return; }
+      var chips = (state.players[me] || {}).chips || 0;
+      host.innerHTML =
+        '<button class="nt-act pass" ' + (chips > 0 ? '' : 'disabled') + ' onclick="passCard()">🙅 Non merci<small>' + (chips > 0 ? 'paie 1 jeton' : 'plus de jetons !') + '</small></button>' +
+        '<button class="nt-act take" onclick="takeCard()">✋ Je prends<small>la carte + ' + pot + ' jeton' + (pot > 1 ? 's' : '') + '</small></button>';
+    }
+
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice();
+      order.sort(function (a, b) { return (state.players[a].score) - (state.players[b].score); });
+      var w = state.winner, iWon = w === window.myPid;
+      setText('res-emoji', iWon ? '🏆' : '🙅');
+      setText('res-title', iWon ? 'Tu gagnes ! 🏆' : (w ? Room.name(w) + ' gagne !' : 'Terminé'));
+      var medals = ['🥇', '🥈', '🥉'];
+      setHTML('res-rank', order.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-score">' + state.players[pid].score + ' pts</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

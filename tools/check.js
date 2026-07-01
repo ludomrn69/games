@@ -75,10 +75,13 @@ gameHtmls.forEach(function (f) {
   else if (sw.indexOf("'" + eng + "'") < 0) err(eng + ' (moteur de games/' + f + ') absent du cache service worker (sw.js)');
 });
 
-// 4) JSON
-['manifest.webmanifest', 'database.rules.example.json'].forEach(function (f) {
-  try { JSON.parse(read(f)); } catch (e) { err('JSON invalide : ' + f + ' — ' + e.message); }
-});
+// 4) JSON (on valide les fichiers présents ; les règles peuvent exister en version
+// permissive .example et/ou en version stricte database.rules.json)
+['manifest.webmanifest', 'database.rules.example.json', 'database.rules.json']
+  .filter(function (f) { return fs.existsSync(path.join(ROOT, f)); })
+  .forEach(function (f) {
+    try { JSON.parse(read(f)); } catch (e) { err('JSON invalide : ' + f + ' — ' + e.message); }
+  });
 
 if (errors.length) { console.error('❌ ' + errors.length + ' problème(s) :\n\n' + errors.join('\n\n')); process.exit(1); }
 console.log('✅ Vérifs OK : ' + (files.filter(function (f) { return f.endsWith('.js'); }).length + aiJs.length) + ' JS (dont ' + aiJs.length + ' modules ai/), ' + (gameHtmls.length + 1) + ' HTML, ' + gameKeys.length + ' jeux cohérents (index/sw/fichiers).');

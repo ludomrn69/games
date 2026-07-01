@@ -77,6 +77,11 @@ la synchro temps réel.
 | 🐺 Loup-Garou | 4–12 | ✈️ | déduction sociale (IA) |
 | ⏱️ Time's Up | 1–12 | ✈️ | équipes (+ solo chrono) |
 | 💰 La Bonne Paye | 2–6 | ✈️ | gestion / cartes |
+| 💎 Diamants | 2–8 | ✈️ | stop-ou-encore |
+| 🎲 Perudo | 2–6 | ✈️ | dés / bluff |
+| 🚂 Aventuriers du Rail | 2–5 | ✈️ | plateau / réseau |
+| 🙅 No Thanks! | 2–7 | ✈️ | stop-ou-encore |
+| 🎲 Qwixx | 1–5 | ✈️ | dés / roll-and-write |
 
 <!-- GAMES:END -->
 

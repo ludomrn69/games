@@ -33,6 +33,7 @@
   var cfg = null, room = null, players = [], totalPlayers = 2;
   var humanPids = [], humanPid = null, lastTurnShown = null;
   var offlineDifficulty = 'normal';
+  var statsRecorded = false; // stats par jeu : un seul enregistrement par partie
   var BOT_DELAY = 650;
 
   function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
@@ -162,17 +163,32 @@
     var sub = mode === 'solo'
       ? (noBots ? 'Toi contre le chrono ⏱' : (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi'))
       : 'Chacun son tour, on se passe l\'appareil';
+    // Reprise d'une partie interrompue (le plus utile en avion) : proposée en tête,
+    // avant les réglages, si un snapshot valide existe pour ce jeu et ce mode.
+    var saved = loadResume();
+    var resumeBtn = saved
+      ? '<button class="lb-btn" id="off-resume" style="background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff">▶ Reprendre la partie</button>' +
+        '<div style="margin:-6px 0 14px;font-size:.82rem;color:var(--ink-light)">' + resumeAgeLabel(saved.ts) + ' · <button id="off-resume-drop" style="background:none;border:none;color:var(--ink-light);text-decoration:underline;cursor:pointer;font:inherit;padding:0">effacer</button></div>'
+      : '';
     host.innerHTML =
       '<div class="lb-wrap">' +
         (cfg.emoji ? '<div class="lb-emoji-big">' + cfg.emoji + '</div>' : '') +
         '<h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
         '<p class="lb-sub">' + (mode === 'solo' ? '🤖 Solo' : '📱 Local') + ' · ' + sub + '</p>' +
+        (window.GameStats ? GameStats.summaryHTML(cfg.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
+        resumeBtn +
         controls +
-        '<button class="lb-btn" id="off-start">Commencer</button>' +
+        '<button class="lb-btn" id="off-start">' + (saved ? 'Nouvelle partie' : 'Commencer') + '</button>' +
         '<a class="lb-link" href="' + location.pathname + '">↺ Passer en mode en ligne</a>' +
         '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
       '</div>';
     document.getElementById('off-start').onclick = startFromSetup;
+    if (saved) {
+      var rb = document.getElementById('off-resume');
+      if (rb) rb.onclick = function () { resumeGame(loadResume()); };
+      var rd = document.getElementById('off-resume-drop');
+      if (rd) rd.onclick = function () { clearResume(); renderSetup(); };
+    }
     // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
     host.querySelectorAll('.off-set-row').forEach(function (row) {
       row.addEventListener('click', function (e) {
@@ -224,6 +240,7 @@
 
   function startGame(savedKeep) {
     endFx = false; // ré-arme le son/confetti de fin pour cette nouvelle partie
+    statsRecorded = false;
     var id0 = readIdentity();
     var pmap = {}, ids = [];
     players = [];
@@ -266,6 +283,64 @@
     startGame(saved);
   }
 
+  // ── Sauvegarde / reprise d'une partie hors-ligne (le plus utile en avion) ────
+  //  Tout l'état durable d'un jeu de plateau/cartes vit dans `room` : le jeu se
+  //  re-rend intégralement depuis `room` via onState (comme un client qui rejoint
+  //  une partie en cours). On sérialise donc `room` dans localStorage à chaque
+  //  changement ; « Reprendre » recharge ce snapshot. On EXCLUT les puzzles-chrono
+  //  (soloNoBots : leur grille vit dans les variables locales de la page, pas dans
+  //  `room`) et le défi du jour (grille imposée par la date).
+  function resumeKey() { return 'games.resume.' + ((cfg && cfg.gameKey) || 'x') + '.' + mode; }
+  function canResume() { return !!cfg && !(cfg.offline && cfg.offline.soloNoBots) && !daily; }
+  function saveResume() {
+    if (!canResume() || !room) return;
+    if (ended() || room.status !== 'playing') { clearResume(); return; }
+    try {
+      localStorage.setItem(resumeKey(), JSON.stringify({
+        v: 1, ts: Date.now(), room: room,
+        totalPlayers: totalPlayers, offlineDifficulty: offlineDifficulty
+      }));
+    } catch (e) {}
+  }
+  function clearResume() { try { localStorage.removeItem(resumeKey()); } catch (e) {} }
+  function resumeAgeLabel(ts) {
+    var m = Math.max(0, Math.round((Date.now() - (ts || 0)) / 60000));
+    if (m < 1) return 'sauvegardée à l\'instant';
+    if (m < 60) return 'interrompue il y a ' + m + ' min';
+    var h = Math.round(m / 60);
+    return 'interrompue il y a ' + h + ' h';
+  }
+  function loadResume() {
+    if (!canResume()) return null;
+    try {
+      var raw = localStorage.getItem(resumeKey()); if (!raw) return null;
+      var d = JSON.parse(raw);
+      if (!d || !d.room || d.room.game !== cfg.gameKey || d.room.status !== 'playing') return null;
+      return d;
+    } catch (e) { return null; }
+  }
+  // Repart d'un snapshot sauvegardé : on reconstruit l'état moteur puis on laisse
+  // afterChange re-rendre le jeu (et relancer l'ordi si c'est son tour).
+  function resumeGame(saved) {
+    if (!saved || !saved.room) { renderSetup(); return; }
+    endFx = false;
+    room = saved.room;
+    var order = (room.order && room.order.length) ? room.order : Object.keys(room.players || {});
+    totalPlayers = saved.totalPlayers || order.length;
+    offlineDifficulty = saved.offlineDifficulty || room.difficulty || 'normal';
+    players = order.map(function (pid) {
+      var p = (room.players || {})[pid] || {};
+      return { pid: pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat, isBot: !!p.isBot };
+    });
+    humanPids = players.filter(function (p) { return !p.isBot; }).map(function (p) { return p.pid; });
+    humanPid = humanPids[0];
+    window.room = room;
+    window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
+    lastTurnShown = null;
+    hidePass();
+    afterChange();
+  }
+
   // ── Après chaque changement d'état : router l'écran / faire jouer l'ordi ──────
   function safeOnState() { try { if (cfg.onState) cfg.onState(snap()); } catch (e) { console.error(e); } }
 
@@ -287,14 +362,21 @@
       if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
       if (ended() && !endFx) { endFx = true; if (window.Sfx) Sfx.play(room.winner ? 'win' : 'lose'); }
       if (daily && ended()) setTimeout(recordDaily, 450); // Défi du jour : enregistre + partage
+      // Stats par jeu (solo, hors défi du jour qui a son propre suivi) : une fois par partie.
+      if (ended() && !daily && window.GameStats && !statsRecorded) {
+        statsRecorded = true;
+        try { GameStats.record(cfg.gameKey, { won: room.winner === humanPid, timeMs: (room.players[humanPid] || {}).finishedAt || null }); } catch (e) {}
+      }
+      if (ended()) clearResume(); else saveResume();
     } else {
-      if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); return; }
+      if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); clearResume(); return; }
       window.myPid = active || room.turn || (room.order || [])[0];
       var changed = (active !== lastTurnShown);
       safeOnState();
       // À chaque changement de joueur actif : réinit éventuelle de l'état local du jeu.
       if (changed && cfg.offlineEnter) { try { cfg.offlineEnter(room, window.myPid); } catch (e) {} }
       if (changed && active) { showPass(active); lastTurnShown = active; }
+      saveResume();
     }
   }
 
