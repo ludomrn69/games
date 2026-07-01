@@ -103,16 +103,19 @@
     // autoriser 0 (vrai solo : le joueur seul, ex. Le juste prix) via
     // offline:{ soloMinBots: 0 }.
     var loBots = (off.soloMinBots != null) ? off.soloMinBots : 1;
+    // Jeu SOLO PUR (puzzle au chrono : Sudoku, Zip, Patches…) : aucun adversaire
+    // ordi, on cache le compteur d'adversaires et on parle de « Difficulté ».
+    var noBots = mode === 'solo' && off.soloNoBots;
     var controls = '';
     if (mode === 'solo') {
-      if (max > 2) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
-      // Difficulté des ordis (présente dès qu'il peut y avoir au moins un ordi).
-      if (max - 1 >= 1) controls += diffRow();
+      if (max > 2 && !noBots) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
+      // Difficulté (des ordis, ou de la grille pour un solo pur).
+      if (max - 1 >= 1) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
     }
     var sub = mode === 'solo'
-      ? (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi')
+      ? (noBots ? 'Toi contre le chrono ⏱' : (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi'))
       : 'Chacun son tour, on se passe l\'appareil';
     host.innerHTML =
       '<div class="lb-wrap">' +
@@ -147,19 +150,20 @@
     for (var v = lo; v <= hi; v++) btns += '<button type="button" class="off-num' + (v === initial ? ' active' : '') + '" data-val="' + v + '">' + v + '</button>';
     return '<div class="off-set"><div class="off-set-label">' + label + '</div><div class="off-set-row">' + btns + '</div></div>';
   }
-  function diffRow() {
+  function diffRow(label) {
     var B = window.Bots || { LEVELS: ['easy', 'normal', 'hard'], LABELS: { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' } };
     var def = 'normal';
     var btns = B.LEVELS.map(function (lv) {
       return '<button type="button" class="off-diff' + (lv === def ? ' active' : '') + '" data-diff="' + lv + '">' + B.LABELS[lv] + '</button>';
     }).join('');
-    return '<div class="off-set"><div class="off-set-label">Niveau des ordis</div><div class="off-set-row">' + btns + '</div></div>';
+    return '<div class="off-set"><div class="off-set-label">' + (label || 'Niveau des ordis') + '</div><div class="off-set-row">' + btns + '</div></div>';
   }
   function startFromSetup() {
     var min = cfg.minPlayers || 2, max = cfg.maxPlayers || 8;
+    var noBots = mode === 'solo' && cfg.offline && cfg.offline.soloNoBots;
     var active = document.querySelector('.off-num.active');
     var val = active ? +active.dataset.val : min;
-    if (mode === 'solo') totalPlayers = (max > 2) ? (1 + val) : 2;
+    if (mode === 'solo') totalPlayers = noBots ? 1 : ((max > 2) ? (1 + val) : 2);
     else totalPlayers = (max > 2) ? val : min;
     // En solo « 0 adversaire autorisé », le plancher tombe à 1 (joueur seul).
     var soloPure = (mode === 'solo' && cfg.offline && cfg.offline.soloMinBots === 0);
