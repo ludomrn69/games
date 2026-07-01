@@ -11,7 +11,7 @@
 (function () {
   var me = document.currentScript;
   var engine = me && me.getAttribute('data-engine');
-  var list = ['/nav.js', '/daily.js', '/presence.js', '/avatars.js', '/lobby.js', '/offline.js'];
+  var list = ['/nav.js', '/daily.js', '/sfx.js', '/presence.js', '/avatars.js', '/lobby.js', '/offline.js'];
   if (engine) list.push('/' + engine);
   document.write(list.map(function (s) { return '<script src="' + s + '"><\/script>'; }).join(''));
 })();

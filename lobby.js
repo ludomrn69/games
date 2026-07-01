@@ -131,7 +131,7 @@
   window.Lobby.soundOn = soundOn;
   window.Lobby.turnAlertFor = function (room) {
     var mine = !!(room && room.status === 'playing' && !room.winner && room.turn === window.myPid);
-    if (mine && !_lastMine) { beep(); try { if (soundOn() && navigator.vibrate) navigator.vibrate(180); } catch (e) {} }
+    if (mine && !_lastMine) { if (window.Sfx) Sfx.play('turn'); else beep(); try { if (soundOn() && navigator.vibrate) navigator.vibrate(180); } catch (e) {} }
     _lastMine = mine;
     updateTurnClock(room);
   };

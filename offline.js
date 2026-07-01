@@ -20,7 +20,7 @@
   var mode = params.get('mode');
   if (mode !== 'solo' && mode !== 'local') return; // mode EN LIGNE → on ne touche à rien
   var daily = params.get('daily') === '1' && mode === 'solo'; // Défi du jour (voir daily.js)
-  var dailyRecorded = false;
+  var dailyRecorded = false, endFx = false; // endFx : son/confetti de fin joués une seule fois
 
   // ── firebase factice (au cas où le SDK n'a pas pu se charger, ex. en avion) ──
   if (typeof window.firebase === 'undefined') {
@@ -223,6 +223,7 @@
   var BOT_EMOJI = ['🤖', '👾', '🐲', '🦾'];
 
   function startGame(savedKeep) {
+    endFx = false; // ré-arme le son/confetti de fin pour cette nouvelle partie
     var id0 = readIdentity();
     var pmap = {}, ids = [];
     players = [];
@@ -284,6 +285,7 @@
       safeOnState();
       try { if (window.Lobby && Lobby.turnAlertFor) Lobby.turnAlertFor(room); } catch (e) {}
       if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
+      if (ended() && !endFx) { endFx = true; if (window.Sfx) { if (room.winner) { Sfx.play('win'); Sfx.confetti(); } else Sfx.play('lose'); } }
       if (daily && ended()) setTimeout(recordDaily, 450); // Défi du jour : enregistre + partage
     } else {
       if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); return; }
