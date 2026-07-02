@@ -58,6 +58,12 @@
 
     .uno-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
     .uno-my-hand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 0 10px 8px; }
+    /* Tablette / ordi : on exploite la largeur — main et adversaires centrés et aérés. */
+    @media (min-width: 760px) {
+      .uno-opps, .uno-my-hand { max-width: 940px; margin-left: auto; margin-right: auto; }
+      .uno-center { gap: 34px; }
+      .uno-my-hand { gap: 9px; }
+    }
     .uno-card.in-hand { cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; }
     .uno-card.in-hand:hover { transform: translateY(-6px); box-shadow: 0 8px 18px rgba(0,0,0,0.22); }
     .uno-card.in-hand.unplayable { opacity: 0.45; cursor: not-allowed; }

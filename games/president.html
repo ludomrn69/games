@@ -42,6 +42,13 @@
 
     .pr-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
     .pr-hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 0 10px 8px; }
+    /* Tablette / ordi : cartes plus grandes, contenu centré et aéré. */
+    @media (min-width: 760px) {
+      .pr-opps, .pr-pile-wrap, .pr-hand { max-width: 900px; margin-left: auto; margin-right: auto; }
+      .card { width: 64px; height: 92px; }
+      .pr-hand { gap: 8px; }
+      .pr-pile { min-height: 100px; }
+    }
     .pr-hand .card { cursor: pointer; transition: transform 0.15s; }
     .pr-hand .card.sel { transform: translateY(-12px); box-shadow: 0 8px 18px rgba(196,116,90,0.4); border-color: var(--terracotta); }
     .pr-hand .card.dim { opacity: 0.4; }

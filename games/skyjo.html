@@ -61,6 +61,14 @@
     .sk-cell.tappable:hover { transform: translateY(-3px); }
     .sk-cell.back { color: rgba(255,255,255,0.9); }
     @media (max-width: 380px) { .sk-cell { width: 48px; height: 66px; font-size: 1.2rem; } }
+    /* Tablette / ordi : on exploite la largeur — piles plus grandes, grille plus généreuse, adversaires en ligne. */
+    @media (min-width: 760px) {
+      .sk-opps { gap: 14px; max-width: 900px; margin: 0 auto; }
+      .sk-center { gap: 28px; padding: 12px; }
+      .sk-card { width: 60px; height: 84px; font-size: 1.5rem; }
+      .sk-cell { width: 72px; height: 98px; font-size: 1.7rem; }
+      .sk-my-grid { gap: 9px; }
+    }
     .sk-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
     .sk-act-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.45rem 0.9rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
 

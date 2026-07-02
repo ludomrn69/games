@@ -47,6 +47,12 @@
 
     .pa-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
     .pa-hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 0 10px 14px; }
+    /* Tablette / ordi : on exploite la largeur — cartes plus grandes, contenu centré. */
+    @media (min-width: 760px) {
+      .pa-opps, .pa-trick-wrap, .pa-hand { max-width: 920px; margin-left: auto; margin-right: auto; }
+      .pa-hand .card, .pa-trick .card { width: 62px; height: 88px; }
+      .pa-hand { gap: 8px; }
+    }
     .pa-hand .card { cursor: pointer; transition: transform 0.15s; }
     .pa-hand .card.playable:hover { transform: translateY(-10px); }
     .pa-hand .card.dim { opacity: 0.34; cursor: not-allowed; }
