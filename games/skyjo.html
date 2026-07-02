@@ -37,7 +37,17 @@
     .sk-pile-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .sk-pile-label { font-family: 'Caveat', cursive; font-size: 0.8rem; color: var(--ink-light); }
     .sk-card { width: 46px; height: 64px; border-radius: 8px; font-weight: 900; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
-    .sk-card.back { background: linear-gradient(135deg, var(--ink), #4a3f37); color: #fff; cursor: pointer; }
+    /* Dos de carte : motif tissé chaud (plus de fond noir) */
+    .sk-card.back, .sk-cell.back {
+      background-color: #c4745a;
+      background-image:
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.14) 0 3px, transparent 3px 9px),
+        repeating-linear-gradient(-45deg, rgba(255,255,255,0.14) 0 3px, transparent 3px 9px),
+        linear-gradient(135deg, var(--terracotta), var(--gold));
+      color: rgba(255,255,255,0.9);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 0 0 3px rgba(255,255,255,0.12);
+    }
+    .sk-card.back { cursor: pointer; }
     .sk-card.candidate { box-shadow: 0 0 0 3px var(--terracotta); }
     .v-neg { background: #5b8dd6; color: #fff; } .v-zero { background: #c9c2b8; color: #2C2520; }
     .v-low { background: #6ab04c; color: #fff; } .v-mid { background: #f0c419; color: #2C2520; } .v-high { background: #e05a4e; color: #fff; }
@@ -49,7 +59,7 @@
     .sk-cell { width: 56px; height: 76px; border-radius: 9px; font-weight: 900; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.14); cursor: default; transition: transform .12s; }
     .sk-cell.tappable { cursor: pointer; }
     .sk-cell.tappable:hover { transform: translateY(-3px); }
-    .sk-cell.back { background: linear-gradient(135deg, var(--ink), #4a3f37); color: #fff; }
+    .sk-cell.back { color: rgba(255,255,255,0.9); }
     @media (max-width: 380px) { .sk-cell { width: 48px; height: 66px; font-size: 1.2rem; } }
     .sk-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
     .sk-act-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.45rem 0.9rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
@@ -106,10 +116,11 @@
           <div id="sk-discard-wrap"></div>
         </div>
       </div>
+      <!-- Boutons contextuels (défausser & retourner, annuler…) juste sous les piles -->
+      <div class="sk-actions" id="sk-actions"></div>
       <div class="sk-status" id="sk-status"></div>
       <div class="sk-my-wrap">
         <div class="sk-my-grid" id="sk-my-grid"></div>
-        <div class="sk-actions" id="sk-actions"></div>
       </div>
     </div>
 
@@ -296,7 +307,7 @@
       for (var i = 0; i < 12; i++) {
         if (rm[i]) h += '<div class="sk-mini-cell sk-empty"></div>';
         else if (fl[i]) h += '<div class="sk-mini-cell ' + valueClass(g[i]) + '">' + g[i] + '</div>';
-        else h += '<div class="sk-mini-cell back" style="background:linear-gradient(135deg,#2C2520,#4a3f37)"></div>';
+        else h += '<div class="sk-mini-cell back" style="background:linear-gradient(135deg,var(--terracotta),var(--gold))"></div>';
       }
       return h;
     }
