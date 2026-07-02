@@ -26,6 +26,7 @@
     .mb-ruler-scale span { position: absolute; transform: translateX(-50%); font-size: 0.58rem; font-weight: 800; color: var(--ink-light); white-space: nowrap; }
     .mb-ruler-scale span:first-child { transform: none; }
     .mb-ruler-scale span:last-child { transform: translateX(-100%); }
+    @media (max-width: 560px) { .mb-ruler-scale span:nth-child(even) { display: none; } }
     .mb-lane { padding: 5px 6px; border-radius: 10px; border: 2px solid transparent; }
     .mb-lane + .mb-lane { margin-top: 5px; }
     .mb-lane.turn { border-color: var(--terracotta); }
@@ -347,10 +348,14 @@
     }
     function render(state) {
       var me = window.myPid, order = state.order || [];
-      // Règle commune (0 → 1000) affichée une seule fois en haut du plateau partagé.
-      var ticks = [[0, '0'], [25, '250'], [50, '500'], [75, '750'], [100, '🏁 1000']];
-      var ruler = '<div class="mb-ruler"><div></div><div class="mb-ruler-scale">' +
-        ticks.map(function (t) { return '<span style="left:' + t[0] + '%">' + t[1] + '</span>'; }).join('') + '</div></div>';
+      // Règle commune (0 → 1000) affichée une seule fois en haut du plateau partagé —
+      // bornes tous les 100 km, comme sur le vrai plateau.
+      var ruler = '<div class="mb-ruler"><div></div><div class="mb-ruler-scale">';
+      for (var km = 0; km <= 1000; km += 100) {
+        var lbl = km === 0 ? '0' : (km === 1000 ? '🏁 1000' : km);
+        ruler += '<span style="left:' + (km / 10) + '%">' + lbl + '</span>';
+      }
+      ruler += '</div></div>';
       setHTML('mb-players', ruler + order.map(function (pid) { return laneHTML(state, pid, me); }).join(''));
       // anime les voitures vers leur nouvelle position (léger différé pour laisser la transition jouer)
       requestAnimationFrame(function () {
