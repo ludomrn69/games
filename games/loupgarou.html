@@ -120,7 +120,7 @@
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
     function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-    var ROLE_INFO = { loup: { ic: '🐺', nm: 'Loup-Garou' }, voyante: { ic: '🔮', nm: 'Voyante' }, villageois: { ic: '🧑‍🌾', nm: 'Villageois' } };
+    var ROLE_INFO = { loup: { ic: '🐺', nm: 'Loup-Garou' }, voyante: { ic: '🔮', nm: 'Voyante' }, sorciere: { ic: '🧪', nm: 'Sorcière' }, chasseur: { ic: '🔫', nm: 'Chasseur' }, villageois: { ic: '🧑‍🌾', nm: 'Villageois' } };
 
     function P(s, pid) { return s.players[pid] || {}; }
     function isBot(s, pid) { return !!P(s, pid).isBot; }
@@ -129,6 +129,7 @@
     function aliveWolves(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) === 'loup'; }); }
     function aliveVillagers(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) !== 'loup'; }); }
     function aliveSeer(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) === 'voyante'; })[0] || null; }
+    function aliveWitch(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) === 'sorciere'; })[0] || null; }
 
     /* ━━ Enregistrement ━━ */
     var prevStatus = null, pendAction = null;
@@ -141,8 +142,8 @@
       maxPlayers: 12,
       rules: [
         'Des loups-garous se cachent dans le village',
-        'La nuit : les loups dévorent, la voyante sonde un joueur',
-        'Le jour : tout le monde vote pour éliminer un suspect',
+        'La nuit : les loups dévorent, la voyante sonde, la sorcière (≥5 j.) sauve ou empoisonne',
+        'Le jour : vote pour éliminer un suspect (égalité = personne) · le chasseur (≥6 j.) tire en mourant',
         'Villageois : éliminez tous les loups · Loups : égalez les villageois'
       ],
       offline: { solo: true, soloMinBots: 3 },
@@ -159,16 +160,22 @@
       var roles = [];
       for (var i = 0; i < nW; i++) roles.push('loup');
       roles.push('voyante');
+      if (n >= 5) roles.push('sorciere');
+      if (n >= 6) roles.push('chasseur');
       while (roles.length < n) roles.push('villageois');
       shuffle(roles);
       order.forEach(function (p, i) { cur.players[p].role = roles[i]; cur.players[p].alive = true; cur.players[p].knows = {}; });
-      return { phase: 'wolves', day: 1, wolfVotes: {}, seerCheck: null, dayVotes: {}, claims: {}, banner: '🌙 La nuit tombe sur le village…', winner: null };
+      return { phase: 'wolves', day: 1, wolfVotes: {}, seerCheck: null, dayVotes: {}, claims: {},
+        witchHealUsed: false, witchPoisonUsed: false, witchSave: false, witchKill: null, hunterPid: null, afterHunter: null,
+        banner: '🌙 La nuit tombe sur le village…', winner: null };
     }
 
     function offlineTurn(r) {
       if (!r || r.status === 'ended') return null;
       if (r.phase === 'wolves') { var wv = r.wolfVotes || {}; return aliveWolves(r).filter(function (p) { return !(p in wv) && isBot(r, p); })[0] || null; }
       if (r.phase === 'seer') { var s = aliveSeer(r); return (s && isBot(r, s) && !r.seerCheck) ? s : null; }
+      if (r.phase === 'witch') { var w = aliveWitch(r); return (w && isBot(r, w)) ? w : null; }
+      if (r.phase === 'hunter') { var h = r.hunterPid; return (h && isBot(r, h)) ? h : null; }
       if (r.phase === 'day') { var dv = r.dayVotes || {}; return aliveList(r).filter(function (p) { return !(p in dv) && isBot(r, p); })[0] || null; }
       return null;
     }
@@ -195,25 +202,62 @@
       var victim = null, best = -1; Object.keys(tally).forEach(function (t) { if (tally[t] > best) { best = tally[t]; victim = t; } });
       cur.nightVictim = victim;
       cur.phase = 'seer';
-      if (!aliveSeer(cur)) resolveNight(cur);
+      if (!aliveSeer(cur)) gotoWitch(cur);
+    }
+    // Après la voyante : la sorcière (si vivante et avec au moins une potion), sinon l'aube.
+    function gotoWitch(cur) {
+      var w = aliveWitch(cur);
+      if (w && (!cur.witchHealUsed || !cur.witchPoisonUsed)) { cur.phase = 'witch'; return; }
+      resolveNight(cur);
     }
     function resolveNight(cur) {
+      var deads = [];
       var v = cur.nightVictim;
-      if (v && P(cur, v).alive) { cur.players[v].alive = false; cur.lastNightDead = v; cur.banner = '🌅 ' + Room.name(v) + ' a été dévoré·e cette nuit (' + ROLE_INFO[roleOf(cur, v)].nm + ')'; }
-      else cur.banner = '🌅 Personne n\'est mort cette nuit';
-      cur.nightVictim = null; cur.wolfVotes = {}; cur.seerCheck = null;
+      if (v && P(cur, v).alive && !cur.witchSave) { cur.players[v].alive = false; cur.lastNightDead = v; deads.push(v); }
+      var pk = cur.witchKill;
+      if (pk && P(cur, pk).alive) { cur.players[pk].alive = false; deads.push(pk); }
+      if (deads.length) {
+        cur.banner = '🌅 ' + deads.map(function (p) { return Room.name(p) + ' (' + ROLE_INFO[roleOf(cur, p)].nm + ')'; }).join(' et ') + (deads.length > 1 ? ' sont morts' : ' est mort·e') + ' cette nuit';
+      } else {
+        cur.banner = cur.witchSave ? '🌅 Personne n\'est mort — la sorcière a agi 💚' : '🌅 Personne n\'est mort cette nuit';
+      }
+      cur.nightVictim = null; cur.witchSave = false; cur.witchKill = null; cur.wolfVotes = {}; cur.seerCheck = null;
       if (checkWin(cur)) return;
+      var hunter = deads.filter(function (p) { return roleOf(cur, p) === 'chasseur'; })[0];
+      if (hunter) { cur.phase = 'hunter'; cur.hunterPid = hunter; cur.afterHunter = 'day'; cur.banner += ' — 🔫 le Chasseur tire une dernière balle !'; return; }
       cur.phase = 'day'; cur.dayVotes = {};
+    }
+    function startNight(cur) {
+      cur.day = (cur.day || 1) + 1;
+      cur.phase = 'wolves'; cur.dayVotes = {};
+      cur.banner = '🌙 Nuit ' + cur.day + ' — le village s\'endort…';
     }
     function resolveDay(cur) {
       var tally = {}; var dv = cur.dayVotes || {};
       Object.keys(dv).forEach(function (p) { if (dv[p]) tally[dv[p]] = (tally[dv[p]] || 0) + 1; });
-      var top = null, best = -1; Object.keys(tally).forEach(function (t) { if (tally[t] > best) { best = tally[t]; top = t; } });
-      if (top) { cur.players[top].alive = false; cur.lastDayDead = top; cur.banner = '⚖️ Le village élimine ' + Room.name(top) + ' — c\'était un ' + ROLE_INFO[roleOf(cur, top)].nm + ' !'; }
-      else cur.banner = '⚖️ Aucun vote — personne n\'est éliminé';
-      cur.dayVotes = {}; cur.day = (cur.day || 1) + 1;
+      // Égalité = personne n'est éliminé (règle officielle).
+      var top = null, best = -1, tie = false;
+      Object.keys(tally).forEach(function (t) { if (tally[t] > best) { best = tally[t]; top = t; tie = false; } else if (tally[t] === best) { tie = true; } });
+      if (top && !tie) {
+        cur.players[top].alive = false; cur.lastDayDead = top;
+        cur.banner = '⚖️ Le village élimine ' + Room.name(top) + ' — c\'était un ' + ROLE_INFO[roleOf(cur, top)].nm + ' !';
+        if (checkWin(cur)) return;
+        if (roleOf(cur, top) === 'chasseur') { cur.phase = 'hunter'; cur.hunterPid = top; cur.afterHunter = 'night'; cur.dayVotes = {}; cur.banner += ' 🔫 Il tire une dernière balle !'; return; }
+      } else {
+        cur.banner = top ? '⚖️ Égalité des votes — personne n\'est éliminé' : '⚖️ Aucun vote — personne n\'est éliminé';
+        if (checkWin(cur)) return;
+      }
+      startNight(cur);
+    }
+    // Dernière balle du chasseur, puis la partie reprend (jour ou nuit suivante).
+    function hunterShoot(cur, target) {
+      cur.players[target].alive = false;
+      cur.banner = '🔫 Le Chasseur emporte ' + Room.name(target) + ' (' + ROLE_INFO[roleOf(cur, target)].nm + ') dans la tombe !';
+      var after = cur.afterHunter;
+      cur.hunterPid = null; cur.afterHunter = null;
       if (checkWin(cur)) return;
-      cur.phase = 'wolves'; cur.banner = '🌙 Nuit ' + cur.day + ' — le village s\'endort…';
+      if (after === 'day') { cur.phase = 'day'; cur.dayVotes = {}; }
+      else startNight(cur);
     }
 
     /* ━━ Actions (humain & bot via window.myPid) ━━ */
@@ -233,11 +277,45 @@
           var isW = roleOf(cur, target) === 'loup';
           cur.players[me].knows = cur.players[me].knows || {}; cur.players[me].knows[target] = isW;
           cur.seerCheck = { by: me, target: target, isWolf: isW };
-          resolveNight(cur);
+          gotoWitch(cur);
         } else if (phase === 'day') {
           cur.dayVotes = cur.dayVotes || {}; cur.dayVotes[me] = target;
           if (aliveList(cur).every(function (p) { return p in cur.dayVotes; })) resolveDay(cur);
         }
+        return cur;
+      });
+    }
+    /* ── Sorcière : sauver la victime / empoisonner / ne rien faire ── */
+    function actWitchHeal() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'witch' || roleOf(cur, window.myPid) !== 'sorciere') return cur;
+        if (cur.witchHealUsed || cur.witchSave || !cur.nightVictim) return cur;
+        cur.witchHealUsed = true; cur.witchSave = true;
+        return cur;
+      });
+    }
+    function actWitchPoison(target) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'witch' || roleOf(cur, window.myPid) !== 'sorciere') return cur;
+        if (cur.witchPoisonUsed || !P(cur, target).alive || target === window.myPid) return cur;
+        cur.witchPoisonUsed = true; cur.witchKill = target;
+        resolveNight(cur);
+        return cur;
+      });
+    }
+    function actWitchPass() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'witch' || roleOf(cur, window.myPid) !== 'sorciere') return cur;
+        resolveNight(cur);
+        return cur;
+      });
+    }
+    /* ── Chasseur : dernière balle ── */
+    function actHunter(target) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'hunter' || cur.hunterPid !== window.myPid) return cur;
+        if (!P(cur, target).alive || target === window.myPid) return cur;
+        hunterShoot(cur, target);
         return cur;
       });
     }
@@ -256,8 +334,28 @@
        accusation crédible, sinon votent au hasard. Difficile = coordination forte. ━━ */
     function claimedWolf(s) { var c = s.claims || {}; var k = Object.keys(c).filter(function (t) { return P(s, t).alive; }); return k[0] || null; }
     function lgBot(state, pid) {
-      if (state.status !== 'playing' || !P(state, pid).alive) return;
+      if (state.status !== 'playing') return;
       var level = window.Bots ? window.Bots.level(state) : 'normal';
+      // Chasseur (il vient de mourir : il joue quand même sa dernière balle)
+      if (state.phase === 'hunter' && state.hunterPid === pid) {
+        window.myPid = pid;
+        var suspects = aliveList(state).filter(function (p) { return p !== pid; });
+        var cw0 = claimedWolf(state);
+        var shot = (roleOf(state, pid) !== 'loup' && cw0 && level !== 'easy') ? cw0 : suspects[Math.floor(Math.random() * suspects.length)];
+        if (shot) actHunter(shot);
+        return;
+      }
+      if (!P(state, pid).alive) return;
+      // Sorcière : sauve (elle-même toujours, autrui parfois), empoisonne le loup accusé
+      if (state.phase === 'witch' && roleOf(state, pid) === 'sorciere') {
+        window.myPid = pid;
+        var v = state.nightVictim;
+        if (v && !state.witchSave && !state.witchHealUsed &&
+            (v === pid || (level === 'hard' && Math.random() < 0.5) || (level === 'normal' && Math.random() < 0.3))) { actWitchHeal(); return; }
+        var cw = claimedWolf(state);
+        if (!state.witchPoisonUsed && cw && cw !== pid && (state.day || 1) >= 2 && level !== 'easy' && Math.random() < 0.6) { actWitchPoison(cw); return; }
+        actWitchPass(); return;
+      }
       if (state.phase === 'wolves' && roleOf(state, pid) === 'loup' && !((state.wolfVotes || {})[pid])) {
         var prey = aliveVillagers(state);
         // cible prioritaire : un joueur qui a "accusé" (sans doute la voyante) ; sinon plus petit siège (coordination)
@@ -309,7 +407,7 @@
     /* ━━ Rendu ━━ */
     function render(state) {
       var me = window.myPid, myRole = roleOf(state, me), iAmAlive = P(state, me).alive;
-      var night = (state.phase === 'wolves' || state.phase === 'seer');
+      var night = (state.phase === 'wolves' || state.phase === 'seer' || state.phase === 'witch');
       var ph = document.getElementById('lg-phase');
       ph.className = 'lg-phase' + (night ? ' lg-phase-night' : '');
       ph.innerHTML = '<div class="lg-phase-icon">' + (night ? '🌙' : '☀️') + '</div>' +
@@ -319,7 +417,21 @@
 
       // Instruction + cibles cliquables selon la phase
       var instruct = '', pickFn = null, canPick = function () { return false; };
-      if (!iAmAlive) instruct = 'Tu es mort·e — observe la partie.';
+      if (state.phase === 'hunter') {
+        // le chasseur vient de MOURIR mais joue sa dernière balle
+        if (state.hunterPid === me) { instruct = '🔫 <b>Dernière balle :</b> choisis qui tu emportes avec toi.'; pickFn = 'actHunter'; canPick = function (p) { return p !== me; }; }
+        else instruct = '🔫 Le Chasseur choisit qui il emporte…';
+      }
+      else if (!iAmAlive) instruct = 'Tu es mort·e — observe la partie.';
+      else if (state.phase === 'witch') {
+        if (myRole === 'sorciere') {
+          var vic = state.nightVictim;
+          instruct = '🧪 <b>La sorcière agit.</b> ' +
+            (vic && !state.witchSave ? 'Les loups ont attaqué <b>' + escapeHtml(Room.name(vic)) + '</b>.' : (state.witchSave ? 'Victime sauvée 💚.' : 'Personne n\'a été attaqué.')) +
+            (!state.witchPoisonUsed ? ' Touche un joueur pour l\'<b>empoisonner</b> ☠️, ou termine la nuit.' : '');
+          if (!state.witchPoisonUsed) { pickFn = 'actWitchPoison'; canPick = function (p) { return p !== me; }; }
+        } else instruct = '😴 La sorcière prépare ses potions…';
+      }
       else if (state.phase === 'wolves') {
         if (myRole === 'loup') {
           if ((state.wolfVotes || {})[me]) instruct = 'Choix fait. Les autres loups décident…';
@@ -340,8 +452,9 @@
       var knows = (myRole === 'voyante') ? (P(state, me).knows || {}) : {};
       var dayTally = {}; var dv = state.dayVotes || {}; Object.keys(dv).forEach(function (p) { if (dv[p]) dayTally[dv[p]] = (dayTally[dv[p]] || 0) + 1; });
 
+      var canAct = iAmAlive || (state.phase === 'hunter' && state.hunterPid === me);
       setHTML('lg-players', (state.order || []).map(function (pid) {
-        var alive = P(state, pid).alive, pickable = iAmAlive && pickFn && alive && canPick(pid);
+        var alive = P(state, pid).alive, pickable = canAct && pickFn && alive && canPick(pid);
         var tag = '';
         if (!alive) tag = '<span class="lg-ptag">☠️ ' + ROLE_INFO[roleOf(state, pid)].nm + '</span>';
         else if (myRole === 'loup' && roleOf(state, pid) === 'loup' && pid !== me) tag = '<span class="lg-ptag wolf">🐺 allié</span>';
@@ -358,6 +471,12 @@
       if (iAmAlive && myRole === 'voyante' && state.phase === 'day') {
         var kw = Object.keys(knows).filter(function (t) { return knows[t] && P(state, t).alive && !(state.claims || {})[t]; });
         if (kw.length) act = '<button class="btn-primary" onclick="claimSeer(\'' + kw[0] + '\')">🔮 Accuser ' + escapeHtml(Room.name(kw[0])) + ' (loup !)</button>';
+      }
+      // Boutons de la sorcière (sauver / terminer)
+      if (iAmAlive && myRole === 'sorciere' && state.phase === 'witch') {
+        if (state.nightVictim && !state.witchSave && !state.witchHealUsed)
+          act += '<button class="btn-primary" onclick="actWitchHeal()">💚 Sauver ' + escapeHtml(Room.name(state.nightVictim)) + '</button>';
+        act += '<button class="btn-primary" style="background:var(--white);color:var(--ink);border:1.5px solid var(--gold-light)" onclick="actWitchPass()">🌙 Terminer la nuit</button>';
       }
       setHTML('lg-actions', act);
     }

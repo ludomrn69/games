@@ -100,8 +100,9 @@
       <div class="modal-body">
         <p>Chacun mise, puis reçoit 2 cartes. Le but : s'approcher de <b>21</b> sans dépasser, et battre le croupier.</p>
         <p style="margin-top:10px">Les figures valent 10, l'As vaut 1 ou 11. <b>Tirer</b> (carte en plus) ou <b>rester</b>. Dépasser 21 = perdu.</p>
+        <p style="margin-top:10px"><b>Doubler</b> (sur tes 2 premières cartes) : mise ×2, une seule carte, stop. <b>Séparer</b> une paire : deux mains, deux mises.</p>
         <p style="margin-top:10px">Le croupier tire jusqu'à 17. Un <b>blackjack</b> (21 en 2 cartes) paie 3:2. Plus près de 21 que le croupier = gagné.</p>
-        <p style="margin-top:10px">On joue manche après manche, les jetons s'accumulent. ↻ remet tout le monde à 100.</p>
+        <p style="margin-top:10px">On joue manche après manche, les jetons s'accumulent (ruiné = recave à 100). ↻ remet tout le monde à 100.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -182,9 +183,12 @@
         return;
       }
       if (state.phase === 'play' && state.turn === pid) {
-        var hand = (state.hands && state.hands[pid]) || [];
+        var hand = activeHand(state, pid) || [];
         var hv = handValue(hand);
         var up = cardVal((state.dealer || [])[0] || 0); // carte visible du croupier
+        // Stratégie de base : séparer les As et les 8, doubler sur 10/11 dur.
+        if (canSplit(state, pid)) { var r0 = hand[0] % 13; if (r0 === 0 || r0 === 7) { doSplit(pid); return; } }
+        if (canDouble(state, pid) && !hv.soft && (hv.total === 10 || hv.total === 11) && up >= 2 && up <= 9) { doDouble(pid); return; }
         var hit;
         if (hv.soft) hit = hv.total <= 17;                       // soft : tire jusqu'à soft 18
         else if (hv.total <= 11) hit = true;
@@ -207,12 +211,21 @@
       base.pos = 0;
       base.hands = {};
       base.bets = {};
+      base.split = null;      // mains séparées : { pid: { hand: [...], bet: n } }
+      base.turnHand = 0;      // 0 = main principale, 1 = main séparée
       base.dealer = [];
       base.dealerDone = false;
       base.results = {};
+      base.results2 = {};     // résultat de la main séparée
       base.turn = null;
       base.winner = null;
-      (order || []).forEach(function (pid) { base.hands[pid] = []; });
+      // Recave : un joueur ruiné repart à 100 (la table ne se bloque jamais).
+      var broke = [];
+      (order || []).forEach(function (pid) {
+        base.hands[pid] = [];
+        if (base.chips && base.chips[pid] != null && base.chips[pid] <= 0) { base.chips[pid] = START_CHIPS; broke.push(pid); }
+      });
+      if (broke.length) base.banner = '🏦 Recave : ' + broke.length + ' joueur(s) ruiné(s) repartent à ' + START_CHIPS;
       return base;
     }
 
@@ -245,7 +258,24 @@
       });
     }
 
-    function draw(cur) { return cur.deck[cur.pos++]; }
+    // Sabot : si le paquet s'épuise, on y ajoute un nouveau 52 mélangé.
+    function draw(cur) { if (cur.pos >= cur.deck.length) cur.deck = cur.deck.concat(shuffledDeck()); return cur.deck[cur.pos++]; }
+    /* ━━ Main active (principale ou séparée) du joueur courant ━━ */
+    function splitOf(cur, pid) { return (cur.split && cur.split[pid]) || null; }
+    function activeHand(cur, pid) { return (cur.turnHand === 1 && splitOf(cur, pid)) ? splitOf(cur, pid).hand : cur.hands[pid]; }
+    function canDouble(cur, pid) { return cur.phase === 'play' && cur.turn === pid && !cur.turnHand && !splitOf(cur, pid) && (cur.hands[pid] || []).length === 2 && chipsOf(cur, pid) >= (cur.bets[pid] || 0); }
+    function canSplit(cur, pid) {
+      if (cur.phase !== 'play' || cur.turn !== pid || cur.turnHand || splitOf(cur, pid)) return false;
+      var h = cur.hands[pid] || [];
+      return h.length === 2 && (h[0] % 13) === (h[1] % 13) && chipsOf(cur, pid) >= (cur.bets[pid] || 0);
+    }
+    // Fin de la main active : passe à la main séparée s'il y en a une, sinon au joueur suivant.
+    function nextHandOrTurn(cur) {
+      var pid = cur.turn;
+      if (!cur.turnHand && splitOf(cur, pid)) { cur.turnHand = 1; return; }
+      cur.turnHand = 0;
+      advanceTurn(cur);
+    }
 
     function dealRound(cur) {
       var order = (cur.order || []).filter(function (pid) { return cur.bets[pid] != null && cur.bets[pid] > 0; });
@@ -266,8 +296,9 @@
       var pid = asPid || window.myPid;
       rref().transaction(function (cur) {
         if (!cur || cur.phase !== 'play' || cur.turn !== pid) return cur;
-        cur.hands[pid].push(draw(cur));
-        if (handValue(cur.hands[pid]).total >= 21) advanceTurn(cur); // bust ou 21 → joueur suivant
+        var h = activeHand(cur, pid);
+        h.push(draw(cur));
+        if (handValue(h).total >= 21) nextHandOrTurn(cur); // bust ou 21 → main/joueur suivant
         return cur;
       });
     }
@@ -275,7 +306,33 @@
       var pid = asPid || window.myPid;
       rref().transaction(function (cur) {
         if (!cur || cur.phase !== 'play' || cur.turn !== pid) return cur;
-        advanceTurn(cur);
+        nextHandOrTurn(cur);
+        return cur;
+      });
+    }
+    // Doubler : double la mise, une seule carte, puis stop.
+    function doDouble(asPid) {
+      var pid = asPid || window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || !canDouble(cur, pid)) return cur;
+        cur.chips[pid] = chipsOf(cur, pid) - cur.bets[pid];
+        cur.bets[pid] = cur.bets[pid] * 2;
+        cur.hands[pid].push(draw(cur));
+        nextHandOrTurn(cur);
+        return cur;
+      });
+    }
+    // Séparer une paire : deux mains, chacune recomplétée à 2 cartes, mise égale.
+    function doSplit(asPid) {
+      var pid = asPid || window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || !canSplit(cur, pid)) return cur;
+        var h = cur.hands[pid];
+        var c2 = h.pop();
+        cur.chips[pid] = chipsOf(cur, pid) - cur.bets[pid];
+        cur.split = cur.split || {};
+        cur.split[pid] = { hand: [c2, draw(cur)], bet: cur.bets[pid] };
+        h.push(draw(cur));
         return cur;
       });
     }
@@ -295,15 +352,23 @@
       cur.dealerDone = true;
       var dv = handValue(cur.dealer), dealerBust = dv.total > 21;
       var order = (cur.order || []).filter(function (pid) { return cur.bets[pid] != null && cur.bets[pid] > 0; });
-      cur.results = {};
+      cur.results = {}; cur.results2 = {};
+      // Règle une main contre le croupier. Après un split, un 21 en 2 cartes n'est
+      // PAS un blackjack (règle officielle) → isSplit désactive le 3:2.
+      function settle(hand, bet, isSplit) {
+        var hv = handValue(hand), bj = hv.bj && !isSplit;
+        if (hv.total > 21) return { res: 'lose', gain: 0 };
+        if (bj && !dv.bj) return { res: 'bj', gain: Math.floor(bet * 2.5) };
+        if (dealerBust || hv.total > dv.total) return { res: 'win', gain: bet * 2 };
+        if (hv.total === dv.total && bj === dv.bj) return { res: 'push', gain: bet };
+        return { res: 'lose', gain: 0 };
+      }
       order.forEach(function (pid) {
-        var hv = handValue(cur.hands[pid]), bet = cur.bets[pid], gain = 0, res;
-        if (hv.total > 21) { res = 'lose'; }
-        else if (hv.bj && !dv.bj) { res = 'bj'; gain = Math.floor(bet * 2.5); }
-        else if (dealerBust || hv.total > dv.total) { res = 'win'; gain = bet * 2; }
-        else if (hv.total === dv.total && hv.bj === dv.bj) { res = 'push'; gain = bet; }
-        else { res = 'lose'; }
-        cur.results[pid] = res;
+        var sp = splitOf(cur, pid);
+        var r1 = settle(cur.hands[pid], cur.bets[pid], !!sp);
+        cur.results[pid] = r1.res;
+        var gain = r1.gain;
+        if (sp) { var r2 = settle(sp.hand, sp.bet, true); cur.results2[pid] = r2.res; gain += r2.gain; }
         if (gain) cur.chips[pid] = chipsOf(cur, pid) + gain;
       });
       cur.phase = 'done';
@@ -358,18 +423,28 @@
         var meta = '';
         if (phase === 'bet') meta = (bet != null) ? ('Mise : ' + bet) : 'mise…';
         else meta = 'Mise : ' + (bet || 0);
-        var resBadge = '';
-        if (phase === 'done' && state.results && state.results[pid]) {
-          var r = state.results[pid];
-          var lbl = r === 'bj' ? 'Blackjack +' : r === 'win' ? 'Gagné' : r === 'push' ? 'Égalité' : 'Perdu';
-          var rc = (r === 'win' || r === 'bj') ? 'win' : (r === 'push' ? 'push' : 'lose');
-          resBadge = '<span class="bj-res ' + rc + '">' + lbl + '</span>';
+        function resBadgeOf(res) {
+          if (!res) return '';
+          var lbl = res === 'bj' ? 'Blackjack +' : res === 'win' ? 'Gagné' : res === 'push' ? 'Égalité' : 'Perdu';
+          var rc = (res === 'win' || res === 'bj') ? 'win' : (res === 'push' ? 'push' : 'lose');
+          return '<span class="bj-res ' + rc + '">' + lbl + '</span>';
         }
+        var resBadge = (phase === 'done' && state.results) ? resBadgeOf(state.results[pid]) : '';
         var valB = hand.length ? valBadge(hand) : '';
+        var sp = splitOf(state, pid);
+        var onMain = isActive && (!state.turnHand || !sp);
+        var splitHTML = '';
+        if (sp) {
+          var res2 = (phase === 'done' && state.results2) ? resBadgeOf(state.results2[pid]) : '';
+          splitHTML = '<div class="bj-cards" style="margin-top:4px;' + (isActive && state.turnHand === 1 ? 'outline:2px solid var(--gold);outline-offset:3px;border-radius:8px' : '') + '">' +
+            sp.hand.map(function (c) { return cardHTML(c, false); }).join('') + ' ' + valBadge(sp.hand) + ' ' + res2 +
+            '</div><div class="bj-meta">Main séparée · mise : ' + sp.bet + '</div>';
+        }
         felt += '<div class="' + cls + '">' +
           '<div class="bj-row"><div class="bj-seat-name"><span class="bj-av" style="background:' + (p.color || 'var(--gold)') + '">' + (p.emoji || '🙂') + '</span>' + escapeHtml(p.name || 'Joueur') + '</div>' + right + '</div>' +
-          '<div class="bj-cards">' + (hand.map(function (c) { return cardHTML(c, false); }).join('') || '<span class="bj-meta">' + meta + '</span>') + ' ' + valB + ' ' + resBadge + '</div>' +
+          '<div class="bj-cards"' + (sp && onMain ? ' style="outline:2px solid var(--gold);outline-offset:3px;border-radius:8px"' : '') + '>' + (hand.map(function (c) { return cardHTML(c, false); }).join('') || '<span class="bj-meta">' + meta + '</span>') + ' ' + valB + ' ' + resBadge + '</div>' +
           (hand.length ? '<div class="bj-meta">' + meta + '</div>' : '') +
+          splitHTML +
           '</div>';
       });
       setHTML('bj-felt', felt);
@@ -396,9 +471,12 @@
         }
       } else if (phase === 'play') {
         if (isMyTurn) {
-          html = '<div class="bj-bar-label">À toi de jouer</div>' +
+          var sp = splitOf(state, me);
+          html = '<div class="bj-bar-label">À toi de jouer' + (sp ? (state.turnHand === 1 ? ' — main séparée' : ' — main 1') : '') + '</div>' +
             '<button class="bj-btn primary" onclick="doHit()">Tirer</button>' +
-            '<button class="bj-btn" onclick="doStand()">Rester</button>';
+            '<button class="bj-btn" onclick="doStand()">Rester</button>' +
+            (canDouble(state, me) ? '<button class="bj-btn" onclick="doDouble()">×2 Doubler</button>' : '') +
+            (canSplit(state, me) ? '<button class="bj-btn" onclick="doSplit()">✂️ Séparer</button>' : '');
         } else {
           var who = state.players && state.players[state.turn];
           html = '<div class="bj-bar-label">Au tour de ' + escapeHtml((who && who.name) || '…') + '</div>';

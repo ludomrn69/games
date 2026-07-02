@@ -49,6 +49,10 @@
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
+      .tm-sh-banner { margin-top: 10px; font-weight: 700; color: var(--gold); }
+    .tm-sh-hint { font-size: 0.8rem; color: var(--ink-light); font-weight: 400; }
+    .tm-sh-btns { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+    .tm-sh-propose { margin-top: 10px; border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink); border-radius: 30px; padding: 0.55rem 1.2rem; font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -79,6 +83,7 @@
         <div class="tm-hand-label" id="tm-hand-label"></div>
         <div class="tm-hand" id="tm-hand"></div>
         <button class="btn-primary" id="tm-play-btn" onclick="playMine()">Jouer ma plus petite carte</button>
+        <div id="tm-shuriken"></div>
       </div>
     </div>
 
@@ -136,7 +141,8 @@
         'Coopératif et sans parler : jouer toutes les cartes dans l\'ordre croissant',
         'Au niveau N, chacun a N cartes (1–100)',
         'Jouer trop tôt (un coéquipier a plus petit) = −1 vie',
-        'Finir tous les niveaux pour gagner ensemble'
+        'Shuriken ⭐ (si tous d\'accord) : chacun défausse sa plus petite carte',
+        'Récompenses : +1 ⭐ aux niveaux 2/5/8 · +1 ❤️ aux 3/6/9'
       ],
       offline: { solo: true },
       bot: function () {},                          // pilotage temps réel via timers (scheduleBots)
@@ -149,14 +155,14 @@
     function dealLevel(order, cur, level) {
       var deck = []; for (var i = 1; i <= 100; i++) deck.push(i); shuffle(deck);
       var k = 0; order.forEach(function (p) { cur.players[p].hand = deck.slice(k, k + level).sort(function (a, b) { return a - b; }); k += level; });
-      cur.pile = 0; cur.level = level;
+      cur.pile = 0; cur.level = level; cur.shurikenVotes = null;
     }
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
       var tmp = { players: {} }; order.forEach(function (p) { tmp.players[p] = {}; });
       dealLevel(order, tmp, 1);
       players.forEach(function (p) { cur.players[p.pid].hand = tmp.players[p.pid].hand; });
-      return { level: 1, lives: order.length, pile: 0, maxLevel: maxLevelFor(order.length), banner: 'Niveau 1 — concentrez-vous 🧘', winner: null, failed: false };
+      return { level: 1, lives: order.length, shurikens: 1, shurikenVotes: null, pile: 0, maxLevel: maxLevelFor(order.length), banner: 'Niveau 1 — concentrez-vous 🧘', winner: null, failed: false };
     }
 
     function onState(snap) {
@@ -183,12 +189,59 @@
         cur.banner = '✅ ' + V + ' — continuez…';
       }
       if (cur.lives <= 0) { cur.status = 'ended'; cur.failed = true; cur.banner = 'Perdu au niveau ' + cur.level + ' 😵'; return; }
+      maybeLevelUp(cur);
+    }
+
+    // Niveau terminé ? → récompenses officielles (⭐ aux niveaux 2/5/8, ❤️ aux 3/6/9) puis niveau suivant.
+    function maybeLevelUp(cur) {
       var anyLeft = (cur.order || []).some(function (p) { return handOf(cur, p).length > 0; });
-      if (!anyLeft) {
-        if (cur.level >= (cur.maxLevel || 12)) { cur.status = 'ended'; cur.winner = true; cur.banner = '🏆 Niveau max atteint — gagné !'; return; }
-        dealLevel(cur.order, cur, cur.level + 1);
-        cur.banner = '🎉 Niveau ' + cur.level + ' !';
-      }
+      if (anyLeft) return;
+      var done = cur.level;
+      if (done >= (cur.maxLevel || 12)) { cur.status = 'ended'; cur.winner = true; cur.banner = '🏆 Niveau max atteint — gagné !'; return; }
+      var reward = '';
+      if (done === 2 || done === 5 || done === 8) { cur.shurikens = Math.min(3, (cur.shurikens || 0) + 1); reward = ' · récompense +1 ⭐'; }
+      if (done === 3 || done === 6 || done === 9) { cur.lives = (cur.lives || 0) + 1; reward = ' · récompense +1 ❤️'; }
+      dealLevel(cur.order, cur, done + 1);
+      cur.banner = '🎉 Niveau ' + cur.level + ' !' + reward;
+    }
+
+    /* ━━ Shuriken ⭐ : proposition collective — si TOUT le monde est d'accord,
+       chacun défausse (face visible) sa plus petite carte. ━━ */
+    function shurikenNeeded(cur) { return (cur.order || []).filter(function (p) { return handOf(cur, p).length > 0; }); }
+    function resolveShuriken(cur) {
+      var sv = cur.shurikenVotes; if (!sv) return;
+      var need = shurikenNeeded(cur);
+      if (!need.every(function (p) { return sv.votes && sv.votes[p]; })) return;
+      cur.shurikens = (cur.shurikens || 0) - 1;
+      var discarded = [];
+      need.forEach(function (p) {
+        var h = handOf(cur, p).slice(); var low = Math.min.apply(null, h);
+        h.splice(h.indexOf(low), 1); cur.players[p].hand = h; discarded.push(low);
+      });
+      cur.shurikenVotes = null;
+      cur.banner = '⭐ Shuriken ! Défaussées : ' + discarded.sort(function (a, b) { return a - b; }).join(' · ');
+      maybeLevelUp(cur);
+    }
+    function proposeShuriken() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || (cur.shurikens || 0) <= 0 || cur.shurikenVotes) return cur;
+        cur.shurikenVotes = { by: window.myPid, votes: {} };
+        cur.shurikenVotes.votes[window.myPid] = true;
+        cur.banner = '⭐ ' + Room.name(window.myPid) + ' propose un shuriken — tout le monde doit accepter';
+        resolveShuriken(cur);
+        return cur;
+      });
+    }
+    function voteShuriken(yes, asPid) {
+      var pid = asPid || window.myPid;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.shurikenVotes) return cur;
+        if (!yes) { cur.shurikenVotes = null; cur.banner = 'Proposition de shuriken retirée'; return cur; }
+        cur.shurikenVotes.votes = cur.shurikenVotes.votes || {};
+        cur.shurikenVotes.votes[pid] = true;
+        resolveShuriken(cur);
+        return cur;
+      });
     }
 
     function playMine() {
@@ -207,6 +260,17 @@
     function scheduleBots(state) {
       clearBots();
       if (state.status !== 'playing' || state.host !== window.myPid) return;
+      // Vote de shuriken en cours : les ordis acceptent (après un petit délai) et
+      // personne ne joue de carte tant que la proposition n'est pas résolue.
+      if (state.shurikenVotes) {
+        (state.order || []).forEach(function (pid) {
+          var p = state.players[pid]; if (!p || !p.isBot) return;
+          if ((p.hand || []).length === 0) return;
+          if (state.shurikenVotes.votes && state.shurikenVotes.votes[pid]) return;
+          botTimers[pid] = setTimeout(function () { voteShuriken(true, pid); }, 400 + Math.random() * 700);
+        });
+        return;
+      }
       var pile = state.pile || 0, level = window.Bots ? window.Bots.level(state) : 'normal';
       var base = level === 'hard' ? 55 : level === 'easy' ? 62 : 58;
       var jitter = level === 'hard' ? 0.06 : level === 'easy' ? 0.45 : 0.2;
@@ -234,7 +298,7 @@
     function render(state) {
       var me = window.myPid, order = state.order || [];
       setHTML('tm-status', '<span class="lvl">Niveau ' + (state.level || 1) + ' / ' + (state.maxLevel || 12) + '</span>' +
-        '<span class="lives">' + '❤️'.repeat(Math.max(0, state.lives || 0)) + '</span>');
+        '<span class="lives">' + '❤️'.repeat(Math.max(0, state.lives || 0)) + ' ' + '⭐'.repeat(Math.max(0, state.shurikens || 0)) + '</span>');
       setHTML('tm-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
         return '<div class="tm-opp"><span class="tm-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           escapeHtml(Room.name(pid)) + ' <span class="cnt">' + handOf(state, pid).length + '</span></div>';
@@ -252,8 +316,27 @@
         return '<div class="tm-mcard' + (v === lowest ? ' next' : '') + '"' + (v === lowest ? ' onclick="playMine()"' : '') + '>' + v + '</div>';
       }).join('') || '—');
       var btn = document.getElementById('tm-play-btn');
-      btn.disabled = !myHand.length || state.status !== 'playing';
-      btn.textContent = myHand.length ? ('Jouer ' + lowest + ' (ma plus petite)') : 'En attente…';
+      var voting = !!state.shurikenVotes;
+      btn.disabled = !myHand.length || state.status !== 'playing' || voting;
+      btn.textContent = voting ? '⭐ Vote de shuriken en cours…' : (myHand.length ? ('Jouer ' + lowest + ' (ma plus petite)') : 'En attente…');
+      // Zone shuriken : proposer, ou voter si une proposition est en cours
+      var sh = document.getElementById('tm-shuriken');
+      if (sh) {
+        var html = '';
+        if (voting) {
+          var sv = state.shurikenVotes, need = (state.order || []).filter(function (p) { return handOf(state, p).length > 0; });
+          var got = need.filter(function (p) { return sv.votes && sv.votes[p]; }).length;
+          html = '<div class="tm-sh-banner">⭐ ' + escapeHtml(Room.name(sv.by)) + ' propose un shuriken (' + got + '/' + need.length + ')' +
+            '<div class="tm-sh-hint">Chacun défaussera sa plus petite carte, face visible.</div></div>';
+          if (myHand.length && !(sv.votes && sv.votes[me])) {
+            html += '<div class="tm-sh-btns"><button class="btn-primary" style="width:auto;padding:.5rem 1.2rem" onclick="voteShuriken(true)">⭐ D\'accord</button>' +
+              '<button class="btn-primary" style="width:auto;padding:.5rem 1.2rem;background:var(--white);color:var(--ink);border:1.5px solid var(--gold-light)" onclick="voteShuriken(false)">✖ Non</button></div>';
+          }
+        } else if ((state.shurikens || 0) > 0 && myHand.length) {
+          html = '<button class="tm-sh-propose" onclick="proposeShuriken()">⭐ Proposer un shuriken (' + state.shurikens + ' dispo)</button>';
+        }
+        sh.innerHTML = html;
+      }
     }
 
     /* ━━ Résultats ━━ */

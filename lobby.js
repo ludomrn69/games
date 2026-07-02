@@ -169,7 +169,11 @@
     var humans = active && room.order ? room.order.filter(function (pid) { return room.players[pid] && !room.players[pid].isBot; }) : [];
     var multi = humans.length >= 2 && !isOfflineMode();
     if (!active || !multi) { if (_clockInt) { clearInterval(_clockInt); _clockInt = null; } var e = document.getElementById('lb-turnclock'); if (e) e.style.display = 'none'; _clockTurn = null; return; }
-    if (room.turn !== _clockTurn) { _clockTurn = room.turn; _clockStart = Date.now(); _timedOutTurn = null; }
+    // Signature = joueur actif + phase : les jeux multi-étapes (Cluedo, Bataille
+    // navale…) réarment le chrono à chaque étape — un absent est débloqué à
+    // chaque phase, pas seulement au changement de `turn`.
+    var clockSig = String(room.turn) + '|' + String(room.phase || '') + '|' + String(botActivePid(room) || '');
+    if (clockSig !== _clockTurn) { _clockTurn = clockSig; _clockStart = Date.now(); _timedOutTurn = null; }
     if (_clockInt) clearInterval(_clockInt);
     var total = turnSecondsFor();
     var render = function () {

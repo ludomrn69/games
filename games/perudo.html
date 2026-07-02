@@ -55,6 +55,7 @@
     .pd-act { flex: 1; border: none; border-radius: 16px; padding: 0.85rem 0.5rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.98rem; cursor: pointer; box-shadow: var(--shadow); }
     .pd-act.bid { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
     .pd-act.dudo { background: linear-gradient(135deg, #e79a92, #cf5347); color: #fff; }
+    .pd-act.calza { background: linear-gradient(135deg, #9b7fd4, #6d4fa8); color: #fff; }
     .pd-act:disabled { opacity: 0.45; cursor: default; }
     .pd-wait { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); padding: 12px; }
 
@@ -123,6 +124,8 @@
         <p style="margin-top:8px">• Surenchérir = plus de dés, ou autant de dés d'une valeur plus haute.</p>
         <p style="margin-top:6px">• Les <b>⚀ (1) sont jokers</b> : ils comptent pour n'importe quelle valeur. Miser sur les ⚀ : la quantité requise est ~divisée par deux.</p>
         <p style="margin-top:6px">• <b>Dudo !</b> : tu doutes de l'enchère précédente → on révèle tout et on compte. Si l'enchère tenait, TU perds un dé ; sinon c'est l'enchérisseur.</p>
+        <p style="margin-top:6px">• <b>Calza !</b> : tu paries que l'enchère est <b>exactement</b> juste → exact : tu regagnes un dé (max 5) ; sinon tu en perds un.</p>
+        <p style="margin-top:6px">• <b>Palifico</b> : quand un joueur passe à 1 dé, il ouvre une manche spéciale — les ⚀ ne sont plus jokers et la valeur annoncée est figée.</p>
         <p style="margin-top:6px">• Plus de dés = éliminé. Dernier joueur avec des dés gagne.</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
@@ -150,8 +153,8 @@
       rules: [
         'Chacun 5 dés cachés · tu surenchéris sur le nombre d\'une valeur sur la table',
         'Les ⚀ sont jokers (comptent pour tout)',
-        '« Dudo ! » pour contester : le perdant perd un dé',
-        'Dernier joueur avec des dés gagne'
+        '« Dudo ! » : le perdant perd un dé · « Calza » : exact = tu regagnes un dé',
+        'Palifico à 1 dé : ⚀ non jokers, valeur figée · dernier avec des dés gagne'
       ],
       offline: { solo: true, local: true },
       bot: perudoBot,
@@ -169,16 +172,28 @@
       return from;
     }
     // Une enchère nb = {qty,face} est-elle STRICTEMENT plus haute que cur ? (⚀ = jokers, règle du /2)
-    function isHigher(nb, cur) {
+    // Manche PALIFICO : les ⚀ ne sont plus jokers et la valeur est FIGÉE par la 1ʳᵉ enchère.
+    function isHigher(nb, cur, palifico) {
       if (!nb || nb.qty < 1 || nb.face < 1 || nb.face > 6) return false;
       if (!cur) return nb.qty >= 1;
+      if (palifico) return nb.face === cur.face && nb.qty > cur.qty;
       var na = nb.face === 1, ca = cur.face === 1;
       if (na && !ca) return nb.qty >= Math.ceil(cur.qty / 2);
       if (!na && ca) return nb.qty >= cur.qty * 2 + 1;
       if (na && ca) return nb.qty > cur.qty;
       return (nb.qty > cur.qty) || (nb.qty === cur.qty && nb.face > cur.face);
     }
-    function minQtyHigher(face, cur) { for (var q = 1; q <= 60; q++) if (isHigher({ qty: q, face: face }, cur)) return q; return 999; }
+    function minQtyHigher(face, cur, palifico) { for (var q = 1; q <= 60; q++) if (isHigher({ qty: q, face: face }, cur, palifico)) return q; return 999; }
+    // Nombre de dés sur la table validant `face` (⚀ jokers sauf en palifico) + copie des mains.
+    function tableCount(cur, face, diceOut) {
+      var count = 0;
+      activePids(cur).forEach(function (p) {
+        var d = ((cur.players[p] || {}).dice || []);
+        if (diceOut) diceOut[p] = d.slice();
+        d.forEach(function (v) { if (v === face || (!cur.palifico && face !== 1 && v === 1)) count++; });
+      });
+      return count;
+    }
 
     /* ━━ Manche ━━ */
     function rollDice(cur) {
@@ -192,7 +207,13 @@
       rollDice(cur);
       cur.bid = null; cur.phase = 'bid'; cur.reveal = null;
       cur.turn = ((cur.diceCount || {})[starter] > 0) ? starter : nextActive(cur, starter);
-      cur.banner = Room.name(cur.turn) + ' ouvre les enchères';
+      // PALIFICO : le lanceur vient de passer à 1 dé (une seule fois par joueur).
+      cur.palificoDone = cur.palificoDone || {};
+      cur.palifico = false;
+      if ((cur.diceCount[cur.turn] || 0) === 1 && !cur.palificoDone[cur.turn] && activeCount(cur) > 2) {
+        cur.palifico = true; cur.palificoDone[cur.turn] = true;
+      }
+      cur.banner = (cur.palifico ? '🟣 PALIFICO ! Les ⚀ ne sont plus jokers, la valeur est figée. ' : '') + Room.name(cur.turn) + ' ouvre les enchères';
     }
 
     function onStart(players, cur) {
@@ -219,7 +240,7 @@
     function makeBid(qty, face) {
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
-        if (!isHigher({ qty: qty, face: face }, cur.bid)) return cur;
+        if (!isHigher({ qty: qty, face: face }, cur.bid, cur.palifico)) return cur;
         if (qty > totalDice(cur)) return cur;
         cur.bid = { qty: qty, face: face, by: window.myPid };
         cur.banner = Room.name(window.myPid) + ' mise ' + qty + ' × ' + DIE[face];
@@ -231,21 +252,37 @@
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
         if (!cur.bid) return cur;
-        var face = cur.bid.face, qty = cur.bid.qty, count = 0, dice = {};
-        activePids(cur).forEach(function (p) {
-          var d = (cur.players[p].dice || []); dice[p] = d.slice();
-          d.forEach(function (v) { if (v === face || (face !== 1 && v === 1)) count++; });
-        });
+        var face = cur.bid.face, qty = cur.bid.qty, dice = {};
+        var count = tableCount(cur, face, dice);
         var bidder = cur.bid.by, challenger = window.myPid;
         var loser = (count >= qty) ? challenger : bidder; // l'enchère tient → le contesteur perd
         cur.diceCount[loser] = Math.max(0, (cur.diceCount[loser] || 0) - 1);
-        cur.reveal = { face: face, qty: qty, count: count, loser: loser, bidder: bidder, challenger: challenger, dice: dice };
+        cur.reveal = { kind: 'dudo', face: face, qty: qty, count: count, loser: loser, bidder: bidder, challenger: challenger, dice: dice };
         cur.phase = 'reveal';
         cur.banner = '🎲 Dudo ! ' + count + ' × ' + DIE[face] + ' sur la table — ' +
           (loser === challenger ? 'l\'enchère tenait, ' : 'enchère trop haute, ') + Room.name(loser) + ' perd un dé';
         // Prochain lanceur = le perdant (s'il lui reste des dés), sinon le suivant actif.
         cur.turn = ((cur.diceCount[loser] || 0) > 0) ? loser : nextActive(cur, loser);
         if (activeCount(cur) <= 1) { cur.status = 'ended'; cur.winner = activePids(cur)[0] || loser; }
+        return cur;
+      });
+    }
+    // CALZA : parier que l'enchère est EXACTEMENT juste. Exact → +1 dé (max 5) ; sinon −1 dé.
+    function callCalza() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
+        if (!cur.bid || cur.bid.by === window.myPid) return cur;
+        var face = cur.bid.face, qty = cur.bid.qty, dice = {};
+        var count = tableCount(cur, face, dice);
+        var caller = window.myPid, exact = (count === qty);
+        if (exact) cur.diceCount[caller] = Math.min(START_DICE, (cur.diceCount[caller] || 0) + 1);
+        else cur.diceCount[caller] = Math.max(0, (cur.diceCount[caller] || 0) - 1);
+        cur.reveal = { kind: 'calza', face: face, qty: qty, count: count, loser: exact ? null : caller, winner: exact ? caller : null, bidder: cur.bid.by, challenger: caller, dice: dice };
+        cur.phase = 'reveal';
+        cur.banner = '🎯 Calza ! ' + count + ' × ' + DIE[face] + ' sur la table — ' +
+          (exact ? Room.name(caller) + ' avait juste et regagne un dé !' : 'raté, ' + Room.name(caller) + ' perd un dé');
+        cur.turn = ((cur.diceCount[caller] || 0) > 0) ? caller : nextActive(cur, caller);
+        if (activeCount(cur) <= 1) { cur.status = 'ended'; cur.winner = activePids(cur)[0] || caller; }
         return cur;
       });
     }
@@ -264,14 +301,18 @@
       if (state.phase === 'reveal') { if (state.turn === pid) continueRound(); return; }
       if (state.phase !== 'bid' || state.turn !== pid) return;
       var my = (state.players[pid] || {}).dice || [];
-      var tot = totalDice(state), unknown = tot - my.length;
-      function myCount(face) { var n = 0; my.forEach(function (v) { if (v === face || (face !== 1 && v === 1)) n++; }); return n; }
-      function prob(face) { return face === 1 ? 1 / 6 : 1 / 3; } // 1/3 car les ⚀ comptent aussi
+      var tot = totalDice(state), unknown = tot - my.length, pal = !!state.palifico;
+      function myCount(face) { var n = 0; my.forEach(function (v) { if (v === face || (!pal && face !== 1 && v === 1)) n++; }); return n; }
+      function prob(face) { return (pal || face === 1) ? 1 / 6 : 1 / 3; } // ⚀ jokers sauf palifico
       var bid = state.bid;
 
-      // Contester ? (si l'enchère en cours dépasse nettement l'espérance)
       if (bid) {
         var expStanding = myCount(bid.face) + unknown * prob(bid.face);
+        // Calza ? (l'enchère semble EXACTEMENT juste et il y a un dé à regagner)
+        var lvl = window.Bots ? window.Bots.level(state) : 'normal';
+        if (bid.by !== pid && lvl !== 'easy' && (state.diceCount[pid] || 0) < START_DICE &&
+            bid.qty >= 3 && Math.abs(expStanding - bid.qty) < 0.3 && Math.random() < 0.5) { callCalza(); return; }
+        // Contester ? (si l'enchère en cours dépasse nettement l'espérance)
         var margin = window.Bots ? window.Bots.pick(state, { easy: 1.8, normal: 1.1, hard: 0.7 }) : 1.1;
         var doubtful = bid.qty > expStanding + margin;
         if (window.Bots && window.Bots.shouldBlunder(state)) doubtful = Math.random() < 0.5;
@@ -279,30 +320,33 @@
       }
 
       // Sinon, composer la meilleure enchère valide (la plus « sûre »).
+      // En palifico avec une enchère posée, seule la valeur de l'enchère est jouable.
+      var faces = (pal && bid) ? [bid.face] : [1, 2, 3, 4, 5, 6];
       var best = null;
-      for (var face = 1; face <= 6; face++) {
+      for (var fi = 0; fi < faces.length; fi++) {
+        var face = faces[fi];
         var exp = myCount(face) + unknown * prob(face);
-        var q = bid ? minQtyHigher(face, bid) : Math.max(1, Math.round(exp));
+        var q = bid ? minQtyHigher(face, bid, pal) : Math.max(1, Math.round(exp));
         if (bid) q = Math.max(q, Math.min(Math.round(exp), tot)); // viser autour de l'espérance
         if (q > tot || q < 1) continue;
         var safety = exp - q; // marge positive = enchère crédible
         if (best === null || safety > best.safety) best = { qty: q, face: face, safety: safety };
       }
-      if (best && isHigher(best, bid)) makeBid(best.qty, best.face);
+      if (best && isHigher(best, bid, pal)) makeBid(best.qty, best.face);
       else if (bid) callDudo(); // aucune surenchère crédible → on conteste
-      else makeBid(1, 2);
+      else makeBid(1, my.length ? bestFace(my) : 2);
     }
 
     /* ━━ Rendu ━━ */
-    function diceRow(dice, hitFace) {
+    function diceRow(dice, hitFace, noJoker) {
       return (dice || []).slice().sort(function (a, b) { return a - b; }).map(function (v) {
-        var hit = (v === hitFace) || (hitFace && hitFace !== 1 && v === 1);
+        var hit = (v === hitFace) || (!noJoker && hitFace && hitFace !== 1 && v === 1);
         return '<span class="pd-die' + (hit ? ' hit' : '') + '">' + DIE[v] + '</span>';
       }).join('');
     }
     function render(state) {
       var order = state.order || [], me = window.myPid, dc = state.diceCount || {};
-      setText('pd-round-label', 'Manche ' + (state.round || 1) + ' · ' + totalDice(state) + ' dés');
+      setText('pd-round-label', 'Manche ' + (state.round || 1) + (state.palifico ? ' 🟣 PALIFICO' : '') + ' · ' + totalDice(state) + ' dés');
       setHTML('pd-players', order.map(function (pid) {
         var dead = (dc[pid] || 0) <= 0;
         return '<div class="pd-pl' + (state.turn === pid && state.phase === 'bid' && !dead ? ' turn' : '') + (dead ? ' dead' : '') + '">' +
@@ -326,7 +370,7 @@
         rev.innerHTML = '<div class="pd-reveal">' + activePids0(state).map(function (pid) {
           var d = (R.dice || {})[pid] || [];
           return '<div class="pd-reveal-row"><span class="pd-reveal-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-            '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face) + '</span></div>';
+            '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face, state.palifico) + '</span></div>';
         }).join('') + '</div>';
       } else rev.innerHTML = '';
 
@@ -358,12 +402,17 @@
         host.innerHTML = handHTML + (myAlive ? '<div class="pd-wait">Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>' : '');
         pick = null; return;
       }
-      // Contrôles d'enchère
+      // Contrôles d'enchère (palifico : la valeur est figée par la 1ʳᵉ enchère)
+      var pal = !!state.palifico;
       if (!pick) { pick = state.bid ? { qty: state.bid.qty + 1, face: state.bid.face } : { qty: 1, face: bestFace(myDice) }; }
+      if (pal && state.bid) pick.face = state.bid.face;
       var faces = [1, 2, 3, 4, 5, 6].map(function (f) {
-        return '<button class="pd-face' + (pick.face === f ? ' sel' : '') + '" onclick="setFace(' + f + ')">' + (f === 1 ? '<span>⚀</span>' : DIE[f]) + '</button>';
+        var locked = pal && state.bid && f !== state.bid.face;
+        return '<button class="pd-face' + (pick.face === f ? ' sel' : '') + '" ' + (locked ? 'disabled style="opacity:.35"' : 'onclick="setFace(' + f + ')"') + '>' + (f === 1 ? '<span>⚀</span>' : DIE[f]) + '</button>';
       }).join('');
+      var canCalza = state.bid && state.bid.by !== me;
       host.innerHTML = handHTML +
+        (pal ? '<div class="pd-wait" style="color:#7e57c2;font-weight:700">🟣 Palifico : ⚀ non jokers, valeur figée</div>' : '') +
         '<div class="pd-picker">' +
           '<div class="pd-qty"><button onclick="bumpQty(-1)">−</button><span class="pd-qty-val">' + pick.qty + '</span><button onclick="bumpQty(1)">+</button>' +
             '<span style="font-size:1.4rem;margin:0 4px">×</span><span class="pd-qty-val">' + faceHTML(pick.face) + '</span></div>' +
@@ -371,6 +420,7 @@
         '</div>' +
         '<div class="pd-actions">' +
           '<button class="pd-act dudo" ' + (state.bid ? '' : 'disabled') + ' onclick="callDudo()">🚫 Dudo !</button>' +
+          '<button class="pd-act calza" ' + (canCalza ? '' : 'disabled') + ' onclick="callCalza()" title="Parier que l\'enchère est exactement juste">🎯 Calza</button>' +
           '<button class="pd-act bid" onclick="submitBid()">Miser ' + pick.qty + ' × ' + DIE[pick.face] + '</button>' +
         '</div>';
     }
@@ -379,7 +429,7 @@
     function setFace(f) { if (!pick) return; pick.face = f; render(window.room); }
     function submitBid() {
       if (!pick) return;
-      if (!isHigher(pick, window.room.bid)) { lbToast('Enchère trop basse'); return; }
+      if (!isHigher(pick, window.room.bid, window.room.palifico)) { lbToast('Enchère trop basse'); return; }
       var q = pick.qty, f = pick.face; pick = null; makeBid(q, f);
     }
 

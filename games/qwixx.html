@@ -190,7 +190,17 @@
       var P = cur.players[pid];
       P.rows = P.rows || {};
       P.rows[rowKey] = marksOf(P, rowKey).concat([idx]);
-      if (idx === 10) { cur.locks = cur.locks || {}; cur.locks[rowKey] = true; } // verrouille la ligne
+      if (idx === 10) {
+        // Fermeture SIMULTANÉE possible sur la même somme blanche (règle officielle) :
+        // pendant la phase blanche, le verrou n'est posé qu'à la fin de la phase.
+        if (cur.phase === 'white') { cur.pendingLocks = cur.pendingLocks || {}; cur.pendingLocks[rowKey] = true; }
+        else { cur.locks = cur.locks || {}; cur.locks[rowKey] = true; }
+      }
+    }
+    function mergeLocks(cur) {
+      var pl = cur.pendingLocks || {};
+      Object.keys(pl).forEach(function (k) { cur.locks = cur.locks || {}; cur.locks[k] = true; });
+      cur.pendingLocks = null;
     }
     function whiteSum(cur) { return cur.dice.w1 + cur.dice.w2; }
     function colorOptions(cur, pid) {
@@ -220,8 +230,8 @@
           if (me === cur.turn) cur.activeMarked = true;
         }
         cur.whiteDone = cur.whiteDone || {}; cur.whiteDone[me] = true;
-        // Tous ont statué → phase couleur (actif seulement).
-        if ((cur.order || []).every(function (p) { return cur.whiteDone[p]; })) { cur.phase = 'color'; }
+        // Tous ont statué → verrous différés posés, puis phase couleur (actif seulement).
+        if ((cur.order || []).every(function (p) { return cur.whiteDone[p]; })) { mergeLocks(cur); cur.phase = 'color'; }
         return cur;
       });
     }
@@ -286,7 +296,10 @@
       var me = window.myPid, dice = state.dice || {};
       setText('qx-round-label', '🎲 Qwixx');
       setHTML('qx-dice', '<div class="qx-die w">' + (dice.w1 || '?') + '</div><div class="qx-die w">' + (dice.w2 || '?') + '</div>' +
-        ['red', 'yellow', 'green', 'blue'].map(function (c) { return '<div class="qx-die ' + c + '">' + (dice[c] || '?') + '</div>'; }).join(''));
+        ['red', 'yellow', 'green', 'blue'].map(function (c) {
+          var locked = state.locks && state.locks[c]; // ligne verrouillée = dé retiré du jeu
+          return '<div class="qx-die ' + c + '"' + (locked ? ' style="opacity:.25;filter:grayscale(1)" title="Dé retiré (ligne verrouillée)"' : '') + '>' + (locked ? '✕' : (dice[c] || '?')) + '</div>';
+        }).join(''));
       var wsum = (dice.w1 || 0) + (dice.w2 || 0);
 
       // autres joueurs

@@ -211,16 +211,17 @@
     function sum(arr) { return arr.reduce(function (a, b) { return a + b; }, 0); }
 
     /* ━━ Construction du paquet d'une expédition ━━ */
-    function buildDeck(round) {
+    function buildDeck(round, removedHaz) {
       var deck = TREASURES.map(function (v) { return { t: 'T', v: v }; });
-      HAZARDS.forEach(function (h) { for (var i = 0; i < 3; i++) deck.push({ t: 'H', h: h.k }); });
+      // Chaque catastrophe RETIRE définitivement une carte danger de ce type (règle officielle).
+      HAZARDS.forEach(function (h) { var n = 3 - ((removedHaz || {})[h.k] || 0); for (var i = 0; i < n; i++) deck.push({ t: 'H', h: h.k }); });
       deck.push({ t: 'R', v: round <= 3 ? 5 : 10 }); // une relique par expédition (5 puis 10)
       return shuffle(deck);
     }
 
     /* ━━ Déroulé d'une expédition (tout en transaction) ━━ */
     function startRound(cur) {
-      cur.deck = buildDeck(cur.round || 1);
+      cur.deck = buildDeck(cur.round || 1, cur.removedHaz);
       cur.path = []; cur.pot = 0; cur.relics = []; cur.hazSeen = {};
       cur.inCave = {}; cur.roundGems = {};
       (cur.order || []).forEach(function (p) { cur.inCave[p] = true; cur.roundGems[p] = 0; if (cur.players[p]) cur.players[p].nextReady = false; });
@@ -250,6 +251,7 @@
           pidsIn(cur).forEach(function (p) { cur.roundGems[p] = 0; });
           cur.pot = 0; cur.relics = []; cur.inCave = {};
           cur.lastDisaster = card.h;
+          cur.removedHaz = cur.removedHaz || {}; cur.removedHaz[card.h] = (cur.removedHaz[card.h] || 0) + 1;
           endRoundOrGame(cur, true);
         } else {
           cur.banner = info.e + ' ' + info.n + ' — prudence…';
@@ -362,7 +364,7 @@
     /* ━━ onStart / onState ━━ */
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
-      cur.banked = {}; order.forEach(function (p) { cur.banked[p] = 0; cur.players[p].nextReady = false; });
+      cur.banked = {}; cur.removedHaz = {}; order.forEach(function (p) { cur.banked[p] = 0; cur.players[p].nextReady = false; });
       cur.round = 1; cur.winner = null;
       startRound(cur);
       return { winner: null };
