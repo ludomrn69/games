@@ -255,6 +255,13 @@
       var g = gOf(window.room, window.myPid); if (!g) return;
       var u = g.t[col].u; if (idx >= u.length) return;
       if (sel) { tapCol(col); return; }      // une sélection existe → cette colonne est la cible
+      // Carte du DESSUS qui peut monter en famille → elle y va directement (comme
+      // la défausse) : un simple clic sur l'As, puis le 2, etc. les envoie en haut.
+      if (idx === u.length - 1 && canFound(g, u[idx])) {
+        var card = u[idx];
+        withG(function (gg) { gg.f[suitOf(card)].push(gg.t[col].u.pop()); flipIfNeeded(gg.t[col]); return true; });
+        sel = null; render(window.room); return;
+      }
       // sinon : sélectionner la suite à partir de cette carte si elle est valide (descendante alternée)
       var ok = true; for (var k = idx; k < u.length - 1; k++) { if (!(isRed(u[k]) !== isRed(u[k + 1]) && rankVal(u[k]) === rankVal(u[k + 1]) + 1)) { ok = false; break; } }
       if (!ok) return;
