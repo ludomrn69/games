@@ -1,50 +1,50 @@
 /*
-  cluedo-engine.js — Moteur Cluedo PUR (sans DOM). Plateau 13×13 (lattice de
-  couloirs + 9 pièces), déplacement case par case, suggestions / réfutations,
-  accusation, et IA de déduction. Testé par simulation, inclus tel quel dans
-  cluedo.html.
+  cluedo-engine.js — Moteur Cluedo PUR (sans DOM). Plateau fidèle à l'édition
+  MODERNE Hasbro (manoir contemporain) : grille 20×20 de couloirs + 9 pièces,
+  déplacement case par case, suggestions / réfutations, accusation, et IA de
+  déduction. Testé par simulation, inclus tel quel dans cluedo.html.
 */
 (function (root) {
   'use strict';
 
   var SUSPECTS = ['Moutarde', 'Rose', 'Violet', 'Leblanc', 'Olive', 'Pervenche'];
   var WEAPONS = ['Poignard', 'Chandelier', 'Revolver', 'Corde', 'Clé', 'Matraque'];
-  // 9 pièces, index = br*3+bc (br,bc ∈ 0..2). Disposition fidèle au Cluedo : les 4
-  // COINS sont les pièces à passage secret, comme sur le plateau Hasbro :
-  //   Cuisine (HG) · Salle de bal (HC) · Véranda (HD)
-  //   Salle à manger (MG) · Bibliothèque (M) · Billard (MD)
-  //   Salon (BG) · Vestibule (BC) · Bureau (BD)
-  var ROOMS = ['Cuisine', 'Salle de bal', 'Véranda', 'Salle à manger', 'Bibliothèque', 'Billard', 'Salon', 'Vestibule', 'Bureau'];
-  // Passages secrets entre coins OPPOSÉS, comme dans le vrai jeu :
-  //   Cuisine (0) ↔ Bureau (8)  et  Véranda (2) ↔ Salon (6).
-  var SECRET = { 0: 8, 8: 0, 2: 6, 6: 2 };
+  // 9 pièces de l'édition moderne, placées comme sur le plateau :
+  //   Chambre · Salle de bains · Bureau · Cuisine     (rangée du haut)
+  //   Salle de jeux · [CLUEDO] · Salle à manger        (milieu)
+  //   Garage · Entrée · Salon                          (rangée du bas)
+  var ROOMS = ['Chambre', 'Salle de bains', 'Bureau', 'Cuisine', 'Salle de jeux', 'Salle à manger', 'Garage', 'Entrée', 'Salon'];
+  // 2 passages secrets entre coins OPPOSÉS, comme sur le plateau :
+  //   Chambre (0) ↔ Salon (8)  et  Cuisine (3) ↔ Garage (6).
+  var SECRET = { 0: 8, 8: 0, 3: 6, 6: 3 };
   var ALLCARDS = SUSPECTS.concat(WEAPONS).concat(ROOMS);
-  var START_CELLS = ['0,8', '17,9', '8,0', '9,17', '0,2', '17,15']; // sur l'anneau de couloirs (≤ 6 joueurs)
+  var START_ROOM = 7; // tous les joueurs commencent dans l'ENTRÉE, comme dans le vrai jeu
 
   function catOf(card) { return SUSPECTS.indexOf(card) >= 0 ? 'suspect' : WEAPONS.indexOf(card) >= 0 ? 'arme' : 'piece'; }
   function cardsOfCat(cat) { return cat === 'suspect' ? SUSPECTS : cat === 'arme' ? WEAPONS : ROOMS; }
 
-  // ── Plateau (disposition fidèle au Cluedo) ───────────────────────────────────
-  // Grille 18×18. Chaque pièce est un RECTANGLE [r0,r1,c0,c1] (inclus), placé comme
-  // sur le vrai plateau ; le CELLIER central est bloqué ; tout le reste est couloir.
-  // Les PORTES sont des cases couloir adjacentes par lesquelles on entre/sort.
-  var GRID_W = 18, GRID_H = 18;
+  // ── Plateau (disposition fidèle à l'édition moderne) ─────────────────────────
+  // Grille 20×20. Chaque pièce est un RECTANGLE [r0,r1,c0,c1] (inclus), placé comme
+  // sur le vrai plateau ; la dalle CLUEDO centrale est franchissable ; tout le reste
+  // est couloir. Les PORTES sont des cases couloir adjacentes par lesquelles on
+  // entre/sort.
+  var GRID_W = 20, GRID_H = 20;
   var ROOM_RECT = {
-    0: [1, 4, 1, 4],    // Cuisine        (haut-gauche)
-    1: [1, 4, 7, 10],   // Salle de bal   (haut-centre)
-    2: [1, 4, 13, 16],  // Véranda        (haut-droite)
-    3: [7, 9, 1, 4],    // Salle à manger (milieu-gauche)
-    5: [6, 8, 13, 16],  // Billard        (milieu-droite haut)
-    4: [10, 11, 13, 16],// Bibliothèque   (milieu-droite bas)
-    6: [13, 16, 1, 4],  // Salon          (bas-gauche)
-    7: [13, 16, 7, 10], // Vestibule      (bas-centre)
-    8: [13, 16, 13, 16] // Bureau         (bas-droite)
+    0: [0, 4, 0, 3],    // Chambre        (haut-gauche, passage secret → Salon)
+    1: [0, 4, 5, 8],    // Salle de bains (haut, centre-gauche)
+    2: [0, 4, 11, 14],  // Bureau         (haut, centre-droite)
+    3: [0, 4, 16, 19],  // Cuisine        (haut-droite, passage secret → Garage)
+    4: [7, 12, 0, 4],   // Salle de jeux  (milieu-gauche, billard)
+    5: [7, 12, 15, 19], // Salle à manger (milieu-droite)
+    6: [15, 19, 0, 4],  // Garage         (bas-gauche, passage secret → Cuisine)
+    7: [15, 19, 7, 12], // Entrée         (bas-centre : tout le monde part d'ici)
+    8: [15, 19, 15, 19] // Salon          (bas-droite, passage secret → Chambre)
   };
-  var CELLAR = [7, 10, 7, 10]; // cellier central (zone de l'enveloppe) — non franchissable
+  var CELLAR = [8, 11, 8, 11]; // dalle centrale « CLUEDO » (on y ACCUSE) — franchissable
   var DOORS = {
-    0: [[5, 2], [2, 5]], 1: [[5, 8], [2, 6], [2, 11]], 2: [[5, 14], [2, 12]],
-    3: [[6, 2], [8, 5]], 5: [[7, 12], [9, 14]], 4: [[11, 12], [12, 14]],
-    6: [[12, 2], [14, 5]], 7: [[12, 8], [14, 6], [14, 11]], 8: [[12, 15], [14, 12]]
+    0: [[5, 2], [2, 4]], 1: [[5, 6], [2, 9]], 2: [[5, 13], [2, 10]], 3: [[5, 17], [2, 15]],
+    4: [[6, 2], [9, 5]], 5: [[6, 17], [9, 14]],
+    6: [[14, 2], [17, 5]], 7: [[14, 8], [14, 11], [17, 6], [17, 13]], 8: [[14, 17], [17, 14]]
   };
   function inRect(r, c, R) { return r >= R[0] && r <= R[1] && c >= R[2] && c <= R[3]; }
   function roomOfCell(r, c) { for (var k = 0; k < 9; k++) { if (inRect(r, c, ROOM_RECT[k])) return k; } return -1; }
@@ -105,10 +105,14 @@
     shuffle(deck, rnd);
     var hands = {}; order.forEach(function (p) { hands[p] = []; });
     deck.forEach(function (c, i) { hands[order[i % order.length]].push(c); });
-    var pos = {}; order.forEach(function (p, i) { pos[p] = START_CELLS[i % START_CELLS.length]; });
+    // Tous les pions démarrent dans l'ENTRÉE (comme sur le vrai plateau moderne).
+    var pos = {}; order.forEach(function (p) { pos[p] = 'R' + START_ROOM; });
+    // Les 6 armes sont réparties au hasard dans 6 pièces différentes au départ.
+    var weaponPos = {}, roomsIdx = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8], rnd);
+    WEAPONS.forEach(function (w, i) { weaponPos[w] = roomsIdx[i]; });
     var s = {
       order: order.slice(), turn: order[0], phase: 'roll',
-      pos: pos, hands: hands, solution: sol,
+      pos: pos, hands: hands, solution: sol, weaponPos: weaponPos,
       dice: 0, reach: null, suggestion: null, eliminated: {},
       mem: {}, winner: null, log: [], turnCount: 0
     };
@@ -124,6 +128,14 @@
   //   clauses = [{pid,cards}]   : pid détient AU MOINS une de ces cartes (réfutation vue de loin)
   //   env[cat] = card          : carte solution identifiée
   function emptyMem(pid) { return { self: pid, hand: [], holds: {}, no: {}, clauses: [], env: { suspect: null, arme: null, piece: null } }; }
+  // Firebase RTDB SUPPRIME les tableaux vides et les valeurs null : après un
+  // aller-retour en ligne, `clauses`, `env`… peuvent manquer. On les restaure
+  // avant toute lecture (sans quoi la première suggestion plante en ligne).
+  function normMem(m) {
+    m.hand = m.hand || []; m.holds = m.holds || {}; m.no = m.no || {}; m.clauses = m.clauses || [];
+    m.env = m.env || {};
+    return m;
+  }
   function setNo(m, pid, card) { (m.no[pid] = m.no[pid] || {})[card] = true; }
   function setHolds(m, order, card, owner) { if (m.holds[card]) return; m.holds[card] = owner; order.forEach(function (P) { if (P !== owner) setNo(m, P, card); }); }
   function buildMem(s, pid) { var m = emptyMem(pid); m.hand = (s.hands[pid] || []).slice(); m.hand.forEach(function (c) { setHolds(m, s.order, c, pid); }); propagate(m, s.order); return m; }
@@ -132,6 +144,7 @@
   // ev = { by, cards:[s,w,r], disprover|null, shown|null, passers:[pids], responders:[pids] }
   function recordEvent(s, ev) { s.order.forEach(function (pid) { updateMem(s.mem[pid], s.order, ev, pid); }); }
   function updateMem(m, order, ev, observer) {
+    normMem(m);
     (ev.passers || []).forEach(function (P) { ev.cards.forEach(function (c) { setNo(m, P, c); }); });
     if (ev.disprover) {
       if (observer === ev.by && ev.shown) setHolds(m, order, ev.shown, ev.disprover);
@@ -143,6 +156,7 @@
   }
 
   function propagate(m, order) {
+    normMem(m);
     var changed = true, guard = 0;
     while (changed && guard++ < 60) {
       changed = false;
@@ -173,10 +187,10 @@
       });
     }
   }
-  function solved(m) { return !!(m.env.suspect && m.env.arme && m.env.piece); }
+  function solved(m) { var e = normMem(m).env; return !!(e.suspect && e.arme && e.piece); }
 
   // ── Déroulé du tour ─────────────────────────────────────────────────────────
-  function log(s, msg) { s.log.push(msg); if (s.log.length > 14) s.log = s.log.slice(s.log.length - 14); }
+  function log(s, msg) { s.log = s.log || []; s.log.push(msg); if (s.log.length > 14) s.log = s.log.slice(s.log.length - 14); }
   var NAMEFN = null; function nm(pid) { return NAMEFN ? NAMEFN(pid) : pid; }
 
   function actor(s) {
@@ -216,8 +230,6 @@
     if (s.phase !== 'action') return false;
     var n = s.pos[s.turn]; if (!isRoomNode(n)) return false;
     var room = ROOMS[roomIdx(n)];
-    // déplacer le suspect suggéré dans la pièce (si c'est un joueur)
-    s.order.forEach(function (p) { if (s.players && s.players[p]) {} });
     movePawnTo(s, suspect, n);
     s.weaponPos = s.weaponPos || {}; s.weaponPos[arme] = roomIdx(n);
     var idx = s.order.indexOf(s.turn);
@@ -283,6 +295,7 @@
     if (!isPoolNode(s.pos[s.turn])) return false;
     var ok = (suspect === s.solution.suspect && arme === s.solution.arme && piece === s.solution.piece);
     if (ok) { s.winner = s.turn; s.phase = 'over'; log(s, '🏆 ' + nm(s.turn) + ' accuse juste : ' + suspect + ' · ' + arme + ' · ' + piece + ' !'); return true; }
+    s.eliminated = s.eliminated || {};
     s.eliminated[s.turn] = true;
     log(s, '❌ ' + nm(s.turn) + ' accuse à tort (' + suspect + ' · ' + arme + ' · ' + piece + ') et est éliminé');
     // s'il ne reste qu'un non-éliminé → il gagne
@@ -294,6 +307,7 @@
 
   function endTurn(s) {
     if (s.winner) return;
+    s.eliminated = s.eliminated || {};
     s.suggestion = null; s.reach = null;
     s.turnCount++;
     var idx = s.order.indexOf(s.turn);
@@ -342,7 +356,7 @@
   // Joue UN pas du bot pour le joueur courant. level : 'easy' | 'normal' | 'hard'.
   function botStep(s, level) {
     if (s.phase === 'disprove') { disprove(s, botDisproveChoice(s)); return; }
-    var pid = s.turn, m = s.mem[pid];
+    var pid = s.turn, m = normMem(s.mem[pid]);
     var solv = solved(m), inPool = isPoolNode(s.pos[pid]);
     if (s.phase === 'roll') {
       if (solv && inPool) { accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }

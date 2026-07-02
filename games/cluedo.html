@@ -22,26 +22,31 @@
 
     .cl-wrap { width: 100%; max-width: 620px; padding: 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
-    .cl-board { width: min(97vw, 520px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(18, 1fr); grid-template-rows: repeat(18, 1fr); gap: 1px; background: #b9a988; border: 2px solid #b9a988; border-radius: 8px; }
-    .cl-corr { background: var(--cream); }
-    html[data-theme="dark"] .cl-corr { background: #221a2e; }
-    .cl-corr.door { background: rgba(198,152,90,0.16); } /* porte : repère discret */
-    .cl-pool { background: radial-gradient(circle at 50% 40%, #b71c2b, #7d1420); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; box-shadow: inset 0 0 0 3px rgba(255,255,255,0.18); }
+    /* ── Plateau : manoir moderne (dallage ardoise, pièces meublées, dalle CLUEDO) ── */
+    .cl-board { width: min(97vw, 560px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(20, 1fr); grid-template-rows: repeat(20, 1fr); gap: 0; background: #23272e; border: 6px solid #1b2b23; outline: 2px solid #c6985a; outline-offset: -4px; border-radius: 10px; padding: 3px; box-shadow: 0 10px 30px rgba(20,16,28,0.35); }
+    .cl-corr { display: flex; align-items: center; justify-content: center; background: linear-gradient(145deg, #cfd3d9, #b9bec6); box-shadow: inset 0 0 0 1px rgba(35,39,46,0.55), inset 0 1px 0 rgba(255,255,255,0.25); }
+    .cl-corr.alt { background: linear-gradient(145deg, #c2c7ce, #adb3bc); }
+    html[data-theme="dark"] .cl-corr { background: linear-gradient(145deg, #4a4f58, #3a3f47); }
+    html[data-theme="dark"] .cl-corr.alt { background: linear-gradient(145deg, #42474f, #33383f); }
+    .cl-corr.door { background: linear-gradient(145deg, #e2c290, #cda36a); box-shadow: inset 0 0 0 1px rgba(90,60,30,0.55); } /* seuil de porte */
+    html[data-theme="dark"] .cl-corr.door { background: linear-gradient(145deg, #8a6b3e, #6f5430); }
+    .cl-pool { background: radial-gradient(circle at 50% 35%, #2e3138 0%, #17191d 78%); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; box-shadow: inset 0 0 0 2px #c6985a, inset 0 0 22px rgba(0,0,0,0.8); z-index: 1; }
     .cl-pool.reach { outline: 3px solid var(--sage); cursor: pointer; }
-    .cl-pool-logo { color: #fff; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 11px; letter-spacing: 1px; transform: rotate(-8deg); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-    .cl-pool .rtok { display: flex; flex-wrap: wrap; justify-content: center; }
-    .cl-corr.reach { background: rgba(139,158,126,.5); cursor: pointer; }
+    .cl-pool-logo { color: #c62533; font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(13px, 3.4vw, 19px); letter-spacing: 2px; transform: rotate(-6deg); text-shadow: 0 2px 5px rgba(0,0,0,0.85), 0 0 14px rgba(198,37,51,0.45); }
+    .cl-pool-sub { color: rgba(255,255,255,0.55); font-size: 7px; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
+    .cl-pool .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 2px; }
+    .cl-corr.reach { background: rgba(139,158,126,.75); cursor: pointer; box-shadow: inset 0 0 0 1px var(--sage); }
     .cl-corr.reach:hover { background: var(--sage); }
-    .cl-room { border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; }
+    .cl-room { border-radius: 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3px 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; box-shadow: inset 0 0 0 2px rgba(43,34,26,0.5), inset 0 0 0 3px rgba(255,255,255,0.35), inset 0 2px 10px rgba(255,255,255,0.28); z-index: 1; }
     .cl-room.reach { outline: 3px solid var(--sage); cursor: pointer; }
-    .cl-room .rname { line-height: 1.05; }
-    .cl-room .cl-secret { font-size: 7px; font-weight: 700; color: #8a5a2b; line-height: 1.1; margin-top: 1px; opacity: 0.95; }
-    .cl-room .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 0; }
-    .cl-room .rtok span { font-size: 13px; }
-    .cl-tok { font-size: 14px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
-    .cl-corr { display: flex; align-items: center; justify-content: center; }
+    .cl-room .rdeco { font-size: clamp(15px, 4.6vw, 26px); line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
+    .cl-room .rname { line-height: 1.05; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(7.5px, 2vw, 11px); letter-spacing: 0.4px; text-transform: uppercase; background: rgba(255,252,245,0.72); border: 1px solid rgba(43,34,26,0.35); border-radius: 4px; padding: 1px 4px; margin-top: 2px; color: #2f2620; }
+    .cl-room .cl-secret { font-size: clamp(6.5px, 1.7vw, 9px); font-weight: 700; color: #6d4520; line-height: 1.1; margin-top: 2px; background: rgba(255,248,235,0.65); border-radius: 3px; padding: 0 3px; }
+    .cl-room .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 2px; }
+    .cl-wep { font-size: clamp(10px, 2.6vw, 14px); background: rgba(255,255,255,0.75); border: 1px solid rgba(43,34,26,0.3); border-radius: 5px; padding: 0 2px; line-height: 1.25; }
+    .cl-tok { width: clamp(14px, 3.6vw, 20px); height: clamp(14px, 3.6vw, 20px); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: clamp(9px, 2.4vw, 13px); border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.45); background: var(--gold); }
 
-    .cl-panel { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 10px; }
+    .cl-panel { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 10px; }
     .cl-action { background: var(--white); border: 1px solid var(--gold-light); border-radius: 16px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
     .cl-hint { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--ink-light); text-align: center; }
     .cl-btn-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; }
@@ -127,10 +132,10 @@
       <div class="modal-title">Cluedo</div>
       <div style="font-size:.9rem;color:var(--ink-light);line-height:1.6">
         <p>Un meurtre ! Trouve <b>qui</b>, avec <b>quelle arme</b>, dans <b>quelle pièce</b>. Ces 3 cartes sont cachées dans l'enveloppe ; les autres sont en main des joueurs.</p>
-        <p style="margin-top:8px">• À ton tour : lance le dé, déplace-toi (case par case) jusqu'à une pièce.</p>
+        <p style="margin-top:8px">• Tout le monde démarre dans l'<b>Entrée</b>. À ton tour : lance le dé, déplace-toi (case par case) jusqu'à une pièce.</p>
         <p style="margin-top:6px">• Dans une pièce, fais une <b>suggestion</b> (suspect + arme + cette pièce). Le joueur suivant qui possède l'une de ces cartes t'en montre une — en secret.</p>
-        <p style="margin-top:6px">• Note tout dans ton <b>carnet</b> 📓 et déduis. Les coins ont des <b>passages secrets</b>.</p>
-        <p style="margin-top:6px">• Sûr·e de toi ? <b>Accuse</b> ! Juste → tu gagnes. Faux → tu es éliminé (tu réfutes encore mais ne peux plus gagner).</p>
+        <p style="margin-top:6px">• Note tout dans ton <b>carnet</b> 📓 et déduis. Deux <b>passages secrets</b> 🌀 relient Chambre ↔ Salon et Cuisine ↔ Garage.</p>
+        <p style="margin-top:6px">• Sûr·e de toi ? Rejoins la <b>dalle CLUEDO</b> au centre et <b>accuse</b> ! Juste → tu gagnes. Faux → tu es éliminé (tu réfutes encore mais ne peux plus gagner).</p>
       </div>
       <button class="btn-primary" style="width:auto;padding:.6rem 1.4rem;margin:10px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -144,7 +149,20 @@
     var escapeHtml = window.esc;
     var SUS_COLOR = { Moutarde: '#d8b13a', Rose: '#d65b9a', Violet: '#7e57c2', Leblanc: '#c9c4bd', Olive: '#5c9e5c', Pervenche: '#4f7fc0' };
     var WEP_EMOJI = { Poignard: '🗡️', Chandelier: '🕯️', Revolver: '🔫', Corde: '🪢', Clé: '🔧', Matraque: '🏏' };
-    var ROOM_BG = ['#e9d9c3', '#e3d7e9', '#d9e6e9', '#e9e1d0', '#dfe9d6', '#e9dad9', '#d8e2ec', '#ece2d2', '#dde9df'];
+    // Sol + meuble de chaque pièce (index moteur) : Chambre, Salle de bains, Bureau,
+    // Cuisine, Salle de jeux, Salle à manger, Garage, Entrée, Salon.
+    var ROOM_BG = [
+      'linear-gradient(150deg,#ecdff0,#d9c6e2)',   // Chambre (parquet mauve)
+      'linear-gradient(150deg,#ddedf3,#bfdae5)',   // Salle de bains (carrelage bleu)
+      'linear-gradient(150deg,#dfe9d2,#c3d6ae)',   // Bureau (vert cabinet)
+      'linear-gradient(150deg,#e3eff0,#c4dcdf)',   // Cuisine (faïence)
+      'linear-gradient(150deg,#d9e6cf,#b7cfa6)',   // Salle de jeux (tapis billard)
+      'linear-gradient(150deg,#f2ddd4,#e0b9ab)',   // Salle à manger (rouge chaleureux)
+      'linear-gradient(150deg,#dcdcde,#bfc0c4)',   // Garage (béton)
+      'linear-gradient(150deg,#f0e6d0,#ddc9a4)',   // Entrée (marbre doré)
+      'linear-gradient(150deg,#eee0c4,#d9c298)'    // Salon (parquet miel)
+    ];
+    var ROOM_DECO = ['🛏️', '🛁', '📚', '🍳', '🎱', '🍽️', '🚗', '🏛️', '🛋️'];
     CE.setNameFn(function (pid) { return (window.Room && Room.name) ? Room.name(pid) : pid; });
 
     function rref() { return window.roomRef; }
@@ -159,9 +177,9 @@
       minPlayers: 2,
       maxPlayers: 6,
       rules: ['Trouve le coupable, l\'arme et la pièce (cachés dans l\'enveloppe)',
-        'Déplace-toi jusqu\'à une pièce et fais une suggestion',
+        'Tout le monde part de l\'Entrée : déplace-toi jusqu\'à une pièce et suggère',
         'On te montre en secret une carte qui contredit ta suggestion',
-        'Déduis avec ton carnet, puis accuse pour gagner'],
+        'Déduis avec ton carnet, puis accuse depuis la dalle CLUEDO centrale'],
       offline: { solo: true },
       bot: cluedoBot,
       offlineTurn: function (room) { return CE.actor(room); },
@@ -191,40 +209,41 @@
       }
     }
 
-    function gridPosCSS(i) { var p = i.split(','); return { r: +p[0] + 1, c: +p[1] + 1 }; }
+    function tokHTML(pid) { return '<span class="cl-tok" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>'; }
     function renderBoard(s) {
       var me = window.myPid;
       var canMove = (s.phase === 'move' && s.turn === me && s.reach);
-      var toks = {}; s.order.forEach(function (p) { var n = s.pos[p]; (toks[n] = toks[n] || []).push(Room.emoji(p)); });
+      var toks = {}; s.order.forEach(function (p) { var n = s.pos[p]; (toks[n] = toks[n] || []).push(p); });
       var wtoks = {}; var wp = s.weaponPos || {}; Object.keys(wp).forEach(function (w) { (wtoks[wp[w]] = wtoks[wp[w]] || []).push(WEP_EMOJI[w] || '🔪'); });
       var html = '';
       // pièces (rectangles fidèles au plateau)
       for (var k = 0; k < 9; k++) {
         var R = CE.ROOM_RECT[k];
         var reach = canMove && s.reach['R' + k] != null;
-        var tk = (toks['R' + k] || []).map(function (e) { return '<span class="cl-tok">' + e + '</span>'; }).join('');
-        var wk = (wtoks[k] || []).map(function (e) { return '<span>' + e + '</span>'; }).join('');
+        var tk = (toks['R' + k] || []).map(tokHTML).join('');
+        var wk = (wtoks[k] || []).map(function (e) { return '<span class="cl-wep">' + e + '</span>'; }).join('');
         html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (R[0] + 1) + '/' + (R[1] + 2) + ';grid-column:' + (R[2] + 1) + '/' + (R[3] + 2) + ';background:' + ROOM_BG[k] + '"' +
           (reach ? ' onclick="tryMove(\'R' + k + '\')"' : '') + '>' +
+          '<div class="rdeco">' + ROOM_DECO[k] + '</div>' +
           '<div class="rname">' + CE.ROOMS[k] + '</div>' +
-          (CE.SECRET[k] != null ? '<div class="cl-secret">🚪→ ' + CE.ROOMS[CE.SECRET[k]] + '</div>' : '') +
+          (CE.SECRET[k] != null ? '<div class="cl-secret">🌀 passage → ' + CE.ROOMS[CE.SECRET[k]] + '</div>' : '') +
           '<div class="rtok">' + wk + tk + '</div></div>';
       }
-      // Piscine centrale « CLUEDO » : franchissable, c'est ici qu'on ACCUSE.
+      // Dalle centrale « CLUEDO » : franchissable, c'est ici qu'on ACCUSE.
       var CC = CE.CELLAR;
       var poolReach = canMove ? Object.keys(s.reach).filter(function (n) { return CE.isPoolNode(n); }) : [];
       var poolTok = '';
-      CE.poolCells().forEach(function (pc) { (toks[pc[0] + ',' + pc[1]] || []).forEach(function (e) { poolTok += '<span class="cl-tok">' + e + '</span>'; }); });
+      CE.poolCells().forEach(function (pc) { (toks[pc[0] + ',' + pc[1]] || []).forEach(function (p) { poolTok += tokHTML(p); }); });
       html += '<div class="cl-pool' + (poolReach.length ? ' reach' : '') + '" style="grid-row:' + (CC[0] + 1) + '/' + (CC[1] + 2) + ';grid-column:' + (CC[2] + 1) + '/' + (CC[3] + 2) + '"' +
-        (poolReach.length ? ' onclick="tryMove(\'' + poolReach[0] + '\')"' : '') + '><span class="cl-pool-logo">CLUEDO</span><div class="rtok">' + poolTok + '</div></div>';
-      // couloirs + portes (on saute les cases de la piscine, rendues par le bloc ci-dessus)
+        (poolReach.length ? ' onclick="tryMove(\'' + poolReach[0] + '\')"' : '') + '><span class="cl-pool-logo">CLUEDO</span><span class="cl-pool-sub">🔍 accuse ici</span><div class="rtok">' + poolTok + '</div></div>';
+      // couloirs + portes (on saute les cases de la dalle, rendues par le bloc ci-dessus)
       var doorSet = {}; for (var rk = 0; rk < 9; rk++) CE.doorLanes(rk).forEach(function (d) { doorSet[d[0] + ',' + d[1]] = true; });
       for (var r = 0; r < CE.GRID_H; r++) for (var c = 0; c < CE.GRID_W; c++) {
         if (!CE.isCorr(r, c) || CE.isPoolCell(r, c)) continue;
         var id = r + ',' + c;
         var reach2 = canMove && s.reach[id] != null;
-        var t2 = (toks[id] || []).map(function (e) { return '<span class="cl-tok">' + e + '</span>'; }).join('');
-        html += '<div class="cl-corr' + (doorSet[id] ? ' door' : '') + (reach2 ? ' reach' : '') + '" style="grid-row:' + (r + 1) + ';grid-column:' + (c + 1) + '"' +
+        var t2 = (toks[id] || []).map(tokHTML).join('');
+        html += '<div class="cl-corr' + ((r + c) % 2 ? ' alt' : '') + (doorSet[id] ? ' door' : '') + (reach2 ? ' reach' : '') + '" style="grid-row:' + (r + 1) + ';grid-column:' + (c + 1) + '"' +
           (reach2 ? ' onclick="tryMove(\'' + id + '\')"' : '') + '>' + t2 + '</div>';
       }
       document.getElementById('cl-board').innerHTML = html;
@@ -266,9 +285,9 @@
         ? '<button class="btn-primary btn-ghost" onclick="openAccuse()">🔍 Accuser</button>'
         : '';
       if (s.phase === 'roll') {
-        box.innerHTML = '<div class="cl-hint">À toi de jouer' + (inPool ? '' : ' · <span style="color:var(--ink-light)">accuse depuis la piscine 🎯 au centre</span>') + '</div><div class="cl-btn-row">' +
+        box.innerHTML = '<div class="cl-hint">À toi de jouer' + (inPool ? '' : ' · <span style="color:var(--ink-light)">accuse depuis la dalle CLUEDO au centre</span>') + '</div><div class="cl-btn-row">' +
           '<button class="btn-primary" onclick="act(\'roll\')">🎲 Lancer le dé</button>' +
-          (corner ? '<button class="btn-primary btn-ghost" onclick="act(\'secret\')">🚪 Passage secret</button>' : '') +
+          (corner ? '<button class="btn-primary btn-ghost" onclick="act(\'secret\')">🌀 Passage secret</button>' : '') +
           accuseBtn + '</div>';
       } else if (s.phase === 'move') {
         box.innerHTML = '<div class="cl-hint">Dé : ' + s.dice + ' — touche une case ou une pièce surlignée</div>' +
