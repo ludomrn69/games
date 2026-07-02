@@ -129,6 +129,17 @@ html[data-theme="dark"] .game-restart-btn {
 .lb-btn.small { width: auto; max-width: none; padding: 0.6rem 1.2rem; font-size: 0.92rem; }
 .lb-btn + .lb-btn { margin-top: 12px; }
 
+/* Pastille flottante de vitesse des ordis (en jeu, quand il y a des ordis). */
+.lb-botspeed {
+  position: fixed; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 1200;
+  display: none; align-items: center; gap: 6px;
+  padding: 7px 13px; border-radius: 30px; cursor: pointer;
+  border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink);
+  font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.8rem;
+  box-shadow: 0 3px 12px rgba(44,37,32,0.2);
+}
+.lb-botspeed:hover { border-color: var(--terracotta); }
+
 /* Pastilles « Défi du jour » : difficulté / série, bien lisibles sous le bouton. */
 .lb-daily-badge {
   display: inline-flex; align-items: center; gap: 5px;
