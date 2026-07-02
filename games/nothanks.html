@@ -126,7 +126,7 @@
       minPlayers: 2, maxPlayers: 7,
       rules: [
         'Prends la carte (+ ses jetons) ou paie 1 jeton pour la refuser',
-        'Sans jeton, tu dois prendre',
+        'Sans jeton, tu dois prendre (les jetons des autres sont cachés)',
         'Une suite ne compte que par sa plus petite carte · jeton = −1',
         'Le plus petit score gagne'
       ],
@@ -221,7 +221,7 @@
         var P = state.players[pid] || {};
         return '<div class="nt-pl' + (state.turn === pid ? ' turn' : '') + '"><div class="nt-pl-top">' +
           '<span class="nt-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '<span class="nt-pl-chips">🪙' + (P.chips || 0) + '</span></div>' +
+          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '<span class="nt-pl-chips">🪙' + (pid === me ? (P.chips || 0) : '?') + '</span></div>' +
           '<div class="nt-cards">' + (miniCards(P.cards) || '<span style="color:var(--ink-light);font-size:.66rem">—</span>') + '</div></div>';
       }).join(''));
       setText('nt-banner', state.banner || '');

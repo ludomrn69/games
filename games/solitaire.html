@@ -162,9 +162,19 @@
     function startTimer(state) { stopTimer(); function tick() { setText('so-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
     function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
 
-    function gOf(s, pid) { return (s.players[pid] && s.players[pid].g) || null; }
+    // Firebase RTDB supprime les tableaux vides (waste, familles, colonnes vides…) :
+    // on restaure la structure complète avant toute lecture/écriture.
+    function normG(g) {
+      if (!g) return g;
+      g.stock = g.stock || []; g.waste = g.waste || [];
+      g.f = g.f || {}; SUITS.forEach(function (s) { g.f[s] = g.f[s] || []; });
+      g.t = g.t || [];
+      for (var c = 0; c < 7; c++) { var col = g.t[c] = g.t[c] || {}; col.d = col.d || []; col.u = col.u || []; }
+      return g;
+    }
+    function gOf(s, pid) { var g = s.players[pid] && s.players[pid].g; return g ? normG(g) : null; }
     function doneOf(s, pid) { return s.players[pid] && s.players[pid].finishedAt != null; }
-    function foundCount(g) { if (!g) return 0; return g.f.S.length + g.f.H.length + g.f.D.length + g.f.C.length; }
+    function foundCount(g) { if (!g) return 0; normG(g); return g.f.S.length + g.f.H.length + g.f.D.length + g.f.C.length; }
     function won(g) { return foundCount(g) === 52; }
 
     // Peut-on poser `card` sur la famille (même couleur=même couleur n/a → même SUIT, +1) ?
@@ -180,6 +190,7 @@
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
         var g = cur.players[pid].g; if (!g) return cur;
+        normG(g);
         var changed = fn(g);
         if (!changed) return cur;
         cur.players[pid].g = g;

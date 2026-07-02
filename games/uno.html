@@ -95,6 +95,8 @@
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
     #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
     .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+    @keyframes cardFly { from { transform: translateY(44px) rotate(7deg) scale(1.18); opacity: 0; } to { opacity: 1; } }
+    .card-in { animation: cardFly 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
   </style>
 </head>
 <body>
@@ -392,7 +394,13 @@
 
       setText('uno-pile-count', (state.drawPile || []).length);
       var discardEl = document.getElementById('uno-discard'); discardEl.innerHTML = '';
-      if (top) discardEl.appendChild(buildCardEl(top, { lg: true }));
+      if (top) {
+        var el = buildCardEl(top, { lg: true });
+        var sig = JSON.stringify(top);
+        if (window._unoTopSig !== undefined && window._unoTopSig !== sig) el.classList.add('card-in'); // carte fraîchement posée
+        window._unoTopSig = sig;
+        discardEl.appendChild(el);
+      }
       document.getElementById('uno-current-color').className = 'uno-current-color' + (currentColor ? ' ' + currentColor : '');
       var drawEl = document.getElementById('uno-draw-pile');
       var canDraw = isMyTurn && !state.drewThisTurn;

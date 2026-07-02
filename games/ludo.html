@@ -172,7 +172,7 @@
     var GOAL = 56; // 0..50 piste, 51..56 ligne maison (56 = arrivée)
 
     /* ━━ State ━━ */
-    var prevStatus = null, boardBuilt = false, lastDieShown = null;
+    var prevStatus = null, boardBuilt = false, lastDieShown = null, _luPrev = {};
     function rref() { return window.roomRef; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
@@ -185,14 +185,40 @@
     // y a-t-il un coup légal pour `color` avec le dé `d` ?
     function hasLegal(cur, color, d) {
       var arr = (cur.tokens && cur.tokens[color]) || [];
-      for (var t = 0; t < arr.length; t++) { var p = arr[t]; if (p === -1) { if (d === 6) return true; } else if (p >= 0 && p < GOAL && p + d <= GOAL) return true; }
+      for (var t = 0; t < arr.length; t++) { if (legalTarget(cur, color, arr[t], d) != null) return true; }
       return false;
     }
-    // cible légale d'un pion donné (ou null)
+    // cible légale d'un pion donné (ou null), SANS tenir compte des barrages
     function targetOf(p, d) {
       if (p === -1) return d === 6 ? 0 : null;
       if (p >= 0 && p < GOAL && p + d <= GOAL) return p + d;
       return null;
+    }
+    // Occupants d'une case de la boucle : { couleur: nb de pions }
+    function loopOccupants(cur, li) {
+      var out = {};
+      Object.keys(cur.tokens || {}).forEach(function (oc) {
+        (cur.tokens[oc] || []).forEach(function (op) {
+          if (op >= 0 && op <= 50 && (COLOR_INFO[oc].start + op) % 52 === li) out[oc] = (out[oc] || 0) + 1;
+        });
+      });
+      return out;
+    }
+    // BARRAGE : 2 pions d'une même couleur sur une case — infranchissable pour tous.
+    function isBarrier(cur, li) {
+      var occ = loopOccupants(cur, li);
+      for (var c in occ) if (occ[c] >= 2) return true;
+      return false;
+    }
+    // Cible légale AVEC barrages : nul si un barrage est traversé ou atteint.
+    function legalTarget(cur, color, p, d) {
+      var t = targetOf(p, d);
+      if (t == null) return null;
+      var from = (p === -1) ? 0 : p + 1;
+      for (var q = from; q <= Math.min(t, 50); q++) {
+        if (isBarrier(cur, (COLOR_INFO[color].start + q) % 52)) return null;
+      }
+      return t;
     }
 
     /* ━━ Enregistrement du salon ━━ */
@@ -207,6 +233,7 @@
         'Il faut un 6 pour sortir un cheval de l\'écurie',
         'Avance tes 4 chevaux dans le sens horaire',
         'Tomber sur un adversaire le renvoie à l\'écurie (cases colorées = sûres)',
+        '2 pions d\'une même couleur = barrage : infranchissable pour tous',
         'Un 6 fait rejouer · ramène tes 4 chevaux au centre pour gagner'
       ],
       offline: { solo: true, local: true },
@@ -337,6 +364,23 @@
           el.textContent = '♞';
           if (movable) { el.dataset.color = color; el.dataset.tok = String(t); }
           cell.appendChild(el);
+          // Animation FLIP : le pion GLISSE depuis son ancienne case vers la nouvelle.
+          var key = color + '-' + t, prev = _luPrev[key];
+          if (prev && (prev[0] !== coord[0] || prev[1] !== coord[1])) {
+            var prevCell = document.getElementById('cell-' + prev[0] + '-' + prev[1]);
+            if (prevCell) {
+              var pa = prevCell.getBoundingClientRect(), pb = cell.getBoundingClientRect();
+              el.style.transition = 'none';
+              el.style.transform = 'translate(' + (pa.left - pb.left) + 'px,' + (pa.top - pb.top) + 'px) scale(1.25)';
+              el.style.zIndex = '5';
+              requestAnimationFrame(function () {
+                el.style.transition = 'transform 0.55s cubic-bezier(0.3, 1.1, 0.5, 1)';
+                el.style.transform = '';
+                setTimeout(function () { el.style.zIndex = ''; }, 600);
+              });
+            }
+          }
+          _luPrev[key] = coord;
         });
       });
 
@@ -370,7 +414,7 @@
     function legalMap(state, color, d) {
       var arr = (state.tokens && state.tokens[color]) || [];
       var m = {};
-      arr.forEach(function (p, t) { var tg = targetOf(p, d); if (tg != null) m[t] = tg; });
+      arr.forEach(function (p, t) { var tg = legalTarget(state, color, p, d); if (tg != null) m[t] = tg; });
       return m;
     }
 
@@ -402,7 +446,7 @@
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.die == null) return cur;
         if (cur.colorOf[window.myPid] !== color) return cur;
         var d = cur.die, arr = (cur.tokens[color] || []).slice(), p = arr[t];
-        var target = targetOf(p, d);
+        var target = legalTarget(cur, color, p, d);
         if (target == null) return cur;
         arr[t] = target; cur.tokens[color] = arr;
         // capture sur la piste (hors cases sûres)
@@ -439,7 +483,7 @@
         var arr = (cur.tokens[color] || []).slice();
         // choisir un pion jouable : priorité au plus avancé
         var bestT = -1, bestTarget = -1;
-        arr.forEach(function (p, i) { var tg = targetOf(p, d); if (tg != null && tg > bestTarget) { bestTarget = tg; bestT = i; } });
+        arr.forEach(function (p, i) { var tg = legalTarget(cur, color, p, d); if (tg != null && tg > bestTarget) { bestTarget = tg; bestT = i; } });
         if (bestT < 0) { cur.lastRoll = { pid: t, die: d, moved: false }; cur.die = null; cur.turn = nextPid(cur, t); return cur; }
         arr[bestT] = bestTarget; cur.tokens[color] = arr;
         if (bestTarget <= 50) {

@@ -77,6 +77,8 @@
     .pa-set-row { display: flex; gap: 8px; justify-content: center; }
     .pa-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
     .pa-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    @keyframes cardFly { from { transform: translateY(44px) rotate(7deg) scale(1.18); opacity: 0; } to { opacity: 1; } }
+    .card-in { animation: cardFly 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
   </style>
 </head>
 <body>
@@ -423,8 +425,11 @@
       } else {
         var trick = state.trick || [];
         var winNow = trick.length ? trickWinner(trick, state.ledSuit) : null;
-        setHTML('pa-trick', trick.length ? trick.map(function (t) {
-          return '<div class="pa-trick-card">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
+        var grew = window._paTrickLen !== undefined && trick.length > window._paTrickLen;
+        window._paTrickLen = trick.length;
+        setHTML('pa-trick', trick.length ? trick.map(function (t, i) {
+          var fresh = grew && i === trick.length - 1; // dernière carte posée sur le pli
+          return '<div class="pa-trick-card' + (fresh ? ' card-in' : '') + '">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
             '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
         }).join('') : '<span class="pa-trick-empty">— en attente —</span>');
       }

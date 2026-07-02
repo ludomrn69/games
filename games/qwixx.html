@@ -133,6 +133,9 @@
     function numAt(rowKey, idx) { var asc = rowKey === 'red' || rowKey === 'yellow'; return asc ? (2 + idx) : (12 - idx); }
     function idxOf(rowKey, num) { var asc = rowKey === 'red' || rowKey === 'yellow'; return asc ? (num - 2) : (12 - num); }
     function lastIdx(marks) { return (marks && marks.length) ? Math.max.apply(null, marks) : -1; }
+    // Firebase RTDB supprime les tableaux vides : au démarrage, players/<pid>/rows
+    // n'existe pas côté serveur. Toute lecture passe par ce helper.
+    function marksOf(P, rowKey) { return (P && P.rows && P.rows[rowKey]) || []; }
 
     var prevStatus = null;
 
@@ -177,15 +180,27 @@
 
     /* ━━ Règles de marquage ━━ */
     function canMark(cur, pid, rowKey, idx) {
-      if (idx < 0 || idx > 10 || cur.locks[rowKey]) return false;
-      var marks = cur.players[pid].rows[rowKey];
+      if (idx < 0 || idx > 10 || (cur.locks && cur.locks[rowKey])) return false;
+      var marks = marksOf(cur.players[pid], rowKey);
       if (idx <= lastIdx(marks)) return false;
       if (idx === 10 && marks.length < 5) return false; // dernière case : ≥ 5 croix requises
       return true;
     }
     function applyMark(cur, pid, rowKey, idx) {
-      cur.players[pid].rows[rowKey].push(idx);
-      if (idx === 10) cur.locks[rowKey] = true; // verrouille la ligne
+      var P = cur.players[pid];
+      P.rows = P.rows || {};
+      P.rows[rowKey] = marksOf(P, rowKey).concat([idx]);
+      if (idx === 10) {
+        // Fermeture SIMULTANÉE possible sur la même somme blanche (règle officielle) :
+        // pendant la phase blanche, le verrou n'est posé qu'à la fin de la phase.
+        if (cur.phase === 'white') { cur.pendingLocks = cur.pendingLocks || {}; cur.pendingLocks[rowKey] = true; }
+        else { cur.locks = cur.locks || {}; cur.locks[rowKey] = true; }
+      }
+    }
+    function mergeLocks(cur) {
+      var pl = cur.pendingLocks || {};
+      Object.keys(pl).forEach(function (k) { cur.locks = cur.locks || {}; cur.locks[k] = true; });
+      cur.pendingLocks = null;
     }
     function whiteSum(cur) { return cur.dice.w1 + cur.dice.w2; }
     function colorOptions(cur, pid) {
@@ -215,8 +230,8 @@
           if (me === cur.turn) cur.activeMarked = true;
         }
         cur.whiteDone = cur.whiteDone || {}; cur.whiteDone[me] = true;
-        // Tous ont statué → phase couleur (actif seulement).
-        if ((cur.order || []).every(function (p) { return cur.whiteDone[p]; })) { cur.phase = 'color'; }
+        // Tous ont statué → verrous différés posés, puis phase couleur (actif seulement).
+        if ((cur.order || []).every(function (p) { return cur.whiteDone[p]; })) { mergeLocks(cur); cur.phase = 'color'; }
         return cur;
       });
     }
@@ -240,7 +255,7 @@
       rollDice(cur); cur.phase = 'white'; cur.whiteDone = {}; cur.activeMarked = false;
     }
     function scoreRow(marks) { var c = marks.length + (marks.indexOf(10) >= 0 ? 1 : 0); return c * (c + 1) / 2; }
-    function scoreOf(P) { var s = 0; ['red', 'yellow', 'green', 'blue'].forEach(function (c) { s += scoreRow(P.rows[c]); }); return s - 5 * (P.penalties || 0); }
+    function scoreOf(P) { var s = 0; ['red', 'yellow', 'green', 'blue'].forEach(function (c) { s += scoreRow(marksOf(P, c)); }); return s - 5 * (P.penalties || 0); }
     function finalize(cur) {
       var order = cur.order || [], best = null;
       order.forEach(function (p) { var sc = scoreOf(cur.players[p]); cur.players[p].score = sc; if (best === null || sc > cur.players[best].score) best = p; });
@@ -256,11 +271,11 @@
         var sum = whiteSum(state), best = null, bestGap = 99;
         ['red', 'yellow', 'green', 'blue'].forEach(function (c) {
           var idx = idxOf(c, sum); if (!canMark(state, pid, c, idx)) return;
-          var gap = idx - lastIdx(state.players[pid].rows[c]) - 1;
+          var gap = idx - lastIdx(marksOf(state.players[pid], c)) - 1;
           if (gap < bestGap) { bestGap = gap; best = c; }
         });
         var mustAct = pid === state.turn; // l'actif préfère marquer pour éviter la pénalité (couleur possible ensuite)
-        if (best && (bestGap <= 2 || (mustAct && bestGap <= 4) || lastIdx(state.players[pid].rows[best]) >= 5)) markWhite(best);
+        if (best && (bestGap <= 2 || (mustAct && bestGap <= 4) || lastIdx(marksOf(state.players[pid], best)) >= 5)) markWhite(best);
         else markWhite(null);
         return;
       }
@@ -269,7 +284,7 @@
         // si l'actif n'a rien marqué en blanc, il DOIT tenter d'éviter la pénalité
         var need = !state.activeMarked;
         var pick = null, pg = 99;
-        opts.forEach(function (o) { var gap = o.idx - lastIdx(state.players[pid].rows[o.row]) - 1; if (gap < pg) { pg = gap; pick = o; } });
+        opts.forEach(function (o) { var gap = o.idx - lastIdx(marksOf(state.players[pid], o.row)) - 1; if (gap < pg) { pg = gap; pick = o; } });
         if (pick && (need || pg <= 2 || pick.idx >= 9)) markColor(pick.row, pick.idx);
         else markColor(null, null);
         return;
@@ -281,7 +296,10 @@
       var me = window.myPid, dice = state.dice || {};
       setText('qx-round-label', '🎲 Qwixx');
       setHTML('qx-dice', '<div class="qx-die w">' + (dice.w1 || '?') + '</div><div class="qx-die w">' + (dice.w2 || '?') + '</div>' +
-        ['red', 'yellow', 'green', 'blue'].map(function (c) { return '<div class="qx-die ' + c + '">' + (dice[c] || '?') + '</div>'; }).join(''));
+        ['red', 'yellow', 'green', 'blue'].map(function (c) {
+          var locked = state.locks && state.locks[c]; // ligne verrouillée = dé retiré du jeu
+          return '<div class="qx-die ' + c + '"' + (locked ? ' style="opacity:.25;filter:grayscale(1)" title="Dé retiré (ligne verrouillée)"' : '') + '>' + (locked ? '✕' : (dice[c] || '?')) + '</div>';
+        }).join(''));
       var wsum = (dice.w1 || 0) + (dice.w2 || 0);
 
       // autres joueurs
@@ -296,13 +314,13 @@
         : (state.turn === me ? 'À toi : coche une couleur ou passe' : 'Au tour de ' + Room.name(state.turn))));
 
       // mon plateau
-      var P = state.players[me] || { rows: { red: [], yellow: [], green: [], blue: [] }, penalties: 0 };
+      var P = state.players[me] || {};
       var myWhiteTurn = state.phase === 'white' && !(state.whiteDone && state.whiteDone[me]);
       var colorOpts = (state.phase === 'color' && state.turn === me) ? colorOptions(state, me) : [];
       function isColorPlayable(rowKey, idx) { return colorOpts.some(function (o) { return o.row === rowKey && o.idx === idx; }); }
 
       setHTML('qx-board', ROWS.map(function (r) {
-        var marks = P.rows[r.key], locked = state.locks && state.locks[r.key];
+        var marks = marksOf(P, r.key), locked = state.locks && state.locks[r.key];
         var cells = '';
         for (var idx = 0; idx <= 10; idx++) {
           var crossed = marks.indexOf(idx) >= 0;

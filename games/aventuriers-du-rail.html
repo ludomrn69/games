@@ -287,32 +287,58 @@
       renderActions(state);
     }
 
+    // Cases WAGON d'une route : `n` rectangles orientés le long du segment a→b
+    // (le look du vrai plateau). Une route réclamée = wagons pleins du joueur.
+    function slotRects(a, b, n, fill, stroke, claimed) {
+      var dx = b.x - a.x, dy = b.y - a.y, L = Math.sqrt(dx * dx + dy * dy);
+      var ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      var pad = 2.3, gap = 0.7, seg = (L - 2 * pad) / n, w = Math.max(1.6, seg - gap), h = 2.7, out = '';
+      for (var i = 0; i < n; i++) {
+        var t = pad + seg * (i + 0.5), cx = a.x + dx / L * t, cy = a.y + dy / L * t;
+        out += '<g transform="rotate(' + ang.toFixed(1) + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' +
+          '<rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy - h / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h + '" rx="0.6" fill="' + fill + '" stroke="' + stroke + '" stroke-width="0.35"/>' +
+          (claimed ? '<rect x="' + (cx - w / 2 + 0.5).toFixed(1) + '" y="' + (cy - 0.35).toFixed(1) + '" width="' + (w - 1).toFixed(1) + '" height="0.7" rx="0.3" fill="rgba(255,255,255,0.55)"/>' : '') +
+          '</g>';
+      }
+      return out;
+    }
+    // Silhouette stylisée de la France (coordonnées 0..100, mêmes repères que les villes).
+    var FRANCE_PATH = 'M50,3 L62,10 L71,14 L87,21 L89,32 L80,42 L82,55 L86,66 L77,77 L63,83 L52,81 L44,89 L29,85 L22,72 L14,54 L4,37 L2,27 L12,21 L24,25 L33,17 L42,10 Z';
     function renderMap(state) {
       var me = window.myPid, myTurn = state.turn === me && state.phase === 'play' && (state.players[me].drawn || 0) === 0;
-      var svg = '<svg class="tr-map" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">';
-      // routes
+      var svg = '<svg class="tr-map" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">' +
+        '<rect width="100" height="100" fill="#bcd9e2" rx="3"/>' +
+        '<path d="' + FRANCE_PATH + '" fill="#eee3c8" stroke="#b9a06f" stroke-width="0.8" stroke-linejoin="round"/>' +
+        '<path d="' + FRANCE_PATH + '" fill="none" stroke="#fff" stroke-width="0.35" opacity="0.6" transform="translate(0.4 0.5)"/>';
+      // routes en cases wagon
       A.ROUTES.forEach(function (r) {
         var a = cityById[r.a], b = cityById[r.b];
         var owner = state.claimed[r.id];
-        var col = owner ? Room.color(owner) : COLOR_HEX[r.color];
-        var w = owner ? 2.6 : 1.9;
-        var dash = (!owner && r.color === 'X') ? ' stroke-dasharray="2 1.4"' : '';
         var claimable = myTurn && !owner && A.canClaim(state, me, r.id);
-        svg += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="round"' + dash + (owner ? '' : ' opacity="0.85"') + '/>';
-        // longueur au milieu
+        var fill, stroke;
+        if (owner) { fill = Room.color(owner); stroke = '#2c2520'; }
+        else if (r.color === 'X') { fill = '#dcd3c2'; stroke = '#8a7d68'; }
+        else { fill = COLOR_HEX[r.color]; stroke = 'rgba(44,37,32,0.55)'; }
+        svg += slotRects(a, b, r.len, fill, stroke, !!owner);
+        // pastille de longueur, décalée perpendiculairement pour ne pas couvrir les wagons
         var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-        svg += '<circle cx="' + mx + '" cy="' + my + '" r="1.7" fill="#fff" stroke="' + col + '" stroke-width="0.4"/>';
-        svg += '<text x="' + mx + '" y="' + (my + 0.9) + '" font-size="2.2" text-anchor="middle" fill="#2c2520" font-weight="800">' + r.len + '</text>';
+        var dx = b.x - a.x, dy = b.y - a.y, L = Math.sqrt(dx * dx + dy * dy) || 1;
+        var ox = -dy / L * 2.6, oy = dx / L * 2.6;
+        if (!owner) {
+          svg += '<circle cx="' + (mx + ox).toFixed(1) + '" cy="' + (my + oy).toFixed(1) + '" r="1.6" fill="#fff" stroke="' + (r.color === 'X' ? '#8a7d68' : COLOR_HEX[r.color]) + '" stroke-width="0.4"/>' +
+            '<text x="' + (mx + ox).toFixed(1) + '" y="' + (my + oy + 0.9).toFixed(1) + '" font-size="2.2" text-anchor="middle" fill="#2c2520" font-weight="800">' + r.len + '</text>';
+        }
         // zone cliquable
-        svg += '<line class="tr-route-hit' + (claimable ? ' claimable' : '') + '" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke-width="4"' + (claimable ? ' onclick="tryClaim(\'' + r.id + '\')"' : '') + '>' +
+        svg += '<line class="tr-route-hit' + (claimable ? ' claimable' : '') + '" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke-width="4.5"' + (claimable ? ' onclick="tryClaim(\'' + r.id + '\')"' : '') + '>' +
           (claimable ? '<title>Réclamer ' + a.n + ' — ' + b.n + '</title>' : '') + '</line>';
-        if (claimable) svg += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#fff" stroke-width="0.5" stroke-dasharray="0.6 1.2" opacity="0.9" pointer-events="none"/>';
+        if (claimable) svg += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#fff" stroke-width="0.5" stroke-dasharray="0.6 1.2" opacity="0.95" pointer-events="none"/>';
       });
-      // villes
+      // villes : médaillon doré
       A.CITIES.forEach(function (c) {
-        svg += '<circle class="tr-city-dot" cx="' + c.x + '" cy="' + c.y + '" r="1.5"/>';
+        svg += '<circle cx="' + c.x + '" cy="' + c.y + '" r="1.9" fill="#f3d27a" stroke="#7a5a2a" stroke-width="0.5"/>' +
+          '<circle cx="' + c.x + '" cy="' + c.y + '" r="0.7" fill="#fff" opacity="0.85"/>';
         var anchor = c.x < 15 ? 'start' : c.x > 85 ? 'end' : 'middle';
-        svg += '<text class="tr-city-label" x="' + c.x + '" y="' + (c.y - 2.2) + '" font-size="2.5" text-anchor="' + anchor + '">' + escapeHtml(c.n) + '</text>';
+        svg += '<text class="tr-city-label" x="' + c.x + '" y="' + (c.y - 2.6) + '" font-size="2.5" text-anchor="' + anchor + '" style="paint-order:stroke;stroke:#f6efdd;stroke-width:0.8">' + escapeHtml(c.n) + '</text>';
       });
       svg += '</svg>';
       setHTML('tr-map-wrap', svg);
