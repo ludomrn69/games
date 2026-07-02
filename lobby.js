@@ -267,12 +267,20 @@
   // Encart « Défi du jour » (jeux de puzzle solo) — grille du jour + série.
   function dailyHomeHTML(c) {
     var t = window.Daily.today(), st = window.Daily.stateOf(c.gameKey);
-    var sub = st.doneToday
-      ? ('✅ Fait aujourd\'hui' + (st.best && window.Puzzle ? ' en ' + window.Puzzle.fmtTime(st.best) : ''))
-      : ('Difficulté du jour : ' + window.Daily.levelLabel());
-    var streak = st.streak > 0 ? ' · série ' + st.streak + ' 🔥' : '';
-    return '<button class="lb-btn" style="background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="Lobby.goDaily()">🗓️ Défi du jour — ' + esc(t.label) + '</button>' +
-      '<div style="margin:-6px 0 16px;font-size:0.82rem;color:var(--ink-light)">' + sub + streak + '</div>';
+    // Couleur de la pastille selon la difficulté du jour (repère visuel clair).
+    var lvl = window.Daily.level ? window.Daily.level() : 'normal';
+    var lvlColor = lvl === 'easy' ? 'var(--sage)' : lvl === 'hard' ? 'var(--terracotta)' : 'var(--gold)';
+    var badges;
+    if (st.doneToday) {
+      badges = '<span class="lb-daily-badge" style="background:var(--sage);color:#fff">✅ Fait aujourd\'hui' +
+        (st.best && window.Puzzle ? ' · ' + window.Puzzle.fmtTime(st.best) : '') + '</span>';
+    } else {
+      badges = '<span class="lb-daily-badge" style="background:' + lvlColor + ';color:#fff">' +
+        'Difficulté : ' + esc(window.Daily.levelLabel()) + '</span>';
+    }
+    if (st.streak > 0) badges += '<span class="lb-daily-badge" style="background:var(--white);color:var(--terracotta);border:1.5px solid var(--gold-light)">série ' + st.streak + ' 🔥</span>';
+    return '<button class="lb-btn" style="margin-bottom:10px;background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="Lobby.goDaily()">🗓️ Défi du jour — ' + esc(t.label) + '</button>' +
+      '<div class="lb-daily-badges" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:0 0 18px">' + badges + '</div>';
   }
 
   // ── Écran ACCUEIL d'un jeu ────────────────────────────────────────────────

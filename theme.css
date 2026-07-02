@@ -129,6 +129,14 @@ html[data-theme="dark"] .game-restart-btn {
 .lb-btn.small { width: auto; max-width: none; padding: 0.6rem 1.2rem; font-size: 0.92rem; }
 .lb-btn + .lb-btn { margin-top: 12px; }
 
+/* Pastilles « Défi du jour » : difficulté / série, bien lisibles sous le bouton. */
+.lb-daily-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 13px; border-radius: 30px;
+  font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 800;
+  letter-spacing: 0.01em; box-shadow: 0 2px 8px rgba(44,37,32,0.1);
+}
+
 .lb-link {
   background: none; border: none; cursor: pointer; margin-top: 16px;
   font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--ink-light);
