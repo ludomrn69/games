@@ -28,6 +28,7 @@
     .dm-cell.light { background: #ecd9b6; }
     .dm-cell.dark { background: #9c6b3f; cursor: pointer; }
     .dm-cell.sel { box-shadow: inset 0 0 0 4px var(--gold); }
+    .dm-cell.pathstep { box-shadow: inset 0 0 0 3px rgba(214,170,90,0.6); }
     .dm-cell.target::after { content: ''; position: absolute; width: 34%; height: 34%; border-radius: 50%; background: rgba(255,255,255,0.55); }
     .dm-cell.target:hover::after { background: rgba(255,255,255,0.8); }
     .dm-cell.lastfrom, .dm-cell.lastto { box-shadow: inset 0 0 0 3px rgba(214,170,90,0.85); }
@@ -120,8 +121,8 @@
     /* ━━ Dames (Checkers 8×8) — 2 joueurs, en ligne + hors-ligne. Moteur + IA dans
        dames-ai.js (prise obligatoire, rafles, dames, négamax α-β). ━━ */
     var prevStatus = null;
-    var selFrom = -1;        // case sélectionnée (départ d'un coup)
-    var selMoves = [];       // coups légaux depuis selFrom
+    var selPath = [];        // cases parcourues (selPath[0] = case de départ) — rafle pas à pas
+    var selMoves = [];       // coups légaux complets partant de selPath[0]
 
     function rref() { return window.roomRef; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
@@ -213,11 +214,11 @@
         }
         return cur;
       });
-      selFrom = -1; selMoves = [];
+      selPath = []; selMoves = [];
     }
 
     /* ━━ Rendu ━━ */
-    function startPlayingScreen(state) { selFrom = -1; selMoves = []; hideResult(); showScreen('s-playing'); renderPlaying(state); }
+    function startPlayingScreen(state) { selPath = []; selMoves = []; hideResult(); showScreen('s-playing'); renderPlaying(state); }
 
     function scoresHTML(state) {
       var b = state.board || window.DamesAI.startBoard(), ord = state.order || [];
@@ -238,6 +239,8 @@
       var me = sideOf(state, window.myPid);
       var myTurn = (state.turn === window.myPid) && !state.winner;
       var legal = myTurn ? AI.legalMoves(b, me) : [];
+      // Le 2e joueur (siège NOIR) voit le plateau retourné : ses pions face à lui.
+      var flip = (ord.indexOf(window.myPid) === 1);
       // Cases de départ jouables (pour le surlignage / la sélection).
       var fromSquares = {};
       legal.forEach(function (m) { fromSquares[m[0]] = true; });
@@ -249,28 +252,44 @@
         ti.innerHTML = '<span class="dm-turn-dot" style="background:' + seatColor(seat) + '"></span>' +
           (t === window.myPid ? 'À toi' : ('Au tour de ' + escapeHtml(Room.name(t))));
         var mustCapture = legal.length && legal[0].length > 2;
-        setText('dm-hint', myTurn ? (mustCapture ? 'Prise obligatoire — enchaîne les sauts !' : 'Touche un de tes pions, puis sa case d\'arrivée') : 'En attente de ' + Room.name(t) + '…');
+        var inRafle = selPath.length > 1;
+        setText('dm-hint', myTurn
+          ? (inRafle ? 'Continue la rafle — touche la case du saut suivant'
+             : (mustCapture ? 'Prise obligatoire — touche un pion puis chaque saut' : 'Touche un de tes pions, puis sa case d\'arrivée'))
+          : 'En attente de ' + Room.name(t) + '…');
       }
 
-      // Cases cibles si une pièce est sélectionnée.
-      var targets = {};
-      if (selFrom >= 0) selMoves.forEach(function (m) { targets[m[1]] = true; });
+      // Rafle en cours : on affiche le plateau APRÈS les sauts déjà joués (pions
+      // enjambés retirés, pièce sur sa position courante) → la logique de prise est
+      // visible pas à pas. Les cases cibles sont les sauts SUIVANTS possibles.
+      var dispBoard = b;
+      var selHead = selPath.length ? selPath[selPath.length - 1] : -1;
+      if (selPath.length > 1) { try { dispBoard = AI.applyMove(b, selPath, me); } catch (e) { dispBoard = b; } }
+      var targets = {}, pathSet = {};
+      selPath.forEach(function (s) { pathSet[s] = true; });
+      selMoves.forEach(function (m) {
+        var ok = true;
+        for (var k = 0; k < selPath.length; k++) { if (m[k] !== selPath[k]) { ok = false; break; } }
+        if (ok && m.length > selPath.length) targets[m[selPath.length]] = true;
+      });
 
       var board = document.getElementById('dm-board');
-      var html = '';
+      var cells = [];
       for (var i = 0; i < 64; i++) {
         var r = Math.floor(i / 8), col = i % 8, dark = (r + col) % 2 === 1;
         var cls = 'dm-cell ' + (dark ? 'dark' : 'light');
-        if (i === selFrom) cls += ' sel';
+        if (i === selHead) cls += ' sel';
+        else if (pathSet[i]) cls += ' pathstep';
         if (targets[i]) cls += ' target';
         if (i === state.lastFrom) cls += ' lastfrom';
         if (i === state.lastTo) cls += ' lastto';
-        var ch = b[i], piece = '';
+        var ch = dispBoard[i], piece = '';
         if (ch === 'w' || ch === 'W') piece = '<span class="dm-piece w">' + (ch === 'W' ? '<span class="crown">👑</span>' : '') + '</span>';
         else if (ch === 'b' || ch === 'B') piece = '<span class="dm-piece b">' + (ch === 'B' ? '<span class="crown">👑</span>' : '') + '</span>';
-        html += '<div class="' + cls + '" data-i="' + i + '">' + piece + '</div>';
+        cells.push('<div class="' + cls + '" data-i="' + i + '">' + piece + '</div>');
       }
-      board.innerHTML = html;
+      if (flip) cells.reverse();
+      board.innerHTML = cells.join('');
 
       if (state.winner) showResult(state); else hideResult();
     }
@@ -315,20 +334,29 @@
         var b = state.board || AI.startBoard();
         var legal = AI.legalMoves(b, me);
 
-        // Clic sur une case cible d'une pièce déjà sélectionnée → jouer.
-        if (selFrom >= 0) {
-          var chosen = selMoves.filter(function (m) { return m[1] === i; });
-          if (chosen.length) {
-            // S'il existe plusieurs coups vers cette case (rares), on prend la rafle la plus longue.
-            chosen.sort(function (a, z) { return z.length - a.length; });
-            commitMove(chosen[0]);
-            return;
+        // Rafle pas à pas : si une pièce est engagée, un clic sur la case du saut
+        // suivant AVANCE d'un cran. Quand plus aucune prise n'est possible depuis
+        // là (le coup est complet), on le joue.
+        if (selPath.length) {
+          var newPath = selPath.concat([i]);
+          var matches = selMoves.filter(function (m) {
+            if (m.length < newPath.length) return false;
+            for (var k = 0; k < newPath.length; k++) if (m[k] !== newPath[k]) return false;
+            return true;
+          });
+          if (matches.length) {
+            // Un coup se termine-t-il ici ? Y a-t-il une rafle plus longue (prise obligatoire) ?
+            var ends = matches.some(function (m) { return m.length === newPath.length; });
+            var longer = matches.some(function (m) { return m.length > newPath.length; });
+            if (ends && !longer) { commitMove(matches.sort(function (a, z) { return z.length - a.length; })[0]); return; }
+            // Sinon la rafle continue : on avance d'un cran et on ré-affiche.
+            selPath = newPath; selMoves = matches; renderPlaying(state); return;
           }
         }
         // Sinon : (re)sélectionner une pièce de départ jouable.
         var fromHere = legal.filter(function (m) { return m[0] === i; });
-        if (fromHere.length) { selFrom = i; selMoves = fromHere; renderPlaying(state); }
-        else { selFrom = -1; selMoves = []; renderPlaying(state); }
+        if (fromHere.length) { selPath = [i]; selMoves = fromHere; renderPlaying(state); }
+        else { selPath = []; selMoves = []; renderPlaying(state); }
       });
     })();
   </script>
