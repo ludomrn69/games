@@ -99,7 +99,7 @@
         <p><b>À plusieurs (2 équipes) :</b></p>
         <p>• Mêmes cartes sur 3 manches : 1) <b>décris librement</b>, 2) <b>un seul mot</b>, 3) <b>mime</b>.</p>
         <p style="margin-top:4px">• À ton tour, fais deviner un max de cartes à ton équipe avant la fin du chrono. ✅ trouvé / ⤳ passe.</p>
-        <p style="margin-top:8px"><b>En solo :</b> devine la célébrité à partir des indices avant la fin du temps. La difficulté règle le chrono et les indices.</p>
+        <p style="margin-top:8px">• Ce jeu se joue à <b>4 joueurs minimum</b> (2 équipes), en ligne ou à plusieurs sur le même appareil.</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
     </div>
@@ -142,15 +142,15 @@
       name: "Time's Up",
       emoji: '⏱️',
       tagline: 'Fais deviner contre la montre',
-      minPlayers: 1,
+      minPlayers: 4,
       maxPlayers: 12,
       rules: [
-        'À plusieurs : 2 équipes, 3 manches (libre / un mot / mime)',
-        'Fais deviner un max de cartes avant la fin du chrono',
-        'En solo : devine la célébrité à partir des indices',
+        '2 équipes, 3 manches (parle librement / un seul mot / mime)',
+        'Fais deviner un max de cartes à ton équipe avant la fin du chrono',
+        'Même paquet de cartes aux 3 manches — la mémoire aide !',
         'La difficulté règle le chrono et les indices'
       ],
-      offline: { solo: true, local: true, soloMinBots: 0 },
+      offline: { local: true },
       bot: function () {},
       offlineTurn: function (r) { return (r.status === 'ended' || r.solo) ? null : r.turn; },
       offlineEnter: function () { if (window.room) render(window.room); },
