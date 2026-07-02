@@ -129,7 +129,9 @@
       <div class="modal-title">Président</div>
       <div class="modal-body">
         <p>On distribue toutes les cartes. À ton tour, pose une <b>combinaison</b> : une carte seule, une paire, un brelan ou un carré.</p>
-        <p style="margin-top:8px">Il faut <b>autant de cartes</b> que la combinaison posée et une valeur <b>plus forte</b> — sinon tu <b>passes</b>. Ordre : 3 &lt; 4 &lt; … &lt; A &lt; <b>2</b> (la plus forte).</p>
+        <p style="margin-top:8px">Il faut <b>autant de cartes</b> que la combinaison posée et une valeur <b>égale ou plus forte</b> — sinon tu <b>passes</b>. Ordre : 3 &lt; 4 &lt; … &lt; A &lt; <b>2</b> (la plus forte).</p>
+        <p style="margin-top:8px">🔁 <b>Même hauteur</b> : poser exactement la <b>même valeur</b> que le pli fait <b>sauter le tour</b> du joueur suivant.</p>
+        <p style="margin-top:8px">💣 <b>Carré</b> : dès que <b>4 cartes de la même valeur</b> sont posées (d'un coup ou complétées au fil des poses), le pli est <b>coupé</b> : ramassé, et celui qui l'a complété relance.</p>
         <p style="margin-top:8px">Quand tout le monde passe, le dernier à avoir posé relance un nouveau pli. Le <b>premier à vider sa main</b> est Président 👑, le dernier est Trou du cul 💩.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
@@ -184,7 +186,8 @@
       maxPlayers: 8,
       rules: [
         'Pose une carte, une paire, un brelan ou un carré',
-        'Même nombre de cartes et valeur plus forte, sinon tu passes',
+        'Valeur égale ou plus forte, même nombre de cartes, sinon tu passes',
+        'Même hauteur = tu sautes le tour du suivant · carré (4) = pli coupé',
         'Ordre : 3 < 4 < … < As < 2 (la plus forte)',
         'Premier à vider sa main = Président 👑, dernier = Trou du cul 💩'
       ],
@@ -222,16 +225,31 @@
         for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
         var rk = rankOf(cards[0]);
         if (!cards.every(function (c) { return rankOf(c) === rk; })) return cur;
-        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) <= cur.pile.rank) return cur; }
-        cards.forEach(function (c) { hand.splice(hand.indexOf(c), 1); });
-        cur.players[pid].hand = hand;
-        cur.pile = { by: pid, rank: rankVal(cards[0]), count: cards.length, cards: cards };
-        cur.lastPlayer = pid;
-        cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards);
-        if (hand.length === 0) { cur.finishOrder = (cur.finishOrder || []).concat([pid]); cur.banner += ' et a fini !'; }
-        resolveAfterPlay(cur, pid);
+        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) < cur.pile.rank) return cur; }
+        var play = applyPlay(cur, pid, cards, hand);
+        resolveAfterPlay(cur, pid, play);
         return cur;
       });
+    }
+
+    // Pose des cartes (déjà validées) : retire de la main, met à jour le pli et
+    // renvoie les effets « même hauteur » (saut) et « carré » (coupe).
+    //  • total = nb cumulé de cartes de CETTE valeur posées d'affilée sur le pli ;
+    //  • jouer une valeur ÉGALE (« même niveau ») → saute le joueur suivant ;
+    //  • atteindre 4 cartes de la même valeur (carré) → coupe le pli.
+    function applyPlay(cur, pid, cards, hand) {
+      var newRank = rankVal(cards[0]);
+      var equal = !!(cur.pile && newRank === cur.pile.rank);
+      var prevTotal = (cur.pile && equal) ? (cur.pile.total || cur.pile.count) : 0;
+      var total = prevTotal + cards.length;
+      cards.forEach(function (c) { hand.splice(hand.indexOf(c), 1); });
+      cur.players[pid].hand = hand;
+      cur.pile = { by: pid, rank: newRank, count: cards.length, cards: cards, total: total };
+      cur.lastPlayer = pid;
+      cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards) + (equal ? ' (même hauteur)' : '');
+      if (hand.length === 0) { cur.finishOrder = (cur.finishOrder || []).concat([pid]); cur.banner += ' et a fini !'; }
+      var cut = total >= 4;
+      return { skip: equal && !cut, cut: cut };
     }
 
     function onStart(players, cur) {
@@ -354,7 +372,7 @@
       if (!cards.every(function (c) { return rankOf(c) === r; })) { lbToast('Sélectionne des cartes de même valeur'); return; }
       if (st.pile) {
         if (cards.length !== st.pile.count) { lbToast('Il faut ' + st.pile.count + ' carte(s)'); return; }
-        if (rankVal(cards[0]) <= st.pile.rank) { lbToast('Il faut une valeur plus forte'); return; }
+        if (rankVal(cards[0]) < st.pile.rank) { lbToast('Il faut une valeur égale ou plus forte'); return; }
       }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
@@ -362,15 +380,9 @@
         for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
         var rk = rankOf(cards[0]);
         if (!cards.every(function (c) { return rankOf(c) === rk; })) return cur;
-        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) <= cur.pile.rank) return cur; }
-        // retirer les cartes
-        cards.forEach(function (c) { hand.splice(hand.indexOf(c), 1); });
-        cur.players[window.myPid].hand = hand;
-        cur.pile = { by: window.myPid, rank: rankVal(cards[0]), count: cards.length, cards: cards };
-        cur.lastPlayer = window.myPid;
-        cur.banner = Room.name(window.myPid) + ' joue ' + comboLabel(cards);
-        if (hand.length === 0) { cur.finishOrder = (cur.finishOrder || []).concat([window.myPid]); cur.banner += ' et a fini !'; }
-        resolveAfterPlay(cur, window.myPid);
+        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) < cur.pile.rank) return cur; }
+        var play = applyPlay(cur, window.myPid, cards, hand);
+        resolveAfterPlay(cur, window.myPid, play);
         return cur;
       }, function (err, committed) { if (committed) selected = []; });
     }
@@ -414,7 +426,8 @@
       });
     }
 
-    function resolveAfterPlay(cur, pid) {
+    function resolveAfterPlay(cur, pid, opts) {
+      opts = opts || {};
       var order = cur.order || [];
       var active = order.filter(function (p) { return handArr(cur, p).length > 0; });
       if (active.length <= 1) {
@@ -422,7 +435,26 @@
         cur.status = 'ended'; cur.turn = null;
         return;
       }
+      // Carré (4 cartes de même valeur) → le pli est coupé : ramassé, celui qui a
+      // complété relance.
+      if (opts.cut) {
+        cur.pile = null; cur.passed = [];
+        cur.turn = handArr(cur, pid).length > 0 ? pid : nextActiveAfter(cur, pid);
+        if (cur.turn) cur.banner += ' — carré ! Pli coupé, ' + Room.name(cur.turn) + ' relance';
+        return;
+      }
       var nt = nextTurnAfter(cur, pid);
+      // « Ça saute » : une pose à la MÊME hauteur saute le joueur suivant.
+      if (opts.skip && nt !== null) {
+        var nt2 = nextTurnAfter(cur, nt);
+        if (nt2 === null || nt2 === pid) { // le saut revient à moi → je remporte et relance
+          cur.pile = null; cur.passed = [];
+          cur.turn = handArr(cur, pid).length > 0 ? pid : nextActiveAfter(cur, pid);
+          return;
+        }
+        cur.banner += ' — ' + Room.name(nt) + ' saute son tour';
+        nt = nt2;
+      }
       if (nt === null) { // tout le monde a passé/fini → je relance (ou la main passe si j'ai fini)
         cur.pile = null; cur.passed = [];
         cur.turn = handArr(cur, pid).length > 0 ? pid : nextActiveAfter(cur, pid);

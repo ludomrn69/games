@@ -328,7 +328,7 @@
       var pts = trickPoints(cur.trick, cur.papSuit);
       cur.totals = cur.totals || {};
       cur.totals[winner] = (cur.totals[winner] || 0) + pts;
-      cur.banner = Room.name(winner) + ' ramasse le pli' + (pts ? ' (+' + pts + ' pts 😬)' : ' (0 pt 😌)');
+      cur.banner = Room.name(winner) + ' ramasse le pli' + (pts ? ' (+' + pts + ' pts)' : ' (0 pt)');
       cur.lastTrick = cur.trick; cur.trick = []; cur.ledSuit = null; cur.turn = winner;
       // Fin de la donne ?
       var anyLeft = order.some(function (p) { return handOf(cur, p).length > 0; });
