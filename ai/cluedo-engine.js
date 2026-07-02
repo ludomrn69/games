@@ -29,23 +29,29 @@
   // est couloir. Les PORTES sont des cases couloir adjacentes par lesquelles on
   // entre/sort.
   var GRID_W = 20, GRID_H = 20;
+  // Comme sur le vrai plateau : les pièces se TOUCHENT (murs mitoyens) et la cour
+  // centrale de dalles dessert toutes les portes. La Cuisine descend jusqu'à la
+  // Salle à manger : elles communiquent directement (ouverture sans couloir).
   var ROOM_RECT = {
-    0: [0, 4, 0, 3],    // Chambre        (haut-gauche, passage secret → Salon)
-    1: [0, 4, 5, 8],    // Salle de bains (haut, centre-gauche)
-    2: [0, 4, 11, 14],  // Bureau         (haut, centre-droite)
-    3: [0, 4, 16, 19],  // Cuisine        (haut-droite, passage secret → Garage)
-    4: [7, 12, 0, 4],   // Salle de jeux  (milieu-gauche, billard)
-    5: [7, 12, 15, 19], // Salle à manger (milieu-droite)
-    6: [15, 19, 0, 4],  // Garage         (bas-gauche, passage secret → Cuisine)
-    7: [15, 19, 7, 12], // Entrée         (bas-centre : tout le monde part d'ici)
-    8: [15, 19, 15, 19] // Salon          (bas-droite, passage secret → Chambre)
+    0: [0, 4, 0, 4],    // Chambre        (haut-gauche, passage secret → Salon)
+    1: [0, 4, 5, 9],    // Salle de bains (mitoyenne de la Chambre)
+    2: [0, 4, 10, 13],  // Bureau         (mitoyen de la Salle de bains)
+    3: [0, 5, 15, 19],  // Cuisine        (haut-droite, touche la Salle à manger)
+    4: [6, 12, 0, 4],   // Salle de jeux  (gauche, billard)
+    5: [6, 12, 15, 19], // Salle à manger (droite, communique avec la Cuisine)
+    6: [14, 19, 0, 4],  // Garage         (bas-gauche, passage secret → Cuisine)
+    7: [14, 19, 7, 12], // Entrée         (bas-centre : tout le monde part d'ici)
+    8: [14, 19, 15, 19] // Salon          (bas-droite, passage secret → Chambre)
   };
   var CELLAR = [8, 11, 8, 11]; // dalle centrale « CLUEDO » (on y ACCUSE) — franchissable
   var DOORS = {
-    0: [[5, 2], [2, 4]], 1: [[5, 6], [2, 9]], 2: [[5, 13], [2, 10]], 3: [[5, 17], [2, 15]],
-    4: [[6, 2], [9, 5]], 5: [[6, 17], [9, 14]],
-    6: [[14, 2], [17, 5]], 7: [[14, 8], [14, 11], [17, 6], [17, 13]], 8: [[14, 17], [17, 14]]
+    0: [[5, 2]], 1: [[5, 7]], 2: [[5, 11], [2, 14]], 3: [[5, 14]],
+    4: [[5, 2], [8, 5]], 5: [[9, 14], [13, 17]],
+    6: [[13, 2], [17, 5]], 7: [[13, 8], [13, 11], [17, 6], [17, 13]], 8: [[13, 17], [17, 14]]
   };
+  // Ouvertures DIRECTES entre pièces mitoyennes (sans passer par un couloir) :
+  // la Cuisine et la Salle à manger communiquent, comme sur le plateau.
+  var ADJOIN = { 3: [5], 5: [3] };
   function inRect(r, c, R) { return r >= R[0] && r <= R[1] && c >= R[2] && c <= R[3]; }
   function roomOfCell(r, c) { for (var k = 0; k < 9; k++) { if (inRect(r, c, ROOM_RECT[k])) return k; } return -1; }
   // Le centre est la PISCINE (« Cluedo ») : case spéciale, FRANCHISSABLE, où l'on
@@ -69,6 +75,7 @@
     var out = [];
     if (isRoomNode(node)) {
       doorLanes(roomIdx(node)).forEach(function (d) { var id = d[0] + ',' + d[1]; if (!occ[id]) out.push({ node: id, terminal: false }); });
+      (ADJOIN[roomIdx(node)] || []).forEach(function (k) { out.push({ node: 'R' + k, terminal: true }); });
       return out;
     }
     var parts = node.split(','), r = +parts[0], c = +parts[1];
@@ -107,12 +114,18 @@
     deck.forEach(function (c, i) { hands[order[i % order.length]].push(c); });
     // Tous les pions démarrent dans l'ENTRÉE (comme sur le vrai plateau moderne).
     var pos = {}; order.forEach(function (p) { pos[p] = 'R' + START_ROOM; });
+    // Chaque joueur INCARNE un suspect (pion du plateau) : une suggestion qui le
+    // nomme le déplacera dans la pièce, comme dans le vrai jeu.
+    var suspectOf = {}; order.forEach(function (p, i) { suspectOf[p] = SUSPECTS[i % SUSPECTS.length]; });
+    // Les suspects non incarnés sont des pions neutres, posés dans l'Entrée.
+    var suspectPos = {}; SUSPECTS.forEach(function (sus) { suspectPos[sus] = START_ROOM; });
     // Les 6 armes sont réparties au hasard dans 6 pièces différentes au départ.
     var weaponPos = {}, roomsIdx = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8], rnd);
     WEAPONS.forEach(function (w, i) { weaponPos[w] = roomsIdx[i]; });
     var s = {
       order: order.slice(), turn: order[0], phase: 'roll',
       pos: pos, hands: hands, solution: sol, weaponPos: weaponPos,
+      suspectOf: suspectOf, suspectPos: suspectPos,
       dice: 0, reach: null, suggestion: null, eliminated: {},
       mem: {}, winner: null, log: [], turnCount: 0
     };
@@ -231,6 +244,12 @@
     var n = s.pos[s.turn]; if (!isRoomNode(n)) return false;
     var room = ROOMS[roomIdx(n)];
     movePawnTo(s, suspect, n);
+    // Le joueur qui INCARNE le suspect nommé est amené dans la pièce (vrai jeu).
+    if (s.suspectOf) {
+      s.order.forEach(function (p) {
+        if (s.suspectOf[p] === suspect && p !== s.turn) { s.pos[p] = n; log(s, nm(p) + ' (' + suspect + ') est amené·e : ' + room); }
+      });
+    }
     s.weaponPos = s.weaponPos || {}; s.weaponPos[arme] = roomIdx(n);
     var idx = s.order.indexOf(s.turn);
     var responders = []; for (var k = 1; k < s.order.length; k++) responders.push(s.order[(idx + k) % s.order.length]);
@@ -403,7 +422,7 @@
     catOf: catOf, cardsOfCat: cardsOfCat,
     isCorr: isCorr, doorLanes: doorLanes, roomCells: roomCells, roomOfCell: roomOfCell,
     isPoolCell: isPoolCell, isPoolNode: isPoolNode, poolCells: poolCells,
-    GRID_W: GRID_W, GRID_H: GRID_H, ROOM_RECT: ROOM_RECT, CELLAR: CELLAR, DOORS: DOORS,
+    GRID_W: GRID_W, GRID_H: GRID_H, ROOM_RECT: ROOM_RECT, CELLAR: CELLAR, DOORS: DOORS, ADJOIN: ADJOIN,
     isRoomNode: isRoomNode, roomIdx: roomIdx, reachable: reachable, neighbors: neighbors,
     initGame: initGame, roll: roll, moveTo: moveTo, useSecret: useSecret, stay: stay,
     suggest: suggest, disprove: disprove, botDisproveChoice: botDisproveChoice, accuse: accuse,

@@ -37,14 +37,17 @@
     .cl-pool .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 2px; }
     .cl-corr.reach { background: rgba(139,158,126,.75); cursor: pointer; box-shadow: inset 0 0 0 1px var(--sage); }
     .cl-corr.reach:hover { background: var(--sage); }
-    .cl-room { border-radius: 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3px 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; box-shadow: inset 0 0 0 2px rgba(43,34,26,0.5), inset 0 0 0 3px rgba(255,255,255,0.35), inset 0 2px 10px rgba(255,255,255,0.28); z-index: 1; }
-    .cl-room.reach { outline: 3px solid var(--sage); cursor: pointer; }
-    .cl-room .rdeco { font-size: clamp(15px, 4.6vw, 26px); line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
-    .cl-room .rname { line-height: 1.05; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(7.5px, 2vw, 11px); letter-spacing: 0.4px; text-transform: uppercase; background: rgba(255,252,245,0.72); border: 1px solid rgba(43,34,26,0.35); border-radius: 4px; padding: 1px 4px; margin-top: 2px; color: #2f2620; }
-    .cl-room .cl-secret { font-size: clamp(6.5px, 1.7vw, 9px); font-weight: 700; color: #6d4520; line-height: 1.1; margin-top: 2px; background: rgba(255,248,235,0.65); border-radius: 3px; padding: 0 3px; }
-    .cl-room .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 2px; }
-    .cl-wep { font-size: clamp(10px, 2.6vw, 14px); background: rgba(255,255,255,0.75); border: 1px solid rgba(43,34,26,0.3); border-radius: 5px; padding: 0 2px; line-height: 1.25; }
-    .cl-tok { width: clamp(14px, 3.6vw, 20px); height: clamp(14px, 3.6vw, 20px); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: clamp(9px, 2.4vw, 13px); border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.45); background: var(--gold); }
+    .cl-room { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; padding: 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; box-shadow: inset 0 0 0 3px #4a3b2c, inset 0 0 0 4px rgba(255,255,255,0.35); z-index: 1; }
+    .cl-room.reach { outline: 3px solid var(--sage); outline-offset: -3px; cursor: pointer; }
+    .cl-room .rsvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .cl-room .rname { position: relative; z-index: 2; line-height: 1.05; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(7px, 1.9vw, 10.5px); letter-spacing: 0.4px; text-transform: uppercase; background: rgba(30,24,18,0.78); border-radius: 3px; padding: 1px 5px; color: #f3e8d2; }
+    .cl-room .cl-secret { position: relative; z-index: 2; font-size: clamp(6.5px, 1.6vw, 8.5px); font-weight: 700; color: #ffe6b8; line-height: 1.1; margin: 1px 0 2px; background: rgba(30,24,18,0.6); border-radius: 3px; padding: 0 3px; }
+    .cl-room .rtok { position: absolute; top: 3px; left: 3px; right: 3px; z-index: 2; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1px; }
+    .cl-wep { font-size: clamp(10px, 2.6vw, 14px); background: rgba(255,255,255,0.85); border: 1px solid rgba(43,34,26,0.35); border-radius: 5px; padding: 0 2px; line-height: 1.25; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+    .cl-tok { width: clamp(14px, 3.6vw, 20px); height: clamp(14px, 3.6vw, 20px); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: clamp(9px, 2.4vw, 13px); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.45); background: var(--gold); }
+    .cl-sus { width: clamp(11px, 3vw, 16px); height: clamp(11px, 3vw, 16px); border-radius: 50% 50% 42% 42%; display: inline-flex; align-items: center; justify-content: center; font-size: clamp(7px, 1.9vw, 10px); font-weight: 900; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.5); border: 1.2px solid rgba(255,255,255,0.85); box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+    .cl-adjoin { z-index: 3; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .cl-adjoin i { display: block; width: 70%; height: 55%; background: linear-gradient(145deg, #e2c290, #b98a4e); border: 1.5px solid #4a3b2c; border-radius: 3px; }
 
     .cl-panel { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 10px; }
     .cl-action { background: var(--white); border: 1px solid var(--gold-light); border-radius: 16px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
@@ -70,14 +73,20 @@
     .cl-chip .dot { width: 11px; height: 11px; border-radius: 50%; }
     .modal-btns { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 
-    /* Carnet */
+    /* Carnet — petite feuille papier comme dans la boîte du jeu */
+    .cl-paper { background: #fdf9ec; border: 1px solid #d8c9a4; border-radius: 6px; padding: 10px 8px 8px; box-shadow: 0 2px 8px rgba(90,70,40,0.18), inset 0 0 0 1px rgba(255,255,255,0.6); background-image: repeating-linear-gradient(0deg, transparent, transparent 21px, rgba(180,150,100,0.16) 21px, rgba(180,150,100,0.16) 22px); }
+    .cl-paper-title { font-family: 'Caveat', cursive; font-size: 1.3rem; text-align: center; color: #7a5a3a; margin-bottom: 4px; }
     .cl-note { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
-    .cl-note th, .cl-note td { border: 1px solid var(--gold-light); padding: 2px 3px; text-align: center; }
-    .cl-note th.cat { background: var(--cream); text-align: left; font-weight: 700; }
-    .cl-note td.cardname { text-align: left; white-space: nowrap; }
-    .cl-note td.mark { cursor: pointer; font-weight: 800; min-width: 22px; }
-    .cl-note td.mark.no { color: var(--terracotta); }
-    .cl-note td.mark.yes { color: var(--sage); }
+    .cl-note th, .cl-note td { border: 1px solid #cdbb92; padding: 2px 3px; text-align: center; }
+    .cl-note th.cat { background: rgba(198,152,90,0.18); text-align: left; font-weight: 800; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: #7a5a3a; }
+    .cl-note td.cardname { text-align: left; white-space: nowrap; color: #3a2f28; }
+    .cl-note td.mark { cursor: pointer; font-weight: 800; min-width: 24px; font-family: 'Caveat', cursive; font-size: 1rem; line-height: 1; color: #b9a988; }
+    .cl-note td.mark.no { color: #b3402c; }
+    .cl-note td.mark.yes { color: #2c7a42; }
+    .cl-note td.mark.maybe { color: #c8811f; }
+    .cl-note .self { background: rgba(139,158,126,0.12); }
+    html[data-theme="dark"] .cl-paper { background: #efe6cf; }
+    .cl-legend { display: flex; gap: 10px; justify-content: center; font-size: 0.68rem; color: #7a5a3a; margin-top: 6px; flex-wrap: wrap; }
 
     .cl-ov { position: fixed; inset: 0; z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.7); backdrop-filter: blur(6px); }
     .cl-ov.active { display: flex; animation: fadeUp .3s ease both; }
@@ -149,20 +158,93 @@
     var escapeHtml = window.esc;
     var SUS_COLOR = { Moutarde: '#d8b13a', Rose: '#d65b9a', Violet: '#7e57c2', Leblanc: '#c9c4bd', Olive: '#5c9e5c', Pervenche: '#4f7fc0' };
     var WEP_EMOJI = { Poignard: '🗡️', Chandelier: '🕯️', Revolver: '🔫', Corde: '🪢', Clé: '🔧', Matraque: '🏏' };
-    // Sol + meuble de chaque pièce (index moteur) : Chambre, Salle de bains, Bureau,
-    // Cuisine, Salle de jeux, Salle à manger, Garage, Entrée, Salon.
-    var ROOM_BG = [
-      'linear-gradient(150deg,#ecdff0,#d9c6e2)',   // Chambre (parquet mauve)
-      'linear-gradient(150deg,#ddedf3,#bfdae5)',   // Salle de bains (carrelage bleu)
-      'linear-gradient(150deg,#dfe9d2,#c3d6ae)',   // Bureau (vert cabinet)
-      'linear-gradient(150deg,#e3eff0,#c4dcdf)',   // Cuisine (faïence)
-      'linear-gradient(150deg,#d9e6cf,#b7cfa6)',   // Salle de jeux (tapis billard)
-      'linear-gradient(150deg,#f2ddd4,#e0b9ab)',   // Salle à manger (rouge chaleureux)
-      'linear-gradient(150deg,#dcdcde,#bfc0c4)',   // Garage (béton)
-      'linear-gradient(150deg,#f0e6d0,#ddc9a4)',   // Entrée (marbre doré)
-      'linear-gradient(150deg,#eee0c4,#d9c298)'    // Salon (parquet miel)
+    /* ━━ Pièces illustrées (SVG vu de dessus, comme sur le vrai plateau) ━━ */
+    function svgWrap(inner) { return '<svg class="rsvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + inner + '</svg>'; }
+    function parquet(base, line) { var s = '<rect width="100" height="100" fill="' + base + '"/>'; for (var y = 12; y < 100; y += 12) s += '<line x1="0" y1="' + y + '" x2="100" y2="' + y + '" stroke="' + line + '" stroke-width="1"/>'; return s; }
+    function tiles(base, line) { var s = '<rect width="100" height="100" fill="' + base + '"/>'; for (var t = 20; t < 100; t += 20) s += '<line x1="0" y1="' + t + '" x2="100" y2="' + t + '" stroke="' + line + '" stroke-width="1"/><line x1="' + t + '" y1="0" x2="' + t + '" y2="100" stroke="' + line + '" stroke-width="1"/>'; return s; }
+    function checker(base, dark) { var s = '<rect width="100" height="100" fill="' + base + '"/>'; for (var r = 0; r < 7; r++) for (var c = 0; c < 7; c++) if ((r + c) % 2) s += '<rect x="' + (c * 14.3) + '" y="' + (r * 14.3) + '" width="14.3" height="14.3" fill="' + dark + '"/>'; return s; }
+    var ROOM_SVG = [
+      // 0 Chambre : lit double, tapis, table de nuit, armoire
+      svgWrap(parquet('#e9dff0', '#d6c6e2') +
+        '<ellipse cx="38" cy="76" rx="22" ry="11" fill="#cbb3da" opacity="0.8"/>' +
+        '<rect x="8" y="6" width="40" height="7" rx="2" fill="#6d4e30"/>' +
+        '<rect x="10" y="12" width="36" height="50" rx="3" fill="#faf6ff" stroke="#c9b8d8"/>' +
+        '<rect x="10" y="34" width="36" height="28" rx="3" fill="#a97fc4"/><line x1="10" y1="40" x2="46" y2="40" stroke="#8f63ac" stroke-width="1.5"/>' +
+        '<rect x="13" y="15" width="14" height="10" rx="2" fill="#efe6f7" stroke="#cbb8dc"/><rect x="29" y="15" width="14" height="10" rx="2" fill="#efe6f7" stroke="#cbb8dc"/>' +
+        '<rect x="54" y="7" width="12" height="11" rx="1.5" fill="#8a6a48"/><circle cx="60" cy="12" r="3.4" fill="#ffd97a" stroke="#c79b3a"/>' +
+        '<rect x="74" y="6" width="20" height="38" rx="2" fill="#8a6a48" stroke="#6d4e30"/><line x1="84" y1="8" x2="84" y2="42" stroke="#6d4e30" stroke-width="1.4"/>' +
+        '<rect x="72" y="62" width="22" height="26" rx="2" fill="#b39bc8" opacity="0.5"/>'),
+      // 1 Salle de bains : baignoire, tapis de bain, lavabo, WC
+      svgWrap(tiles('#e3f0f5', '#c4dde8') +
+        '<rect x="6" y="8" width="58" height="28" rx="14" fill="#f6fafc" stroke="#94b4c2" stroke-width="2"/>' +
+        '<rect x="11" y="13" width="48" height="18" rx="9" fill="#cfe8f2"/>' +
+        '<circle cx="59" cy="17" r="2.2" fill="#8aa8b5"/><circle cx="59" cy="27" r="2.2" fill="#8aa8b5"/>' +
+        '<rect x="12" y="44" width="30" height="11" rx="3" fill="#a8cdda"/>' +
+        '<rect x="72" y="6" width="21" height="15" rx="3" fill="#f6fafc" stroke="#94b4c2"/><ellipse cx="82.5" cy="13.5" rx="6.5" ry="4.5" fill="#cfe8f2"/>' +
+        '<rect x="76" y="32" width="14" height="7" fill="#f6fafc" stroke="#94b4c2"/><ellipse cx="83" cy="47" rx="7.5" ry="8.5" fill="#f6fafc" stroke="#94b4c2"/><ellipse cx="83" cy="46" rx="4.5" ry="5.5" fill="#dcecf3"/>' +
+        '<rect x="8" y="66" width="16" height="26" rx="2" fill="#e8f2f6" stroke="#b7d2dd"/><line x1="10" y1="72" x2="22" y2="72" stroke="#94b4c2"/><line x1="10" y1="80" x2="22" y2="80" stroke="#94b4c2"/>'),
+      // 2 Bureau : bureau + ordinateur, fauteuil, bibliothèque, plante
+      svgWrap(parquet('#e7ecdb', '#d2ddbc') +
+        '<rect x="6" y="5" width="64" height="13" rx="1.5" fill="#6d4e30"/>' +
+        '<rect x="9" y="7" width="5" height="9" fill="#b8524e"/><rect x="15" y="7" width="5" height="9" fill="#4f7fc0"/><rect x="21" y="7" width="5" height="9" fill="#d8b13a"/><rect x="27" y="7" width="5" height="9" fill="#5c9e5c"/><rect x="33" y="7" width="5" height="9" fill="#7e57c2"/><rect x="39" y="7" width="5" height="9" fill="#c96f4a"/><rect x="45" y="7" width="5" height="9" fill="#4a8f8a"/><rect x="51" y="7" width="5" height="9" fill="#9a5a78"/><rect x="57" y="7" width="5" height="9" fill="#b0813f"/><rect x="63" y="7" width="4" height="9" fill="#6a7a4a"/>' +
+        '<rect x="16" y="38" width="48" height="20" rx="2" fill="#8a6a48" stroke="#6d4e30"/>' +
+        '<rect x="28" y="41" width="16" height="11" rx="1" fill="#2c3038"/><rect x="33" y="52" width="6" height="3" fill="#4a4f58"/>' +
+        '<rect x="48" y="42" width="10" height="7" fill="#f6f2e8" stroke="#c9bfa8"/>' +
+        '<circle cx="38" cy="70" r="8.5" fill="#4a4f58"/><rect x="30" y="76" width="16" height="4" rx="2" fill="#33373e"/>' +
+        '<circle cx="85" cy="82" r="8" fill="#5c9e5c"/><circle cx="80" cy="76" r="5" fill="#6fae6f"/><circle cx="90" cy="76" r="5" fill="#6fae6f"/><rect x="80" y="88" width="10" height="7" rx="1.5" fill="#a9746a"/>' +
+        '<rect x="76" y="28" width="18" height="30" rx="2" fill="#c9d8b0" opacity="0.55"/>'),
+      // 3 Cuisine : plan de travail, évier, plaques, frigo, îlot
+      svgWrap(checker('#f0f3f4', '#d5e0e3') +
+        '<rect x="4" y="4" width="92" height="14" rx="2" fill="#cfd6da" stroke="#a5aeb4"/>' +
+        '<rect x="14" y="6.5" width="20" height="9" rx="1.5" fill="#33373e"/><circle cx="19" cy="9" r="1.8" fill="#5a6068"/><circle cx="29" cy="9" r="1.8" fill="#5a6068"/><circle cx="19" cy="13" r="1.8" fill="#5a6068"/><circle cx="29" cy="13" r="1.8" fill="#5a6068"/>' +
+        '<rect x="56" y="6.5" width="22" height="9" rx="2" fill="#aab8bf"/><rect x="59" y="8" width="7.5" height="6" rx="1" fill="#e7eef1"/><rect x="68.5" y="8" width="7.5" height="6" rx="1" fill="#e7eef1"/><rect x="65" y="4.5" width="2.4" height="4" fill="#7f8d94"/>' +
+        '<rect x="82" y="22" width="14" height="28" rx="2" fill="#e3e9ec" stroke="#a5aeb4"/><line x1="83.5" y1="34" x2="94.5" y2="34" stroke="#a5aeb4"/><line x1="85" y1="26" x2="85" y2="31" stroke="#7f8d94" stroke-width="1.6"/>' +
+        '<rect x="26" y="46" width="46" height="22" rx="3" fill="#b78a5a" stroke="#8a6a48"/><rect x="30" y="50" width="12" height="6" rx="1" fill="#e8d9c2"/><circle cx="60" cy="57" r="4" fill="#e8d9c2"/>' +
+        '<circle cx="20" cy="80" r="5" fill="#8a6a48"/><circle cx="50" cy="84" r="5" fill="#8a6a48"/><circle cx="78" cy="80" r="5" fill="#8a6a48"/>'),
+      // 4 Salle de jeux : billard, boules, cible de fléchettes, tabourets
+      svgWrap(parquet('#e6dcc8', '#d4c6a8') +
+        '<rect x="12" y="18" width="76" height="50" rx="6" fill="#6d4e30"/>' +
+        '<rect x="18" y="24" width="64" height="38" rx="3" fill="#3f7d4e"/>' +
+        '<circle cx="20" cy="26" r="2.6" fill="#1c1712"/><circle cx="80" cy="26" r="2.6" fill="#1c1712"/><circle cx="20" cy="60" r="2.6" fill="#1c1712"/><circle cx="80" cy="60" r="2.6" fill="#1c1712"/><circle cx="50" cy="25" r="2.6" fill="#1c1712"/><circle cx="50" cy="61" r="2.6" fill="#1c1712"/>' +
+        '<circle cx="36" cy="42" r="3" fill="#fff"/><circle cx="58" cy="38" r="3" fill="#d8b13a"/><circle cx="63" cy="44" r="3" fill="#b8524e"/><circle cx="57" cy="49" r="3" fill="#4f7fc0"/><circle cx="64" cy="52" r="3" fill="#33373e"/>' +
+        '<line x1="16" y1="76" x2="70" y2="70" stroke="#8a6a48" stroke-width="2.6" stroke-linecap="round"/><line x1="16" y1="76" x2="26" y2="74.8" stroke="#5a4030" stroke-width="2.8" stroke-linecap="round"/>' +
+        '<circle cx="88" cy="8.5" r="6.5" fill="#f3e8d2" stroke="#8a3e2d"/><circle cx="88" cy="8.5" r="4.2" fill="#b8524e"/><circle cx="88" cy="8.5" r="2" fill="#f3e8d2"/><circle cx="88" cy="8.5" r="0.9" fill="#8a3e2d"/>' +
+        '<circle cx="12" cy="88" r="5" fill="#8a6a48"/><circle cx="88" cy="88" r="5" fill="#8a6a48"/>'),
+      // 5 Salle à manger : grand tapis, table, 6 chaises, assiettes
+      svgWrap(parquet('#efe4da', '#e0cfc2') +
+        '<rect x="8" y="8" width="84" height="84" rx="4" fill="#b8524e"/><rect x="12" y="12" width="76" height="76" rx="3" fill="#c96b60" stroke="#9c403c"/>' +
+        '<rect x="24" y="6" width="14" height="10" rx="2" fill="#5a4030"/><rect x="62" y="6" width="14" height="10" rx="2" fill="#5a4030"/>' +
+        '<rect x="24" y="84" width="14" height="10" rx="2" fill="#5a4030"/><rect x="62" y="84" width="14" height="10" rx="2" fill="#5a4030"/>' +
+        '<rect x="6" y="42" width="10" height="14" rx="2" fill="#5a4030"/><rect x="84" y="42" width="10" height="14" rx="2" fill="#5a4030"/>' +
+        '<rect x="22" y="20" width="56" height="60" rx="4" fill="#7a5a3a" stroke="#5a4030"/><rect x="46" y="22" width="8" height="56" fill="#8f6d48"/>' +
+        '<circle cx="34" cy="32" r="5" fill="#f6f2e8"/><circle cx="66" cy="32" r="5" fill="#f6f2e8"/><circle cx="34" cy="50" r="5" fill="#f6f2e8"/><circle cx="66" cy="50" r="5" fill="#f6f2e8"/><circle cx="34" cy="68" r="5" fill="#f6f2e8"/><circle cx="66" cy="68" r="5" fill="#f6f2e8"/>' +
+        '<circle cx="50" cy="50" r="4" fill="#d8b13a"/>'),
+      // 6 Garage : deux voitures, mur à outils, traces
+      svgWrap('<rect width="100" height="100" fill="#d9dbde"/><line x1="0" y1="30" x2="100" y2="30" stroke="#c3c6cb"/><line x1="0" y1="65" x2="100" y2="65" stroke="#c3c6cb"/>' +
+        '<ellipse cx="70" cy="88" rx="12" ry="4" fill="#b9bcc2"/>' +
+        '<rect x="4" y="4" width="56" height="9" rx="1.5" fill="#8a8f96"/><rect x="8" y="6" width="3" height="5" fill="#4a4f58"/><rect x="16" y="6" width="6" height="3" fill="#4a4f58"/><rect x="27" y="6" width="3" height="5" fill="#b8524e"/><rect x="36" y="6" width="7" height="3.4" fill="#4a4f58"/><rect x="49" y="6" width="4" height="5" fill="#c79b3a"/>' +
+        '<rect x="10" y="26" width="28" height="60" rx="9" fill="#c0392b"/><rect x="13" y="38" width="22" height="14" rx="3" fill="#aebfc9"/><rect x="13" y="66" width="22" height="10" rx="3" fill="#aebfc9"/><rect x="14" y="54" width="20" height="11" rx="2" fill="#a93226"/>' +
+        '<rect x="7" y="32" width="4" height="9" rx="1.6" fill="#2c2f33"/><rect x="37" y="32" width="4" height="9" rx="1.6" fill="#2c2f33"/><rect x="7" y="70" width="4" height="9" rx="1.6" fill="#2c2f33"/><rect x="37" y="70" width="4" height="9" rx="1.6" fill="#2c2f33"/>' +
+        '<rect x="58" y="30" width="26" height="54" rx="8" fill="#34495e"/><rect x="61" y="41" width="20" height="12" rx="3" fill="#aebfc9"/><rect x="61" y="66" width="20" height="9" rx="3" fill="#aebfc9"/><rect x="62" y="55" width="18" height="10" rx="2" fill="#2c3e50"/>' +
+        '<rect x="55" y="36" width="4" height="8" rx="1.6" fill="#1e2226"/><rect x="83" y="36" width="4" height="8" rx="1.6" fill="#1e2226"/><rect x="55" y="68" width="4" height="8" rx="1.6" fill="#1e2226"/><rect x="83" y="68" width="4" height="8" rx="1.6" fill="#1e2226"/>'),
+      // 7 Entrée : marbre, tapis rouge, colonnes, escalier du perron
+      svgWrap('<rect width="100" height="100" fill="#f0e6d0"/><line x1="0" y1="25" x2="100" y2="25" stroke="#e0d2b4"/><line x1="0" y1="50" x2="100" y2="50" stroke="#e0d2b4"/><line x1="0" y1="75" x2="100" y2="75" stroke="#e0d2b4"/><line x1="33" y1="0" x2="33" y2="100" stroke="#e0d2b4"/><line x1="66" y1="0" x2="66" y2="100" stroke="#e0d2b4"/>' +
+        '<rect x="38" y="0" width="24" height="100" fill="#b8524e"/><rect x="41" y="0" width="18" height="100" fill="#c96b60"/><line x1="38" y1="0" x2="38" y2="100" stroke="#d8b13a" stroke-width="1.6"/><line x1="62" y1="0" x2="62" y2="100" stroke="#d8b13a" stroke-width="1.6"/>' +
+        '<rect x="30" y="78" width="40" height="6" fill="#e3d5b8" stroke="#c6b088"/><rect x="27" y="84" width="46" height="6" fill="#d9c9a8" stroke="#c6b088"/><rect x="24" y="90" width="52" height="7" fill="#cfbd98" stroke="#c6b088"/>' +
+        '<circle cx="14" cy="82" r="6" fill="#e8dcc0" stroke="#b9a988" stroke-width="2"/><circle cx="14" cy="82" r="2.4" fill="#cbb790"/>' +
+        '<circle cx="86" cy="82" r="6" fill="#e8dcc0" stroke="#b9a988" stroke-width="2"/><circle cx="86" cy="82" r="2.4" fill="#cbb790"/>' +
+        '<circle cx="14" cy="62" r="4.5" fill="#5c9e5c"/><rect x="10.5" y="66" width="7" height="5" rx="1" fill="#a9746a"/>' +
+        '<circle cx="86" cy="62" r="4.5" fill="#5c9e5c"/><rect x="82.5" y="66" width="7" height="5" rx="1" fill="#a9746a"/>' +
+        '<circle cx="50" cy="30" r="5" fill="#ffd97a" stroke="#c79b3a"/><line x1="50" y1="22" x2="50" y2="25" stroke="#c79b3a" stroke-width="1.6"/>'),
+      // 8 Salon : canapés, table basse, cheminée, tapis
+      svgWrap(parquet('#ead9bd', '#dbc7a2') +
+        '<rect x="14" y="24" width="72" height="52" rx="6" fill="#cfa96c"/><rect x="18" y="28" width="64" height="44" rx="4" fill="#deba82" stroke="#b08c50"/>' +
+        '<rect x="18" y="8" width="58" height="15" rx="4" fill="#7d8188"/><line x1="37" y1="9.5" x2="37" y2="21.5" stroke="#5f636a" stroke-width="1.6"/><line x1="56" y1="9.5" x2="56" y2="21.5" stroke="#5f636a" stroke-width="1.6"/><rect x="18" y="8" width="58" height="4.5" rx="2" fill="#6a6e75"/>' +
+        '<rect x="80" y="30" width="15" height="38" rx="4" fill="#7d8188"/><line x1="81.5" y1="49" x2="93.5" y2="49" stroke="#5f636a" stroke-width="1.6"/><rect x="90.5" y="30" width="4.5" height="38" rx="2" fill="#6a6e75"/>' +
+        '<rect x="36" y="42" width="26" height="16" rx="3" fill="#6d4e30" stroke="#5a4030"/><rect x="41" y="46" width="9" height="5" rx="1" fill="#e8d9c2"/>' +
+        '<rect x="26" y="84" width="48" height="11" rx="2" fill="#4a423a"/><rect x="38" y="86.5" width="24" height="6" rx="1" fill="#e07b29"/><circle cx="46" cy="89.5" r="1.6" fill="#ffd97a"/><circle cx="54" cy="89.5" r="1.6" fill="#ffd97a"/>' +
+        '<circle cx="10" cy="10" r="5" fill="#5c9e5c"/><rect x="6.5" y="14.5" width="7" height="5" rx="1" fill="#a9746a"/>')
     ];
-    var ROOM_DECO = ['🛏️', '🛁', '📚', '🍳', '🎱', '🍽️', '🚗', '🏛️', '🛋️'];
     CE.setNameFn(function (pid) { return (window.Room && Room.name) ? Room.name(pid) : pid; });
 
     function rref() { return window.roomRef; }
@@ -209,26 +291,38 @@
       }
     }
 
-    function tokHTML(pid) { return '<span class="cl-tok" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>'; }
+    function tokHTML(pid) {
+      var sus = (window.room && window.room.suspectOf && window.room.suspectOf[pid]) || null;
+      var ring = sus ? SUS_COLOR[sus] : '#fff';
+      return '<span class="cl-tok" style="background:' + Room.color(pid) + ';border-color:' + ring + '" title="' + escapeHtml(Room.name(pid)) + (sus ? ' · ' + sus : '') + '">' + Room.emoji(pid) + '</span>';
+    }
     function renderBoard(s) {
       var me = window.myPid;
       var canMove = (s.phase === 'move' && s.turn === me && s.reach);
       var toks = {}; s.order.forEach(function (p) { var n = s.pos[p]; (toks[n] = toks[n] || []).push(p); });
       var wtoks = {}; var wp = s.weaponPos || {}; Object.keys(wp).forEach(function (w) { (wtoks[wp[w]] = wtoks[wp[w]] || []).push(WEP_EMOJI[w] || '🔪'); });
+      // pions des suspects NON incarnés par un joueur (déplacés par les suggestions)
+      var stoks = {}; var incarnated = {}; var so = s.suspectOf || {};
+      Object.keys(so).forEach(function (p) { incarnated[so[p]] = true; });
+      var sp = s.suspectPos || {};
+      CE.SUSPECTS.forEach(function (sus) { if (!incarnated[sus] && sp[sus] != null) (stoks[sp[sus]] = stoks[sp[sus]] || []).push(sus); });
       var html = '';
-      // pièces (rectangles fidèles au plateau)
+      // pièces (rectangles fidèles au plateau, illustrées)
       for (var k = 0; k < 9; k++) {
         var R = CE.ROOM_RECT[k];
         var reach = canMove && s.reach['R' + k] != null;
         var tk = (toks['R' + k] || []).map(tokHTML).join('');
+        var sk = (stoks[k] || []).map(function (sus) { return '<span class="cl-sus" style="background:' + SUS_COLOR[sus] + '" title="' + sus + '">' + sus[0] + '</span>'; }).join('');
         var wk = (wtoks[k] || []).map(function (e) { return '<span class="cl-wep">' + e + '</span>'; }).join('');
-        html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (R[0] + 1) + '/' + (R[1] + 2) + ';grid-column:' + (R[2] + 1) + '/' + (R[3] + 2) + ';background:' + ROOM_BG[k] + '"' +
+        html += '<div class="cl-room' + (reach ? ' reach' : '') + '" style="grid-row:' + (R[0] + 1) + '/' + (R[1] + 2) + ';grid-column:' + (R[2] + 1) + '/' + (R[3] + 2) + '"' +
           (reach ? ' onclick="tryMove(\'R' + k + '\')"' : '') + '>' +
-          '<div class="rdeco">' + ROOM_DECO[k] + '</div>' +
-          '<div class="rname">' + CE.ROOMS[k] + '</div>' +
+          ROOM_SVG[k] +
+          '<div class="rtok">' + wk + sk + tk + '</div>' +
           (CE.SECRET[k] != null ? '<div class="cl-secret">🌀 passage → ' + CE.ROOMS[CE.SECRET[k]] + '</div>' : '') +
-          '<div class="rtok">' + wk + tk + '</div></div>';
+          '<div class="rname">' + CE.ROOMS[k] + '</div></div>';
       }
+      // Ouverture directe Cuisine ↔ Salle à manger (mur mitoyen percé, ligne rows 5|6)
+      html += '<div class="cl-adjoin" style="grid-row:6/8;grid-column:16/18"><i></i></div>';
       // Dalle centrale « CLUEDO » : franchissable, c'est ici qu'on ACCUSE.
       var CC = CE.CELLAR;
       var poolReach = canMove ? Object.keys(s.reach).filter(function (n) { return CE.isPoolNode(n); }) : [];
@@ -260,7 +354,10 @@
 
     function renderHand(s) {
       var me = window.myPid, hand = (s.hands && s.hands[me]) || [];
-      document.getElementById('cl-hand').innerHTML = '<span style="font-size:.78rem;color:var(--ink-light);align-self:center">Tes cartes :</span>' +
+      var mySus = (s.suspectOf || {})[me];
+      document.getElementById('cl-hand').innerHTML =
+        (mySus ? '<span class="cl-card" style="border-color:' + SUS_COLOR[mySus] + '"><span class="dot" style="background:' + SUS_COLOR[mySus] + '"></span>Tu incarnes ' + escapeHtml(mySus) + '</span>' : '') +
+        '<span style="font-size:.78rem;color:var(--ink-light);align-self:center">Tes cartes :</span>' +
         hand.map(function (c) {
           var col = CE.catOf(c) === 'suspect' ? SUS_COLOR[c] : CE.catOf(c) === 'arme' ? '#8d6e63' : '#7e9bbf';
           var ic = CE.catOf(c) === 'arme' ? (WEP_EMOJI[c] + ' ') : '';
@@ -385,37 +482,56 @@
     function autoNote(s) {
       var me = window.myPid, n = loadNote(), changed = false;
       (s.hands[me] || []).forEach(function (c) { var k = c + '|' + me; if (n[k] !== 'yes') { n[k] = 'yes'; changed = true; } });
-      // carte montrée à moi
-      if (s.phase === 'postsuggest' && s.suggestion && s.suggestion.by === me && s.suggestion.disprover && s.suggestion.shown) {
-        var k2 = s.suggestion.shown + '|' + s.suggestion.disprover;
-        if (n[k2] !== 'yes') { n[k2] = 'yes'; changed = true; }
+      if (s.phase === 'postsuggest' && s.suggestion && s.suggestion.disprover) {
+        var sg = s.suggestion;
+        if (sg.by === me && sg.shown) {
+          // carte montrée à MOI → ✓ certain
+          var k2 = sg.shown + '|' + sg.disprover;
+          if (n[k2] !== 'yes') { n[k2] = 'yes'; changed = true; }
+        } else if (sg.by !== me && sg.disprover !== me) {
+          // un joueur a réfuté la suggestion d'un AUTRE (carte non vue) → petites
+          // vagues ≈ sur les 3 cartes possibles, une seule fois par événement.
+          var sig = 'ev' + (s.turnCount || 0) + '|' + sg.by + '|' + sg.disprover + '|' + sg.cards.join(',');
+          if (n._seen !== sig) {
+            n._seen = sig; changed = true;
+            sg.cards.forEach(function (c) { var k3 = c + '|' + sg.disprover; if (!n[k3]) n[k3] = 'maybe'; });
+          }
+        }
       }
       if (changed) saveNote(n);
     }
     function openNote() {
       var s = window.room, n = loadNote();
-      var cols = s.order;
-      function headRow() { return '<tr><th class="cat"></th>' + cols.map(function (p) { return '<th>' + Room.emoji(p) + '</th>'; }).join('') + '</tr>'; }
+      var cols = s.order, me = window.myPid;
+      var SYM = { yes: '✓', no: '✗', maybe: '≈' };
+      function headRow() {
+        return '<tr><th class="cat"></th>' + cols.map(function (p) {
+          var sus = (s.suspectOf || {})[p];
+          return '<th' + (p === me ? ' class="self"' : '') + ' title="' + escapeHtml(Room.name(p)) + '">' +
+            (sus ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + SUS_COLOR[sus] + ';margin-right:2px"></span>' : '') + Room.emoji(p) + '</th>';
+        }).join('') + '</tr>';
+      }
       function grp(title, cards) {
         return '<tr><th class="cat" colspan="' + (cols.length + 1) + '">' + title + '</th></tr>' +
           cards.map(function (c) {
             return '<tr><td class="cardname">' + escapeHtml(c) + '</td>' + cols.map(function (p) {
               var v = n[c + '|' + p] || '';
-              var cls = v === 'yes' ? 'mark yes' : v === 'no' ? 'mark no' : 'mark';
-              var sym = v === 'yes' ? '✓' : v === 'no' ? '✗' : '·';
-              return '<td class="' + cls + '" onclick="cycleNote(\'' + c.replace(/'/g, "\\'") + '\',\'' + p + '\')">' + sym + '</td>';
+              var cls = 'mark' + (v ? ' ' + v : '') + (p === me ? ' self' : '');
+              return '<td class="' + cls + '" onclick="cycleNote(\'' + c.replace(/'/g, "\\'") + '\',\'' + p + '\')">' + (SYM[v] || '·') + '</td>';
             }).join('') + '</tr>';
           }).join('');
       }
-      document.getElementById('note-card').innerHTML = '<div class="modal-title">📓 Carnet</div>' +
-        '<div style="font-size:.75rem;color:var(--ink-light);text-align:center;margin-bottom:6px">Touche une case : · → ✗ (pas la carte) → ✓ (a la carte)</div>' +
+      document.getElementById('note-card').innerHTML = '<div class="cl-paper">' +
+        '<div class="cl-paper-title">Carnet de détective</div>' +
         '<table class="cl-note">' + headRow() + grp('Suspects', CE.SUSPECTS) + grp('Armes', CE.WEAPONS) + grp('Pièces', CE.ROOMS) + '</table>' +
+        '<div class="cl-legend"><span style="color:#b3402c">✗ ne l\'a pas</span><span style="color:#c8811f">≈ l\'a peut-être montrée</span><span style="color:#2c7a42">✓ l\'a (vue/déduite)</span></div>' +
+        '</div>' +
         '<div class="modal-btns"><button class="btn-primary" style="width:auto;padding:.5rem 1.3rem" onclick="closeModal(\'modal-note\')">Fermer</button></div>';
       openModal('modal-note');
     }
     function cycleNote(card, pid) {
       var n = loadNote(), k = card + '|' + pid, v = n[k] || '';
-      n[k] = v === '' ? 'no' : v === 'no' ? 'yes' : '';
+      n[k] = v === '' ? 'no' : v === 'no' ? 'maybe' : v === 'maybe' ? 'yes' : '';
       saveNote(n); openNote();
     }
 
