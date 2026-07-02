@@ -25,9 +25,9 @@
   <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
   <div id="stage">
     <canvas id="cv"></canvas>
-    <div class="hint">Glisse pour déplacer le cube</div>
-    <div class="screen" id="start"><h1>🧊 Dangerwall</h1><p>Ton cube fonce dans le tunnel. Déplace-le pour passer par le trou des murs qui arrivent&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
-    <div class="screen hidden" id="over"><h1>Écrasé&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">murs franchis</p><button class="btn" id="replayBtn">Rejouer</button></div>
+    <div class="hint">Touche l'écran pour sauter</div>
+    <div class="screen" id="start"><h1>🧊 Dangerwall</h1><p>Ton cube rebondit de mur en mur. <b>Touche l'écran</b> pour le faire bondir et grimpe le plus haut possible en évitant les <b>piques</b> sur les côtés&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Aïe&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">mètres grimpés</p><button class="btn" id="replayBtn">Rejouer</button></div>
   </div>
 <script>
 (function(){
@@ -39,39 +39,107 @@
   addEventListener('resize',resize);
   var BEST='playus_dangerwall_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
-  // Le cube est en bas ; des murs descendent avec un trou ; on aligne le cube.
-  var state,score,cubeX=0,walls=[],speed,spawnAcc,cubeSz=0;
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
-  function mkWall(){var slots=4,hole=Math.floor(Math.random()*slots);return {y:-30,hole:hole,slots:slots,scored:false};}
-  function start(){resize();score=0;cubeX=W/2;walls=[mkWall()];speed=Math.max(3,H*0.005);spawnAcc=0;cubeSz=Math.max(30,W*0.09);
-    state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');}
-  function end(){state='over';document.getElementById('finalScore').textContent=score;
-    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
-    else document.getElementById('overMsg').textContent='murs franchis';showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);}
-  function at(e){var rect=cv.getBoundingClientRect();return e.clientX-rect.left;}
-  stage.addEventListener('pointerdown',function(e){if(state==='play')cubeX=at(e);});
-  stage.addEventListener('pointermove',function(e){if(state==='play')cubeX=at(e);});
-  document.getElementById('startBtn').onclick=start;document.getElementById('replayBtn').onclick=start;
-  function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);var cubeY=H-100;
-    cubeX=Math.max(cubeSz/2,Math.min(W-cubeSz/2,cubeX));
-    if(state==='play'){speed+=0.0018;spawnAcc+=speed;
-      if(spawnAcc>Math.max(160,340-score*3)){spawnAcc=0;walls.push(mkWall());}
-      walls.forEach(function(w){w.y+=speed;});
-      walls=walls.filter(function(w){
-        if(Math.abs(w.y-cubeY)<12+cubeSz/2){var slotW=W/w.slots,holeMin=w.hole*slotW,holeMax=holeMin+slotW;
-          if(cubeX-cubeSz/2<holeMin+6||cubeX+cubeSz/2>holeMax-6){end();return false;}}
-        if(w.y>cubeY+40){if(!w.scored){w.scored=true;score++;scoreEl.textContent=score;vibrate(8);}}
-        return w.y<H+40;});
-    }
-    // murs
-    walls.forEach(function(w){var slotW=W/w.slots;for(var s=0;s<w.slots;s++){if(s===w.hole)continue;
-      ctx.fillStyle='#8b3fd6';ctx.fillRect(s*slotW,w.y-14,slotW,28);ctx.fillStyle='#c94b9e';ctx.fillRect(s*slotW,w.y-14,slotW,5);}});
-    // cube
-    ctx.save();ctx.translate(cubeX,cubeY);ctx.fillStyle='#ffd45e';ctx.fillRect(-cubeSz/2,-cubeSz/2,cubeSz,cubeSz);
-    ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(-cubeSz/2,-cubeSz/2,cubeSz,6);
-    ctx.strokeStyle='#d98a10';ctx.lineWidth=3;ctx.strokeRect(-cubeSz/2,-cubeSz/2,cubeSz,cubeSz);ctx.restore();
+
+  // Le cube rebondit horizontalement de mur en mur ; la gravité le tire vers le bas,
+  // un tap lui donne une impulsion vers le HAUT. Des piques poussent sur les murs
+  // gauche/droite : toucher un mur à l'endroit d'une pique = perdu. On grimpe →
+  // le monde défile vers le bas, le score = hauteur atteinte.
+  var state,score,cube,spikes,wallW,cubeSz,grav,jump,scrolled,spawnAt;
+  function reset(){
+    resize();
+    wallW=Math.max(14,W*0.05);
+    cubeSz=Math.max(26,W*0.075);
+    grav=Math.max(0.4,H*0.0011);
+    jump=Math.max(8,H*0.016);
+    var r=cubeSz/2;
+    cube={x:wallW+r,y:H*0.55,vx:Math.max(2.6,W*0.008),vy:0};
+    spikes=[];            // {side:'L'|'R', y, h}
+    score=0;scrolled=0;spawnAt=H*0.35;
+    state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');
+    // quelques piques de départ, jamais trop près du cube
+    for(var y=-40;y>-H*1.4;y-=(90+Math.random()*70)){addSpike(y);}
   }
-  resize();frame();
+  function addSpike(y){
+    var side=Math.random()<0.5?'L':'R';
+    var h=Math.max(46,cubeSz*1.5)+Math.random()*cubeSz;
+    spikes.push({side:side,y:y,h:h});
+  }
+  function end(){
+    state='over';var m=Math.round(score);
+    document.getElementById('finalScore').textContent=m;
+    if(m>best){best=m;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='mètres grimpés';
+    showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);
+  }
+  function hop(){ if(state==='play') cube.vy=-jump; }
+  stage.addEventListener('pointerdown',function(){ if(state==='play') hop(); });
+  document.getElementById('startBtn').onclick=reset;
+  document.getElementById('replayBtn').onclick=reset;
+
+  function step(){
+    var r=cubeSz/2;
+    cube.vy+=grav; cube.y+=cube.vy; cube.x+=cube.vx;
+    // rebond sur les murs + test des piques à ce mur
+    if(cube.x-r<=wallW){ cube.x=wallW+r; cube.vx=Math.abs(cube.vx); hitWall('L'); }
+    else if(cube.x+r>=W-wallW){ cube.x=W-wallW-r; cube.vx=-Math.abs(cube.vx); hitWall('R'); }
+    // défilement : si le cube monte au-dessus de 45% de l'écran, on descend le monde
+    var top=H*0.45;
+    if(cube.y<top){ var d=top-cube.y; cube.y=top; scrolled+=d; score+=d/32;
+      scoreEl.textContent=Math.round(score);
+      for(var i=0;i<spikes.length;i++) spikes[i].y+=d;
+    }
+    // chute hors de l'écran
+    if(cube.y-r>H){ end(); return; }
+    // faire pousser de nouvelles piques en haut au fil de la montée
+    var highest=spikes.reduce(function(a,s){return Math.min(a,s.y);},H);
+    while(highest>-H*0.6){ highest-=(70+Math.random()*70/(1+score*0.002)); addSpike(highest); }
+    // nettoyage
+    spikes=spikes.filter(function(s){return s.y<H+60;});
+    // vitesse horizontale qui augmente doucement
+    var dir=cube.vx<0?-1:1; var sp=Math.min(W*0.02,Math.max(2.6,W*0.008)+score*0.004); cube.vx=dir*sp;
+  }
+  function hitWall(side){
+    var r=cubeSz/2;
+    for(var i=0;i<spikes.length;i++){var s=spikes[i];
+      if(s.side!==side)continue;
+      if(cube.y+r> s.y && cube.y-r < s.y+s.h){ end(); return; }
+    }
+    vibrate(6);
+  }
+
+  function drawSpikes(){
+    var teeth=6;
+    spikes.forEach(function(s){
+      ctx.fillStyle='#c94b9e';
+      var depth=wallW*0.9, th=s.h/teeth;
+      for(var t=0;t<teeth;t++){var yy=s.y+t*th;
+        ctx.beginPath();
+        if(s.side==='L'){ctx.moveTo(0,yy);ctx.lineTo(depth,yy+th/2);ctx.lineTo(0,yy+th);}
+        else{ctx.moveTo(W,yy);ctx.lineTo(W-depth,yy+th/2);ctx.lineTo(W,yy+th);}
+        ctx.closePath();ctx.fill();
+      }
+    });
+  }
+  function frame(){
+    requestAnimationFrame(frame);
+    ctx.clearRect(0,0,W,H);
+    // murs latéraux
+    ctx.fillStyle='rgba(139,63,214,.35)';
+    ctx.fillRect(0,0,wallW,H); ctx.fillRect(W-wallW,0,wallW,H);
+    if(state==='play') step();
+    drawSpikes();
+    // cube
+    var r=cubeSz/2;
+    ctx.save();ctx.translate(cube.x,cube.y);
+    ctx.fillStyle='#ffd45e';ctx.fillRect(-r,-r,cubeSz,cubeSz);
+    ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(-r,-r,cubeSz,6);
+    ctx.strokeStyle='#d98a10';ctx.lineWidth=3;ctx.strokeRect(-r,-r,cubeSz,cubeSz);
+    ctx.restore();
+  }
+  resize();
+  cube={x:W/2,y:H*0.55,vx:3,vy:0};spikes=[];state='start';score=0;
+  frame();
 })();
 </script>
 </body>
