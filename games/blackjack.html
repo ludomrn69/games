@@ -151,10 +151,26 @@
       ],
       offline: { solo: true, local: true, soloMinBots: 0 },
       bot: bjBot,
+      lobbyExtraHTML: lobbyExtraHTML,
       onState: onState,
       onStart: onStart,
       offlineTurn: activePid
     });
+
+    // Réglage de salon : jetons de départ (mise de départ de chaque joueur).
+    var CHIP_OPTIONS = [50, 100, 250, 500, 1000];
+    function startChipsOf(room) { var v = room && room.startChips; return CHIP_OPTIONS.indexOf(v) >= 0 ? v : START_CHIPS; }
+    function lobbyExtraHTML(room) {
+      var isHost = room.host === window.myPid, sel = startChipsOf(room);
+      var btns = CHIP_OPTIONS.map(function (n) {
+        return '<button type="button" class="lb-set-btn' + (n === sel ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setStartChips(' + n + ')"' : ' disabled') + '>' + n + '</button>';
+      }).join('');
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">💰 Jetons de départ</div>' +
+        '<div class="lb-set-row">' + btns + '</div>' + (isHost ? '' : '<div class="lb-set-hint">Réglé par l’hôte</div>') + '</div></div>';
+    }
+    function setStartChips(n) { if (CHIP_OPTIONS.indexOf(n) >= 0 && window.roomRef) window.roomRef.child('startChips').set(n); }
+    window.setStartChips = setStartChips;
 
     /* ━━ Qui doit agir maintenant ? (mises puis tour de jeu). Sert au mode hors-ligne
        ET au pilotage des bots en ligne (lobby.botActivePid). ━━ */
@@ -172,7 +188,7 @@
       return null;
     }
 
-    function chipsOf(room, pid) { var c = room.chips || {}; return c[pid] == null ? START_CHIPS : c[pid]; }
+    function chipsOf(room, pid) { var c = room.chips || {}; return c[pid] == null ? startChipsOf(room) : c[pid]; }
 
     /* ━━ Bot : mise à plat + stratégie de base (jouable, pas optimale au 1/10e). ━━ */
     function bjBot(state, pid) {
@@ -198,10 +214,11 @@
       }
     }
 
-    function onStart(players) {
+    function onStart(players, cur) {
+      var sc = startChipsOf(cur || {});
       var chips = {};
-      players.forEach(function (p) { chips[p.pid] = START_CHIPS; });
-      return freshRound({ chips: chips }, players.map(function (p) { return p.pid; }));
+      players.forEach(function (p) { chips[p.pid] = sc; });
+      return freshRound({ chips: chips, startChips: sc }, players.map(function (p) { return p.pid; }));
     }
 
     // Construit l'état d'une nouvelle manche (garde les jetons fournis dans `base`).
@@ -219,13 +236,14 @@
       base.results2 = {};     // résultat de la main séparée
       base.turn = null;
       base.winner = null;
-      // Recave : un joueur ruiné repart à 100 (la table ne se bloque jamais).
+      // Recave : un joueur ruiné repart aux jetons de départ (la table ne se bloque jamais).
+      var sc = startChipsOf(base);
       var broke = [];
       (order || []).forEach(function (pid) {
         base.hands[pid] = [];
-        if (base.chips && base.chips[pid] != null && base.chips[pid] <= 0) { base.chips[pid] = START_CHIPS; broke.push(pid); }
+        if (base.chips && base.chips[pid] != null && base.chips[pid] <= 0) { base.chips[pid] = sc; broke.push(pid); }
       });
-      if (broke.length) base.banner = '🏦 Recave : ' + broke.length + ' joueur(s) ruiné(s) repartent à ' + START_CHIPS;
+      if (broke.length) base.banner = '🏦 Recave : ' + broke.length + ' joueur(s) ruiné(s) repartent à ' + sc;
       return base;
     }
 
@@ -379,7 +397,7 @@
     function newRound() {
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'done') return cur;
-        return freshRound({ chips: cur.chips, order: cur.order, players: cur.players, status: 'playing', game: cur.game, host: cur.host, difficulty: cur.difficulty }, cur.order);
+        return freshRound({ chips: cur.chips, order: cur.order, players: cur.players, status: 'playing', game: cur.game, host: cur.host, difficulty: cur.difficulty, startChips: cur.startChips }, cur.order);
       });
     }
     function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
