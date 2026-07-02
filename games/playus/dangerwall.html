@@ -25,9 +25,9 @@
   <div class="hud"><a href="../../index.html">‹</a><span class="score" id="score">0</span><span class="best" id="best"></span></div>
   <div id="stage">
     <canvas id="cv"></canvas>
-    <div class="hint">Touche l'écran pour sauter</div>
-    <div class="screen" id="start"><h1>🧊 Dangerwall</h1><p>Ton cube rebondit de mur en mur. <b>Touche l'écran</b> pour le faire bondir et grimpe le plus haut possible en évitant les <b>piques</b> sur les côtés&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
-    <div class="screen hidden" id="over"><h1>Aïe&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">mètres grimpés</p><button class="btn" id="replayBtn">Rejouer</button></div>
+    <div class="hint">Touche l'écran pour bondir vers le haut</div>
+    <div class="screen" id="start"><h1>🧊 Dangerwall</h1><p>Ton cube rebondit d'un mur à l'autre. <b>Touche l'écran</b> pour le faire bondir et vise les <b>trous entre les piques</b>. À chaque mur franchi, de nouvelles piques apparaissent — de plus en plus serrées&nbsp;!</p><button class="btn" id="startBtn">Jouer</button></div>
+    <div class="screen hidden" id="over"><h1>Aïe&nbsp;!</h1><div class="big" id="finalScore">0</div><p id="overMsg">murs franchis</p><button class="btn" id="replayBtn">Rejouer</button></div>
   </div>
 <script>
 (function(){
@@ -41,104 +41,101 @@
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
 
-  // Le cube rebondit horizontalement de mur en mur ; la gravité le tire vers le bas,
-  // un tap lui donne une impulsion vers le HAUT. Des piques poussent sur les murs
-  // gauche/droite : toucher un mur à l'endroit d'une pique = perdu. On grimpe →
-  // le monde défile vers le bas, le score = hauteur atteinte.
-  var state,score,cube,spikes,wallW,cubeSz,grav,jump,scrolled,spawnAt;
+  // Le cube rebondit horizontalement d'un mur à l'autre. La gravité le tire vers le
+  // bas, un tap le fait bondir vers le HAUT (haut/bas bornés à l'écran). Chaque mur
+  // porte des piques SAUF des trous : atteindre le mur dans un trou = franchi (score+1,
+  // le cube repart dans l'autre sens et CE mur régénère de nouvelles piques, plus
+  // serrées à mesure que le score monte). Toucher une pique = perdu.
+  var state,score,cube,cubeSz,wallW,grav,jump,spikesL,spikesR;
+  function diff(){ return Math.min(1, score/45); }         // 0 → 1 : difficulté croissante
+  function gapH(){ return cubeSz*(2.6 - diff()*1.5); }      // hauteur des trous (rétrécit)
+  // Génère les piques d'un mur : des trous (≥ gapH) séparés par des dents.
+  function genSpikes(){
+    var arr=[], y=4, gmin=gapH(), gmax=gmin+cubeSz*(1.6-diff()*0.9);
+    while(y<H-4){
+      y += gmin + Math.random()*Math.max(0,gmax-gmin);      // trou
+      if(y>=H-4) break;
+      var sh=cubeSz*(0.7+Math.random()*(1.1+diff()*1.4));   // dent (plus grande si dur)
+      sh=Math.min(sh,H-4-y);
+      if(sh>6) arr.push({y:y,h:sh});
+      y += sh;
+    }
+    return arr;
+  }
   function reset(){
     resize();
-    wallW=Math.max(14,W*0.05);
-    cubeSz=Math.max(26,W*0.075);
-    grav=Math.max(0.4,H*0.0011);
-    jump=Math.max(8,H*0.016);
-    var r=cubeSz/2;
-    cube={x:wallW+r,y:H*0.55,vx:Math.max(2.6,W*0.008),vy:0};
-    spikes=[];            // {side:'L'|'R', y, h}
-    score=0;scrolled=0;spawnAt=H*0.35;
-    state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');
-    // quelques piques de départ, jamais trop près du cube
-    for(var y=-40;y>-H*1.4;y-=(90+Math.random()*70)){addSpike(y);}
-  }
-  function addSpike(y){
-    var side=Math.random()<0.5?'L':'R';
-    var h=Math.max(46,cubeSz*1.5)+Math.random()*cubeSz;
-    spikes.push({side:side,y:y,h:h});
+    wallW=Math.max(14,W*0.055);
+    cubeSz=Math.max(24,W*0.07);
+    grav=Math.max(0.35,H*0.0010);
+    jump=Math.max(7,H*0.014);
+    cube={x:wallW+cubeSz/2, y:H*0.5, vx:Math.max(2.4,W*0.007), vy:0};
+    score=0; spikesL=genSpikes(); spikesR=genSpikes();
+    state='play'; scoreEl.textContent='0'; startScr.classList.add('hidden'); overScr.classList.add('hidden');
   }
   function end(){
-    state='over';var m=Math.round(score);
-    document.getElementById('finalScore').textContent=m;
-    if(m>best){best=m;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
-    else document.getElementById('overMsg').textContent='mètres grimpés';
-    showBest();overScr.classList.remove('hidden');vibrate([40,60,120]);
+    state='over'; document.getElementById('finalScore').textContent=score;
+    if(score>best){best=score;localStorage.setItem(BEST,best);document.getElementById('overMsg').textContent='Record ! 🏆';}
+    else document.getElementById('overMsg').textContent='murs franchis';
+    showBest(); overScr.classList.remove('hidden'); vibrate([40,60,120]);
   }
-  function hop(){ if(state==='play') cube.vy=-jump; }
-  stage.addEventListener('pointerdown',function(){ if(state==='play') hop(); });
+  stage.addEventListener('pointerdown',function(){ if(state==='play') cube.vy=-jump; });
   document.getElementById('startBtn').onclick=reset;
   document.getElementById('replayBtn').onclick=reset;
 
+  function hitsSpike(list){
+    var r=cubeSz/2;
+    for(var i=0;i<list.length;i++){ var s=list[i]; if(cube.y+r>s.y && cube.y-r<s.y+s.h) return true; }
+    return false;
+  }
   function step(){
     var r=cubeSz/2;
     cube.vy+=grav; cube.y+=cube.vy; cube.x+=cube.vx;
-    // rebond sur les murs + test des piques à ce mur
-    if(cube.x-r<=wallW){ cube.x=wallW+r; cube.vx=Math.abs(cube.vx); hitWall('L'); }
-    else if(cube.x+r>=W-wallW){ cube.x=W-wallW-r; cube.vx=-Math.abs(cube.vx); hitWall('R'); }
-    // défilement : si le cube monte au-dessus de 45% de l'écran, on descend le monde
-    var top=H*0.45;
-    if(cube.y<top){ var d=top-cube.y; cube.y=top; scrolled+=d; score+=d/32;
-      scoreEl.textContent=Math.round(score);
-      for(var i=0;i<spikes.length;i++) spikes[i].y+=d;
+    // haut / bas : on borne (rebond doux), seules les piques tuent
+    if(cube.y-r<0){ cube.y=r; if(cube.vy<0) cube.vy=0; }
+    if(cube.y+r>H){ cube.y=H-r; cube.vy=0; }
+    // contact d'un mur
+    if(cube.x-r<=wallW){
+      if(hitsSpike(spikesL)){ end(); return; }
+      cube.x=wallW+r; cube.vx=Math.abs(cube.vx); onWallCleared('L');
+    } else if(cube.x+r>=W-wallW){
+      if(hitsSpike(spikesR)){ end(); return; }
+      cube.x=W-wallW-r; cube.vx=-Math.abs(cube.vx); onWallCleared('R');
     }
-    // chute hors de l'écran
-    if(cube.y-r>H){ end(); return; }
-    // faire pousser de nouvelles piques en haut au fil de la montée
-    var highest=spikes.reduce(function(a,s){return Math.min(a,s.y);},H);
-    while(highest>-H*0.6){ highest-=(70+Math.random()*70/(1+score*0.002)); addSpike(highest); }
-    // nettoyage
-    spikes=spikes.filter(function(s){return s.y<H+60;});
-    // vitesse horizontale qui augmente doucement
-    var dir=cube.vx<0?-1:1; var sp=Math.min(W*0.02,Math.max(2.6,W*0.008)+score*0.004); cube.vx=dir*sp;
   }
-  function hitWall(side){
-    var r=cubeSz/2;
-    for(var i=0;i<spikes.length;i++){var s=spikes[i];
-      if(s.side!==side)continue;
-      if(cube.y+r> s.y && cube.y-r < s.y+s.h){ end(); return; }
-    }
-    vibrate(6);
+  function onWallCleared(side){
+    score++; scoreEl.textContent=score; vibrate(10);
+    // vitesse horizontale accélère un peu ; le mur qu'on vient de quitter se renouvelle
+    var dir=cube.vx<0?-1:1, sp=Math.min(W*0.018, Math.max(2.4,W*0.007)+score*0.0035);
+    cube.vx=dir*sp;
+    if(side==='L') spikesL=genSpikes(); else spikesR=genSpikes();
   }
-
-  function drawSpikes(){
-    var teeth=6;
-    spikes.forEach(function(s){
-      ctx.fillStyle='#c94b9e';
-      var depth=wallW*0.9, th=s.h/teeth;
-      for(var t=0;t<teeth;t++){var yy=s.y+t*th;
+  function drawWallSpikes(side,list){
+    var depth=wallW*0.85, teeth=5;
+    ctx.fillStyle='#c94b9e';
+    list.forEach(function(s){ var th=s.h/teeth;
+      for(var t=0;t<teeth;t++){ var yy=s.y+t*th;
         ctx.beginPath();
-        if(s.side==='L'){ctx.moveTo(0,yy);ctx.lineTo(depth,yy+th/2);ctx.lineTo(0,yy+th);}
-        else{ctx.moveTo(W,yy);ctx.lineTo(W-depth,yy+th/2);ctx.lineTo(W,yy+th);}
-        ctx.closePath();ctx.fill();
+        if(side==='L'){ ctx.moveTo(0,yy); ctx.lineTo(depth,yy+th/2); ctx.lineTo(0,yy+th); }
+        else{ ctx.moveTo(W,yy); ctx.lineTo(W-depth,yy+th/2); ctx.lineTo(W,yy+th); }
+        ctx.closePath(); ctx.fill();
       }
     });
   }
   function frame(){
     requestAnimationFrame(frame);
     ctx.clearRect(0,0,W,H);
-    // murs latéraux
-    ctx.fillStyle='rgba(139,63,214,.35)';
-    ctx.fillRect(0,0,wallW,H); ctx.fillRect(W-wallW,0,wallW,H);
+    ctx.fillStyle='rgba(139,63,214,.35)'; ctx.fillRect(0,0,wallW,H); ctx.fillRect(W-wallW,0,wallW,H);
     if(state==='play') step();
-    drawSpikes();
-    // cube
+    drawWallSpikes('L',spikesL); drawWallSpikes('R',spikesR);
     var r=cubeSz/2;
-    ctx.save();ctx.translate(cube.x,cube.y);
-    ctx.fillStyle='#ffd45e';ctx.fillRect(-r,-r,cubeSz,cubeSz);
-    ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(-r,-r,cubeSz,6);
-    ctx.strokeStyle='#d98a10';ctx.lineWidth=3;ctx.strokeRect(-r,-r,cubeSz,cubeSz);
+    ctx.save(); ctx.translate(cube.x,cube.y);
+    ctx.fillStyle='#ffd45e'; ctx.fillRect(-r,-r,cubeSz,cubeSz);
+    ctx.fillStyle='rgba(255,255,255,.35)'; ctx.fillRect(-r,-r,cubeSz,6);
+    ctx.strokeStyle='#d98a10'; ctx.lineWidth=3; ctx.strokeRect(-r,-r,cubeSz,cubeSz);
     ctx.restore();
   }
   resize();
-  cube={x:W/2,y:H*0.55,vx:3,vy:0};spikes=[];state='start';score=0;
+  cube={x:W/2,y:H*0.5,vx:3,vy:0}; spikesL=[]; spikesR=[]; state='start'; score=0;
   frame();
 })();
 </script>
