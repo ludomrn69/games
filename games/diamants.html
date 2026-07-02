@@ -27,12 +27,20 @@
     .dm-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.25rem; color: var(--terracotta); min-height: 28px; padding: 8px 12px 2px; }
     .dm-pathwrap { padding: 4px 10px; }
     .dm-path { display: flex; gap: 6px; overflow-x: auto; padding: 6px 2px; scrollbar-width: thin; }
-    .dm-card { flex: 0 0 auto; width: 46px; height: 62px; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 2px 8px rgba(0,0,0,0.16); border: 2px solid rgba(0,0,0,0.06); }
-    .dm-card.t { background: linear-gradient(135deg, #7fd0c8, #2fa8a0); color: #05312e; }
-    .dm-card.r { background: linear-gradient(135deg, #e6c15a, #c99a2e); color: #3a2a05; }
-    .dm-card.h { background: linear-gradient(135deg, #e79a92, #cf5347); color: #fff; }
-    .dm-card .big { font-size: 1.3rem; line-height: 1; }
-    .dm-card .lbl { font-size: 0.56rem; font-weight: 700; opacity: 0.85; margin-top: 2px; }
+    .dm-card { flex: 0 0 auto; width: 54px; height: 76px; border-radius: 10px; position: relative; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-weight: 900;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.28); border: 2px solid rgba(255,255,255,0.55); }
+    /* léger grain/relief commun à toutes les cartes (façon parchemin de mine) */
+    .dm-card::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(circle at 50% 20%, rgba(255,255,255,0.35), rgba(255,255,255,0) 55%),
+        repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 6px); }
+    .dm-card.t { background: radial-gradient(circle at 50% 32%, #9fe6dc, #1f8f88); color: #04302c; }
+    .dm-card.r { background: radial-gradient(circle at 50% 32%, #f2d67e, #b9871f); color: #3a2a05; }
+    .dm-card.h { background: radial-gradient(circle at 50% 32%, #f0938a, #b3382c); color: #fff; border-color: rgba(255,255,255,0.7); }
+    .dm-card .big { font-size: 1.55rem; line-height: 1; z-index: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+    .dm-card .val { font-size: 1.15rem; font-weight: 900; line-height: 1; z-index: 1; }
+    .dm-card .lbl { font-size: 0.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.92; z-index: 1; }
+    .dm-card .corner { position: absolute; top: 2px; left: 4px; font-size: 0.62rem; font-weight: 900; z-index: 1; opacity: 0.85; }
 
     .dm-info { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 6px 10px; }
     .dm-pot { background: var(--white); border-radius: 14px; padding: 6px 14px; box-shadow: var(--shadow); font-weight: 800; color: var(--terracotta); }
@@ -388,9 +396,9 @@
 
     /* ━━ Rendu ━━ */
     function cardHTML(card) {
-      if (card.t === 'T') return '<div class="dm-card t"><span class="big">' + card.v + '</span><span class="lbl">💎</span></div>';
-      if (card.t === 'R') return '<div class="dm-card r"><span class="big">🏺</span><span class="lbl">' + card.v + '</span></div>';
-      var h = HAZ(card.h); return '<div class="dm-card h"><span class="big">' + h.e + '</span></div>';
+      if (card.t === 'T') return '<div class="dm-card t" title="Trésor ' + card.v + '"><span class="corner">💎</span><span class="big">💎</span><span class="val">' + card.v + '</span><span class="lbl">Trésor</span></div>';
+      if (card.t === 'R') return '<div class="dm-card r" title="Relique ' + card.v + '"><span class="corner">✦</span><span class="big">🏺</span><span class="val">' + card.v + '</span><span class="lbl">Relique</span></div>';
+      var h = HAZ(card.h); return '<div class="dm-card h" title="Danger : ' + h.n + '"><span class="corner">⚠</span><span class="big">' + h.e + '</span><span class="lbl">' + h.n + '</span></div>';
     }
     function render(state) {
       var order = state.order || [], me = window.myPid, banked = state.banked || {};
