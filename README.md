@@ -56,7 +56,7 @@ la synchro temps réel.
 | 🤵 Président | 3–8 | ✈️ | cartes |
 | 🐴 Petits chevaux | 2–4 | ✈️ | plateau / dés |
 | 💰 Le juste prix | 2–8 | ✈️ | déduction |
-| 🖍️ Télé-dessiné | 3–10 |  | dessin |
+| 🖍️ Gartic Phone | 3–10 |  | dessin |
 | 🏠 Monopoly | 2–6 | ✈️ | plateau |
 | 🔎 Cluedo | 2–6 | ✈️ | déduction (plateau) |
 | 🐔 Papayoo | 3–6 | ✈️ | plis |
