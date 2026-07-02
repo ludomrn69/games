@@ -172,7 +172,7 @@
     var GOAL = 56; // 0..50 piste, 51..56 ligne maison (56 = arrivée)
 
     /* ━━ State ━━ */
-    var prevStatus = null, boardBuilt = false, lastDieShown = null;
+    var prevStatus = null, boardBuilt = false, lastDieShown = null, _luPrev = {};
     function rref() { return window.roomRef; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
@@ -364,6 +364,23 @@
           el.textContent = '♞';
           if (movable) { el.dataset.color = color; el.dataset.tok = String(t); }
           cell.appendChild(el);
+          // Animation FLIP : le pion GLISSE depuis son ancienne case vers la nouvelle.
+          var key = color + '-' + t, prev = _luPrev[key];
+          if (prev && (prev[0] !== coord[0] || prev[1] !== coord[1])) {
+            var prevCell = document.getElementById('cell-' + prev[0] + '-' + prev[1]);
+            if (prevCell) {
+              var pa = prevCell.getBoundingClientRect(), pb = cell.getBoundingClientRect();
+              el.style.transition = 'none';
+              el.style.transform = 'translate(' + (pa.left - pb.left) + 'px,' + (pa.top - pb.top) + 'px) scale(1.25)';
+              el.style.zIndex = '5';
+              requestAnimationFrame(function () {
+                el.style.transition = 'transform 0.55s cubic-bezier(0.3, 1.1, 0.5, 1)';
+                el.style.transform = '';
+                setTimeout(function () { el.style.zIndex = ''; }, 600);
+              });
+            }
+          }
+          _luPrev[key] = coord;
         });
       });
 

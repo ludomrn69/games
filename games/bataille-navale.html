@@ -17,15 +17,22 @@
     .bn-wrap { width: 100%; max-width: 440px; margin: 0 auto; padding: 14px 16px 40px; text-align: center; }
     .bn-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; }
     .bn-sub { color: var(--ink-light); font-size: 0.9rem; margin-bottom: 12px; min-height: 20px; }
-    .bn-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; width: min(92vw, 400px); margin: 0 auto; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 8px; padding: 2px; }
-    .bn-cell { aspect-ratio: 1; background: #cfe4f0; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; color: #fff; }
-    html[data-theme="dark"] .bn-cell { background: #1c2a3a; }
-    .bn-cell.ship { background: var(--ship-color, #5B7EC7); }
-    .bn-cell.preview { background: rgba(198,152,90,0.45); }
-    .bn-cell.hit { background: #e05a4e; } .bn-cell.sunk { background: #7a1f17; }
-    .bn-cell.miss { background: #9bb0bd; color: #2C2520; }
-    .bn-grid.fire .bn-cell.unknown { cursor: pointer; }
-    .bn-grid.fire .bn-cell.unknown:hover { background: rgba(198,152,90,0.4); }
+    .bn-grid { position: relative; display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; width: min(92vw, 400px); margin: 0 auto; background: #0d2233; border: 2px solid #2f5d7a; border-radius: 10px; padding: 3px; box-shadow: inset 0 0 26px rgba(0,0,0,0.55), 0 4px 14px rgba(10,30,45,0.35); overflow: hidden; }
+    .bn-cell { aspect-ratio: 1; background: radial-gradient(circle at 50% 40%, #17415c, #0f3049); border-radius: 3px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; color: #fff; box-shadow: inset 0 0 0 1px rgba(93,178,214,0.14); }
+    /* balayage radar sur la grille de tir */
+    .bn-grid.fire::after { content: ''; position: absolute; inset: -55%; background: conic-gradient(from 0deg, rgba(96,220,170,0.2) 0 18deg, transparent 22deg 360deg); animation: bnSweep 5s linear infinite; pointer-events: none; }
+    @keyframes bnSweep { to { transform: rotate(360deg); } }
+    .bn-cell.ship { background: var(--ship-color, #5B7EC7); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35), inset 0 -3px 5px rgba(0,0,0,0.3); }
+    .bn-cell.preview { background: rgba(96,220,170,0.5); }
+    .bn-cell.hit { background: radial-gradient(circle, #ff9d6b 0%, #e05a4e 55%, #8e2a1f 100%); text-shadow: 0 0 6px #ffd2a8; }
+    .bn-cell.sunk { background: radial-gradient(circle, #6b2019, #3f0e09); }
+    .bn-cell.miss { background: radial-gradient(circle at 50% 40%, #2a5876, #16405c); color: #8fc6de; }
+    .bn-cell.fresh.hit { animation: bnBoom 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    .bn-cell.fresh.miss { animation: bnSplash 0.5s ease both; }
+    @keyframes bnBoom { 0% { transform: scale(0.2); box-shadow: 0 0 0 0 rgba(255,157,107,0.9); } 60% { transform: scale(1.25); } 100% { transform: none; box-shadow: 0 0 14px 3px rgba(224,90,78,0.5); } }
+    @keyframes bnSplash { 0% { transform: scale(0.3); opacity: 0.2; } 60% { transform: scale(1.15); } 100% { transform: none; opacity: 1; } }
+    .bn-grid.fire .bn-cell.unknown { cursor: crosshair; }
+    .bn-grid.fire .bn-cell.unknown:hover { background: rgba(96,220,170,0.35); box-shadow: inset 0 0 0 1.5px #60dcaa; }
 
     .bn-ship-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 12px 0; }
     .bn-ship-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--white); border: 1.5px solid var(--gold-light); border-radius: 10px; padding: 6px 9px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
@@ -366,11 +373,13 @@
       setText('bn-own-count', (5 - countSunk(myShips, oppShots)) + '/5 à flot');
 
       var sunkSet = sunkCellSet(oppShips, myShots);
+      var ls2 = state.lastShot || {};
       var fh = '';
       for (var i = 0; i < 100; i++) {
         var cls = 'bn-cell', txt = '';
-        if (myShots[i] === 'h') { cls += sunkSet[i] ? ' sunk' : ' hit'; txt = '✕'; }
-        else if (myShots[i] === 'm') { cls += ' miss'; txt = '·'; }
+        var fresh = (ls2.by === window.myPid && ls2.idx === i) ? ' fresh' : '';
+        if (myShots[i] === 'h') { cls += (sunkSet[i] ? ' sunk' : ' hit') + fresh; txt = sunkSet[i] ? '☠' : '💥'; }
+        else if (myShots[i] === 'm') { cls += ' miss' + fresh; txt = '〰'; }
         else cls += ' unknown';
         fh += '<div class="' + cls + '" data-i="' + i + '">' + txt + '</div>';
       }
@@ -379,10 +388,12 @@
       var col = Room.color(window.myPid);
       var myMap = {}; myShips.forEach(function (s) { (s.cells || []).forEach(function (c) { myMap[c] = true; }); });
       var oh = '';
+      var ls3 = state.lastShot || {};
       for (var k = 0; k < 100; k++) {
         var c4 = 'bn-cell', tx = '', style = '';
-        if (oppShots[k] === 'h') { c4 += ' hit'; tx = '✕'; }
-        else if (oppShots[k] === 'm') { c4 += ' miss'; tx = '·'; }
+        var fr = (ls3.by !== window.myPid && ls3.idx === k) ? ' fresh' : '';
+        if (oppShots[k] === 'h') { c4 += ' hit' + fr; tx = '💥'; }
+        else if (oppShots[k] === 'm') { c4 += ' miss' + fr; tx = '〰'; }
         else if (myMap[k]) { c4 += ' ship'; style = '--ship-color:' + col; }
         oh += '<div class="' + c4 + '" style="' + style + '" data-i="' + k + '">' + tx + '</div>';
       }
