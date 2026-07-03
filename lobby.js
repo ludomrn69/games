@@ -658,10 +658,10 @@
     if (window.roomRef) window.roomRef.child('botSpeed').set(sp);
   }
 
-  // ── Contrôle de vitesse des ordis EN JEU (pastille flottante) ──────────────
-  // Visible pendant la partie dès qu'il y a des ordis : un clic fait défiler
-  // Posée → Humaine → Vive → Rapide. Fonctionne en ligne (room.botSpeed) et
-  // hors-ligne (préférence appareil + shim roomRef).
+  // ── Contrôle de vitesse des ordis EN JEU (curseur flottant) ────────────────
+  // Visible pendant la partie dès qu'il y a des ordis : un petit CURSEUR qu'on
+  // glisse (Posée → Humaine → Vive → Rapide). Fonctionne en ligne (room.botSpeed)
+  // et hors-ligne (préférence appareil + shim roomRef).
   function refreshBotSpeedUI() {
     var c = cfg(), room = window.room;
     var hasBots = !!(c.bot && room && room.players && Object.keys(room.players).some(function (k) { return room.players[k] && room.players[k].isBot; }));
@@ -669,21 +669,28 @@
     var el = document.getElementById('lb-botspeed');
     if (!hasBots || !playing || !isActive('s-playing')) { if (el) el.style.display = 'none'; return; }
     if (!el) {
-      el = document.createElement('button');
-      el.id = 'lb-botspeed'; el.className = 'lb-botspeed'; el.type = 'button';
-      el.title = 'Vitesse des ordis (clic pour changer)';
-      el.addEventListener('click', cycleBotSpeed);
+      el = document.createElement('div');
+      el.id = 'lb-botspeed'; el.className = 'lb-botspeed';
+      el.title = 'Vitesse des ordis (glisse le curseur)';
+      el.innerHTML = '<span class="lb-botspeed-ic">🤖</span>' +
+        '<input type="range" id="lb-botspeed-range" min="0" max="' + (window.Bots.SPEEDS.length - 1) + '" step="1" aria-label="Vitesse des ordis">' +
+        '<span class="lb-botspeed-lbl" id="lb-botspeed-lbl"></span>';
+      el.querySelector('#lb-botspeed-range').addEventListener('input', function () { onBotSpeedSlide(+this.value); });
       document.body.appendChild(el);
     }
     el.style.display = 'inline-flex';
-    el.textContent = '🤖 ' + window.Bots.SPEED_LABELS[window.Bots.speed(room)];
+    var rng = document.getElementById('lb-botspeed-range');
+    if (document.activeElement !== rng) rng.value = window.Bots.SPEEDS.indexOf(window.Bots.speed(room)); // pas de saut pendant le glissé
+    var lbl = document.getElementById('lb-botspeed-lbl'); if (lbl) lbl.textContent = window.Bots.SPEED_LABELS[window.Bots.speed(room)];
   }
-  function cycleBotSpeed() {
+  function onBotSpeedSlide(i) {
+    var order = window.Bots.SPEEDS, sp = order[Math.max(0, Math.min(order.length - 1, i))];
+    setBotSpeed(sp);
+    var lbl = document.getElementById('lb-botspeed-lbl'); if (lbl) lbl.textContent = window.Bots.SPEED_LABELS[sp];
+  }
+  function cycleBotSpeed() { // compat : gardé au cas où appelé ailleurs
     var order = window.Bots.SPEEDS, cur = window.Bots.speed(window.room);
-    var next = order[(order.indexOf(cur) + 1) % order.length];
-    setBotSpeed(next);
-    refreshBotSpeedUI();
-    lbToast('Vitesse des ordis : ' + window.Bots.SPEED_LABELS[next]);
+    onBotSpeedSlide((order.indexOf(cur) + 1) % order.length);
   }
   function setBotCount(n) {
     var c = cfg(), max = c.maxPlayers || 8;

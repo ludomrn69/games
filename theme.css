@@ -132,13 +132,29 @@ html[data-theme="dark"] .game-restart-btn {
 /* Pastille flottante de vitesse des ordis (en jeu, quand il y a des ordis). */
 .lb-botspeed {
   position: fixed; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 1200;
-  display: none; align-items: center; gap: 6px;
-  padding: 7px 13px; border-radius: 30px; cursor: pointer;
+  display: none; align-items: center; gap: 8px;
+  padding: 6px 13px; border-radius: 30px;
   border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink);
-  font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.8rem;
+  font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.78rem;
   box-shadow: 0 3px 12px rgba(44,37,32,0.2);
 }
 .lb-botspeed:hover { border-color: var(--terracotta); }
+.lb-botspeed .lb-botspeed-ic { font-size: 0.95rem; }
+.lb-botspeed .lb-botspeed-lbl { min-width: 68px; white-space: nowrap; }
+/* Le « trait » : un curseur qu'on glisse (petit rond) pour régler la vitesse. */
+.lb-botspeed input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 82px; height: 6px; margin: 0;
+  border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--terracotta));
+  outline: none; cursor: pointer;
+}
+.lb-botspeed input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--terracotta); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.3); cursor: grab;
+}
+.lb-botspeed input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; background: var(--terracotta);
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.3); cursor: grab;
+}
 
 /* Pastilles « Défi du jour » : difficulté / série, bien lisibles sous le bouton. */
 .lb-daily-badge {
