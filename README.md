@@ -75,7 +75,7 @@ la synchro temps réel.
 | 🃏 Balatro | 1 | ✈️ | roguelike poker (solo) |
 | 🚗 Mille Bornes | 2–4 | ✈️ | cartes / course |
 | 🐺 Loup-Garou | 4–12 | ✈️ | déduction sociale (IA) |
-| ⏱️ Time's Up | 1–12 | ✈️ | équipes (+ solo chrono) |
+| ⏱️ Time's Up | 4–12 | ✈️ | équipes (4 min · + solo chrono) |
 | 💰 La Bonne Paye | 2–6 | ✈️ | gestion / cartes |
 | 💎 Diamants | 2–8 | ✈️ | stop-ou-encore |
 | 🎲 Perudo | 2–6 | ✈️ | dés / bluff |

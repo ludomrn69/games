@@ -30,7 +30,8 @@
 
     .qz-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 12px 24px; }
     .qz-card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow); padding: 14px; }
-    .qz-grid { width: min(90vw, 430px); aspect-ratio: 1; display: grid; gap: 0; border: 3px solid #2C2520; border-radius: 4px; overflow: hidden; touch-action: manipulation; }
+    .qz-grid { width: min(90vw, 430px); aspect-ratio: 1; display: grid; gap: 0; border: 3px solid #2C2520; border-radius: 4px; overflow: hidden; touch-action: none; }
+    .qz-cell { touch-action: none; }
     .qz-cell { display: flex; align-items: center; justify-content: center; font-size: clamp(1.1rem, 6vw, 1.8rem); cursor: pointer; user-select: none; position: relative; box-sizing: border-box; border: 0.5px solid rgba(44,37,32,0.14); }
     .qz-cell.bt { border-top: 3px solid #2C2520; } .qz-cell.bl { border-left: 3px solid #2C2520; }
     .qz-cell.br { border-right: 3px solid #2C2520; } .qz-cell.bb { border-bottom: 3px solid #2C2520; }
@@ -186,7 +187,7 @@
     function onState(snap) {
       var state = snap.val() || {};
       var status = state.status || 'waiting';
-      if (status === 'playing') { if (prevStatus !== 'playing') { showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
+      if (status === 'playing') { if (prevStatus !== 'playing') { showScreen('s-playing'); bindQzInput(); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
       else { stopTimer(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
@@ -223,6 +224,46 @@
         if (res.complete) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' résout en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
         return cur;
       });
+    }
+
+    // Poser un ✕ sur une case VIDE (le glisser ne touche ni les 👑 ni les ✕ déjà là).
+    function paintX(idx) {
+      var pid = window.myPid, s = window.room;
+      if (!qDrag.recorded && assist && s && s.status === 'playing' && !doneOf(s, pid)) { assist.record(); qDrag.recorded = true; }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        var m = marksOf(cur, pid).slice(); if (m[idx] !== 0) return cur; // ne peint que le vide
+        m[idx] = 1; cur.players[pid].marks = m; return cur;
+      });
+    }
+    // Tap simple = cycle (vide→✕→👑→vide). Glisser = trace des ✕ sur les cases vides
+    // survolées — on capture le pointeur sur la grille (stable) pour un suivi fiable
+    // souris comme tactile, sans « ✕ partout » par appui prolongé.
+    var qDrag = { on: false, moved: false, start: -1, recorded: false }, qzBound = false;
+    function bindQzInput() {
+      if (qzBound) return; qzBound = true;
+      var grid = document.getElementById('qz-grid');
+      function cellAt(x, y) { var el = document.elementFromPoint(x, y); var c = el && el.closest && el.closest('.qz-cell'); return c ? +c.dataset.i : -1; }
+      grid.addEventListener('pointerdown', function (e) {
+        var i = cellAt(e.clientX, e.clientY); if (i < 0) return;
+        qDrag.on = true; qDrag.moved = false; qDrag.start = i; qDrag.recorded = false;
+        try { grid.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+      });
+      grid.addEventListener('pointermove', function (e) {
+        if (!qDrag.on) return; var i = cellAt(e.clientX, e.clientY); if (i < 0) return;
+        if (!qDrag.moved && i === qDrag.start) return;      // pas encore bougé
+        if (!qDrag.moved) { qDrag.moved = true; paintX(qDrag.start); } // 1re case du trait
+        paintX(i); e.preventDefault();
+      });
+      function end(e) {
+        if (!qDrag.on) return; qDrag.on = false;
+        try { grid.releasePointerCapture(e.pointerId); } catch (err) {}
+        if (!qDrag.moved) tapCell(qDrag.start);            // simple tap → cycle
+      }
+      grid.addEventListener('pointerup', end);
+      grid.addEventListener('pointercancel', end);
+      grid.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     }
 
     /* ━━ Aide au joueur (Annuler / Indice) ━━ */
@@ -288,7 +329,7 @@
         if (c === n - 1 || region[i + 1] !== rg) cls += ' br';
         if (r === n - 1 || region[i + n] !== rg) cls += ' bb';
         var glyph = m[i] === 2 ? '👑' : (m[i] === 1 ? '<span class="qz-mark">✕</span>' : '');
-        html += '<div class="' + cls + '" style="background:' + (REGION_COLORS[rg % REGION_COLORS.length]) + '" onclick="tapCell(' + i + ')">' + glyph + '</div>';
+        html += '<div class="' + cls + '" data-i="' + i + '" style="background:' + (REGION_COLORS[rg % REGION_COLORS.length]) + '">' + glyph + '</div>';
       }
       var grid = document.getElementById('qz-grid');
       grid.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';

@@ -242,9 +242,19 @@
       if (dragBound) return; dragBound = true;
       var wrap = document.getElementById('zp-wrap');
       function cellAt(x, y) { var el = document.elementFromPoint(x, y); var c = el && el.closest && el.closest('.zp-cell'); return c ? +c.dataset.i : -1; }
-      wrap.addEventListener('pointerdown', function (e) { var i = cellAt(e.clientX, e.clientY); if (i < 0) return; dragging = true; visit(i); e.preventDefault(); });
+      // On CAPTURE le pointeur sur le wrap (élément stable) : la grille interne est
+      // reconstruite à chaque snapshot Firebase, ce qui casse le suivi souris sur PC
+      // (le pointeur souris n'a pas de capture implicite, contrairement au tactile).
+      wrap.addEventListener('pointerdown', function (e) {
+        var i = cellAt(e.clientX, e.clientY); if (i < 0) return;
+        dragging = true; try { wrap.setPointerCapture(e.pointerId); } catch (err) {}
+        visit(i); e.preventDefault();
+      });
       wrap.addEventListener('pointermove', function (e) { if (!dragging) return; var i = cellAt(e.clientX, e.clientY); if (i >= 0) visit(i); e.preventDefault(); });
-      window.addEventListener('pointerup', function () { if (dragging) { dragging = false; commitPath(); } });
+      function endDrag(e) { if (dragging) { dragging = false; try { wrap.releasePointerCapture(e.pointerId); } catch (err) {} commitPath(); } }
+      wrap.addEventListener('pointerup', endDrag);
+      wrap.addEventListener('pointercancel', endDrag);
+      window.addEventListener('pointerup', function (e) { endDrag(e); });
     }
 
     /* ━━ Rendu ━━ */
