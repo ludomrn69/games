@@ -108,6 +108,34 @@
     .modal.active { display: flex; }
     .modal-card { background: var(--white); border-radius: 22px; padding: 24px; box-shadow: var(--shadow-hover); max-width: 420px; width: 100%; max-height: 82vh; overflow: auto; }
     .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; text-align: center; }
+
+    /* ── Refonte : plateau sombre + score bien lisible (feeling du genre) ── */
+    .ba-board { background: radial-gradient(120% 100% at 50% 0, #37285a, #201735); border: 1px solid #4a3a6e; border-radius: 20px; padding: 14px 12px 18px; box-shadow: inset 0 2px 16px rgba(0,0,0,0.45), var(--shadow); }
+    .ba-board .ba-slots { color: rgba(255,255,255,0.7); }
+    .ba-scoreband { display: flex; gap: 12px; align-items: stretch; margin-bottom: 14px; flex-wrap: wrap; }
+    .ba-roundscore { flex: 1; min-width: 175px; background: linear-gradient(135deg, #143559, #0d2440); border-radius: 14px; padding: 10px 16px; color: #eaf3ff; box-shadow: inset 0 1px 8px rgba(0,0,0,0.45); }
+    .ba-roundscore .rs-lab { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.72; }
+    .ba-roundscore .rs-val { font-size: 2.5rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+    .ba-roundscore .rs-tgt { font-size: 0.82rem; opacity: 0.9; margin-top: 3px; }
+    .ba-roundscore .ba-progress { height: 8px; background: rgba(255,255,255,0.16); border-radius: 5px; margin-top: 9px; overflow: hidden; }
+    .ba-roundscore .ba-progress > div { height: 100%; background: linear-gradient(90deg, #f2c14e, #e8763c); transition: width .35s; }
+    .ba-preview { flex: 1; min-width: 210px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.22); border-radius: 14px; padding: 10px; min-height: 98px; }
+    .ba-preview .pv-hand { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.18rem; color: #fff; text-align: center; }
+    .ba-preview .pv-lvl { font-size: 0.72rem; color: #c9b8ef; font-weight: 700; }
+    .ba-preview .pv-empty { color: rgba(255,255,255,0.62); font-size: 0.9rem; text-align: center; line-height: 1.4; }
+    .ba-scorecalc { display: flex; align-items: center; gap: 8px; }
+    .ba-chipbox, .ba-multbox, .ba-scorebox { min-width: 58px; text-align: center; border-radius: 10px; padding: 7px 12px; font-weight: 900; font-size: 1.5rem; color: #fff; font-variant-numeric: tabular-nums; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+    .ba-chipbox { background: linear-gradient(135deg, #4088e2, #2f66c0); }
+    .ba-multbox { background: linear-gradient(135deg, #ec5a41, #c73826); }
+    .ba-scorebox { background: linear-gradient(135deg, #f2c14e, #e0972a); color: #2c2005; }
+    .ba-times { color: #ffd98a; font-weight: 900; font-size: 1.15rem; }
+    .ba-preview.flash .ba-scorecalc { animation: baPop .45s; }
+    /* cartes plus grandes et charnues */
+    .ba-board .ba-hand { gap: 9px; margin-bottom: 4px; }
+    .ba-board .ba-card { width: clamp(50px, 13vw, 74px); border-width: 2px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); }
+    .ba-board .ba-card .rk { font-size: clamp(1rem, 4vw, 1.35rem); }
+    .ba-board .ba-card .su { font-size: clamp(1.2rem, 5vw, 1.7rem); }
+    .ba-board .ba-card.sel { transform: translateY(-16px); box-shadow: 0 8px 18px rgba(242,193,78,0.5); border-color: #f2c14e; }
   </style>
 </head>
 <body>
@@ -119,11 +147,6 @@
       <div class="ba-layout">
         <!-- Bande latérale (façon Balatro) : score, blind, jauges de la manche -->
         <aside class="ba-side">
-          <div class="ba-score-wrap">
-            <div style="width:100%"><div class="tgt">Objectif <span id="ba-target">300</span></div>
-              <div class="big" id="ba-round">0</div>
-              <div class="ba-progress"><div id="ba-bar" style="width:0%"></div></div></div>
-          </div>
           <div class="ba-side-stats">
             <div class="ba-stat"><div class="lab">Ante</div><div class="val"><span id="ba-ante">1</span>/8</div></div>
             <div class="ba-stat"><div class="lab">Blind</div><div class="val ba-blindname" id="ba-blind">—</div></div>
@@ -133,11 +156,21 @@
           </div>
         </aside>
 
-        <!-- Zone de jeu : jokers en haut, main en bas -->
+        <!-- Zone de jeu : plateau sombre (score + jokers + main) -->
         <div class="ba-main">
-          <div class="ba-jokers" id="ba-jokers"></div>
-          <div class="ba-handinfo" id="ba-handinfo"></div>
-          <div class="ba-hand" id="ba-hand"></div>
+          <div class="ba-board">
+            <div class="ba-scoreband">
+              <div class="ba-roundscore">
+                <div class="rs-lab">Score de la manche</div>
+                <div class="rs-val" id="ba-round">0</div>
+                <div class="rs-tgt">Objectif <b id="ba-target">300</b></div>
+                <div class="ba-progress"><div id="ba-bar" style="width:0%"></div></div>
+              </div>
+              <div class="ba-preview" id="ba-handinfo"></div>
+            </div>
+            <div class="ba-jokers" id="ba-jokers"></div>
+            <div class="ba-hand" id="ba-hand"></div>
+          </div>
           <div class="ba-sort">
             <button data-sort="rank" onclick="sortHand('rank')">Trier par rang</button>
             <button data-sort="suit" onclick="sortHand('suit')">Trier par couleur</button>
@@ -419,6 +452,7 @@
       tickJokers(res, cards);                                  // jokers cumulatifs → main suivante
       var before = G.roundScore; G.roundScore += res.score;
       G.lastHand = res.name + '  ' + res.chips + ' × ' + res.mult + ' = ' + res.score;
+      G.lastHandData = { name: res.name, chips: res.chips, mult: res.mult, score: res.score };
       G.handsLeft--;
       if (window.Sfx) Sfx.play('place');
       G.hand = G.hand.filter(function (c) { return G.sel.indexOf(c.id) < 0; }); G.sel = [];
@@ -528,10 +562,21 @@
       // consommables (tarots) : cliquer pour utiliser sur les cartes sélectionnées
       var cel = $('ba-consum'); if (!cel) { cel = document.createElement('div'); cel.id = 'ba-consum'; cel.className = 'ba-jokers'; var jk = $('ba-jokers'); jk.parentNode.insertBefore(cel, jk.nextSibling); }
       cel.innerHTML = G.consumables.length ? (G.consumables.map(function (id, i) { var t = TAROTS[id]; return '<div class="ba-joker" style="border-color:#7c5cdb;cursor:pointer" onclick="useConsumable(' + i + ')"><span class="jn" style="color:#7c5cdb">🎴 ' + t.name + '</span>' + t.desc + '</div>'; }).join('') + '<span class="ba-slots">Touche pour utiliser · ' + G.consumables.length + '/2</span>') : '';
-      // info main sélectionnée
+      // Aperçu de la main sélectionnée : nom + jetons × mult (le calcul complet,
+      // cartes et jokers compris, se fait à la pose). Sinon, on montre la dernière
+      // main jouée avec son score, ou une invite.
       var cards = selCards(), info = '';
-      if (cards.length) { var ev = evaluate(cards), hb = handBase(ev.key); info = '<div class="ht">' + HANDS[ev.key].name + ' <span style="font-size:0.7rem;color:var(--ink-light)">niv.' + hb.lvl + '</span></div><div><span class="hs ba-chips">' + hb.chips + '</span> × <span class="hs ba-mult">' + hb.mult + '</span></div>'; }
-      else if (G.lastHand) info = '<div style="color:var(--ink-light);font-size:0.86rem">Dernière : ' + G.lastHand + '</div>';
+      if (cards.length) {
+        var ev = evaluate(cards), hb = handBase(ev.key);
+        info = '<div class="pv-hand">' + HANDS[ev.key].name + ' <span class="pv-lvl">niv. ' + hb.lvl + '</span></div>' +
+          '<div class="ba-scorecalc"><span class="ba-chipbox">' + hb.chips + '</span><span class="ba-times">×</span><span class="ba-multbox">' + hb.mult + '</span></div>';
+      } else if (G.lastHandData) {
+        var d = G.lastHandData;
+        info = '<div class="pv-hand">' + d.name + '</div>' +
+          '<div class="ba-scorecalc"><span class="ba-chipbox">' + d.chips + '</span><span class="ba-times">×</span><span class="ba-multbox">' + d.mult + '</span><span class="ba-times">=</span><span class="ba-scorebox">' + d.score.toLocaleString('fr') + '</span></div>';
+      } else {
+        info = '<div class="pv-empty">Sélectionne des cartes<br>pour voir la main et son score</div>';
+      }
       $('ba-handinfo').innerHTML = info;
       $('ba-hand').innerHTML = G.hand.map(cardHTML).join('');
       // Bouton de tri actif surligné (le tri est mémorisé même après pioche)
