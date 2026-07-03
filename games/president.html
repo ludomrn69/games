@@ -89,7 +89,7 @@
       <div class="pr-opps" id="pr-opps"></div>
       <div class="pr-banner" id="pr-banner"></div>
       <div class="pr-pile-wrap">
-        <div class="pr-pile-label">Pli en cours</div>
+        <div class="pr-pile-label" id="pr-mode">Pli en cours</div>
         <div class="pr-pile" id="pr-pile"></div>
       </div>
       <div class="pr-my-label">Tes cartes <span id="pr-my-count"></span></div>
@@ -129,6 +129,7 @@
         <p style="margin-top:8px">Il faut <b>autant de cartes</b> que la combinaison posée et une valeur <b>égale ou plus forte</b> — sinon tu <b>passes</b>. Ordre : 3 &lt; 4 &lt; … &lt; A &lt; <b>2</b> (la plus forte).</p>
         <p style="margin-top:8px">🔁 <b>Même hauteur</b> : poser exactement la <b>même valeur</b> que le pli fait <b>sauter le tour</b> du joueur suivant.</p>
         <p style="margin-top:8px">💣 <b>Carré</b> : dès que <b>4 cartes de la même valeur</b> sont posées (d'un coup ou complétées au fil des poses), le pli est <b>coupé</b> : ramassé, et celui qui l'a complété relance.</p>
+        <p style="margin-top:8px">2️⃣ <b>Le 2</b> (la plus forte) <b>ferme le pli</b> : dès qu'un 2 est posé, le pli est coupé et son poseur relance. Mais <b>interdit de finir sur un 2</b> : si ta dernière pose est un 2, tu deviens d'office <b>Trou du cul 💩</b>.</p>
         <p style="margin-top:8px">Quand tout le monde passe, le dernier à avoir posé relance un nouveau pli. Le <b>premier à vider sa main</b> est Président 👑, le dernier est Trou du cul 💩.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
@@ -185,6 +186,7 @@
         'Pose une carte, une paire, un brelan ou un carré',
         'Valeur égale ou plus forte, même nombre de cartes, sinon tu passes',
         'Même hauteur = tu sautes le tour du suivant · carré (4) = pli coupé',
+        'Le 2 ferme le pli (son poseur relance) · interdit de finir sur un 2',
         'Ordre : 3 < 4 < … < As < 2 (la plus forte)',
         'Premier à vider sa main = Président 👑, dernier = Trou du cul 💩'
       ],
@@ -236,6 +238,7 @@
     //  • atteindre 4 cartes de la même valeur (carré) → coupe le pli.
     function applyPlay(cur, pid, cards, hand) {
       var newRank = rankVal(cards[0]);
+      var isTwo = rankOf(cards[0]) === '2'; // le 2 ferme le pli (règle maison)
       var equal = !!(cur.pile && newRank === cur.pile.rank);
       var prevTotal = (cur.pile && equal) ? (cur.pile.total || cur.pile.count) : 0;
       var total = prevTotal + cards.length;
@@ -243,9 +246,13 @@
       cur.players[pid].hand = hand;
       cur.pile = { by: pid, rank: newRank, count: cards.length, cards: cards, total: total };
       cur.lastPlayer = pid;
-      cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards) + (equal ? ' (même hauteur)' : '');
-      if (hand.length === 0) { cur.finishOrder = (cur.finishOrder || []).concat([pid]); cur.banner += ' et a fini !'; }
-      var cut = total >= 4;
+      cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards) + (isTwo ? ' — le 2 ferme le pli' : (equal ? ' (même hauteur)' : ''));
+      if (hand.length === 0) {
+        // Interdit de finir sur un 2 : le joueur devient d'office Trou du cul 💩.
+        if (isTwo) { cur.forcedLast = pid; cur.banner = Room.name(pid) + ' finit sur un 2 → Trou du cul 💩 !'; }
+        else { cur.finishOrder = (cur.finishOrder || []).concat([pid]); cur.banner += ' et a fini !'; }
+      }
+      var cut = total >= 4 || isTwo; // carré OU 2 → pli coupé, celui qui l'a posé relance
       return { skip: equal && !cut, cut: cut };
     }
 
@@ -308,6 +315,12 @@
       }).join('');
 
       setText('pr-banner', state.banner || '');
+
+      // Simple / Double / Triple / Carré : taille de combinaison imposée par le pli
+      // en cours (affichée sous les joueurs). Sans pli → nouveau pli, taille libre.
+      var SIZE_NAMES = { 1: 'Simple', 2: 'Double', 3: 'Triple', 4: 'Carré' };
+      var pc = state.pile && state.pile.count;
+      setText('pr-mode', pc ? ('Pli en cours — ' + (SIZE_NAMES[pc] || (pc + ' cartes'))) : 'Nouveau pli — taille libre');
 
       // Pile
       var pileEl = document.getElementById('pr-pile');
@@ -429,6 +442,8 @@
       var active = order.filter(function (p) { return handArr(cur, p).length > 0; });
       if (active.length <= 1) {
         if (active.length === 1) cur.finishOrder = (cur.finishOrder || []).concat(active);
+        // Le joueur qui a fini sur un 2 est placé tout en dernier (Trou du cul).
+        if (cur.forcedLast && (cur.finishOrder || []).indexOf(cur.forcedLast) < 0) cur.finishOrder = (cur.finishOrder || []).concat([cur.forcedLast]);
         cur.status = 'ended'; cur.turn = null;
         return;
       }
