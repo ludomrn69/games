@@ -223,7 +223,22 @@
     // d'1 coup sur 2) → trois niveaux franchement différents.
     blunderP: function (state) { return window.Bots.pick(state, { easy: 0.55, normal: 0.2, hard: 0 }); },
     // true s'il faut jouer un coup au hasard ce tour-ci (selon le niveau).
-    shouldBlunder: function (state) { return Math.random() < window.Bots.blunderP(state); }
+    shouldBlunder: function (state) { return Math.random() < window.Bots.blunderP(state); },
+
+    // ── Vitesse des ORDIS ──────────────────────────────────────────────────
+    // Délai avant chaque coup d'ordi. Par défaut « humaine » (≈ 1,3 s) pour
+    // qu'on SUIVE la partie ; réglable dans le salon (room.botSpeed) et en jeu.
+    // Repli sur une préférence locale (appareil) puis « humaine ».
+    SPEEDS: ['chill', 'human', 'brisk', 'fast'],
+    SPEED_LABELS: { chill: '🐢 Posée', human: '🚶 Humaine', brisk: '🏃 Vive', fast: '⚡ Rapide' },
+    SPEED_MS: { chill: 2200, human: 1300, brisk: 750, fast: 320 },
+    speedPref: function () { try { return localStorage.getItem('games.botSpeed'); } catch (e) { return null; } },
+    setSpeedPref: function (s) { try { localStorage.setItem('games.botSpeed', s); } catch (e) {} },
+    speed: function (state) {
+      var s = (state && state.botSpeed) || (window.room && window.room.botSpeed) || window.Bots.speedPref() || 'human';
+      return window.Bots.SPEED_MS[s] != null ? s : 'human';
+    },
+    speedDelay: function (state) { return window.Bots.SPEED_MS[window.Bots.speed(state)]; }
   };
 
   // ── Firebase / salon ──────────────────────────────────────────────────────
@@ -267,12 +282,20 @@
   // Encart « Défi du jour » (jeux de puzzle solo) — grille du jour + série.
   function dailyHomeHTML(c) {
     var t = window.Daily.today(), st = window.Daily.stateOf(c.gameKey);
-    var sub = st.doneToday
-      ? ('✅ Fait aujourd\'hui' + (st.best && window.Puzzle ? ' en ' + window.Puzzle.fmtTime(st.best) : ''))
-      : ('Difficulté du jour : ' + window.Daily.levelLabel());
-    var streak = st.streak > 0 ? ' · série ' + st.streak + ' 🔥' : '';
-    return '<button class="lb-btn" style="background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="Lobby.goDaily()">🗓️ Défi du jour — ' + esc(t.label) + '</button>' +
-      '<div style="margin:-6px 0 16px;font-size:0.82rem;color:var(--ink-light)">' + sub + streak + '</div>';
+    // Couleur de la pastille selon la difficulté du jour (repère visuel clair).
+    var lvl = window.Daily.level ? window.Daily.level() : 'normal';
+    var lvlColor = lvl === 'easy' ? 'var(--sage)' : lvl === 'hard' ? 'var(--terracotta)' : 'var(--gold)';
+    var badges;
+    if (st.doneToday) {
+      badges = '<span class="lb-daily-badge" style="background:var(--sage);color:#fff">✅ Fait aujourd\'hui' +
+        (st.best && window.Puzzle ? ' · ' + window.Puzzle.fmtTime(st.best) : '') + '</span>';
+    } else {
+      badges = '<span class="lb-daily-badge" style="background:' + lvlColor + ';color:#fff">' +
+        'Difficulté : ' + esc(window.Daily.levelLabel()) + '</span>';
+    }
+    if (st.streak > 0) badges += '<span class="lb-daily-badge" style="background:var(--white);color:var(--terracotta);border:1.5px solid var(--gold-light)">série ' + st.streak + ' 🔥</span>';
+    return '<button class="lb-btn" style="margin-bottom:10px;background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff" onclick="Lobby.goDaily()">🗓️ Défi du jour — ' + esc(t.label) + '</button>' +
+      '<div class="lb-daily-badges" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:0 0 18px">' + badges + '</div>';
   }
 
   // ── Écran ACCUEIL d'un jeu ────────────────────────────────────────────────
@@ -488,6 +511,7 @@
     if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
+    try { refreshBotSpeedUI(); } catch (e) {}
     try { window.Lobby.turnAlertFor(room); } catch (e) {}
     try { recordStatsFor(room); } catch (e) {}
   }
@@ -610,15 +634,56 @@
         (isHost ? ' onclick="Lobby.setDifficulty(\'' + lv + '\')"' : ' disabled') + '>' + window.Bots.LABELS[lv] + '</button>';
     }).join('');
 
+    var speed = window.Bots.speed(room);
+    var speedBtns = window.Bots.SPEEDS.map(function (sp2) {
+      return '<button type="button" class="lb-set-btn' + (sp2 === speed ? ' active' : '') + '"' +
+        (isHost ? ' onclick="Lobby.setBotSpeed(\'' + sp2 + '\')"' : ' disabled') + '>' + window.Bots.SPEED_LABELS[sp2] + '</button>';
+    }).join('');
+
     var hint = isHost ? '' : '<div class="lb-set-hint">Réglé par l’hôte</div>';
+    var showBotOpts = curBots > 0 || !isHost;
     return '<div class="lb-botset">' +
       '<div class="lb-set"><div class="lb-set-label">🤖 Ordis</div><div class="lb-set-row">' + countBtns + '</div></div>' +
-      (curBots > 0 || !isHost ? '<div class="lb-set"><div class="lb-set-label">Niveau</div><div class="lb-set-row">' + diffBtns + '</div></div>' : '') +
+      (showBotOpts ? '<div class="lb-set"><div class="lb-set-label">Niveau</div><div class="lb-set-row">' + diffBtns + '</div></div>' : '') +
+      (showBotOpts ? '<div class="lb-set"><div class="lb-set-label">Vitesse des ordis</div><div class="lb-set-row">' + speedBtns + '</div></div>' : '') +
       hint + '</div>';
   }
   function setDifficulty(level) {
     if (window.Bots.LEVELS.indexOf(level) < 0) return;
     if (window.roomRef) window.roomRef.child('difficulty').set(level);
+  }
+  function setBotSpeed(sp) {
+    if (window.Bots.SPEEDS.indexOf(sp) < 0) return;
+    window.Bots.setSpeedPref(sp);                 // préférence appareil (repli hors-ligne)
+    if (window.roomRef) window.roomRef.child('botSpeed').set(sp);
+  }
+
+  // ── Contrôle de vitesse des ordis EN JEU (pastille flottante) ──────────────
+  // Visible pendant la partie dès qu'il y a des ordis : un clic fait défiler
+  // Posée → Humaine → Vive → Rapide. Fonctionne en ligne (room.botSpeed) et
+  // hors-ligne (préférence appareil + shim roomRef).
+  function refreshBotSpeedUI() {
+    var c = cfg(), room = window.room;
+    var hasBots = !!(c.bot && room && room.players && Object.keys(room.players).some(function (k) { return room.players[k] && room.players[k].isBot; }));
+    var playing = !!(room && room.status === 'playing' && !room.winner);
+    var el = document.getElementById('lb-botspeed');
+    if (!hasBots || !playing || !isActive('s-playing')) { if (el) el.style.display = 'none'; return; }
+    if (!el) {
+      el = document.createElement('button');
+      el.id = 'lb-botspeed'; el.className = 'lb-botspeed'; el.type = 'button';
+      el.title = 'Vitesse des ordis (clic pour changer)';
+      el.addEventListener('click', cycleBotSpeed);
+      document.body.appendChild(el);
+    }
+    el.style.display = 'inline-flex';
+    el.textContent = '🤖 ' + window.Bots.SPEED_LABELS[window.Bots.speed(room)];
+  }
+  function cycleBotSpeed() {
+    var order = window.Bots.SPEEDS, cur = window.Bots.speed(window.room);
+    var next = order[(order.indexOf(cur) + 1) % order.length];
+    setBotSpeed(next);
+    refreshBotSpeedUI();
+    lbToast('Vitesse des ordis : ' + window.Bots.SPEED_LABELS[next]);
   }
   function setBotCount(n) {
     var c = cfg(), max = c.maxPlayers || 8;
@@ -656,7 +721,6 @@
   // de l'ordi le temps de l'action (les fonctions de jeu lisent window.myPid).
   // Idempotent et sans risque : un coup avorté (re-run de transaction) est un
   // no-op rejoué au tour suivant ; aucun bot ajouté ⇒ ce code ne fait rien.
-  var BOT_DRIVE_DELAY = 700;
   var botDrive = { sig: null, t: 0 };
   function botActivePid(room) {
     var c = cfg();
@@ -673,7 +737,7 @@
     if (!p || !p.isBot) return;
     var sig = pid + '|' + (room.turn || '') + '|' + (room.phase || '') + '|' + (room.status || '');
     var now = Date.now();
-    if (sig === botDrive.sig && (now - botDrive.t) < 4000) return; // anti-rafale / déjà programmé
+    if (sig === botDrive.sig && (now - botDrive.t) < 6000) return; // anti-rafale / déjà programmé
     botDrive = { sig: sig, t: now };
     setTimeout(function () {
       var r = window.room;
@@ -685,7 +749,7 @@
       try { c.bot(JSON.parse(JSON.stringify(r)), a); }
       catch (e) { console.error('bot', e); }
       finally { window.myPid = saved; }
-    }, BOT_DRIVE_DELAY);
+    }, window.Bots.speedDelay(room));
   }
 
   // ── Démarrage automatique quand tout le monde est prêt ────────────────────
@@ -856,6 +920,8 @@
     toggleReady: toggleReady,
     setBotCount: setBotCount,
     setDifficulty: setDifficulty,
+    setBotSpeed: setBotSpeed,
+    refreshBotSpeedUI: refreshBotSpeedUI,
     shareRoom: shareRoom,
     changeIdentity: changeIdentity,
     cancelChange: cancelChange,

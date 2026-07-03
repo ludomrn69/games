@@ -8,8 +8,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
 
     #s-playing { min-height: calc(100vh - 52px); }
     .qx-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -23,18 +21,18 @@
     .qx-die.red { background: #d63636; } .qx-die.yellow { background: #f1c40f; color: #3a2a05; } .qx-die.green { background: #27ae60; } .qx-die.blue { background: #2980b9; }
     .qx-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
 
-    .qx-board { max-width: 520px; margin: 4px auto; padding: 0 8px; }
-    .qx-row { display: flex; align-items: center; gap: 3px; margin-bottom: 5px; }
-    .qx-rowtag { width: 16px; height: 26px; border-radius: 5px; flex: 0 0 auto; }
-    .qx-cells { display: flex; gap: 2px; flex: 1; }
-    .qx-cell { flex: 1; min-width: 0; height: 26px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; color: #fff; opacity: 0.85; position: relative; }
-    .qx-cell.crossed { opacity: 1; }
-    .qx-cell.crossed::after { content: '✕'; position: absolute; font-size: 0.95rem; color: rgba(0,0,0,0.6); }
-    .qx-cell.lockcell { font-size: 0.9rem; }
-    .qx-cell.playable { cursor: pointer; outline: 2px solid var(--ink); outline-offset: -2px; opacity: 1; }
-    .qx-cell.playable:hover { transform: scale(1.08); }
-    .qx-cell.dead { opacity: 0.3; }
+    .qx-board { max-width: 640px; margin: 4px auto; padding: 0 8px; }
+    .qx-row { display: flex; align-items: center; gap: 4px; margin-bottom: 7px; }
+    .qx-rowtag { width: 20px; height: 34px; border-radius: 6px; flex: 0 0 auto; }
+    .qx-cells { display: flex; gap: 3px; flex: 1; }
+    .qx-cell { flex: 1; min-width: 0; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.95rem; color: #fff; opacity: 1; position: relative; text-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform .12s; }
+    .qx-cell.crossed::after { content: '✕'; position: absolute; font-size: 1.15rem; color: rgba(0,0,0,0.65); font-weight: 900; }
+    .qx-cell.lockcell { font-size: 1rem; }
+    .qx-cell.playable { cursor: pointer; outline: 3px solid var(--ink); outline-offset: -2px; box-shadow: 0 0 0 3px rgba(255,255,255,0.55); z-index: 2; }
+    .qx-cell.playable:hover { transform: scale(1.12); }
+    .qx-cell.dead { opacity: 0.28; }
     .row-red .qx-cell, .row-red .qx-rowtag { background: #d63636; } .row-yellow .qx-cell, .row-yellow .qx-rowtag { background: #f1c40f; color: #3a2a05; }
+    .row-yellow .qx-cell { text-shadow: none; }
     .row-green .qx-cell, .row-green .qx-rowtag { background: #27ae60; } .row-blue .qx-cell, .row-blue .qx-rowtag { background: #2980b9; }
     .qx-locked .qx-rowtag::after { content: '🔒'; }
 
@@ -57,11 +55,6 @@
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
 
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.7rem; margin: 6px 0; }
-    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 8px auto 22px; }
-    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--cream); border-radius: 14px; padding: 9px 12px; }
-    .res-rank-pos { font-weight: 800; width: 26px; } .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
   </style>
 </head>
@@ -107,12 +100,15 @@
   <div class="modal" id="modal-rules"><div class="modal-card">
     <div class="modal-title">🎲 Qwixx</div>
     <div class="modal-body">
-      <p>4 lignes de couleur (rouge/jaune montent 2→12, vert/bleu descendent 12→2). On coche de <b>gauche à droite</b> (les cases sautées sont perdues).</p>
-      <p style="margin-top:8px">• <b>Dés blancs</b> : leur somme peut être cochée par <b>tout le monde</b>, dans n'importe quelle ligne.</p>
-      <p style="margin-top:6px">• Le joueur actif peut <b>en plus</b> cocher (1 dé blanc + 1 dé de couleur) dans la ligne de cette couleur.</p>
-      <p style="margin-top:6px">• L'actif qui ne coche <b>rien</b> prend une <b>pénalité (−5)</b>.</p>
-      <p style="margin-top:6px">• Cocher la dernière case (≥ 5 déjà cochées) <b>verrouille</b> la ligne. Fin à 4 pénalités ou 2 lignes verrouillées.</p>
-      <p style="margin-top:6px">• Score par ligne : 1,3,6,10,15,21… selon le nombre de croix. Le plus grand total gagne.</p>
+      <p><b>But :</b> cocher un maximum de cases dans 4 lignes de couleur pour marquer le plus de points.</p>
+      <p style="margin-top:8px"><b>Les 4 lignes :</b> rouge et jaune vont de <b>2 → 12</b>, vert et bleu de <b>12 → 2</b>. On coche <b>toujours de gauche à droite</b> : dès qu'on saute des cases, elles sont perdues.</p>
+      <p style="margin-top:10px"><b>À chaque tour, on lance 6 dés (2 blancs + 4 couleurs), en 2 temps :</b></p>
+      <p style="margin-top:6px">1️⃣ <b>Somme des 2 dés blancs</b> → <b>tout le monde</b> (actif compris) peut cocher ce nombre dans <b>une</b> ligne de son choix.</p>
+      <p style="margin-top:6px">2️⃣ Ensuite le <b>joueur actif seul</b> peut cocher <b>1 dé blanc + 1 dé de couleur</b> dans la ligne de cette couleur.</p>
+      <p style="margin-top:6px">⚠️ Cocher n'est <b>jamais obligatoire</b>… sauf pour l'actif : s'il ne coche <b>rien</b> des deux temps, il prend une <b>pénalité −5</b>.</p>
+      <p style="margin-top:10px">🔒 La <b>dernière case</b> (le 12 rouge/jaune, le 2 vert/bleu) ne se coche qu'avec <b>≥ 5 croix</b> déjà dans la ligne, et elle <b>verrouille</b> la ligne pour tous.</p>
+      <p style="margin-top:6px">🏁 <b>Fin</b> : dès que 2 lignes sont verrouillées, ou qu'un joueur atteint 4 pénalités.</p>
+      <p style="margin-top:6px">🏆 <b>Score</b> par ligne selon le nombre de croix (1,3,6,10,15,21,28…), moins 5 par pénalité. Plus haut total gagne.</p>
     </div>
     <div class="modal-btns" style="margin-top:14px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
   </div></div>
@@ -143,10 +139,11 @@
       gameKey: 'qwixx', name: 'Qwixx', emoji: '🎲', tagline: 'Coche vite, coche bien',
       minPlayers: 1, maxPlayers: 5,
       rules: [
-        '4 lignes : coche de gauche à droite (cases sautées perdues)',
-        'Somme des dés blancs : tout le monde peut cocher',
-        'Actif : en plus, (1 blanc + 1 couleur) dans la ligne de cette couleur',
-        'Rien coché par l\'actif = pénalité −5 · fin à 4 pénalités / 2 lignes verrouillées'
+        'But : cocher un max de cases dans 4 lignes de couleur',
+        '4 lignes : rouge/jaune 2→12, vert/bleu 12→2 · on coche de gauche à droite',
+        '1) Somme des 2 dés blancs : tout le monde peut la cocher dans une ligne',
+        '2) L\'actif seul coche en plus 1 blanc + 1 couleur (sinon pénalité −5)',
+        'Fin à 2 lignes verrouillées ou 4 pénalités · plus haut score gagne'
       ],
       offline: { solo: true, local: true, soloMinBots: 0 },
       bot: qxBot,

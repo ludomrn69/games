@@ -164,6 +164,7 @@
       if (max > 2 && !noBots) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
       // Difficulté (des ordis, ou de la grille pour un solo pur).
       if (max - 1 >= 1) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
+      if (!noBots && cfg.bot) controls += speedRow();   // vitesse des ordis (pas pour un solo-chrono pur)
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
     }
@@ -199,9 +200,11 @@
     // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
     host.querySelectorAll('.off-set-row').forEach(function (row) {
       row.addEventListener('click', function (e) {
-        var b = e.target.closest('.off-num, .off-diff'); if (!b) return;
-        row.querySelectorAll('.off-num, .off-diff').forEach(function (x) { x.classList.remove('active'); });
+        var b = e.target.closest('.off-num, .off-diff, .off-speed'); if (!b) return;
+        row.querySelectorAll('.off-num, .off-diff, .off-speed').forEach(function (x) { x.classList.remove('active'); });
         b.classList.add('active');
+        // Vitesse des ordis : mémorisée immédiatement (préférence appareil).
+        if (b.classList.contains('off-speed') && window.Bots) window.Bots.setSpeedPref(b.dataset.speed);
       });
     });
     showScreen('s-home');
@@ -225,6 +228,14 @@
       return '<button type="button" class="off-diff' + (lv === def ? ' active' : '') + '" data-diff="' + lv + '">' + B.LABELS[lv] + '</button>';
     }).join('');
     return '<div class="off-set"><div class="off-set-label">' + (label || 'Niveau des ordis') + '</div><div class="off-set-row">' + btns + '</div></div>';
+  }
+  function speedRow() {
+    var B = window.Bots; if (!B || !B.SPEEDS) return '';
+    var def = B.speedPref() || 'human';
+    var btns = B.SPEEDS.map(function (sp) {
+      return '<button type="button" class="off-speed' + (sp === def ? ' active' : '') + '" data-speed="' + sp + '">' + B.SPEED_LABELS[sp] + '</button>';
+    }).join('');
+    return '<div class="off-set"><div class="off-set-label">Vitesse des ordis</div><div class="off-set-row">' + btns + '</div></div>';
   }
   function startFromSetup() {
     var min = cfg.minPlayers || 2, max = cfg.maxPlayers || 8;
@@ -366,7 +377,8 @@
       window.myPid = humanPid;
       safeOnState();
       try { if (window.Lobby && Lobby.turnAlertFor) Lobby.turnAlertFor(room); } catch (e) {}
-      if (!ended() && active && isBot(active)) setTimeout(botStep, BOT_DELAY);
+      try { if (window.Lobby && window.Lobby.refreshBotSpeedUI) window.Lobby.refreshBotSpeedUI(); } catch (e) {}
+      if (!ended() && active && isBot(active)) setTimeout(botStep, (window.Bots && window.Bots.speedDelay) ? window.Bots.speedDelay(room) : BOT_DELAY);
       if (ended() && !endFx) { endFx = true; if (window.Sfx) Sfx.play(room.winner ? 'win' : 'lose'); }
       if (daily && ended()) setTimeout(recordDaily, 450); // Défi du jour : enregistre + partage
       // Stats par jeu (solo, hors défi du jour qui a son propre suivi) : une fois par partie.
@@ -428,8 +440,8 @@
       '.off-set{margin:6px 0 10px;}' +
       '.off-set-label{font-size:.8rem;color:var(--ink-light);margin-bottom:6px;}' +
       '.off-set-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;}' +
-      '.off-num,.off-diff{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
-      '.off-num.active,.off-diff.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
+      '.off-num,.off-diff,.off-speed{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
+      '.off-num.active,.off-diff.active,.off-speed.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
       '#off-pass{position:fixed;inset:0;z-index:9000;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,16,28,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}' +
       '#off-pass.show{display:flex;}' +
       '.off-pass-card{background:var(--white);border-radius:22px;padding:32px 26px;text-align:center;max-width:340px;width:100%;box-shadow:var(--shadow-hover);}' +

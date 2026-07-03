@@ -8,8 +8,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
 
     #s-playing { min-height: calc(100vh - 52px); }
     .lg-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -22,9 +20,17 @@
     .lg-phase-icon { font-size: 2rem; } .lg-phase-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.2rem; }
     .lg-role { display: inline-flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 4px 14px; box-shadow: var(--shadow); font-weight: 700; margin-top: 6px; }
     html[data-theme="dark"] .lg-role { background: #2a2333; }
+    /* Séquenceur de nuit : montre clairement qui agit et l'ordre des rôles. */
+    .lg-steps { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
+    .lg-step { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 800; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); border: 1.5px solid transparent; }
+    .lg-step.done { color: #b6e3b0; background: rgba(120,190,110,0.18); }
+    .lg-step.active { color: #fff; background: linear-gradient(135deg, var(--terracotta), var(--gold)); border-color: rgba(255,255,255,0.6); box-shadow: 0 0 12px rgba(214,170,90,0.5); transform: scale(1.06); }
+    .lg-step-arrow { color: rgba(255,255,255,0.4); font-size: 0.7rem; }
 
     .lg-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 6px 12px; }
-    .lg-instruct { text-align: center; font-size: 0.9rem; color: var(--ink-light); padding: 0 14px 8px; } .lg-instruct b { color: var(--ink); }
+    .lg-instruct { text-align: center; font-size: 1rem; color: var(--ink-light); padding: 2px 14px 8px; } .lg-instruct b { color: var(--ink); }
+    .lg-instruct .lg-you { display: inline-block; margin-bottom: 4px; font-family: 'Caveat', cursive; font-size: 1.3rem; font-weight: 700; }
+    .lg-instruct .lg-you.act { color: var(--terracotta); } .lg-instruct .lg-you.wait { color: var(--ink-light); }
 
     .lg-players { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 6px 12px 12px; max-width: 480px; margin: 0 auto; }
     .lg-pcard { width: 92px; background: var(--white); border-radius: 14px; padding: 8px 6px; box-shadow: var(--shadow); text-align: center; border: 2px solid transparent; }
@@ -40,8 +46,6 @@
 
     .lg-actions { text-align: center; padding: 0 14px 16px; }
 
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
     .res-sub { font-size: 1rem; color: var(--ink-light); margin-bottom: 8px; }
     .lg-reveal { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 6px; margin: 12px auto 22px; }
     .lg-reveal-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); }
@@ -55,6 +59,7 @@
     .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; } .modal-body b { color: var(--ink); }
+    @media (min-width: 760px) { .lg-players{max-width:820px;margin-inline:auto} }
   </style>
 </head>
 <body>
@@ -405,6 +410,21 @@
     function randomOther(s, me) { var a = aliveList(s).filter(function (p) { return p !== me; }); return a[Math.floor(Math.random() * a.length)]; }
 
     /* ━━ Rendu ━━ */
+    // Séquenceur de la nuit : Loups → Voyante → Sorcière (n'affiche que les rôles
+    // présents/actifs), avec l'étape en cours mise en avant.
+    function nightStepsHTML(state) {
+      var steps = [{ k: 'wolves', ic: '🐺', nm: 'Loups' }];
+      if (aliveSeer(state)) steps.push({ k: 'seer', ic: '🔮', nm: 'Voyante' });
+      if (aliveWitch(state) && (!state.witchHealUsed || !state.witchPoisonUsed)) steps.push({ k: 'witch', ic: '🧪', nm: 'Sorcière' });
+      var order = ['wolves', 'seer', 'witch'];
+      var curIx = order.indexOf(state.phase);
+      return '<div class="lg-steps">' + steps.map(function (s, i) {
+        var six = order.indexOf(s.k);
+        var cls = six === curIx ? ' active' : (six < curIx ? ' done' : '');
+        return (i ? '<span class="lg-step-arrow">›</span>' : '') +
+          '<span class="lg-step' + cls + '">' + s.ic + ' ' + s.nm + (six < curIx ? ' ✓' : '') + '</span>';
+      }).join('') + '</div>';
+    }
     function render(state) {
       var me = window.myPid, myRole = roleOf(state, me), iAmAlive = P(state, me).alive;
       var night = (state.phase === 'wolves' || state.phase === 'seer' || state.phase === 'witch');
@@ -412,7 +432,8 @@
       ph.className = 'lg-phase' + (night ? ' lg-phase-night' : '');
       ph.innerHTML = '<div class="lg-phase-icon">' + (night ? '🌙' : '☀️') + '</div>' +
         '<div class="lg-phase-title">' + (night ? 'Nuit ' + (state.day || 1) : 'Jour ' + (state.day || 1)) + '</div>' +
-        '<div class="lg-role">Ton rôle : ' + ROLE_INFO[myRole].ic + ' ' + ROLE_INFO[myRole].nm + (iAmAlive ? '' : ' (mort)') + '</div>';
+        '<div class="lg-role">Ton rôle : ' + ROLE_INFO[myRole].ic + ' ' + ROLE_INFO[myRole].nm + (iAmAlive ? '' : ' (mort)') + '</div>' +
+        (night ? nightStepsHTML(state) : '');
       setText('lg-banner', state.banner || '');
 
       // Instruction + cibles cliquables selon la phase
@@ -446,7 +467,13 @@
         if ((state.dayVotes || {})[me]) instruct = 'Vote enregistré. En attente des autres…';
         else { instruct = '⚖️ <b>Vote</b> pour éliminer un suspect.'; pickFn = 'actVote'; canPick = function (p) { return p !== me; }; }
       }
-      setHTML('lg-instruct', instruct);
+      // En-tête clair : dois-je agir maintenant, ou patienter ?
+      var mustAct = !!pickFn || (iAmAlive && ((myRole === 'sorciere' && state.phase === 'witch') ||
+        (myRole === 'voyante' && state.phase === 'day')));
+      var youLine = state.phase === 'day'
+        ? (mustAct ? '<span class="lg-you act">👉 À toi de voter</span>' : '<span class="lg-you wait">⏳ En attente des votes…</span>')
+        : (mustAct ? '<span class="lg-you act">👉 C\'est à toi d\'agir</span>' : '<span class="lg-you wait">⏳ Patiente… un autre rôle agit</span>');
+      setHTML('lg-instruct', youLine + '<br>' + instruct);
 
       // Connaissances de la voyante
       var knows = (myRole === 'voyante') ? (P(state, me).knows || {}) : {};

@@ -8,8 +8,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
 
     #s-playing { min-height: calc(100vh - 52px); }
     .tr-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -24,7 +22,14 @@
     /* Cartes nombres */
     .tcard { width: 46px; height: 64px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 7px rgba(0,0,0,0.16); display: flex; align-items: center; justify-content: center; font-weight: 900; font-family: 'Playfair Display', serif; font-size: 1.5rem; color: #2C2520; flex-shrink: 0; }
     html[data-theme="dark"] .tcard { background: #f4efe7; }
-    .tcard.back { background: linear-gradient(135deg, #6a4c93, #4a3270); color: rgba(255,255,255,0.7); font-size: 1.1rem; border-color: #3a2860; }
+    /* Dos de carte : motif sobre (plus de logo/emoji derrière) */
+    .tcard.back {
+      background-color: #c4745a;
+      background-image:
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0 3px, transparent 3px 8px),
+        linear-gradient(135deg, var(--terracotta), var(--gold));
+      color: rgba(255,255,255,0.92); font-size: 1.1rem; border-color: rgba(255,255,255,0.5);
+    }
     .tcard.seven { color: #d8a200; border-color: #e8c34a; box-shadow: 0 0 0 2px #e8c34a, 0 2px 7px rgba(0,0,0,0.2); }
     .tcard.pick { cursor: pointer; transition: transform 0.14s; }
     .tcard.pick:hover { transform: translateY(-6px); }
@@ -57,15 +62,6 @@
     .tr-myhand { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
     .tr-myhand .tcard { width: 38px; height: 52px; font-size: 1.15rem; }
     .tr-myhand .tcard.ext { box-shadow: 0 0 0 2px var(--terracotta), 0 2px 7px rgba(0,0,0,0.16); }
-
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
-    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
-    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
-    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
-    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
-    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
-    .res-rank-sc { font-weight: 800; color: var(--gold); }
 
     .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
     .modal.active { display: flex; }
@@ -137,6 +133,7 @@
         <p>• 36 cartes : les nombres <b>1 à 12</b>, trois fois chacun. Le but : réunir un <b>Trio</b> (trois cartes identiques).</p>
         <p style="margin-top:6px">• À ton tour, retourne des cartes en cherchant le même nombre : la carte <b>la plus basse</b> ▽ ou <b>la plus haute</b> △ d'un joueur, ou une carte du <b>centre</b>.</p>
         <p style="margin-top:6px">• Tant que ça correspond, tu continues. Dès que ça diffère, ton tour s'arrête.</p>
+        <p style="margin-top:6px">• 🧠 <b>Mémoire</b> : quand un tour rate, les cartes retournées restent visibles un instant avant de se recacher — <b>mémorise-les</b> pour tes prochains coups !</p>
         <p style="margin-top:6px">• Tu gagnes avec <b>3 Trios</b>… ou immédiatement avec le <b>Trio de 7</b> ! 🍀</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
@@ -229,15 +226,39 @@
         return { src: 'center', ci: ci, v: cur.center[ci] };
       });
     }
+    // Pause « mémorisation » : quand une séquence rate, les cartes retournées
+    // restent visibles quelques secondes (pour les mémoriser) avant de se recacher.
+    var PAUSE_MS = 2200, _pauseScheduled = false;
     // Applique un pick (calculé par makePick) au tour du joueur actif courant.
     function doReveal(makePick) {
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid) return cur;
+        if (cur.reveal && cur.reveal.done) return cur;          // en pause mémorisation : on n'agit pas
         cur.reveal = cur.reveal || { picks: [] };
         var pick = makePick(cur);
         if (!pick) return cur;
         cur.reveal.picks = (cur.reveal.picks || []).concat([pick]);
         processReveal(cur);
+        return cur;
+      }, function (err, committed, snap) {
+        // Le client qui a joué déclenche la fin de la pause (recache + tour suivant).
+        var v = snap && snap.val && snap.val();
+        if (v && v.reveal && v.reveal.done) scheduleClear();
+      });
+    }
+    function scheduleClear() {
+      if (_pauseScheduled) return;
+      _pauseScheduled = true;
+      setTimeout(function () { _pauseScheduled = false; clearMiss(); }, PAUSE_MS);
+    }
+    // Recache les cartes ratées et passe au joueur suivant (après la pause).
+    function clearMiss() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.reveal || cur.reveal.done !== 'miss') return cur;
+        var active = cur.turn;
+        cur.reveal = { picks: [] };
+        advanceTurn(cur, active);
+        cur.banner = 'Au tour de ' + Room.name(cur.turn);
         return cur;
       });
     }
@@ -247,10 +268,9 @@
       var picks = cur.reveal.picks, target = picks[0].v, last = picks[picks.length - 1];
       var active = cur.turn;
       if (picks.length === 1) { cur.banner = Room.name(active) + ' cherche des ' + target; return; }
-      if (last.v !== target) {                                  // raté → fin du tour
-        cur.banner = Room.name(active) + ' retourne un ' + last.v + ' ≠ ' + target + ' — tour passé';
-        cur.reveal = { picks: [] };
-        advanceTurn(cur, active);
+      if (last.v !== target) {                                  // raté → pause mémorisation, puis fin du tour
+        cur.banner = '👀 ' + last.v + ' ≠ ' + target + ' — mémorise les cartes !';
+        cur.reveal.done = 'miss';                               // on garde les cartes visibles (clearMiss recache)
         return;
       }
       if (picks.length === 3) { collectTrio(cur, active, target); return; }
@@ -300,6 +320,7 @@
     function trioBot(state, pid) {
       if (state.status !== 'playing' || state.winner || state.turn !== pid) return;
       var reveal = state.reveal || { picks: [] }, picks = reveal.picks || [];
+      if (reveal.done) return;                                  // pause mémorisation en cours
       var myHand = handOf(state, pid);
       var loIdx = accessibleIdx(state, pid, 'low'), hiIdx = accessibleIdx(state, pid, 'high');
       var flippedC = picks.filter(function (p) { return p.src === 'center'; }).map(function (p) { return p.ci; });
@@ -323,11 +344,15 @@
     function render(state) {
       var me = window.myPid, order = state.order || [], reveal = state.reveal || { picks: [] }, picks = reveal.picks || [];
       var myTurn = (state.turn === me) && !state.winner && state.status === 'playing';
+      var paused = !!reveal.done;                               // pause mémorisation (cartes ratées visibles)
+      var canAct = myTurn && !paused;                          // on ne peut cliquer que si c'est notre tour et hors pause
       setText('tr-banner', state.banner || '');
       var target = picks.length ? picks[0].v : null;
-      setHTML('tr-hint', myTurn
-        ? (picks.length ? 'Cherche un autre <b>' + target + '</b> : main ▽/△ d\'un joueur ou carte du centre.' : 'À toi ! Retourne une 1<sup>re</sup> carte (main d\'un joueur ou centre).')
-        : 'Au tour de <b>' + escapeHtml(Room.name(state.turn)) + '</b>.');
+      setHTML('tr-hint', paused
+        ? '👀 Mémorise bien les cartes… elles vont se recacher.'
+        : (myTurn
+          ? (picks.length ? 'Cherche un autre <b>' + target + '</b> : main ▽/△ d\'un joueur ou carte du centre.' : 'À toi ! Retourne une 1<sup>re</sup> carte (main d\'un joueur ou centre).')
+          : 'Au tour de <b>' + escapeHtml(Room.name(state.turn)) + '</b>.'));
 
       // Cartes retournées cette séquence
       setHTML('tr-reveal', picks.length
@@ -341,7 +366,7 @@
       setHTML('tr-center', (state.center || []).map(function (v, ci) {
         var up = flippedC.indexOf(ci) >= 0;
         if (up) return cardFace(v, ' flip');
-        return '<div class="tcard back' + (myTurn ? ' pick' : '') + '"' + (myTurn ? ' onclick="revealCenter(' + ci + ')"' : '') + '>🎴</div>';
+        return '<div class="tcard back' + (canAct ? ' pick' : '') + '"' + (canAct ? ' onclick="revealCenter(' + ci + ')"' : '') + '></div>';
       }).join('') || '<span class="tr-reveal-empty">centre vide</span>');
 
       // Joueurs (avec leurs extrêmes accessibles)
@@ -354,14 +379,23 @@
           // On NE révèle PAS la valeur (face cachée) sauf si déjà retournée cette séquence.
           var flippedIdx = flippedHandIdx(reveal, pid);
           var shown = flippedIdx.indexOf(idx) >= 0;
-          var inner = shown ? cardFace(hand[idx]) : ('<div class="tcard back' + (myTurn ? ' pick' : '') + '"' + (myTurn ? ' onclick="revealHand(\'' + pid + '\',\'' + which + '\')"' : '') + '>' + (which === 'low' ? '▽' : '△') + '</div>');
+          var inner = shown ? cardFace(hand[idx]) : ('<div class="tcard back' + (canAct ? ' pick' : '') + '"' + (canAct ? ' onclick="revealHand(\'' + pid + '\',\'' + which + '\')"' : '') + '>' + (which === 'low' ? '▽' : '△') + '</div>');
           return '<div class="tr-ext-col"><div class="tr-ext-lbl">' + (which === 'low' ? 'basse' : 'haute') + '</div>' + inner + '</div>';
+        }
+        // Les boutons « basse / haute » ne s'affichent QUE pendant notre tour (hors pause).
+        // Le reste du temps, seules les cartes déjà retournées cette séquence restent visibles.
+        var flippedIdxP = flippedHandIdx(reveal, pid);
+        var extHTML;
+        if (canAct) extHTML = ext('low', lowIdx) + ext('high', highIdx);
+        else {
+          extHTML = [lowIdx, highIdx].filter(function (ix) { return ix >= 0 && flippedIdxP.indexOf(ix) >= 0; })
+            .map(function (ix) { return '<div class="tr-ext-col"><div class="tr-ext-lbl">&nbsp;</div>' + cardFace(hand[ix]) + '</div>'; }).join('');
         }
         return '<div class="tr-prow' + (isTurn ? ' turn' : '') + (isMe ? ' me' : '') + '">' +
           '<span class="tr-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           '<span class="tr-pname">' + escapeHtml(Room.name(pid)) + (isMe ? ' (toi)' : '') + ' · ' + hand.length + ' c.</span>' +
           '<span class="tr-trios">🎴 ' + triosOf(state, pid) + '/3</span>' +
-          '<div class="tr-ext">' + ext('low', lowIdx) + ext('high', highIdx) + '</div></div>';
+          '<div class="tr-ext">' + extHTML + '</div></div>';
       }).join(''));
 
       // Ma main (je vois mes valeurs ; mes extrêmes accessibles surlignés)

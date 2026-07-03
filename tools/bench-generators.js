@@ -112,7 +112,7 @@ function seed() { return Puzzle.seed(); }
 // ── ZIP ───────────────────────────────────────────────────────────────────────
 (function () {
   console.log('🔗 Zip');
-  var Z = build(readGame('zip'), ['neighbors', 'adjacent', 'snake', 'backbite', 'genZip', 'analyze']);
+  var Z = build(readGame('zip'), ['neighbors', 'adjacent', 'edgeKey', 'snake', 'backbite', 'genZip', 'analyze']);
   function isHam(path, N) { if (path.length !== N * N) return false; var seen = {}; for (var i = 0; i < path.length; i++) { if (seen[path[i]]) return false; seen[path[i]] = 1; if (i > 0 && !Z.adjacent(path[i], path[i - 1], N)) return false; } return true; }
   // 1) invariant de construction : le chemin serpent + backbite reste hamiltonien
   var badHam = 0;
@@ -150,9 +150,17 @@ function seed() { return Puzzle.seed(); }
     }
     return dfs(start, 1, 1); // on entre sur la case « 1 », qui consomme le numéro 1
   }
-  var unsolv = 0, incon = 0;
-  for (var t2 = 0; t2 < 30; t2++) { var P = Z.genZip('easy', seed()); var r = solvable(P.numbers, P.size); if (r === null) incon++; else if (!r) unsolv++; }
+  var unsolv = 0, incon = 0, badWall = 0;
+  ['easy', 'normal', 'hard'].forEach(function (lvl) {
+    for (var t2 = 0; t2 < 30; t2++) {
+      var P = Z.genZip(lvl, seed());
+      var wset = {}; (P.walls || []).forEach(function (k) { wset[k] = 1; });   // aucun mur ne doit couper la solution
+      for (var e2 = 0; e2 < P.path.length - 1; e2++) if (wset[Z.edgeKey(P.path[e2], P.path[e2 + 1])]) badWall++;
+      if (lvl === 'easy') { var r = solvable(P.numbers, P.size); if (r === null) incon++; else if (!r) unsolv++; }
+    }
+  });
   if (!unsolv) ok('bout-en-bout : un chemin solution existe (5×5' + (incon ? ', ' + incon + ' non concluant' : '') + ')'); else bad('Zip : ' + unsolv + ' grille(s) 5×5 insolubles');
+  if (!badWall) ok('murs posés uniquement hors de la solution (la solution reste traçable)'); else bad('Zip : ' + badWall + ' mur(s) sur la solution');
 })();
 
 // ── PATCHES ───────────────────────────────────────────────────────────────────

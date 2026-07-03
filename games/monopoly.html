@@ -8,8 +8,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 340px; margin: 0 auto; padding: 0.8rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
     .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
     .btn-ghost { background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); box-shadow: var(--shadow); }
 
@@ -25,7 +23,7 @@
     .mo-wrap { width: 100%; max-width: 760px; padding: 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
     /* Plateau */
-    .mo-board { width: min(96vw, 600px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(11, 1fr); gap: 2px; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 10px; padding: 2px; }
+    .mo-board { width: min(94vw, 74vh, 560px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(11, 1fr); gap: 2px; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 10px; padding: 2px; }
     .mo-cell { position: relative; background: var(--cream); border-radius: 3px; overflow: hidden; display: flex; flex-direction: column; font-size: clamp(6px, 1.5vw, 9px); line-height: 1; cursor: pointer; min-width: 0; }
     html[data-theme="dark"] .mo-cell { background: #14101c; }
     .mo-cell .bar { height: 7px; flex-shrink: 0; }
@@ -111,6 +109,7 @@
     .mo-ov { position: fixed; inset: 0; z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.7); backdrop-filter: blur(6px); }
     .mo-ov.active { display: flex; animation: fadeUp .3s ease both; }
     .mo-ov-card { background: var(--white); border-radius: 22px; padding: 30px 26px; text-align: center; max-width: 340px; width: 100%; box-shadow: var(--shadow-hover); }
+    @media (min-width: 760px) { .mo-wrap{max-width:820px} .mo-board{width:min(62vw,72vh,600px)} }
   </style>
 </head>
 <body>
@@ -542,12 +541,12 @@
       closeModal('modal-trade');
       if (isBotPid(window.room, tradeTarget)) {
         if (ENG.aiAcceptTrade(window.room, t)) {
-          tx(function (cur) { ENG.applyTrade(cur, t); });
+          tx(function (cur) { ENG.applyTrade(cur, t); cur.trade = null; });
           lbToast('✅ ' + Room.name(tradeTarget) + ' accepte l\'échange !');
         } else {
           var counter = ENG.aiCounterTrade(window.room, t);
           if (counter) { tx(function (cur) { cur.trade = counter; }); lbToast('🔄 ' + Room.name(tradeTarget) + ' fait une contre-offre'); }
-          else lbToast('❌ ' + Room.name(tradeTarget) + ' refuse (il ne lâche pas un monopole)');
+          else { tx(function (cur) { cur.trade = null; }); lbToast('❌ ' + Room.name(tradeTarget) + ' refuse (il ne lâche pas un monopole)'); }
         }
       } else {
         tx(function (cur) { cur.trade = t; });
@@ -560,10 +559,29 @@
       // du point de vue du destinataire (moi) : je reçois t.give, je donne t.recv
       return '<div class="hint">' + (t.counter ? '🔄 ' + escapeHtml(Room.name(t.from)) + ' fait une CONTRE-OFFRE' : '🤝 ' + escapeHtml(Room.name(t.from)) + ' te propose un échange') + '</div>' +
         '<div style="font-size:.85rem;text-align:center"><b>Tu reçois :</b> ' + lst(t.give.props, t.give.cash) + '<br><b>Tu donnes :</b> ' + lst(t.recv.props, t.recv.cash) + '</div>' +
-        '<div class="mo-btn-row"><button class="btn-primary" onclick="respondTrade(true)">Accepter</button><button class="btn-primary btn-ghost" onclick="respondTrade(false)">Refuser</button></div>';
+        '<div class="mo-btn-row"><button class="btn-primary" onclick="respondTrade(true)">Accepter</button>' +
+        '<button class="btn-primary btn-ghost" onclick="openCounter()">🔄 Contre-offre</button>' +
+        '<button class="btn-primary btn-ghost" onclick="respondTrade(false)">Refuser</button></div>';
     }
     function respondTrade(accept) {
       tx(function (cur) { if (accept && cur.trade && ENG.tradeValid(cur, cur.trade)) ENG.applyTrade(cur, cur.trade); cur.trade = null; });
+    }
+    // Contre-offre : rouvre l'éditeur d'échange pré-rempli avec la proposition reçue
+    // (côtés inversés), modifiable, renvoyée à l'expéditeur (bot OU joueur en ligne).
+    function openCounter() {
+      var s = window.room, t = s.trade;
+      if (!t || t.to !== window.myPid) return;
+      openTrade();
+      setTradeTarget(t.from);
+      var giveProps = (t.recv && t.recv.props) || [], recvProps = (t.give && t.give.props) || [];
+      document.querySelectorAll('#trade-body input[type=checkbox]').forEach(function (c) {
+        var v = +c.value;
+        if (c.dataset.side === 'give' && giveProps.indexOf(v) >= 0) c.checked = true;
+        if (c.dataset.side === 'recv' && recvProps.indexOf(v) >= 0) c.checked = true;
+      });
+      var gcEl = document.getElementById('trade-give-cash'); if (gcEl) gcEl.value = (t.recv && t.recv.cash) || 0;
+      var rcEl = document.getElementById('trade-recv-cash'); if (rcEl) rcEl.value = (t.give && t.give.cash) || 0;
+      var titleEl = document.querySelector('#trade-card .modal-title'); if (titleEl) titleEl.textContent = '🔄 Contre-offre à ' + Room.name(t.from);
     }
 
     /* ━━━━━━━━━━ Fin de partie ━━━━━━━━━━ */

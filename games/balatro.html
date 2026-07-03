@@ -7,6 +7,26 @@
   <style>
     body { padding-top: 52px; }
     .ba-wrap { max-width: 720px; margin: 0 auto; padding: 10px 12px 40px; }
+    @media (min-width: 860px) { .ba-wrap { max-width: 1040px; } }
+
+    /* Disposition façon Balatro : bande latérale + zone de jeu */
+    .ba-layout { display: flex; flex-direction: column; gap: 12px; }
+    .ba-side { display: flex; flex-direction: column; gap: 8px; }
+    .ba-side-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .ba-side-stats .ba-stat { text-align: center; }
+    .ba-money-stat .val { color: #c99a2e; }
+    .ba-main { min-width: 0; }
+    @media (min-width: 860px) {
+      .ba-layout { flex-direction: row; align-items: flex-start; }
+      .ba-side { flex: 0 0 236px; width: 236px; position: sticky; top: 62px; }
+      .ba-side-stats { grid-template-columns: 1fr 1fr; }
+      .ba-score-wrap { flex-direction: column; align-items: flex-start; }
+      .ba-score-wrap .big { font-size: 2.1rem; }
+      .ba-main { flex: 1; }
+      .ba-hand { min-height: 120px; }
+      .ba-hand .ba-card { width: clamp(58px, 6.4vw, 78px); }
+      .ba-jokers { min-height: 96px; }
+    }
 
     /* Bandeau d'état */
     .ba-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
@@ -57,6 +77,7 @@
     .ba-btn:disabled { opacity: 0.4; cursor: default; }
     .ba-sort { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
     .ba-sort button { background: transparent; border: 1px solid var(--gold-light); border-radius: 20px; padding: 3px 12px; font-size: 0.76rem; cursor: pointer; color: var(--ink); font-weight: 700; }
+    .ba-sort button.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
 
     /* Écran blind / boutique / fin */
     .ba-panel { text-align: center; padding: 16px 6px; }
@@ -95,28 +116,38 @@
   <div class="ba-wrap">
     <!-- Écran de jeu -->
     <div id="ba-game" style="display:none">
-      <div class="ba-top">
-        <div class="ba-stat"><div class="lab">Ante</div><div class="val"><span id="ba-ante">1</span>/8</div></div>
-        <div class="ba-stat"><div class="lab">Blind</div><div class="val ba-blindname" id="ba-blind">—</div></div>
-        <div class="ba-score-wrap">
-          <div><div class="tgt">Objectif <span id="ba-target">300</span></div><div class="big" id="ba-round">0</div>
-            <div class="ba-progress"><div id="ba-bar" style="width:0%"></div></div></div>
-          <div style="text-align:right"><div class="tgt">Mains 🖐 <b id="ba-hands">4</b></div><div class="tgt">Défausses ♻ <b id="ba-disc">3</b></div><div class="tgt ba-money">$<span id="ba-money">4</span></div></div>
+      <div class="ba-layout">
+        <!-- Bande latérale (façon Balatro) : score, blind, jauges de la manche -->
+        <aside class="ba-side">
+          <div class="ba-score-wrap">
+            <div style="width:100%"><div class="tgt">Objectif <span id="ba-target">300</span></div>
+              <div class="big" id="ba-round">0</div>
+              <div class="ba-progress"><div id="ba-bar" style="width:0%"></div></div></div>
+          </div>
+          <div class="ba-side-stats">
+            <div class="ba-stat"><div class="lab">Ante</div><div class="val"><span id="ba-ante">1</span>/8</div></div>
+            <div class="ba-stat"><div class="lab">Blind</div><div class="val ba-blindname" id="ba-blind">—</div></div>
+            <div class="ba-stat"><div class="lab">Mains 🖐</div><div class="val" id="ba-hands">4</div></div>
+            <div class="ba-stat"><div class="lab">Défausses ♻</div><div class="val" id="ba-disc">3</div></div>
+            <div class="ba-stat ba-money-stat"><div class="lab">Argent</div><div class="val ba-money">$<span id="ba-money">4</span></div></div>
+          </div>
+        </aside>
+
+        <!-- Zone de jeu : jokers en haut, main en bas -->
+        <div class="ba-main">
+          <div class="ba-jokers" id="ba-jokers"></div>
+          <div class="ba-handinfo" id="ba-handinfo"></div>
+          <div class="ba-hand" id="ba-hand"></div>
+          <div class="ba-sort">
+            <button data-sort="rank" onclick="sortHand('rank')">Trier par rang</button>
+            <button data-sort="suit" onclick="sortHand('suit')">Trier par couleur</button>
+            <button onclick="openModal('ba-modal-hands')">📖 Mains</button>
+          </div>
+          <div class="ba-actions">
+            <button class="ba-btn play" id="ba-play" onclick="playHand()">Jouer la main</button>
+            <button class="ba-btn disc" id="ba-discard" onclick="discardCards()">Défausser</button>
+          </div>
         </div>
-      </div>
-
-      <div class="ba-jokers" id="ba-jokers"></div>
-      <div class="ba-handinfo" id="ba-handinfo"></div>
-
-      <div class="ba-sort">
-        <button onclick="sortHand('rank')">Trier par rang</button>
-        <button onclick="sortHand('suit')">Trier par couleur</button>
-        <button onclick="openModal('ba-modal-hands')">📖 Mains</button>
-      </div>
-      <div class="ba-hand" id="ba-hand"></div>
-      <div class="ba-actions">
-        <button class="ba-btn play" id="ba-play" onclick="playHand()">Jouer la main</button>
-        <button class="ba-btn disc" id="ba-discard" onclick="discardCards()">Défausser</button>
       </div>
     </div>
 
@@ -336,7 +367,7 @@
     function newGame() {
       G = { levels: {}, jokers: [], jscale: {}, consumables: [], handPlays: {}, money: 4, ante: 1, blindIdx: 0, phase: 'blind',
         stock: fullDeck(), deck: [], hand: [], sel: [], roundScore: 0, target: 0, handsLeft: 4, discardsLeft: 3, handSize: 8, boss: null,
-        bosses: {}, shop: null, lastHand: null };
+        bosses: {}, shop: null, lastHand: null, sortMode: 'rank' };
       HAND_ORDER.forEach(function (k) { G.levels[k] = 1; });
       _endFx = false;
       // pré-tire un boss par ante (déterministe pour l'affichage du blind)
@@ -365,7 +396,13 @@
       G.deck = shuffle(G.stock.map(cloneCard)); G.hand = []; G.sel = []; // depuis le deck PERSISTANT de la partie
       draw(); route(); save();
     }
-    function draw() { while (G.hand.length < G.handSize && G.deck.length) G.hand.push(G.deck.pop()); }
+    function applySort() {
+      var mode = G.sortMode || 'rank';
+      G.hand.sort(mode === 'suit'
+        ? function (a, b) { return a.s.localeCompare(b.s) || b.r - a.r; }
+        : function (a, b) { return b.r - a.r || a.s.localeCompare(b.s); });
+    }
+    function draw() { while (G.hand.length < G.handSize && G.deck.length) G.hand.push(G.deck.pop()); applySort(); }
 
     function toggleSel(id) {
       var i = G.sel.indexOf(id);
@@ -417,8 +454,8 @@
       draw(); route(); save();
     }
     function sortHand(mode) {
-      G.hand.sort(mode === 'suit' ? function (a, b) { return a.s.localeCompare(b.s) || b.r - a.r; } : function (a, b) { return b.r - a.r || a.s.localeCompare(b.s); });
-      route();
+      G.sortMode = mode; applySort();
+      route(); save();
     }
 
     function beatBlind() {
@@ -497,6 +534,10 @@
       else if (G.lastHand) info = '<div style="color:var(--ink-light);font-size:0.86rem">Dernière : ' + G.lastHand + '</div>';
       $('ba-handinfo').innerHTML = info;
       $('ba-hand').innerHTML = G.hand.map(cardHTML).join('');
+      // Bouton de tri actif surligné (le tri est mémorisé même après pioche)
+      document.querySelectorAll('.ba-sort button[data-sort]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-sort') === (G.sortMode || 'rank'));
+      });
       $('ba-play').disabled = !cards.length; $('ba-discard').disabled = !cards.length || G.discardsLeft <= 0;
     }
     function renderBlindScreen() {

@@ -8,15 +8,17 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
 
-    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
-    .pt-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    html[data-theme="dark"] .pt-head { background: rgba(20,16,28,0.97); }
-    .pt-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
-    .pt-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
-    .pt-head-actions { display: flex; gap: 6px; }
+    #s-playing.active { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    /* ── En-tête façon LinkedIn : retour · titre · chrono · pastille de niveau ── */
+    .pt-head { position: sticky; top: 52px; z-index: 100; background: var(--nav-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 10px 16px; display: flex; align-items: center; }
+    .pt-back { font-size: 1.5rem; line-height: 1; color: var(--ink); text-decoration: none; padding: 0 8px 2px; margin-right: 4px; border-radius: 8px; }
+    .pt-back:hover { background: rgba(44,37,32,0.06); }
+    .pt-title { font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--ink); }
+    .pt-timer { margin-left: auto; display: flex; align-items: center; gap: 5px; font-weight: 800; font-size: 1rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .pt-timer svg { width: 17px; height: 17px; }
+    .pt-diff { margin-left: auto; background: rgba(44,37,32,0.06); color: var(--ink-light); border-radius: 30px; padding: 6px 14px; font-weight: 700; font-size: 0.8rem; white-space: nowrap; }
+    html[data-theme="dark"] .pt-back:hover, html[data-theme="dark"] .pt-diff { background: rgba(255,255,255,0.08); }
 
     .pt-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
     .pt-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
@@ -25,34 +27,34 @@
     .pt-opp .pc { color: var(--sage); }
     .pt-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
 
-    .pt-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 10px; }
-    .pt-wrap { position: relative; width: min(92vw, 430px); aspect-ratio: 1; touch-action: none; }
-    .pt-grid { width: 100%; height: 100%; display: grid; border: 2px solid #2C2520; border-radius: 10px; overflow: hidden; background: var(--cream); }
-    html[data-theme="dark"] .pt-grid { background: #221a2e; }
-    .pt-cell { position: relative; display: flex; align-items: center; justify-content: center; user-select: none; box-sizing: border-box; font-size: clamp(0.6rem, 2.7vw, 1rem); }
-    .pt-clue { display: flex; align-items: center; justify-content: center; border: 2px solid #2C2520; background: rgba(255,255,255,0.9); color: #2C2520; font-weight: 800; font-size: 0.92em; border-radius: 4px; z-index: 3; }
+    .pt-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 12px 24px; }
+    .pt-card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow); padding: 14px; }
+    .pt-wrap { position: relative; width: min(88vw, 420px); aspect-ratio: 1; touch-action: none; }
+    .pt-grid { position: relative; z-index: 1; width: 100%; height: 100%; display: grid; border: 2px solid rgba(44,37,32,0.5); border-radius: 12px; overflow: hidden; background: var(--white); }
+    html[data-theme="dark"] .pt-grid { background: #221a2e; border-color: rgba(255,255,255,0.4); }
+    .pt-cell { position: relative; display: flex; align-items: center; justify-content: center; user-select: none; box-sizing: border-box; font-size: clamp(0.6rem, 2.7vw, 1rem); border: 1px dashed rgba(44,37,32,0.16); }
+    html[data-theme="dark"] .pt-cell { border-color: rgba(255,255,255,0.14); }
+    .pt-clue { display: flex; align-items: center; justify-content: center; border: 2px solid #2C2520; background: rgba(255,255,255,0.92); color: #2C2520; font-weight: 800; font-size: 0.92em; border-radius: 4px; z-index: 3; }
     .pt-sq { width: 1.55em; height: 1.55em; } .pt-tall { width: 1.12em; height: 1.7em; } .pt-wide { width: 1.7em; height: 1.12em; }
     .pt-any { width: 1.55em; height: 1.55em; border-style: dashed; }
-    .pt-prev { position: absolute; border: 2.5px dashed var(--terracotta); border-radius: 8px; background: rgba(196,116,90,0.12); pointer-events: none; z-index: 4; display: none; }
+    /* Patchs posés : tuiles arrondies pleines (façon LinkedIn) au-dessus de la grille. */
+    .pt-tiles { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+    .pt-tile { position: absolute; box-sizing: border-box; border-radius: 10px; border: 2px solid rgba(44,37,32,0.18); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.06), inset 0 2px 0 rgba(255,255,255,0.25); }
+    .pt-tile.bad { border-color: #d8453b; }
+    .pt-prev { position: absolute; border: 2.5px dashed var(--terracotta); border-radius: 10px; background: rgba(196,116,90,0.14); pointer-events: none; z-index: 4; display: none; }
 
-    .pt-tools { display: flex; gap: 8px; justify-content: center; }
-    .pt-tool { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.42rem 1.2rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; color: var(--ink); }
-    .pt-tool:disabled { opacity: 0.45; cursor: default; }
+    .pt-actions { display: flex; gap: 12px; width: min(88vw, 420px); }
+    .pt-btn { flex: 1; padding: 0.85rem; border: none; border-radius: 14px; background: rgba(44,37,32,0.06); color: var(--ink-light); font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.98rem; cursor: pointer; transition: background .15s; }
+    .pt-btn:hover:not(:disabled) { background: rgba(44,37,32,0.11); }
+    .pt-btn:disabled { opacity: 0.45; cursor: default; }
+    html[data-theme="dark"] .pt-btn { background: rgba(255,255,255,0.08); }
+    html[data-theme="dark"] .pt-btn:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
     .pt-legend { background: var(--white); border-radius: 14px; box-shadow: var(--shadow); padding: 10px 14px; max-width: 360px; font-size: 0.8rem; color: var(--ink-light); }
     .pt-legend-title { text-align: center; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
     .pt-legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
     .pt-legend-row { display: flex; align-items: center; gap: 7px; }
     .pt-lm { border: 2px solid #2C2520; border-radius: 3px; flex: none; }
     .pt-legend-note { text-align: center; margin-top: 8px; font-size: 0.76rem; }
-
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
-    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
-    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
-    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
-    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
-    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
-    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
 
     .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
     .modal.active { display: flex; }
@@ -61,6 +63,7 @@
     .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    @media (min-width: 760px) { .pt-wrap{width:min(66vw,520px)} }
   </style>
 </head>
 <body>
@@ -74,20 +77,18 @@
 
     <div id="s-playing" class="screen">
       <div class="pt-head">
-        <span class="pt-title-mini">Patches</span>
-        <span class="pt-timer" id="pt-timer">⏱ 0:00</span>
-        <div class="pt-head-actions">
-          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
-          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
-        </div>
+        <a class="pt-back" href="/index.html" title="Retour aux jeux">←</a>
+        <span class="pt-title">Patches</span>
+        <span class="pt-timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 1.8"/></svg><span id="pt-time">0:00</span></span>
+        <span class="pt-diff" id="pt-diff">Niveau —</span>
       </div>
       <div class="pt-opps" id="pt-opps"></div>
       <div class="pt-banner" id="pt-banner"></div>
       <div class="pt-stage">
-        <div class="pt-wrap" id="pt-wrap"><div class="pt-grid" id="pt-grid"></div><div class="pt-prev" id="pt-prev"></div></div>
-        <div class="pt-tools">
-          <button class="pt-tool" id="pt-undo" onclick="undo()">↩ Annuler</button>
-          <button class="pt-tool" id="pt-hint" onclick="hint()">💡 Indice</button>
+        <div class="pt-card"><div class="pt-wrap" id="pt-wrap"><div class="pt-grid" id="pt-grid"></div><div class="pt-tiles" id="pt-tiles"></div><div class="pt-prev" id="pt-prev"></div></div></div>
+        <div class="pt-actions">
+          <button class="pt-btn" id="pt-undo" onclick="undo()">Annuler</button>
+          <button class="pt-btn" id="pt-hint" onclick="hint()">Indice</button>
         </div>
         <div class="pt-legend">
           <div class="pt-legend-title">Complète chaque forme pour remplir la grille</div>
@@ -235,7 +236,8 @@
       else { stopTimer(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
-    function startTimer(state) { stopTimer(); function tick() { setText('pt-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function startTimer(state) { stopTimer(); function tick() { setText('pt-time', Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function diffLabel(s) { var d = (s && s.difficulty) || 'normal', L = (window.Bots && Bots.LABELS) || { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' }; return 'Niveau ' + (L[d] || 'Moyen').toUpperCase(); }
     function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
 
     function NS() { return (window.room && window.room.N) || 6; }
@@ -306,7 +308,12 @@
     }
 
     /* ━━ Rendu ━━ */
-    function shapeBox(c) { var cls = c.shape === 'tall' ? 'pt-tall' : c.shape === 'wide' ? 'pt-wide' : c.shape === 'any' ? 'pt-any' : 'pt-sq'; return '<div class="pt-clue ' + cls + '">' + (c.num != null ? c.num : '') + '</div>'; }
+    function shapeBox(c) {
+      var cls = c.shape === 'tall' ? 'pt-tall' : c.shape === 'wide' ? 'pt-wide' : c.shape === 'any' ? 'pt-any' : 'pt-sq';
+      var col = c.color || '#2C2520';                       // chaque indice porte la couleur de son patch
+      var st = 'border-color:' + col + ';color:' + col + ';background:' + hexA(col, 0.16);
+      return '<div class="pt-clue ' + cls + '" style="' + st + '">' + (c.num != null ? c.num : '') + '</div>';
+    }
     function render(state) {
       var me = window.myPid, order = state.order || [], N = state.N || 6, cs = state.clues || [], pl = placedOf(state, me);
       setHTML('pt-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
@@ -314,27 +321,33 @@
           escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : coverOf(state, pid) + '/' + (N * N)) + '</span></div>';
       }).join(''));
       setText('pt-banner', state.banner || '');
+      setText('pt-diff', diffLabel(state));
 
       var owner = []; for (var z = 0; z < N * N; z++) owner.push(-1);
       pl.forEach(function (p, pi) { for (var yy = p.y; yy < p.y + p.h; yy++) for (var xx = p.x; xx < p.x + p.w; xx++) owner[yy * N + xx] = pi; });
       var ev = evalPlacement(N, cs, pl), badRect = {}; ev.bad.forEach(function (i) { badRect[i] = 1; });
       var clueAt = {}; cs.forEach(function (c) { clueAt[c.cy * N + c.cx] = c; });
 
+      // Grille de fond : cases pointillées, indice affiché tant que la case n'est pas couverte.
       var html = '';
       for (var i = 0; i < N * N; i++) {
-        var x = i % N, y = i / N | 0, o = owner[i], col = o >= 0 ? cs[pl[o].ci].color : null;
-        var bad = o >= 0 && badRect[o];
-        var bg = col ? (bad ? 'rgba(216,69,59,0.22)' : hexA(col, 0.5)) : 'transparent';
-        var edge = bad ? '#d8453b' : '#2C2520', faint = 'rgba(44,37,32,0.10)';
-        function side(nx, ny) { var ni = ny * N + nx; var diff = (nx < 0 || ny < 0 || nx >= N || ny >= N) ? false : owner[ni] !== o; return (nx < 0 || ny < 0 || nx >= N || ny >= N) ? '0' : (diff ? '2px solid ' + edge : '1px solid ' + faint); }
-        var bt = (y === 0) ? '0' : side(x, y - 1), bl = (x === 0) ? '0' : side(x - 1, y), br = (x === N - 1) ? '0' : side(x + 1, y), bb = (y === N - 1) ? '0' : side(x, y + 1);
-        var st = 'background:' + bg + ';border-top:' + bt + ';border-left:' + bl + ';border-right:' + br + ';border-bottom:' + bb;
-        html += '<div class="pt-cell" data-x="' + x + '" data-y="' + y + '" style="' + st + '">' + (clueAt[i] ? shapeBox(clueAt[i]) : '') + '</div>';
+        var x = i % N, y = i / N | 0, covered = owner[i] >= 0;
+        html += '<div class="pt-cell" data-x="' + x + '" data-y="' + y + '">' + (clueAt[i] && !covered ? shapeBox(clueAt[i]) : '') + '</div>';
       }
       var grid = document.getElementById('pt-grid');
       grid.style.gridTemplateColumns = 'repeat(' + N + ', 1fr)';
       grid.style.gridTemplateRows = 'repeat(' + N + ', 1fr)';
       grid.innerHTML = html;
+
+      // Tuiles : un rectangle arrondi plein par patch posé, avec un léger espace.
+      var u = 100 / N, g = 1.1, tiles = '';
+      pl.forEach(function (p, pi) {
+        var col = cs[p.ci].color, bad = !!badRect[pi];
+        var bg = bad ? hexA('#d8453b', 0.32) : hexA(col, 0.9);
+        var l = (p.x * u + g).toFixed(3), t = (p.y * u + g).toFixed(3), w = (p.w * u - 2 * g).toFixed(3), h = (p.h * u - 2 * g).toFixed(3);
+        tiles += '<div class="pt-tile' + (bad ? ' bad' : '') + '" style="left:' + l + '%;top:' + t + '%;width:' + w + '%;height:' + h + '%;background:' + bg + '"></div>';
+      });
+      document.getElementById('pt-tiles').innerHTML = tiles;
       var undoBtn = document.getElementById('pt-undo'); if (undoBtn) undoBtn.disabled = !pl.length;
     }
     function hexA(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; }

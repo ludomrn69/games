@@ -56,7 +56,7 @@ la synchro temps réel.
 | 🤵 Président | 3–8 | ✈️ | cartes |
 | 🐴 Petits chevaux | 2–4 | ✈️ | plateau / dés |
 | 💰 Le juste prix | 2–8 | ✈️ | déduction |
-| 🖍️ Télé-dessiné | 3–10 |  | dessin |
+| 🖍️ Gartic Phone | 3–10 |  | dessin |
 | 🏠 Monopoly | 2–6 | ✈️ | plateau |
 | 🔎 Cluedo | 2–6 | ✈️ | déduction (plateau) |
 | 🐔 Papayoo | 3–6 | ✈️ | plis |
@@ -159,6 +159,16 @@ node tools/bench-playus.js   # smoke test des mini-jeux Playus (charge + démarr
 Le tableau « Les jeux » ci-dessus est **généré** depuis le catalogue `GAMES` de
 `index.html` (source unique). Ne l'édite pas à la main : modifie `index.html` puis
 lance `node tools/gen-readme.js`. La CI échoue si le README n'est pas à jour.
+
+### Hook pre-commit (recommandé)
+Pour ne plus jamais oublier de régénérer les fichiers dérivés (`sw.js`, `README.md`,
+`common.js`) avant de committer — première cause de CI rouge — active le hook fourni,
+**une fois par clone** :
+```bash
+git config core.hooksPath .githooks
+```
+Il régénère automatiquement ces fichiers, les ré-indexe et lance `tools/check.js`
+avant chaque commit.
 Le benchmark vérifie que les bots « difficile » écrasent l'aléatoire/facile et ne
 perdent jamais au morpion — garde-fou contre les régressions d'IA.
 

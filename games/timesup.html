@@ -8,10 +8,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
 
-    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    #s-playing.active { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
     .tu-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     html[data-theme="dark"] .tu-head { background: rgba(20,16,28,0.97); }
     .tu-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
@@ -38,8 +36,6 @@
     .tu-wait { font-family: 'Caveat', cursive; font-size: 1.3rem; color: var(--ink-light); }
     .tu-big { font-size: 1.05rem; }
 
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
     .res-sub { font-size: 1.1rem; color: var(--ink-light); margin-bottom: 20px; }
 
     .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
@@ -49,6 +45,7 @@
     .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.88rem; color: var(--ink-light); line-height: 1.55; } .modal-body b { color: var(--ink); }
+    @media (min-width: 760px) { .tu-stage{max-width:680px;margin-inline:auto} }
   </style>
 </head>
 <body>
@@ -98,7 +95,7 @@
         <p><b>À plusieurs (2 équipes) :</b></p>
         <p>• Mêmes cartes sur 3 manches : 1) <b>décris librement</b>, 2) <b>un seul mot</b>, 3) <b>mime</b>.</p>
         <p style="margin-top:4px">• À ton tour, fais deviner un max de cartes à ton équipe avant la fin du chrono. ✅ trouvé / ⤳ passe.</p>
-        <p style="margin-top:8px"><b>En solo :</b> devine la célébrité à partir des indices avant la fin du temps. La difficulté règle le chrono et les indices.</p>
+        <p style="margin-top:8px">• Ce jeu se joue à <b>4 joueurs minimum</b> (2 équipes), en ligne ou à plusieurs sur le même appareil.</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
     </div>
@@ -141,15 +138,15 @@
       name: "Time's Up",
       emoji: '⏱️',
       tagline: 'Fais deviner contre la montre',
-      minPlayers: 1,
+      minPlayers: 4,
       maxPlayers: 12,
       rules: [
-        'À plusieurs : 2 équipes, 3 manches (libre / un mot / mime)',
-        'Fais deviner un max de cartes avant la fin du chrono',
-        'En solo : devine la célébrité à partir des indices',
+        '2 équipes, 3 manches (parle librement / un seul mot / mime)',
+        'Fais deviner un max de cartes à ton équipe avant la fin du chrono',
+        'Même paquet de cartes aux 3 manches — la mémoire aide !',
         'La difficulté règle le chrono et les indices'
       ],
-      offline: { solo: true, local: true, soloMinBots: 0 },
+      offline: { local: true },
       bot: function () {},
       offlineTurn: function (r) { return (r.status === 'ended' || r.solo) ? null : r.turn; },
       offlineEnter: function () { if (window.room) render(window.room); },

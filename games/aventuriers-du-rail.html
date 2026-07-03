@@ -8,8 +8,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
     .btn-primary:disabled { opacity: 0.5; }
 
     #s-playing { min-height: calc(100vh - 52px); }
@@ -69,14 +67,12 @@
     .tk-opt.sel { border-color: var(--terracotta); background: var(--white); }
     .pay-opt { border: none; border-radius: 12px; padding: 0.6rem 1rem; font-weight: 800; cursor: pointer; color: #fff; margin: 4px; }
 
-    #s-results { align-items: center; justify-content: flex-start; min-height: calc(100vh - 52px); padding: 30px 20px; text-align: center; }
-    .res-emoji { font-size: 3rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.7rem; margin: 4px 0 10px; }
-    .res-rank { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; margin: 0 auto 20px; }
     .res-row { background: var(--cream); border-radius: 14px; padding: 10px 14px; text-align: left; }
     .res-row .top { display: flex; align-items: center; gap: 10px; font-weight: 800; }
     .res-row .top .av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     .res-row .top .tot { margin-left: auto; color: var(--gold); font-size: 1.1rem; }
     .res-row .brk { font-size: 0.76rem; color: var(--ink-light); margin-top: 4px; }
+    @media (min-width: 760px) { .tr-hand,.tr-players{max-width:900px;margin-inline:auto} }
   </style>
 </head>
 <body>
@@ -161,7 +157,7 @@
     var prevStatus = null, pickTickets = null;
 
     GameRoom({
-      gameKey: 'aventuriers-du-rail', name: 'Aventuriers du Rail', emoji: '🚂', tagline: 'Bâtis ton réseau ferré',
+      gameKey: 'aventuriers-du-rail', name: 'Aventuriers du Rail', emoji: '🚂', tagline: 'Ton réseau ferré à travers l\'Europe',
       minPlayers: 2, maxPlayers: 5,
       rules: [
         'À ton tour : piocher 2 cartes, réclamer une route, ou piocher des billets',
@@ -302,14 +298,14 @@
       }
       return out;
     }
-    // Silhouette stylisée de la France (coordonnées 0..100, mêmes repères que les villes).
-    var FRANCE_PATH = 'M50,3 L62,10 L71,14 L87,21 L89,32 L80,42 L82,55 L86,66 L77,77 L63,83 L52,81 L44,89 L29,85 L22,72 L14,54 L4,37 L2,27 L12,21 L24,25 L33,17 L42,10 Z';
+    // Fond stylisé « continent européen » (masse de terre décorative, coords 0..100).
+    var EUROPE_PATH = 'M18,8 Q4,14 4,30 Q2,48 8,60 Q4,74 14,82 Q28,90 44,86 Q58,90 70,82 Q86,76 94,60 Q98,44 94,28 Q90,12 72,8 Q54,3 40,7 Q28,3 18,8 Z';
     function renderMap(state) {
       var me = window.myPid, myTurn = state.turn === me && state.phase === 'play' && (state.players[me].drawn || 0) === 0;
       var svg = '<svg class="tr-map" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">' +
         '<rect width="100" height="100" fill="#bcd9e2" rx="3"/>' +
-        '<path d="' + FRANCE_PATH + '" fill="#eee3c8" stroke="#b9a06f" stroke-width="0.8" stroke-linejoin="round"/>' +
-        '<path d="' + FRANCE_PATH + '" fill="none" stroke="#fff" stroke-width="0.35" opacity="0.6" transform="translate(0.4 0.5)"/>';
+        '<path d="' + EUROPE_PATH + '" fill="#eee3c8" stroke="#b9a06f" stroke-width="0.8" stroke-linejoin="round"/>' +
+        '<path d="' + EUROPE_PATH + '" fill="none" stroke="#fff" stroke-width="0.35" opacity="0.6" transform="translate(0.4 0.5)"/>';
       // routes en cases wagon
       A.ROUTES.forEach(function (r) {
         var a = cityById[r.a], b = cityById[r.b];

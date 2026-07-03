@@ -9,8 +9,6 @@
   <script src="/firebase-init.js"></script>
   <style>
 
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
     .btn-primary:disabled { opacity: 0.5; }
     .btn-ghost { background: transparent; border: 1.5px solid var(--gold-light); color: var(--ink-light); border-radius: 14px; padding: 0.5rem 0.9rem; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; }
 
@@ -67,6 +65,7 @@
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
+    @media (min-width: 760px) { .bn-wrap{max-width:900px} .bn-grid{width:min(44vw,460px)} }
   </style>
 </head>
 <body>

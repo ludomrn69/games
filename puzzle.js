@@ -67,8 +67,11 @@
     opts = opts || {};
     var stack = [], undoBtn = null, hintBtn = null, built = false;
     function canEdit() { return !opts.canEdit || !!opts.canEdit(); }
+    function doHint() { if (canEdit() && opts.hint) { try { opts.hint(); } catch (e) {} } }
     function build() {
-      if (built || typeof document === 'undefined') return;
+      // Sans `mount`, l'aide ne pose PAS ses propres boutons : le jeu appelle
+      // A.undo()/A.hint() depuis ses boutons à lui (rendu façon LinkedIn).
+      if (built || typeof document === 'undefined' || !opts.mount) return;
       var mount = document.getElementById(opts.mount);
       if (!mount) return;
       built = true;
@@ -79,7 +82,7 @@
       if (opts.hint) {
         hintBtn = document.createElement('button');
         hintBtn.type = 'button'; hintBtn.className = 'game-rules-btn'; hintBtn.title = 'Indice'; hintBtn.textContent = '💡';
-        hintBtn.onclick = function () { if (canEdit()) { try { opts.hint(); } catch (e) {} } };
+        hintBtn.onclick = doHint;
         mount.insertBefore(hintBtn, mount.firstChild);
       }
       refresh();
@@ -103,7 +106,11 @@
       if (hintBtn) hintBtn.disabled = !canEdit();
     }
     build();
-    return { record: record, reset: reset, refresh: refresh };
+    return {
+      record: record, reset: reset, refresh: refresh,
+      undo: doUndo, hint: doHint,
+      canUndo: function () { return stack.length > 0 && canEdit(); }
+    };
   }
 
   root.Puzzle = { rng: rng, shuffle: shuffle, seed: seed, fmtTime: fmtTime, elapsed: elapsed, finish: finish, rankByTime: rankByTime, assist: assist };

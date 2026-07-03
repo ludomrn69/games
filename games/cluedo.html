@@ -8,8 +8,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 340px; margin: 0 auto; padding: 0.8rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
     .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
     .btn-ghost { background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); box-shadow: var(--shadow); }
 
@@ -31,14 +29,19 @@
     .cl-corr.door { background: linear-gradient(145deg, #e2c290, #cda36a); box-shadow: inset 0 0 0 1px rgba(90,60,30,0.55); } /* seuil de porte */
     html[data-theme="dark"] .cl-corr.door { background: linear-gradient(145deg, #8a6b3e, #6f5430); }
     .cl-pool { background: radial-gradient(circle at 50% 35%, #2e3138 0%, #17191d 78%); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; box-shadow: inset 0 0 0 2px #c6985a, inset 0 0 22px rgba(0,0,0,0.8); z-index: 1; }
-    .cl-pool.reach { outline: 3px solid var(--sage); cursor: pointer; }
+    .cl-pool.reach { outline: 4px solid #34c759; cursor: pointer; box-shadow: 0 0 0 3px rgba(52,199,89,0.4), 0 0 16px rgba(52,199,89,0.6); animation: clReach 1.1s ease-in-out infinite; z-index: 5; }
     .cl-pool-logo { color: #c62533; font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(13px, 3.4vw, 19px); letter-spacing: 2px; transform: rotate(-6deg); text-shadow: 0 2px 5px rgba(0,0,0,0.85), 0 0 14px rgba(198,37,51,0.45); }
     .cl-pool-sub { color: rgba(255,255,255,0.55); font-size: 7px; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
     .cl-pool .rtok { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 2px; }
-    .cl-corr.reach { background: rgba(139,158,126,.75); cursor: pointer; box-shadow: inset 0 0 0 1px var(--sage); }
-    .cl-corr.reach:hover { background: var(--sage); }
+    .cl-corr.reach { background: rgba(52,199,89,.55); cursor: pointer; box-shadow: inset 0 0 0 2px #34c759; position: relative; z-index: 4; }
+    .cl-corr.reach::after { content: ''; position: absolute; width: 42%; height: 42%; border-radius: 50%; background: #34c759; box-shadow: 0 0 8px rgba(52,199,89,0.9); animation: clReach 1.1s ease-in-out infinite; }
+    .cl-corr.reach:hover { background: #34c759; }
+    @keyframes clReach { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
     .cl-room { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; padding: 2px; font-size: 9px; font-weight: 700; color: #3a2f28; position: relative; overflow: hidden; box-shadow: inset 0 0 0 3px #4a3b2c, inset 0 0 0 4px rgba(255,255,255,0.35); z-index: 1; }
-    .cl-room.reach { outline: 3px solid var(--sage); outline-offset: -3px; cursor: pointer; }
+    .cl-room.reach { outline: 4px solid #34c759; outline-offset: -4px; cursor: pointer; box-shadow: inset 0 0 0 100px rgba(52,199,89,0.22), 0 0 16px rgba(52,199,89,0.55); animation: clReach 1.1s ease-in-out infinite; z-index: 5; }
+    .cl-room.reach .rname { background: #218c3c; color: #fff; }
+    .cl-note-btn { display: block; width: 100%; margin: 0 0 10px; padding: 0.7rem 1rem; border: none; border-radius: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.95rem; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 3px 12px rgba(196,116,90,0.3); }
+    .cl-note-btn:hover { transform: translateY(-1px); }
     .cl-room .rsvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
     .cl-room .rname { position: relative; z-index: 2; line-height: 1.05; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(7px, 1.9vw, 10.5px); letter-spacing: 0.4px; text-transform: uppercase; background: rgba(30,24,18,0.78); border-radius: 3px; padding: 1px 5px; color: #f3e8d2; }
     .cl-room .cl-secret { position: relative; z-index: 2; font-size: clamp(6.5px, 1.6vw, 8.5px); font-weight: 700; color: #ffe6b8; line-height: 1.1; margin: 1px 0 2px; background: rgba(30,24,18,0.6); border-radius: 3px; padding: 0 3px; }
@@ -91,6 +94,7 @@
     .cl-ov { position: fixed; inset: 0; z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.7); backdrop-filter: blur(6px); }
     .cl-ov.active { display: flex; animation: fadeUp .3s ease both; }
     .cl-ov-card { background: var(--white); border-radius: 22px; padding: 30px 26px; text-align: center; max-width: 360px; width: 100%; box-shadow: var(--shadow-hover); }
+    @media (min-width: 760px) { .cl-wrap{max-width:780px} .cl-board{width:min(66vw,680px)} }
   </style>
 </head>
 <body>
@@ -115,6 +119,7 @@
       <div class="cl-wrap">
         <div class="cl-board" id="cl-board"></div>
         <div class="cl-panel">
+          <button class="cl-note-btn" onclick="openNote()">📓 Mon carnet de détective</button>
           <div class="cl-action" id="cl-action"></div>
           <div class="cl-hand" id="cl-hand"></div>
           <div class="cl-log" id="cl-log"></div>

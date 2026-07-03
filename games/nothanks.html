@@ -8,10 +8,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
 
-    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    #s-playing.active { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
     .nt-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     html[data-theme="dark"] .nt-head { background: rgba(20,16,28,0.97); }
     .nt-round-label { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--gold); }
@@ -51,12 +49,8 @@
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
 
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.7rem; margin: 6px 0; }
-    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 8px auto 22px; }
-    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--cream); border-radius: 14px; padding: 9px 12px; }
-    .res-rank-pos { font-weight: 800; width: 26px; } .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--terracotta); }
+    @media (min-width: 760px) { .nt-players,.nt-center,.nt-cards{max-width:740px;margin-inline:auto} }
   </style>
 </head>
 <body>

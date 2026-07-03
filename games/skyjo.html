@@ -9,8 +9,6 @@
   <script src="/firebase-init.js"></script>
   <style>
 
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
     .btn-primary:disabled { opacity: 0.5; }
 
     .sk-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
@@ -37,7 +35,17 @@
     .sk-pile-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .sk-pile-label { font-family: 'Caveat', cursive; font-size: 0.8rem; color: var(--ink-light); }
     .sk-card { width: 46px; height: 64px; border-radius: 8px; font-weight: 900; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
-    .sk-card.back { background: linear-gradient(135deg, var(--ink), #4a3f37); color: #fff; cursor: pointer; }
+    /* Dos de carte : motif tissé chaud (plus de fond noir) */
+    .sk-card.back, .sk-cell.back {
+      background-color: #c4745a;
+      background-image:
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.14) 0 3px, transparent 3px 9px),
+        repeating-linear-gradient(-45deg, rgba(255,255,255,0.14) 0 3px, transparent 3px 9px),
+        linear-gradient(135deg, var(--terracotta), var(--gold));
+      color: rgba(255,255,255,0.9);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18), inset 0 0 0 3px rgba(255,255,255,0.12);
+    }
+    .sk-card.back { cursor: pointer; }
     .sk-card.candidate { box-shadow: 0 0 0 3px var(--terracotta); }
     .v-neg { background: #5b8dd6; color: #fff; } .v-zero { background: #c9c2b8; color: #2C2520; }
     .v-low { background: #6ab04c; color: #fff; } .v-mid { background: #f0c419; color: #2C2520; } .v-high { background: #e05a4e; color: #fff; }
@@ -49,8 +57,16 @@
     .sk-cell { width: 56px; height: 76px; border-radius: 9px; font-weight: 900; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.14); cursor: default; transition: transform .12s; }
     .sk-cell.tappable { cursor: pointer; }
     .sk-cell.tappable:hover { transform: translateY(-3px); }
-    .sk-cell.back { background: linear-gradient(135deg, var(--ink), #4a3f37); color: #fff; }
+    .sk-cell.back { color: rgba(255,255,255,0.9); }
     @media (max-width: 380px) { .sk-cell { width: 48px; height: 66px; font-size: 1.2rem; } }
+    /* Tablette / ordi : on exploite la largeur — piles plus grandes, grille plus généreuse, adversaires en ligne. */
+    @media (min-width: 760px) {
+      .sk-opps { gap: 14px; max-width: 900px; margin: 0 auto; }
+      .sk-center { gap: 28px; padding: 12px; }
+      .sk-card { width: 60px; height: 84px; font-size: 1.5rem; }
+      .sk-cell { width: 72px; height: 98px; font-size: 1.7rem; }
+      .sk-my-grid { gap: 9px; }
+    }
     .sk-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
     .sk-act-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.45rem 0.9rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
 
@@ -68,11 +84,6 @@
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
 
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
-    .res-rank { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 8px; margin: 8px auto 22px; }
-    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 9px 12px; box-shadow: var(--shadow); }
-    .res-rank-pos { font-weight: 800; width: 26px; } .res-rank-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
   </style>
 </head>
@@ -106,10 +117,11 @@
           <div id="sk-discard-wrap"></div>
         </div>
       </div>
+      <!-- Boutons contextuels (défausser & retourner, annuler…) juste sous les piles -->
+      <div class="sk-actions" id="sk-actions"></div>
       <div class="sk-status" id="sk-status"></div>
       <div class="sk-my-wrap">
         <div class="sk-my-grid" id="sk-my-grid"></div>
-        <div class="sk-actions" id="sk-actions"></div>
       </div>
     </div>
 
@@ -296,7 +308,7 @@
       for (var i = 0; i < 12; i++) {
         if (rm[i]) h += '<div class="sk-mini-cell sk-empty"></div>';
         else if (fl[i]) h += '<div class="sk-mini-cell ' + valueClass(g[i]) + '">' + g[i] + '</div>';
-        else h += '<div class="sk-mini-cell back" style="background:linear-gradient(135deg,#2C2520,#4a3f37)"></div>';
+        else h += '<div class="sk-mini-cell back" style="background:linear-gradient(135deg,var(--terracotta),var(--gold))"></div>';
       }
       return h;
     }

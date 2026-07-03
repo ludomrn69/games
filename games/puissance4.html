@@ -10,10 +10,6 @@
   <style>
     html { scroll-behavior: smooth; }
 
-
-    .btn-primary { display: block; width: 100%; padding: 0.9rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 4px 16px rgba(196,116,90,0.28); }
-    .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
-
     /* Playing */
     #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
     .p4-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
@@ -57,6 +53,7 @@
     .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
+    @media (min-width: 760px) { .p4-frame{width:min(64vw,520px)} }
   </style>
 </head>
 <body>
