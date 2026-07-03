@@ -18,7 +18,7 @@
 */
 // La version est estampillée automatiquement (empreinte du contenu mis en cache)
 // par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
-var CACHE = 'jeux-442bb18dc1';
+var CACHE = 'jeux-c9677ad791';
 var ASSETS = [
   './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
   'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',
@@ -36,10 +36,10 @@ var ASSETS = [
   'games/playus/knife-throw.html', 'games/playus/memorizer.html', 'games/playus/memory.html', 'games/playus/ninja-chop.html', 'games/playus/on-time.html', 'games/playus/perfect-shape.html',
   'games/playus/piano.html', 'games/playus/react.html', 'games/playus/rhythm.html', 'games/playus/slicer.html', 'games/playus/snake.html', 'games/playus/speed-tap.html',
   'games/playus/speedgolf.html', 'games/playus/swipe-fast.html', 'games/playus/sword-balance.html', 'games/playus/target-speed.html', 'games/playus/tilted.html', 'games/playus/times-up.html',
-  'games/playus/tower-stack.html', 'games/playus/trampbox.html', 'games/playus/zig.html', 'games/president.html', 'games/puissance4.html', 'games/queens.html',
-  'games/qwixx.html', 'games/reversi.html', 'games/sixnimmt.html', 'games/skyjo.html', 'games/solitaire.html', 'games/sudoku.html',
-  'games/sutom.html', 'games/tango.html', 'games/telephone-dessine.html', 'games/themind.html', 'games/timesup.html', 'games/trio.html',
-  'games/undercover.html', 'games/uno.html', 'games/zip.html'
+  'games/playus/tower-stack.html', 'games/playus/trampbox.html', 'games/playus/zig.html', 'games/poker.html', 'games/president.html', 'games/puissance4.html',
+  'games/queens.html', 'games/qwixx.html', 'games/reversi.html', 'games/sixnimmt.html', 'games/skyjo.html', 'games/solitaire.html',
+  'games/sudoku.html', 'games/sutom.html', 'games/tango.html', 'games/telephone-dessine.html', 'games/themind.html', 'games/timesup.html',
+  'games/trio.html', 'games/undercover.html', 'games/uno.html', 'games/zip.html'
 ];
 
 self.addEventListener('install', function (e) {

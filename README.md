@@ -46,6 +46,7 @@ la synchro temps réel.
 | 🔍 Lynx | 2–12 |  | observation |
 | 🎨 Pictionary | 2–12 |  | dessin |
 | 🂡 Blackjack | 1–6 | ✈️ | cartes / 21 |
+| ♠️ Poker | 2–6 | ✈️ | cartes / Texas Hold'em |
 | 🃏 Uno | 2–8 | ✈️ | cartes |
 | 🎴 Skyjo | 2–8 | ✈️ | cartes |
 | 🧩 Blokus | 2–4 | ✈️ | placement |
