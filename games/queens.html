@@ -12,11 +12,15 @@
     .btn-primary:hover { transform: translateY(-2px); }
 
     #s-playing.active { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
-    .qz-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    html[data-theme="dark"] .qz-head { background: rgba(20,16,28,0.97); }
-    .qz-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
-    .qz-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
-    .qz-head-actions { display: flex; gap: 6px; }
+    /* ── En-tête façon LinkedIn : retour · titre · chrono · pastille de niveau ── */
+    .qz-head { position: sticky; top: 52px; z-index: 100; background: var(--nav-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 10px 16px; display: flex; align-items: center; }
+    .qz-back { font-size: 1.5rem; line-height: 1; color: var(--ink); text-decoration: none; padding: 0 8px 2px; margin-right: 4px; border-radius: 8px; }
+    .qz-back:hover { background: rgba(44,37,32,0.06); }
+    .qz-title { font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--ink); }
+    .qz-timer { margin-left: auto; display: flex; align-items: center; gap: 5px; font-weight: 800; font-size: 1rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .qz-timer svg { width: 17px; height: 17px; }
+    .qz-diff { margin-left: auto; background: rgba(44,37,32,0.06); color: var(--ink-light); border-radius: 30px; padding: 6px 14px; font-weight: 700; font-size: 0.8rem; white-space: nowrap; }
+    html[data-theme="dark"] .qz-back:hover, html[data-theme="dark"] .qz-diff { background: rgba(255,255,255,0.08); }
 
     .qz-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
     .qz-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
@@ -26,15 +30,22 @@
 
     .qz-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
 
-    .qz-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 10px; }
-    .qz-grid { width: min(94vw, 440px); aspect-ratio: 1; display: grid; gap: 0; border: 3px solid #2C2520; border-radius: 6px; overflow: hidden; touch-action: manipulation; }
-    .qz-cell { display: flex; align-items: center; justify-content: center; font-size: clamp(1.1rem, 6vw, 1.8rem); cursor: pointer; user-select: none; position: relative; box-sizing: border-box; border: 0.5px solid rgba(44,37,32,0.12); }
+    .qz-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 12px 24px; }
+    .qz-card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow); padding: 14px; }
+    .qz-grid { width: min(90vw, 430px); aspect-ratio: 1; display: grid; gap: 0; border: 3px solid #2C2520; border-radius: 4px; overflow: hidden; touch-action: manipulation; }
+    .qz-cell { display: flex; align-items: center; justify-content: center; font-size: clamp(1.1rem, 6vw, 1.8rem); cursor: pointer; user-select: none; position: relative; box-sizing: border-box; border: 0.5px solid rgba(44,37,32,0.14); }
     .qz-cell.bt { border-top: 3px solid #2C2520; } .qz-cell.bl { border-left: 3px solid #2C2520; }
     .qz-cell.br { border-right: 3px solid #2C2520; } .qz-cell.bb { border-bottom: 3px solid #2C2520; }
     .qz-cell.bad { box-shadow: inset 0 0 0 3px #e05a4e; }
-    .qz-mark { opacity: 0.55; font-size: 0.7em; }
+    .qz-mark { font-size: 0.66em; font-weight: 700; color: rgba(44,37,32,0.5); }
 
-    .qz-hint { font-size: 0.82rem; color: var(--ink-light); text-align: center; padding: 0 12px; }
+    .qz-actions { display: flex; gap: 12px; width: min(90vw, 430px); }
+    .qz-btn { flex: 1; padding: 0.85rem; border: none; border-radius: 14px; background: rgba(44,37,32,0.06); color: var(--ink-light); font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.98rem; cursor: pointer; transition: background .15s; }
+    .qz-btn:hover:not(:disabled) { background: rgba(44,37,32,0.11); }
+    .qz-btn:disabled { opacity: 0.45; cursor: default; }
+    html[data-theme="dark"] .qz-btn { background: rgba(255,255,255,0.08); }
+    html[data-theme="dark"] .qz-btn:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
+    .qz-hint { font-size: 0.84rem; color: var(--ink-light); text-align: center; padding: 0 16px; max-width: 460px; line-height: 1.5; }
 
     #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
     .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
@@ -66,18 +77,20 @@
 
     <div id="s-playing" class="screen">
       <div class="qz-head">
-        <span class="qz-title-mini">Queens</span>
-        <span class="qz-timer" id="qz-timer">⏱ 0:00</span>
-        <div class="qz-head-actions" id="qz-actions">
-          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
-          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
-        </div>
+        <a class="qz-back" href="/index.html" title="Retour aux jeux">←</a>
+        <span class="qz-title">Queens</span>
+        <span class="qz-timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 1.8"/></svg><span id="qz-time">0:00</span></span>
+        <span class="qz-diff" id="qz-diff">Niveau —</span>
       </div>
       <div class="qz-opps" id="qz-opps"></div>
       <div class="qz-banner" id="qz-banner"></div>
       <div class="qz-stage">
-        <div class="qz-grid" id="qz-grid"></div>
-        <div class="qz-hint">Touche : vide → ❌ → 👑 → vide. Une 👑 par ligne, colonne et couleur, sans qu'elles se touchent.</div>
+        <div class="qz-card"><div class="qz-grid" id="qz-grid"></div></div>
+        <div class="qz-actions">
+          <button class="qz-btn" id="qz-undo" onclick="assist.undo()">Annuler</button>
+          <button class="qz-btn" id="qz-hint" onclick="assist.hint()">Indice</button>
+        </div>
+        <div class="qz-hint">Touche : vide → ✕ → 👑 → vide. Une 👑 par ligne, colonne et couleur, sans qu'elles se touchent.</div>
       </div>
     </div>
 
@@ -188,7 +201,8 @@
       else { stopTimer(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
-    function startTimer(state) { stopTimer(); function tick() { setText('qz-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function startTimer(state) { stopTimer(); function tick() { setText('qz-time', Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function diffLabel(s) { var d = (s && s.difficulty) || 'normal', L = (window.Bots && Bots.LABELS) || { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' }; return 'Niveau ' + (L[d] || 'Moyen').toUpperCase(); }
     function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
 
     function N() { return (window.room && window.room.size) || 7; }
@@ -264,7 +278,7 @@
       });
       render(window.room);
     }
-    var assist = Puzzle.assist({ mount: 'qz-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
+    var assist = Puzzle.assist({ canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
 
     /* ━━ Rendu ━━ */
     function render(state) {
@@ -274,6 +288,7 @@
           escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : queensCount(state, pid) + '/' + n) + '</span></div>';
       }).join(''));
       setText('qz-banner', state.banner || '');
+      setText('qz-diff', diffLabel(state));
 
       var res = analyze(m, region, n), html = '';
       for (var i = 0; i < n * n; i++) {
@@ -283,14 +298,14 @@
         if (r === 0) cls += ' bt'; if (c === 0) cls += ' bl';
         if (c === n - 1 || region[i + 1] !== rg) cls += ' br';
         if (r === n - 1 || region[i + n] !== rg) cls += ' bb';
-        var glyph = m[i] === 2 ? '👑' : (m[i] === 1 ? '<span class="qz-mark">❌</span>' : '');
+        var glyph = m[i] === 2 ? '👑' : (m[i] === 1 ? '<span class="qz-mark">✕</span>' : '');
         html += '<div class="' + cls + '" style="background:' + (REGION_COLORS[rg % REGION_COLORS.length]) + '" onclick="tapCell(' + i + ')">' + glyph + '</div>';
       }
       var grid = document.getElementById('qz-grid');
       grid.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
       grid.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
       grid.innerHTML = html;
-      if (typeof assist !== 'undefined' && assist) assist.refresh();
+      if (typeof assist !== 'undefined' && assist) { assist.refresh(); var ub = document.getElementById('qz-undo'); if (ub) ub.disabled = !assist.canUndo(); }
     }
 
     function showResults(state) {
