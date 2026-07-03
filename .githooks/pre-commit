@@ -1,0 +1,21 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────────────────
+# Hook pre-commit : régénère les fichiers DÉRIVÉS (cache du service worker,
+# tableau README, bundle common.js) puis lance les vérifs. Comme ça un commit
+# ne peut PLUS partir avec un sw.js/README/common.js périmé → fini les CI rouges.
+#
+# Activation (une fois par clone) :  git config core.hooksPath .githooks
+# ─────────────────────────────────────────────────────────────────────────────
+set -e
+command -v node >/dev/null 2>&1 || { echo "pre-commit: node introuvable, on saute la régénération"; exit 0; }
+
+node tools/gen-sw-version.js >/dev/null
+node tools/gen-readme.js     >/dev/null
+node tools/gen-common.js     >/dev/null
+
+# Ré-indexe les fichiers dérivés s'ils viennent d'être régénérés.
+for f in sw.js README.md common.js; do
+  if [ -f "$f" ] && ! git diff --quiet -- "$f"; then git add "$f"; fi
+done
+
+node tools/check.js

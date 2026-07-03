@@ -8,15 +8,17 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-    .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
-    .btn-primary:hover { transform: translateY(-2px); }
 
     #s-playing.active { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
-    .tg-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    html[data-theme="dark"] .tg-head { background: rgba(20,16,28,0.97); }
-    .tg-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
-    .tg-timer { font-weight: 800; color: var(--terracotta); font-size: 0.98rem; font-variant-numeric: tabular-nums; }
-    .tg-head-actions { display: flex; gap: 6px; }
+    /* ── En-tête façon LinkedIn : retour · titre · chrono · pastille de niveau ── */
+    .tg-head { position: sticky; top: 52px; z-index: 100; background: var(--nav-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 10px 16px; display: flex; align-items: center; }
+    .tg-back { font-size: 1.5rem; line-height: 1; color: var(--ink); text-decoration: none; padding: 0 8px 2px; margin-right: 4px; border-radius: 8px; }
+    .tg-back:hover { background: rgba(44,37,32,0.06); }
+    .tg-title { font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--ink); }
+    .tg-timer { margin-left: auto; display: flex; align-items: center; gap: 5px; font-weight: 800; font-size: 1rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .tg-timer svg { width: 17px; height: 17px; }
+    .tg-diff { margin-left: auto; background: rgba(44,37,32,0.06); color: var(--ink-light); border-radius: 30px; padding: 6px 14px; font-weight: 700; font-size: 0.8rem; white-space: nowrap; }
+    html[data-theme="dark"] .tg-back:hover, html[data-theme="dark"] .tg-diff { background: rgba(255,255,255,0.08); }
 
     .tg-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 8px 12px 2px; }
     .tg-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.78rem; font-weight: 700; }
@@ -26,26 +28,26 @@
 
     .tg-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
 
-    .tg-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 6px 10px; }
-    .tg-wrap { position: relative; width: min(92vw, 420px); aspect-ratio: 1; }
-    .tg-grid { width: 100%; height: 100%; display: grid; gap: 3px; background: var(--gold-light); border: 3px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
-    .tg-cell { background: var(--cream); display: flex; align-items: center; justify-content: center; font-size: clamp(1.3rem, 7vw, 2rem); cursor: pointer; user-select: none; }
-    html[data-theme="dark"] .tg-cell { background: #221a2e; }
-    .tg-cell.given { background: rgba(198,152,90,0.22); cursor: default; }
+    .tg-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 12px 24px; }
+    .tg-card { background: var(--white); border-radius: 20px; box-shadow: var(--shadow); padding: 14px; }
+    .tg-wrap { position: relative; width: min(88vw, 410px); aspect-ratio: 1; }
+    .tg-grid { width: 100%; height: 100%; display: grid; gap: 1px; background: rgba(44,37,32,0.14); border: 2px solid rgba(44,37,32,0.55); border-radius: 8px; overflow: hidden; }
+    html[data-theme="dark"] .tg-grid { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.4); }
+    .tg-cell { background: var(--white); display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
+    .tg-cell.given { background: rgba(44,37,32,0.06); cursor: default; }
+    html[data-theme="dark"] .tg-cell.given { background: rgba(255,255,255,0.07); }
     .tg-cell.bad { box-shadow: inset 0 0 0 3px #e05a4e; }
+    .tg-sym { width: 62%; height: 62%; }
     .tg-cons { position: absolute; inset: 0; pointer-events: none; }
-    .tg-con { position: absolute; transform: translate(-50%, -50%); background: var(--white); border: 1.5px solid var(--ink-light); border-radius: 50%; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--ink); }
+    .tg-con { position: absolute; transform: translate(-50%, -50%); width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: var(--ink-light); background: var(--white); border-radius: 50%; }
 
-    .tg-hint { font-size: 0.82rem; color: var(--ink-light); text-align: center; padding: 0 12px; }
-
-    #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-    .res-emoji { font-size: 3.4rem; } .res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
-    .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
-    .res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
-    .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
-    .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
-    .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
-    .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+    .tg-actions { display: flex; gap: 12px; width: min(88vw, 410px); }
+    .tg-btn { flex: 1; padding: 0.85rem; border: none; border-radius: 14px; background: rgba(44,37,32,0.06); color: var(--ink-light); font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.98rem; cursor: pointer; transition: background .15s; }
+    .tg-btn:hover:not(:disabled) { background: rgba(44,37,32,0.11); }
+    .tg-btn:disabled { opacity: 0.45; cursor: default; }
+    html[data-theme="dark"] .tg-btn { background: rgba(255,255,255,0.08); }
+    html[data-theme="dark"] .tg-btn:hover:not(:disabled) { background: rgba(255,255,255,0.14); }
+    .tg-hint { font-size: 0.84rem; color: var(--ink-light); text-align: center; padding: 0 16px; max-width: 460px; line-height: 1.5; }
 
     .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
     .modal.active { display: flex; }
@@ -68,17 +70,19 @@
 
     <div id="s-playing" class="screen">
       <div class="tg-head">
-        <span class="tg-title-mini">Tango</span>
-        <span class="tg-timer" id="tg-timer">⏱ 0:00</span>
-        <div class="tg-head-actions" id="tg-actions">
-          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
-          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
-        </div>
+        <a class="tg-back" href="/index.html" title="Retour aux jeux">←</a>
+        <span class="tg-title">Tango</span>
+        <span class="tg-timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 1.8"/></svg><span id="tg-time">0:00</span></span>
+        <span class="tg-diff" id="tg-diff">Niveau —</span>
       </div>
       <div class="tg-opps" id="tg-opps"></div>
       <div class="tg-banner" id="tg-banner"></div>
       <div class="tg-stage">
-        <div class="tg-wrap"><div class="tg-grid" id="tg-grid"></div><div class="tg-cons" id="tg-cons"></div></div>
+        <div class="tg-card"><div class="tg-wrap"><div class="tg-grid" id="tg-grid"></div><div class="tg-cons" id="tg-cons"></div></div></div>
+        <div class="tg-actions">
+          <button class="tg-btn" id="tg-undo" onclick="assist.undo()">Annuler</button>
+          <button class="tg-btn" id="tg-hint" onclick="assist.hint()">Indice</button>
+        </div>
         <div class="tg-hint">Touche une case : vide → ☀️ → 🌙 → vide. <b>=</b> : mêmes symboles · <b>✕</b> : symboles différents.</div>
       </div>
     </div>
@@ -118,7 +122,12 @@
     function rref() { return window.roomRef; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
-    var SYM = ['☀️', '🌙'];
+    // Symboles vectoriels (rendu plat façon LinkedIn) : soleil = disque ambré,
+    // lune = croissant bleu. La forme lune est un chemin « lune » (deux arcs).
+    var SYM = [
+      '<svg class="tg-sym" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="30" fill="#f4b23e" stroke="#e08c1a" stroke-width="4"/></svg>',
+      '<svg class="tg-sym" viewBox="0 0 100 100" aria-hidden="true"><path d="M64 20 A42 42 0 1 0 64 80 A34 34 0 1 1 64 20 Z" fill="#4a86c7"/></svg>'
+    ];
 
     /* ━━ Générateur ━━ Solution valide (3/3 par ligne/colonne, jamais 3 à la suite),
        puis on RÉDUIT à un jeu minimal d'indices + contraintes = / ✕ (solution unique).
@@ -196,7 +205,8 @@
       else { stopTimer(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
-    function startTimer(state) { stopTimer(); function tick() { setText('tg-timer', '⏱ ' + Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function startTimer(state) { stopTimer(); function tick() { setText('tg-time', Puzzle.fmtTime(Puzzle.elapsed(state))); } tick(); timerInt = setInterval(tick, 250); }
+    function diffLabel(s) { var d = (s && s.difficulty) || 'normal', L = (window.Bots && Bots.LABELS) || { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' }; return 'Niveau ' + (L[d] || 'Moyen').toUpperCase(); }
     function stopTimer() { if (timerInt) { clearInterval(timerInt); timerInt = null; } }
 
     function marksOf(s, pid) { return (s.players[pid] && s.players[pid].marks) || []; }
@@ -274,7 +284,7 @@
       });
       render(window.room);
     }
-    var assist = Puzzle.assist({ mount: 'tg-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
+    var assist = Puzzle.assist({ canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
 
     /* ━━ Rendu ━━ */
     function render(state) {
@@ -284,6 +294,7 @@
           escapeHtml(Room.name(pid)) + ' <span class="pc">' + (doneOf(state, pid) ? '✓ ' + Puzzle.fmtTime(state.players[pid].finishedAt) : filledCount(state, pid) + '/' + (N * N)) + '</span></div>';
       }).join(''));
       setText('tg-banner', state.banner || '');
+      setText('tg-diff', diffLabel(state));
 
       var res = analyze(eff, state.cons), html = '';
       for (var i = 0; i < N * N; i++) {
@@ -304,7 +315,7 @@
         ch += '<div class="tg-con" style="left:' + x + '%;top:' + y + '%">' + (cc.eq ? '=' : '✕') + '</div>';
       });
       document.getElementById('tg-cons').innerHTML = ch;
-      if (typeof assist !== 'undefined' && assist) assist.refresh();
+      if (typeof assist !== 'undefined' && assist) { assist.refresh(); var ub = document.getElementById('tg-undo'); if (ub) ub.disabled = !assist.canUndo(); }
     }
 
     function showResults(state) {
