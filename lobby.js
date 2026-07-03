@@ -512,6 +512,7 @@
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
     try { refreshBotSpeedUI(); } catch (e) {}
+    try { refreshGameStatsUI(room); } catch (e) {}
     try { window.Lobby.turnAlertFor(room); } catch (e) {}
     try { recordStatsFor(room); } catch (e) {}
   }
@@ -691,6 +692,76 @@
   function cycleBotSpeed() { // compat : gardé au cas où appelé ailleurs
     var order = window.Bots.SPEEDS, cur = window.Bots.speed(window.room);
     onBotSpeedSlide((order.indexOf(cur) + 1) % order.length);
+  }
+
+  // ── Stats de la partie EN COURS (bouton 📊 à côté de Règles/Rejouer) ────────
+  // Bouton injecté automatiquement dans l'en-tête de chaque jeu (à côté du « ? »)
+  // pendant la partie. Le contenu vient de cfg().stats(room) si le jeu en fournit,
+  // sinon d'un résumé GÉNÉRIQUE (joueurs, tour, chrono, scores détectés).
+  function refreshGameStatsUI(room) {
+    room = room || window.room;
+    var playing = !!(room && room.status === 'playing');
+    var btn = document.getElementById('game-stats-btn');
+    if (!playing || !isActive('s-playing')) { if (btn) btn.style.display = 'none'; return; }
+    if (!btn) {
+      var rulesBtn = document.querySelector('#s-playing .game-rules-btn');
+      if (!rulesBtn || !rulesBtn.parentNode) return; // jeu sans en-tête standard : on s'abstient
+      btn = document.createElement('button');
+      btn.id = 'game-stats-btn'; btn.className = 'game-rules-btn game-stats-btn';
+      btn.type = 'button'; btn.title = 'Statistiques de la partie'; btn.textContent = '📊';
+      btn.addEventListener('click', openGameStats);
+      rulesBtn.parentNode.insertBefore(btn, rulesBtn); // juste avant « ? »
+    }
+    btn.style.display = '';
+  }
+  function fmtDur(ms) {
+    if (!ms || ms < 0) return '—';
+    var s = Math.floor(ms / 1000), m = Math.floor(s / 60); s %= 60;
+    return m + ' min ' + (s < 10 ? '0' : '') + s + ' s';
+  }
+  function genericStats(room) {
+    var order = room.order || Object.keys(room.players || {});
+    var esc = window.esc || function (x) { return x; };
+    var NICE = { score: 'Score', penalty: 'Pénalité', heads: '🐮 Têtes', cash: '💰 Argent', money: '💰 Argent', points: 'Points', pts: 'Points', wins: 'Victoires', chips: '🪙 Jetons', trains: '🚃 Wagons', total: 'Total', lives: '❤️ Vies', tricks: 'Plis' };
+    var rows = order.map(function (pid) {
+      var p = (room.players && room.players[pid]) || {};
+      var nm = (window.Room && Room.name) ? Room.name(pid) : pid;
+      var em = (window.Room && Room.emoji) ? Room.emoji(pid) : '👤';
+      var stats = [];
+      Object.keys(NICE).forEach(function (k) { if (typeof p[k] === 'number') stats.push(NICE[k] + ' : <b>' + p[k] + '</b>'); });
+      if (Array.isArray(p.hand)) stats.push('Cartes en main : <b>' + p.hand.length + '</b>');
+      var meta = (p.isBot ? ' <span style="opacity:.6">(ordi)</span>' : '') + ((room.turn && room.turn === pid) ? ' <span style="color:var(--terracotta)">● à jouer</span>' : '');
+      return '<div style="display:flex;flex-direction:column;gap:2px;padding:7px 0;border-bottom:1px solid var(--gold-light)">' +
+        '<div style="font-weight:800">' + em + ' ' + esc(nm) + meta + '</div>' +
+        (stats.length ? '<div style="font-size:.82rem;color:var(--ink-light)">' + stats.join(' · ') + '</div>' : '') + '</div>';
+    }).join('');
+    var t0 = room.startedAt || room.startTime || room.createdAt || null;
+    var meta = [];
+    meta.push('Joueurs : <b>' + order.length + '</b>');
+    if (t0) meta.push('Durée : <b>' + fmtDur(Date.now() - t0) + '</b>');
+    if (room.round != null) meta.push('Manche : <b>' + room.round + '</b>');
+    if (room.difficulty) meta.push('Niveau ordis : <b>' + (window.Bots.LABELS[room.difficulty] || room.difficulty) + '</b>');
+    return '<div style="font-size:.85rem;color:var(--ink-light);margin-bottom:8px">' + meta.join(' · ') + '</div>' + rows;
+  }
+  function openGameStats() {
+    var room = window.room; if (!room) return;
+    var c = cfg(), html;
+    try { html = (typeof c.stats === 'function') ? c.stats(room) : genericStats(room); }
+    catch (e) { html = genericStats(room); }
+    var modal = document.getElementById('game-stats-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'game-stats-modal'; modal.className = 'modal';
+      modal.innerHTML = '<div class="modal-card" style="max-width:420px;width:100%;text-align:left">' +
+        '<div class="modal-title" style="text-align:center">📊 Stats de la partie</div>' +
+        '<div id="game-stats-body" style="max-height:60vh;overflow:auto"></div>' +
+        '<button class="btn-primary" style="width:auto;padding:.6rem 1.4rem;margin:14px auto 0;display:block" onclick="document.getElementById(\'game-stats-modal\').classList.remove(\'active\')">Fermer</button>' +
+        '</div>';
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('active'); });
+      document.body.appendChild(modal);
+    }
+    document.getElementById('game-stats-body').innerHTML = html;
+    modal.classList.add('active');
   }
   function setBotCount(n) {
     var c = cfg(), max = c.maxPlayers || 8;
@@ -929,6 +1000,7 @@
     setDifficulty: setDifficulty,
     setBotSpeed: setBotSpeed,
     refreshBotSpeedUI: refreshBotSpeedUI,
+    refreshGameStatsUI: refreshGameStatsUI,
     shareRoom: shareRoom,
     changeIdentity: changeIdentity,
     cancelChange: cancelChange,

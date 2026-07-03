@@ -378,6 +378,7 @@
       safeOnState();
       try { if (window.Lobby && Lobby.turnAlertFor) Lobby.turnAlertFor(room); } catch (e) {}
       try { if (window.Lobby && window.Lobby.refreshBotSpeedUI) window.Lobby.refreshBotSpeedUI(); } catch (e) {}
+      try { if (window.Lobby && window.Lobby.refreshGameStatsUI) window.Lobby.refreshGameStatsUI(room); } catch (e) {}
       if (!ended() && active && isBot(active)) setTimeout(botStep, (window.Bots && window.Bots.speedDelay) ? window.Bots.speedDelay(room) : BOT_DELAY);
       if (ended() && !endFx) { endFx = true; if (window.Sfx) Sfx.play(room.winner ? 'win' : 'lose'); }
       if (daily && ended()) setTimeout(recordDaily, 450); // Défi du jour : enregistre + partage
@@ -392,6 +393,7 @@
       window.myPid = active || room.turn || (room.order || [])[0];
       var changed = (active !== lastTurnShown);
       safeOnState();
+      try { if (window.Lobby && window.Lobby.refreshGameStatsUI) window.Lobby.refreshGameStatsUI(room); } catch (e) {}
       // À chaque changement de joueur actif : réinit éventuelle de l'état local du jeu.
       if (changed && cfg.offlineEnter) { try { cfg.offlineEnter(room, window.myPid); } catch (e) {} }
       if (changed && active) { showPass(active); lastTurnShown = active; }
