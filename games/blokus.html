@@ -321,9 +321,14 @@
 
       // Résumé par couleur
       var passed = state.passed || {};
+      // À moins de 4 joueurs, un même joueur pilote plusieurs couleurs : on affiche
+      // alors « qui a quoi » directement sur chaque pastille de couleur.
+      var owners = {}; (state.turnOrder || []).forEach(function (c) { owners[ownerOf(state, c)] = 1; });
+      var showOwner = Object.keys(owners).length < (state.turnOrder || []).length;
       document.getElementById('bk-summary').innerHTML = (state.turnOrder || []).map(function (col) {
         var lp = ((state.pieces && state.pieces[col]) || []).length;
-        return '<span class="bk-summary-chip' + (passed[col] ? ' passed' : '') + '"><span class="swatch ' + col + '"></span>' + COLOR_NAME[col] + ' · ' + lp + ' (' + squaresLeft(state, col) + ')</span>';
+        var who = showOwner ? ' <b style="font-weight:800">' + escapeHtml(Room.name(ownerOf(state, col))) + '</b>' : '';
+        return '<span class="bk-summary-chip' + (passed[col] ? ' passed' : '') + '"><span class="swatch ' + col + '"></span>' + COLOR_NAME[col] + who + ' · ' + lp + ' (' + squaresLeft(state, col) + ')</span>';
       }).join('');
 
       renderBoard(state);

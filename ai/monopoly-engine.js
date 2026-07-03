@@ -323,12 +323,17 @@
     startAuction(s, s.pending);
   }
   function startAuction(s, prop) {
-    var bidders = alive(s).slice();
-    // Le joueur qui a refusé d'acheter participe AUSSI et commence les enchères.
-    var first = (s.turn && bidders.indexOf(s.turn) >= 0) ? s.turn : bidders[0];
-    s.auction = { prop: prop, turn: first, high: null, highBid: 0, passed: {}, bidders: bidders };
+    // Règle maison : le joueur qui refuse d'acheter (et met donc la case aux
+    // enchères) NE participe PAS à l'enchère — seuls les autres peuvent miser.
+    var decliner = s.turn;
+    var bidders = alive(s).filter(function (p) { return p !== decliner; });
+    if (!bidders.length) { // personne d'autre en jeu → la case reste à la banque
+      s.pending = null; s.auction = null; s.phase = 'manage';
+      log(s, B[prop].n + ' reste à la banque'); afterResolve(s, decliner); return;
+    }
+    s.auction = { prop: prop, turn: bidders[0], high: null, highBid: 0, passed: {}, bidders: bidders };
     s.pending = null; s.phase = 'auction';
-    log(s, 'Enchère : ' + B[prop].n + ' (tout le monde peut miser)');
+    log(s, 'Enchère : ' + B[prop].n + ' (celui qui a refusé ne mise pas)');
   }
   function auctionAct(s, pid, bid) { norm(s);
     if (s.phase !== 'auction' || !s.auction || s.auction.turn !== pid) return;

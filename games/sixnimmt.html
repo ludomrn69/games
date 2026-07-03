@@ -329,9 +329,13 @@
       // Adversaires
       setHTML('sn-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
         var hasPicked = state.picks && (pid in state.picks);
+        // Têtes ramassées PENDANT la manche en cours (remis à 0 à chaque manche) :
+        // affichées en direct à côté du total, pour suivre qui prend cher ce tour-ci.
+        var rh = headsOf(state, pid);
         return '<div class="sn-opp' + (hasPicked ? ' picked' : '') + '">' +
           '<span class="sn-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           escapeHtml(Room.name(pid)) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
+          (rh > 0 ? ' <span class="sn-row-heads">+' + rh + '🐮</span>' : '') +
           (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✓</span>' : ' …') : '') + '</div>';
       }).join(''));
       setText('sn-banner', state.banner || '');
