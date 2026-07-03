@@ -40,6 +40,9 @@
     .zp-cell .num { width: 1.75em; height: 1.75em; border-radius: 50%; background: #2C2520; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
     .zp-path { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
     .zp-path svg { width: 100%; height: 100%; display: block; }
+    .zp-walls { position: absolute; inset: 0; pointer-events: none; z-index: 3; color: #2C2520; }
+    html[data-theme="dark"] .zp-walls { color: #e8dcc8; }
+    .zp-walls svg { width: 100%; height: 100%; display: block; }
 
     .zp-actions { display: flex; gap: 12px; width: min(88vw, 410px); }
     .zp-btn { flex: 1; padding: 0.85rem; border: none; border-radius: 14px; background: rgba(44,37,32,0.06); color: var(--ink-light); font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.98rem; cursor: pointer; transition: background .15s; }
@@ -87,7 +90,7 @@
       <div class="zp-opps" id="zp-opps"></div>
       <div class="zp-banner" id="zp-banner"></div>
       <div class="zp-stage">
-        <div class="zp-card"><div class="zp-wrap" id="zp-wrap"><div class="zp-path" id="zp-path"></div><div class="zp-grid" id="zp-grid"></div></div></div>
+        <div class="zp-card"><div class="zp-wrap" id="zp-wrap"><div class="zp-path" id="zp-path"></div><div class="zp-grid" id="zp-grid"></div><div class="zp-walls" id="zp-walls"></div></div></div>
         <div class="zp-actions">
           <button class="zp-btn" id="zp-undo" onclick="undoPath()">Annuler</button>
           <button class="zp-btn" onclick="hintPath()">Indice</button>
@@ -137,6 +140,7 @@
        un tracé qui couvre tout en passant par les numéros dans l'ordre. ━━ */
     function neighbors(idx, N) { var r = idx / N | 0, c = idx % N, a = []; if (r > 0) a.push(idx - N); if (r < N - 1) a.push(idx + N); if (c > 0) a.push(idx - 1); if (c < N - 1) a.push(idx + 1); return a; }
     function adjacent(a, b, N) { return Math.abs((a / N | 0) - (b / N | 0)) + Math.abs((a % N) - (b % N)) === 1; }
+    function edgeKey(a, b) { return Math.min(a, b) + '-' + Math.max(a, b); }   // arête (mur) entre 2 cases voisines
     function snake(N) { var p = []; for (var r = 0; r < N; r++) { if (r % 2 === 0) for (var c = 0; c < N; c++) p.push(r * N + c); else for (var c2 = N - 1; c2 >= 0; c2--) p.push(r * N + c2); } return p; }
     function backbite(path, N, rnd) {
       var head = rnd() < 0.5, p = head ? path.slice().reverse() : path;
@@ -150,7 +154,16 @@
       var p = snake(N); for (var i = 0; i < N * N * 30; i++) p = backbite(p, N, rnd);
       var K = Math.min(9, Math.max(5, N + 1)), numbers = {};
       for (var w = 0; w < K; w++) { var pos = Math.round(w * (p.length - 1) / (K - 1)); numbers[p[pos]] = w + 1; }
-      return { size: N, numbers: numbers, K: K, path: p };
+      // ── Murs (obstacles) : on pose des murs sur des arêtes que la solution
+      // n'emprunte PAS. Ça guide fortement le tracé (bien plus facile) tout en
+      // gardant la solution valide (ses arêtes ne sont jamais murées). ──
+      var used = {}; for (var u = 0; u < p.length - 1; u++) used[edgeKey(p[u], p[u + 1])] = 1;
+      var freeEdges = [];
+      for (var j = 0; j < N * N; j++) { var r = j / N | 0, c = j % N; if (c < N - 1 && !used[edgeKey(j, j + 1)]) freeEdges.push([j, j + 1]); if (r < N - 1 && !used[edgeKey(j, j + N)]) freeEdges.push([j, j + N]); }
+      Puzzle.shuffle(freeEdges, rnd);
+      var frac = level === 'easy' ? 0.68 : level === 'hard' ? 0.42 : 0.55;
+      var walls = freeEdges.slice(0, Math.round(freeEdges.length * frac)).map(function (e) { return edgeKey(e[0], e[1]); });
+      return { size: N, numbers: numbers, K: K, path: p, walls: walls };
     }
 
     /* ━━ Enregistrement ━━ */
@@ -174,7 +187,7 @@
       var order = players.map(function (p) { return p.pid; });
       var level = (cur && cur.difficulty) || 'normal', P = genZip(level, Puzzle.seed());
       order.forEach(function (p) { cur.players[p].path = []; cur.players[p].finishedAt = null; });
-      return { size: P.size, numbers: P.numbers, K: P.K, solution: P.path, startedAt: Date.now(), banner: 'Trace ton chemin le plus vite possible !', winner: null };
+      return { size: P.size, numbers: P.numbers, K: P.K, walls: P.walls, solution: P.path, startedAt: Date.now(), banner: 'Trace ton chemin le plus vite possible !', winner: null };
     }
 
     function onState(snap) {
@@ -201,12 +214,14 @@
     }
 
     /* ── Tracé (glisser) ── */
+    function wallSet() { var w = (window.room && window.room.walls) || [], m = {}; for (var k = 0; k < w.length; k++) m[w[k]] = 1; return m; }
+    function canGo(a, b, N, walls) { return adjacent(a, b, N) && !walls[edgeKey(a, b)]; }   // voisines ET pas de mur entre elles
     function visit(i) {
-      var N = NS(), s = window.room;
+      var N = NS(), s = window.room, walls = wallSet();
       if (!localPath.length) { if (s.numbers[i] === 1) { localPath = [i]; renderLocal(); } return; }
       var pos = localPath.indexOf(i);
       if (pos >= 0) { if (pos < localPath.length - 1) { localPath = localPath.slice(0, pos + 1); renderLocal(); } return; } // retour en arrière
-      if (adjacent(i, localPath[localPath.length - 1], N)) { localPath.push(i); renderLocal(); }
+      if (canGo(i, localPath[localPath.length - 1], N, walls)) { localPath.push(i); renderLocal(); }
     }
     function commitPath() {
       var pid = window.myPid;
@@ -253,7 +268,17 @@
       setText('zp-banner', state.banner || '');
       setText('zp-diff', diffLabel(state));
       buildGrid(n, numbers);
+      drawWalls(n, state.walls || []);
       renderLocal();
+    }
+    function drawWalls(n, walls) {
+      var sz = 100 / n, ins = sz * 0.05, th = Math.max(3, sz * 0.16), lines = '';
+      walls.forEach(function (key) {
+        var parts = key.split('-'), a = +parts[0], b = +parts[1], ra = a / n | 0, ca = a % n;
+        if (b === a + 1) { var x = ((ca + 1) * sz).toFixed(2); lines += '<line x1="' + x + '" y1="' + (ra * sz + ins).toFixed(2) + '" x2="' + x + '" y2="' + ((ra + 1) * sz - ins).toFixed(2) + '"/>'; }
+        else { var y = ((ra + 1) * sz).toFixed(2); lines += '<line x1="' + (ca * sz + ins).toFixed(2) + '" y1="' + y + '" x2="' + ((ca + 1) * sz - ins).toFixed(2) + '" y2="' + y + '"/>'; }
+      });
+      document.getElementById('zp-walls').innerHTML = lines ? '<svg viewBox="0 0 100 100" aria-hidden="true"><g stroke="currentColor" stroke-width="' + th.toFixed(2) + '" stroke-linecap="round">' + lines + '</g></svg>' : '';
     }
     function buildGrid(n, numbers) {
       var html = '';

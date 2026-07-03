@@ -319,7 +319,12 @@
     }
 
     /* ━━ Rendu ━━ */
-    function shapeBox(c) { var cls = c.shape === 'tall' ? 'pt-tall' : c.shape === 'wide' ? 'pt-wide' : c.shape === 'any' ? 'pt-any' : 'pt-sq'; return '<div class="pt-clue ' + cls + '">' + (c.num != null ? c.num : '') + '</div>'; }
+    function shapeBox(c) {
+      var cls = c.shape === 'tall' ? 'pt-tall' : c.shape === 'wide' ? 'pt-wide' : c.shape === 'any' ? 'pt-any' : 'pt-sq';
+      var col = c.color || '#2C2520';                       // chaque indice porte la couleur de son patch
+      var st = 'border-color:' + col + ';color:' + col + ';background:' + hexA(col, 0.16);
+      return '<div class="pt-clue ' + cls + '" style="' + st + '">' + (c.num != null ? c.num : '') + '</div>';
+    }
     function render(state) {
       var me = window.myPid, order = state.order || [], N = state.N || 6, cs = state.clues || [], pl = placedOf(state, me);
       setHTML('pt-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
