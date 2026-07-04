@@ -366,7 +366,15 @@
         var who = ls.by === window.myPid ? 'Tu' : Room.name(ls.by);
         if (ls.result === 'sunk') banner.textContent = ls.by === window.myPid ? ('Tu as coulé le ' + ls.ship) : (Room.name(ls.by) + ' a coulé ton ' + ls.ship);
         else banner.textContent = who + ' ' + (ls.by === window.myPid ? (ls.result === 'hit' ? 'as touché' : 'as manqué') : (ls.result === 'hit' ? 'a touché' : 'a manqué'));
-      } else banner.textContent = '';
+        // Son du tir (explosion, navire coulé ou plouf) — une fois par tir, chez tout le monde.
+        var lsSig = ls.by + '|' + ls.idx + '|' + ls.result;
+        if (window._bnShotSig !== lsSig && window.Fx) {
+          if (ls.result === 'sunk') { Fx.sfx('big'); Fx.vib([30, 40, 80]); }
+          else if (ls.result === 'hit') { Fx.sfx('coin'); Fx.vib([20, 30, 20]); }
+          else Fx.sfx('place');
+        }
+        window._bnShotSig = lsSig;
+      } else { banner.textContent = ''; window._bnShotSig = null; }
 
       setText('bn-enemy-count', (5 - countSunk(oppShips, myShots)) + '/5 à flot');
       setText('bn-own-count', (5 - countSunk(myShips, oppShots)) + '/5 à flot');

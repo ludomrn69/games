@@ -358,7 +358,10 @@
           (P.cash >= 500 ? '<button class="lp-bank" onclick="deposit(\'' + me + '\')">🏦 Épargner 500</button>' : '') +
           ((P.savings || 0) > 0 ? '<button class="lp-bank" onclick="withdraw(\'' + me + '\')">Retirer 500</button>' : '') +
           '</div>';
-        stage.innerHTML = '<div class="lp-dice">' + (state.lastDie ? '🎲 ' + state.lastDie : '🎲') + '</div><button class="btn-primary" onclick="rollMove(\'' + me + '\')">Lancer le dé</button>' + bankProjection(P) + bank;
+        var dieFresh = window._lpDie !== state.lastDie && state.lastDie;
+        window._lpDie = state.lastDie;
+        if (dieFresh && window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+        stage.innerHTML = '<div class="lp-dice">' + (state.lastDie && window.Fx ? Fx.die(state.lastDie, 40, dieFresh ? 'roll' : '') : '🎲') + '</div><button class="btn-primary" onclick="rollMove(\'' + me + '\')">Lancer le dé</button>' + bankProjection(P) + bank;
       }
     }
 

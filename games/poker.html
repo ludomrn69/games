@@ -412,6 +412,7 @@
     }
     function fold(asPid) {
       var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('place'); Fx.vib(8); }
       tx(pid, function (cur) {
         cur.inHand[pid] = false; cur.acted[pid] = true; cur.lastAct[pid] = 'Se couche';
         advance(cur);
@@ -419,6 +420,7 @@
     }
     function checkCall(asPid) {
       var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('coin'); Fx.vib(10); }
       tx(pid, function (cur) {
         var need = cur.curBet - (cur.bet[pid] || 0);
         if (need > 0) {
@@ -434,6 +436,7 @@
     // Relance JUSQU'À `to` (mise cumulée cette ronde). Bornée à [minRaiseTo, tapis].
     function raiseTo(to, asPid) {
       var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('coin'); Fx.vib([12, 20, 12]); }
       tx(pid, function (cur) {
         var maxTo = (cur.bet[pid] || 0) + cur.stacks[pid]; // tapis
         var minTo = cur.curBet + cur.minRaise;
@@ -566,9 +569,16 @@
       setText('pk-phase', phaseLabel(s.phase) + ' · donne ' + (s.handNo || 1));
       setText('pk-pot', '💰 Pot : ' + totalPot(s));
       setText('pk-banner', s.banner || '');
-      // cartes communes (5 emplacements)
+      // cartes communes (5 emplacements) — les nouvelles se RETOURNENT (flop/turn/river)
+      var boardN = (s.board || []).filter(function (c) { return c != null; }).length;
+      var prevN = (window._pkBoardNo === (s.handNo || 1)) ? (window._pkBoardN || 0) : 0;
+      window._pkBoardN = boardN; window._pkBoardNo = (s.handNo || 1);
       var comm = '';
-      for (var i = 0; i < 5; i++) comm += (s.board && s.board[i] != null) ? cardHTML(s.board[i]) : '<div class="pk-card back" style="opacity:.35"></div>';
+      for (var i = 0; i < 5; i++) {
+        var fresh = (s.board && s.board[i] != null && i >= prevN && boardN > prevN);
+        comm += (s.board && s.board[i] != null) ? cardHTML(s.board[i], fresh ? 'fx-flip' : '') : '<div class="pk-card back" style="opacity:.35"></div>';
+      }
+      if (boardN > prevN && prevN >= 0 && window.Fx && boardN) Fx.sfx('flip');
       setHTML('pk-community', comm);
 
       var reveal = (s.results && s.results.reveal) || {};

@@ -93,8 +93,8 @@
       </div>
       <div class="tr-banner" id="tr-banner"></div>
       <div class="tr-hint" id="tr-hint"></div>
-      <div class="tr-reveal-wrap">
-        <div class="tr-reveal-label">Cartes retournées</div>
+      <div class="tr-reveal-wrap felt felt-plum" style="margin:6px auto 4px;width:min(94vw,420px);padding:12px 10px 14px">
+        <div class="tr-reveal-label felt-label">Cartes retournées</div>
         <div class="tr-reveal" id="tr-reveal"></div>
       </div>
       <div class="tr-section-label">Centre (à toucher pour retourner)</div>
@@ -231,6 +231,7 @@
     var PAUSE_MS = 2200, _pauseScheduled = false;
     // Applique un pick (calculé par makePick) au tour du joueur actif courant.
     function doReveal(makePick) {
+      if (window.Fx) { Fx.sfx('flip'); Fx.vib(8); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid) return cur;
         if (cur.reveal && cur.reveal.done) return cur;          // en pause mémorisation : on n'agit pas
@@ -278,6 +279,7 @@
     }
 
     function collectTrio(cur, active, value) {
+      if (window.Fx) Fx.sfx('big'); // trio complété !
       // Retirer les 3 cartes de leurs sources.
       var byPid = {}; var centers = [];
       cur.reveal.picks.forEach(function (p) { if (p.src === 'hand') (byPid[p.pid] = byPid[p.pid] || []).push(p.idx); else centers.push(p.ci); });

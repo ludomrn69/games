@@ -156,7 +156,14 @@
     uno: 30, skyjo: 35, president: 35, papayoo: 40, millebornes: 40, trio: 25, blackjack: 25,
     blokus: 45, ludo: 25, monopoly: 60, cluedo: 45, 'bataille-navale': 30
   };
-  function turnSecondsFor() { var c = cfg() || {}; return c.turnSeconds || TURN_SECONDS_BY_GAME[c.gameKey] || TURN_SECONDS_DEFAULT; }
+  function turnSecondsFor() {
+    // Réglage du SALON prioritaire (choisi par l'hôte en salle d'attente) :
+    // nombre de secondes, ou 0 = chrono désactivé. Sinon défaut du jeu.
+    var r = window.room;
+    if (r && r.turnSeconds != null) return +r.turnSeconds;
+    var c = cfg() || {};
+    return c.turnSeconds || TURN_SECONDS_BY_GAME[c.gameKey] || TURN_SECONDS_DEFAULT;
+  }
   function isOfflineMode() { try { var m = new URLSearchParams(location.search).get('mode'); return m === 'solo' || m === 'local'; } catch (e) { return false; } }
   function turnClockEl() {
     var el = document.getElementById('lb-turnclock');
@@ -176,6 +183,8 @@
     if (clockSig !== _clockTurn) { _clockTurn = clockSig; _clockStart = Date.now(); _timedOutTurn = null; }
     if (_clockInt) clearInterval(_clockInt);
     var total = turnSecondsFor();
+    // Chrono désactivé par l'hôte (turnSeconds = 0) → pas de pastille, pas d'auto-jeu.
+    if (!total || total <= 0) { var e0 = document.getElementById('lb-turnclock'); if (e0) e0.style.display = 'none'; return; }
     var render = function () {
       var left = Math.max(0, total - Math.floor((Date.now() - _clockStart) / 1000));
       var el = turnClockEl(); el.style.display = 'block';
@@ -375,13 +384,41 @@
       var iAmIn = !!players[window.myPid] || (room.order || []).indexOf(window.myPid) >= 0;
       var onlineCount = Object.keys(players).filter(function (k) { return players[k].online; }).length;
       var max = cfg().maxPlayers || 8;
-      if (!iAmIn && room.status !== 'waiting') { lbToast('La partie a déjà commencé'); if (fromUrl) window.showScreen('s-home'); return; }
+      // Partie déjà lancée et je n'en suis pas → on entre en SPECTATEUR (lecture
+      // seule) au lieu de refuser : on regarde, et on rejoint à la prochaine manche.
+      if (!iAmIn && room.status !== 'waiting') { startSpectate(code, fromUrl); return; }
       if (!iAmIn && onlineCount >= max) { lbToast('Salon complet'); if (fromUrl) window.showScreen('s-home'); return; }
       setRoom(code);
       if (!fromUrl) { try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {} }
       ensureIdentityThenEnter();
     }).catch(function () { lbToast('Connexion impossible'); });
   }
+
+  // ── Mode SPECTATEUR ────────────────────────────────────────────────────────
+  // On écoute le salon SANS y écrire (pas de nœud joueur, pas de présence) : le
+  // jeu se rend normalement, nos clics n'aboutissent pas (ce n'est jamais notre
+  // tour). Un bandeau l'explique ; on peut réagir avec les émojis. Dès le retour
+  // en salle d'attente, on devient un joueur normal (masterOnState).
+  function startSpectate(code, fromUrl) {
+    setRoom(code);
+    window.isSpectator = true;
+    if (!fromUrl) { try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {} }
+    showSpectatorBadge();
+    if (!window.listenersOn) { window.roomRef.on('value', masterOnState); window.listenersOn = true; }
+    armReactions();
+    lbToast('Partie en cours — tu regardes en spectateur');
+  }
+  function showSpectatorBadge() {
+    var b = document.getElementById('lb-spectator');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'lb-spectator'; b.className = 'lb-spectator';
+      b.innerHTML = '👁 <b>Spectateur</b> — tu entreras à la prochaine partie';
+      document.body.appendChild(b);
+    }
+    b.style.display = 'flex';
+  }
+  function removeSpectatorBadge() { var b = document.getElementById('lb-spectator'); if (b) b.style.display = 'none'; }
 
   // ── Identité (prénom + émoji) ──────────────────────────────────────────────
   function ensureIdentityThenEnter() {
@@ -485,6 +522,7 @@
       // sinon on laisse le jeu router vers son écran de jeu (reconnexion en cours).
       if (status === 'waiting') window.showScreen('s-lobby');
       if (!window.listenersOn) { window.roomRef.on('value', masterOnState); window.listenersOn = true; }
+      armReactions();
       if (c.afterJoin) try { c.afterJoin(); } catch (e) {}
     });
   }
@@ -494,6 +532,21 @@
     var room = snap.val() || {};
     window.room = room;
     var status = room.status || 'waiting';
+
+    // Mode SPECTATEUR : on regarde une partie en cours sans y participer. Dès
+    // que le salon repasse en attente (rejouer), on devient un vrai joueur.
+    if (window.isSpectator) {
+      if (status === 'waiting') {
+        window.isSpectator = false;
+        removeSpectatorBadge();
+        ensureIdentityThenEnter();
+        return;
+      }
+      if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
+      try { refreshReactUI(room); } catch (e) {}
+      try { updateTurnClock(room); } catch (e) {}
+      return; // ni pilotage d'ordis, ni stats, ni bip de tour
+    }
 
     maybeMigrateHost(room);
 
@@ -513,14 +566,35 @@
     try { driveBots(room); } catch (e) { console.error(e); }
     try { refreshBotSpeedUI(); } catch (e) {}
     try { refreshGameStatsUI(room); } catch (e) {}
+    try { refreshReactUI(room); } catch (e) {}
     try { window.Lobby.turnAlertFor(room); } catch (e) {}
+    try { playEndFx(room); } catch (e) {}
     try { recordStatsFor(room); } catch (e) {}
+  }
+
+  // ── Son + vibration de FIN DE PARTIE (en ligne) ────────────────────────────
+  // Le mode hors-ligne le fait déjà (offline.js) ; ici on couvre les salons en
+  // ligne : fanfare si j'ai gagné, descente sinon — une seule fois par partie.
+  var _endFxDone = false;
+  function playEndFx(room) {
+    var ended = !!(room.winner || room.status === 'ended' || room.status === 'finished');
+    if (!ended) { _endFxDone = false; return; }
+    if (_endFxDone || !room.winner) return;
+    _endFxDone = true;
+    if (!window.Sfx) return;
+    if (room.winner === window.myPid) {
+      Sfx.play('win');
+      if (window.Fx) Fx.vib([60, 40, 120]);
+    } else if (room.players && room.players[window.myPid]) {
+      Sfx.play('lose');
+    }
   }
 
   // ── Stats par jeu (localStorage) : enregistrées une fois par partie terminée ──
   var _statsEndRecorded = false;
   function recordStatsFor(room) {
     if (!window.GameStats) return;
+    if (!room.players || !room.players[window.myPid]) return; // spectateur : pas de stats
     var ended = room.status === 'ended' || room.status === 'finished' || !!room.winner;
     if (!ended) { _statsEndRecorded = false; return; }
     if (_statsEndRecorded) return;
@@ -580,7 +654,7 @@
     var extra = '';
     if (c.lobbyExtraHTML) { try { extra = c.lobbyExtraHTML(room) || ''; } catch (e) {} }
     // Réglages « ordis » (ajouter des bots + difficulté), pour les jeux qui les supportent.
-    var botCtl = botControlsHTML(room);
+    var botCtl = botControlsHTML(room) + turnClockControlsHTML(room);
 
     host.innerHTML =
       '<div class="lb-wrap">' +
@@ -653,6 +727,32 @@
     if (window.Bots.LEVELS.indexOf(level) < 0) return;
     if (window.roomRef) window.roomRef.child('difficulty').set(level);
   }
+
+  // ── Chrono de tour : réglage du SALON (hôte) ───────────────────────────────
+  // Jeux au tour par tour en ligne. « Auto » = défaut adapté au jeu (voir
+  // TURN_SECONDS_BY_GAME) ; « Off » (0) = personne n'est jamais pressé.
+  var TURN_CHOICES = [
+    { v: null, label: 'Auto' }, { v: 30, label: '30 s' }, { v: 60, label: '60 s' },
+    { v: 90, label: '90 s' }, { v: 0, label: 'Off' }
+  ];
+  function turnClockControlsHTML(room) {
+    var c = cfg();
+    if (!c.bot) return ''; // même population que le chrono lui-même
+    var isHost = room.host === window.myPid;
+    var cur = (room.turnSeconds == null) ? null : +room.turnSeconds;
+    var btns = TURN_CHOICES.map(function (ch) {
+      var active = (ch.v === null) ? cur === null : cur === ch.v;
+      return '<button type="button" class="lb-set-btn' + (active ? ' active' : '') + '"' +
+        (isHost ? ' onclick="Lobby.setTurnSeconds(' + (ch.v === null ? 'null' : ch.v) + ')"' : ' disabled') + '>' + ch.label + '</button>';
+    }).join('');
+    return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">⏱ Chrono de tour (en ligne)</div>' +
+      '<div class="lb-set-row">' + btns + '</div></div></div>';
+  }
+  function setTurnSeconds(v) {
+    if (!window.roomRef) return;
+    if (v === null || v === undefined) window.roomRef.child('turnSeconds').remove();
+    else window.roomRef.child('turnSeconds').set(Math.max(0, Math.min(300, +v || 0)));
+  }
   function setBotSpeed(sp) {
     if (window.Bots.SPEEDS.indexOf(sp) < 0) return;
     window.Bots.setSpeedPref(sp);                 // préférence appareil (repli hors-ligne)
@@ -692,6 +792,73 @@
   function cycleBotSpeed() { // compat : gardé au cas où appelé ailleurs
     var order = window.Bots.SPEEDS, cur = window.Bots.speed(window.room);
     onBotSpeedSlide((order.indexOf(cur) + 1) % order.length);
+  }
+
+  // ── Réactions emoji EN LIGNE (👏 😂 😮 …) ───────────────────────────────────
+  // Pendant une partie en ligne : un petit bouton flottant ouvre une rangée
+  // d'émojis ; toucher un émoji le fait FLOTTER sur l'écran de tous les joueurs
+  // (et des spectateurs). Éphémère : écrit sous rooms/<code>/rx, l'émetteur
+  // efface son nœud après quelques secondes — rien ne s'accumule dans la base.
+  var REACT_EMOJIS = ['👏', '😂', '😮', '😭', '🔥', '❤️'];
+  var _rxOn = false, _rxHandler = null, _rxLastSend = 0;
+  function myName() {
+    var p = window.Room && Room.me && Room.me();
+    if (p && p.name) return p.name;
+    var id = getIdentity();
+    return (id && id.name) || 'Spectateur';
+  }
+  function armReactions() {
+    if (_rxOn || !window.roomRef || isOfflineMode()) return;
+    _rxOn = true;
+    var born = Date.now();
+    _rxHandler = function (snap) {
+      var v = snap.val() || {};
+      if (!v.e || REACT_EMOJIS.indexOf(v.e) < 0) return;
+      if ((v.t || 0) < born - 15000) return; // réaction d'avant notre arrivée
+      if (window.Fx) Fx.float(v.e, { name: v.n || '' });
+      if (window.Sfx && v.n !== myName()) Sfx.play('flip');
+    };
+    try { window.roomRef.child('rx').on('child_added', _rxHandler); } catch (e) { _rxOn = false; }
+  }
+  function disarmReactions() {
+    if (!_rxOn || !window.roomRef) { _rxOn = false; return; }
+    try { window.roomRef.child('rx').off('child_added', _rxHandler); } catch (e) {}
+    _rxOn = false; _rxHandler = null;
+  }
+  function sendReaction(emoji) {
+    if (REACT_EMOJIS.indexOf(emoji) < 0 || !window.roomRef || isOfflineMode()) return;
+    var now = Date.now();
+    if (now - _rxLastSend < 700) return; // anti-rafale
+    _rxLastSend = now;
+    try {
+      var ref = window.roomRef.child('rx').push({ e: emoji, n: myName(), t: now });
+      setTimeout(function () { try { ref.remove(); } catch (e) {} }, 6000);
+    } catch (e) {}
+    var row = document.getElementById('lb-react-row');
+    if (row) row.classList.remove('open');
+  }
+  // Bouton flottant + rangée d'émojis : visibles en partie EN LIGNE dès qu'il y a
+  // au moins 2 humains dans le salon (spectateur compris — il peut réagir).
+  function refreshReactUI(room) {
+    room = room || window.room;
+    var el = document.getElementById('lb-react');
+    var playing = !!(room && room.status === 'playing');
+    var humans = 0;
+    if (room && room.players) Object.keys(room.players).forEach(function (k) { if (!room.players[k].isBot) humans++; });
+    var show = playing && !isOfflineMode() && (humans >= 2 || window.isSpectator) && isActive('s-playing');
+    if (!show) { if (el) el.style.display = 'none'; return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'lb-react'; el.className = 'lb-react';
+      var btns = REACT_EMOJIS.map(function (e2) {
+        return '<button type="button" class="lb-react-emo" onclick="Lobby.sendReaction(\'' + e2 + '\')">' + e2 + '</button>';
+      }).join('');
+      el.innerHTML = '<div class="lb-react-row" id="lb-react-row">' + btns + '</div>' +
+        '<button type="button" class="lb-react-fab" title="Réagir" onclick="document.getElementById(\'lb-react-row\').classList.toggle(\'open\')">😊</button>';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'flex';
+    armReactions();
   }
 
   // ── Stats de la partie EN COURS (bouton 📊 à côté de Règles/Rejouer) ────────
@@ -955,6 +1122,7 @@
       });
     }
     if (window.listenersOn) { window.roomRef.off('value', masterOnState); window.listenersOn = false; }
+    disarmReactions();
     if (window.GamePresence) GamePresence.stop();
     if (c.onLeave) try { c.onLeave(); } catch (e) {}
     location.href = '/index.html';
@@ -999,6 +1167,8 @@
     setBotCount: setBotCount,
     setDifficulty: setDifficulty,
     setBotSpeed: setBotSpeed,
+    setTurnSeconds: setTurnSeconds,
+    sendReaction: sendReaction,
     refreshBotSpeedUI: refreshBotSpeedUI,
     refreshGameStatsUI: refreshGameStatsUI,
     shareRoom: shareRoom,

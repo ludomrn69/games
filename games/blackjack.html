@@ -17,8 +17,11 @@
     .bj-title { justify-self: center; font-family: 'Playfair Display', serif; font-weight: 800; }
     .bj-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
 
-    .bj-felt { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 16px 14px 120px; display: flex; flex-direction: column; gap: 14px; }
-    .bj-dealer, .bj-seat { background: var(--white); border: 1px solid var(--gold-light); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow); }
+    /* Le nom l'annonçait : la zone de jeu est désormais un vrai TAPIS vert (game.css). */
+    .bj-felt { flex: 1; width: 100%; max-width: 640px; margin: 10px auto; padding: 16px 14px 120px; display: flex; flex-direction: column; gap: 14px; }
+    .bj-dealer, .bj-seat { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.16); border-radius: 18px; padding: 12px 14px; color: #fff; }
+    .bj-dealer .bj-meta, .bj-seat .bj-meta { color: rgba(255,255,255,0.72); }
+    .bj-seat.me .bj-seat-name::after { color: rgba(255,255,255,0.7) !important; }
     .bj-seat.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-light), var(--shadow); }
     .bj-seat.me .bj-seat-name::after { content: ' (toi)'; color: var(--ink-light); font-weight: 400; font-size: 0.8rem; }
     .bj-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -76,7 +79,7 @@
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Recommencer (jetons à 100)">↻</button>
         </div>
       </div>
-      <div class="bj-felt" id="bj-felt"></div>
+      <div class="bj-felt felt felt-green" id="bj-felt"></div>
       <div class="bj-bar"><div class="bj-bar-inner" id="bj-bar"></div></div>
     </div>
   </div>
@@ -258,6 +261,7 @@
     /* ━━ Mise ━━ */
     function placeBet(amount, asPid) {
       var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('coin'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'bet') return cur;
         if (!cur.bets) cur.bets = {};
@@ -310,6 +314,7 @@
     /* ━━ Tour de jeu ━━ */
     function doHit(asPid) {
       var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('flip'); Fx.vib(8); }
       rref().transaction(function (cur) {
         if (!cur || cur.phase !== 'play' || cur.turn !== pid) return cur;
         var h = activeHand(cur, pid);
@@ -329,6 +334,7 @@
     // Doubler : double la mise, une seule carte, puis stop.
     function doDouble(asPid) {
       var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('coin'); Fx.vib([15, 25, 15]); }
       rref().transaction(function (cur) {
         if (!cur || !canDouble(cur, pid)) return cur;
         cur.chips[pid] = chipsOf(cur, pid) - cur.bets[pid];

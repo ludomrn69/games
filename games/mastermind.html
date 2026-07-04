@@ -172,7 +172,8 @@
 
     /* ━━ Jouer une proposition ━━ */
     function submitGuess() {
-      if (draft.length !== PEGS) { lbToast('Choisis 4 couleurs'); return; }
+      if (draft.length !== PEGS) { lbToast('Choisis 4 couleurs'); if (window.Fx) Fx.sfx('error'); return; }
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(10); }
       var g = draft.slice();
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;

@@ -416,7 +416,7 @@
         else if (what === 'end') CE.endTurn(cur);
       });
     }
-    function tryMove(node) { tx(function (cur) { CE.moveTo(cur, node); }); }
+    function tryMove(node) { if (window.Fx) { Fx.sfx('place'); Fx.vib(8); } tx(function (cur) { CE.moveTo(cur, node); }); }
 
     /* ── Suggestion ── */
     var pickS = null, pickW = null;

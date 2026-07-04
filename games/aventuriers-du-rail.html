@@ -237,11 +237,13 @@
       if (A.isClaimed(st, id)) { lbToast('Route déjà prise'); return; }
       var opts = A.paymentOptions(st, window.myPid, id);
       if (!opts.length) { lbToast('Pas assez de cartes pour cette route'); return; }
+      if (window.Fx) Fx.vib(10);
       if (opts.length === 1) { doClaim(id, opts[0]); return; }
       openPayChoice(id, opts);
     }
     function doClaim(id, payment) {
       closeModal('modal-pay');
+      if (window.Fx) { Fx.sfx('place'); Fx.vib([12, 18, 12]); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== window.myPid) return cur;
         if ((cur.players[window.myPid].drawn || 0) > 0) return cur;

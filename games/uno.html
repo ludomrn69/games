@@ -34,9 +34,10 @@
     .uno-opp-chip .cnt { background: var(--ink); color: var(--cream); border-radius: 20px; padding: 0 6px; font-weight: 800; font-size: 0.75rem; }
     .uno-opp-chip .unobadge { color: var(--terracotta); font-weight: 800; }
 
-    .uno-center { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 10px; }
+    /* La zone centrale devient une vraie TABLE (feutre marine, cf. game.css). */
+    .uno-center { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 16px 14px 18px; margin: 4px auto 8px; width: min(94vw, 430px); }
     .uno-pile-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-    .uno-pile-label { font-family: 'Caveat', cursive; font-size: 0.85rem; color: var(--ink-light); }
+    .uno-pile-label { font-family: 'Caveat', cursive; font-size: 0.85rem; color: rgba(255,255,255,0.78); }
     .uno-card { width: 52px; height: 78px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.3rem; color: #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.18); position: relative; flex-shrink: 0; }
     .uno-card.lg { width: 64px; height: 96px; font-size: 1.7rem; }
     .uno-card.color-R { background: var(--uno-r); } .uno-card.color-Y { background: var(--uno-y); color: #2C2520; }
@@ -51,7 +52,11 @@
     .uno-current-color { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--gold-light); }
     .uno-current-color.R { background: var(--uno-r); } .uno-current-color.Y { background: var(--uno-y); }
     .uno-current-color.G { background: var(--uno-g); } .uno-current-color.B { background: var(--uno-b); }
-    .uno-turn-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; }
+    /* Bandeau de tour : l'info critique en GRAS lisible (pulse quand c'est à toi). */
+    .uno-turn-banner { display: flex; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: 92vw;
+      margin: 6px auto 2px; padding: 6px 18px; border-radius: 30px; font-weight: 800; font-size: 0.92rem;
+      background: var(--white); color: var(--ink-light); box-shadow: var(--shadow); min-height: 0; transition: background .25s, color .25s; }
+    .uno-turn-banner.me { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; animation: turnPulse 1.6s ease-out infinite; }
     .uno-dir { font-size: 1.1rem; }
 
     .uno-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
@@ -122,7 +127,7 @@
       <div class="uno-opps" id="uno-opps"></div>
       <div class="uno-turn-banner" id="uno-turn-banner"></div>
 
-      <div class="uno-center">
+      <div class="uno-center felt felt-navy">
         <div class="uno-pile-col">
           <div class="uno-pile-label">Pioche (<span id="uno-pile-count">0</span>)</div>
           <div class="uno-card lg uno-draw-pile" id="uno-draw-pile" onclick="drawCard()">🂠</div>
@@ -390,13 +395,17 @@
 
       var dirArrow = (state.dir === -1 ? '↺' : '↻');
       setText('uno-turn-banner', (isMyTurn ? 'À toi de jouer !' : 'Au tour de ' + Room.name(turn)) + '  ' + dirArrow + (state.pendingDraw > 0 ? '  · cumul +' + state.pendingDraw : ''));
+      document.getElementById('uno-turn-banner').classList.toggle('me', isMyTurn);
 
       setText('uno-pile-count', (state.drawPile || []).length);
       var discardEl = document.getElementById('uno-discard'); discardEl.innerHTML = '';
       if (top) {
         var el = buildCardEl(top, { lg: true });
         var sig = JSON.stringify(top);
-        if (window._unoTopSig !== undefined && window._unoTopSig !== sig) el.classList.add('card-in'); // carte fraîchement posée
+        if (window._unoTopSig !== undefined && window._unoTopSig !== sig) {
+          el.classList.add('card-in'); // carte fraîchement posée
+          if (window.Fx) Fx.sfx('place'); // on ENTEND chaque pose (la sienne comme celle des autres)
+        }
         window._unoTopSig = sig;
         discardEl.appendChild(el);
       }
@@ -409,6 +418,10 @@
 
       setText('uno-my-count', '(' + myHand.length + ')');
       var hand = document.getElementById('uno-my-hand'); hand.innerHTML = '';
+      // Nouvelle manche → la main se distribue en éventail (une seule fois).
+      var dealSig = (state.round || 1) + '|' + window.myPid;
+      hand.classList.toggle('fx-dealwave', window._unoDealSig !== dealSig);
+      window._unoDealSig = dealSig;
       myHand.slice().sort(cardSort).forEach(function (card) {
         var playable = isMyTurn && canPlay(card, top, currentColor) && (!(state.pendingDraw > 0) || parseCard(card).action === 'D');
         var el = buildCardEl(card, { inHand: true });
@@ -436,10 +449,11 @@
     /* ━━ Actions ━━ */
     function onCardTap(card) {
       var st = window.room || {};
-      if (st.status !== 'playing' || st.turn !== window.myPid) { if (st.turn !== window.myPid) lbToast('Ce n\'est pas ton tour'); return; }
-      if ((st.pendingDraw || 0) > 0 && parseCard(card).action !== 'D') { lbToast('Cumul +' + st.pendingDraw + ' : pose un +2 ou pioche !'); return; }
+      if (st.status !== 'playing' || st.turn !== window.myPid) { if (st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); if (window.Fx) Fx.sfx('error'); } return; }
+      if ((st.pendingDraw || 0) > 0 && parseCard(card).action !== 'D') { lbToast('Cumul +' + st.pendingDraw + ' : pose un +2 ou pioche !'); if (window.Fx) Fx.sfx('error'); return; }
       var top = (st.discardPile || []).slice(-1)[0];
-      if (!canPlay(card, top, st.currentColor)) { lbToast('Carte non jouable'); return; }
+      if (!canPlay(card, top, st.currentColor)) { lbToast('Carte non jouable'); if (window.Fx) Fx.sfx('error'); return; }
+      if (window.Fx) Fx.vib(12);
       if (parseCard(card).wild) { pendingWildCard = card; openModal('modal-color'); }
       else playCard(card, parseCard(card).color);
     }
@@ -517,8 +531,9 @@
 
     function drawCard() {
       var st = window.room || {};
-      if (st.status !== 'playing' || st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      if (st.status !== 'playing' || st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); if (window.Fx) Fx.sfx('error'); return; }
       if (st.drewThisTurn) { lbToast('Tu as déjà pioché'); return; }
+      if (window.Fx) { Fx.sfx('flip'); Fx.vib(8); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
         var order = cur.order || [], dir = cur.dir || 1, me = window.myPid;
@@ -557,6 +572,7 @@
     }
 
     function callUno() {
+      if (window.Fx) { Fx.sfx('big'); Fx.vib([20, 30, 40]); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing') return cur;
         var me = window.myPid, h = (cur.players[me] && cur.players[me].hand) || [];

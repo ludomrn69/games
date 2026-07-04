@@ -24,16 +24,26 @@
     .pr-opp .cnt { background: var(--ink); color: var(--cream); border-radius: 20px; padding: 0 6px; font-weight: 800; font-size: 0.74rem; }
     .pr-opp .rank-badge { font-size: 0.72rem; }
 
-    .pr-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
+    /* Bandeau d'info : GRAS lisible (pulse quand c'est à toi de poser). */
+    .pr-banner { display: flex; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: 92vw;
+      margin: 6px auto 2px; padding: 6px 18px; border-radius: 30px; font-weight: 800; font-size: 0.92rem;
+      background: var(--white); color: var(--ink-light); box-shadow: var(--shadow); min-height: 0; transition: background .25s, color .25s; }
+    .pr-banner:empty { display: none; }
+    .pr-banner.me { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; animation: turnPulse 1.6s ease-out infinite; }
 
-    .pr-pile-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 12px 12px; }
-    .pr-pile-label { font-family: 'Caveat', cursive; font-size: 0.9rem; color: var(--ink-light); }
+    /* Le pli se joue sur un TAPIS bordeaux (feutre, cf. game.css). */
+    .pr-pile-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 12px 16px; margin: 6px auto 4px; width: min(94vw, 460px); }
+    .pr-pile-label { font-family: 'Caveat', cursive; font-size: 0.9rem; color: rgba(255,255,255,0.78); }
     .pr-pile { display: flex; gap: 6px; min-height: 80px; align-items: center; justify-content: center; }
-    .pr-pile-empty { font-family: 'Caveat', cursive; color: var(--ink-light); font-size: 1.1rem; }
+    .pr-pile-empty { font-family: 'Caveat', cursive; color: rgba(255,255,255,0.72); font-size: 1.1rem; }
 
-    .card { width: 50px; height: 72px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0; position: relative; }
-    .card .rk { font-size: 1.2rem; line-height: 1; font-family: 'Playfair Display', serif; }
-    .card .st { font-size: 1rem; line-height: 1; }
+    /* Vraie carte à jouer : indices dans les coins (miroir en bas-droite) + enseigne centrale. */
+    .card { width: 50px; height: 72px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.16); flex-shrink: 0; position: relative; font-weight: 900; }
+    .card .cnr { position: absolute; top: 3px; left: 4px; display: flex; flex-direction: column; align-items: center; line-height: 1; gap: 1px; }
+    .card .cnr.b { top: auto; left: auto; bottom: 3px; right: 4px; transform: rotate(180deg); }
+    .card .cnr .rk { font-size: 0.86rem; font-weight: 900; letter-spacing: -0.5px; }
+    .card .cnr .st { font-size: 0.66rem; }
+    .card .mid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.45rem; }
     .card.red { color: #d6584e; } .card.black { color: #2C2520; }
     html[data-theme="dark"] .card { background: #f4efe7; }
 
@@ -88,7 +98,7 @@
       </div>
       <div class="pr-opps" id="pr-opps"></div>
       <div class="pr-banner" id="pr-banner"></div>
-      <div class="pr-pile-wrap">
+      <div class="pr-pile-wrap felt felt-wine">
         <div class="pr-pile-label" id="pr-mode">Pli en cours</div>
         <div class="pr-pile" id="pr-pile"></div>
       </div>
@@ -292,8 +302,10 @@
       return (pos + 1) + 'ᵉ';
     }
     function cardHTML(card, extraClass) {
+      var rk = rankOf(card), st = SUIT_SYM[suitOf(card)];
+      var cnr = '<span class="cnr"><span class="rk">' + rk + '</span><span class="st">' + st + '</span></span>';
       return '<div class="card ' + (isRed(card) ? 'red' : 'black') + (extraClass ? ' ' + extraClass : '') + '" data-card="' + card + '">' +
-        '<span class="rk">' + rankOf(card) + '</span><span class="st">' + SUIT_SYM[suitOf(card)] + '</span></div>';
+        cnr + '<span class="mid">' + st + '</span>' + cnr.replace('class="cnr"', 'class="cnr b"') + '</div>';
     }
 
     function render(state) {
@@ -315,6 +327,7 @@
       }).join('');
 
       setText('pr-banner', state.banner || '');
+      document.getElementById('pr-banner').classList.toggle('me', isMyTurn);
 
       // Simple / Double / Triple / Carré : taille de combinaison imposée par le pli
       // en cours (affichée sous les joueurs). Sans pli → nouveau pli, taille libre.
@@ -330,7 +343,10 @@
         window._prPileSig = pileSig;
         pileEl.innerHTML = state.pile.cards.map(function (c) { return cardHTML(c); }).join('') +
           '<div class="pr-pile-label" style="align-self:flex-end">par ' + escapeHtml(Room.name(state.pile.by)) + '</div>';
-        if (fresh) pileEl.querySelectorAll('.card').forEach(function (el, i) { el.classList.add('card-in'); el.style.animationDelay = (i * 0.05) + 's'; });
+        if (fresh) {
+          pileEl.querySelectorAll('.card').forEach(function (el, i) { el.classList.add('card-in'); el.style.animationDelay = (i * 0.05) + 's'; });
+          if (window.Fx) Fx.sfx('place'); // on entend chaque pose, la sienne comme celle des autres
+        }
       } else {
         pileEl.innerHTML = '<span class="pr-pile-empty">Nouveau pli — à ' + (isMyTurn ? 'toi' : escapeHtml(Room.name(turn))) + ' de poser</span>';
       }
@@ -340,6 +356,10 @@
       setText('pr-my-count', '(' + myHand.length + ')');
       var selRank = selected.length ? rankOf(selected[0]) : null;
       var cont = document.getElementById('pr-hand');
+      // Distribution en éventail quand la main vient d'être servie (nouvelle manche).
+      var dealt = window._prLastHandN == null || myHand.length > window._prLastHandN + 3;
+      cont.classList.toggle('fx-dealwave', dealt);
+      window._prLastHandN = myHand.length;
       cont.innerHTML = myHand.map(function (card) {
         var isSel = selected.indexOf(card) >= 0;
         // griser les cartes d'une autre valeur quand une sélection est en cours
@@ -362,7 +382,8 @@
 
     function toggleCard(card) {
       var st = window.room || {};
-      if (st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      if (st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); if (window.Fx) Fx.sfx('error'); return; }
+      if (window.Fx) { Fx.sfx('click'); Fx.vib(6); }
       var i = selected.indexOf(card);
       if (i >= 0) selected.splice(i, 1);
       else {
@@ -379,11 +400,12 @@
       if (st.turn !== window.myPid || !selected.length) return;
       var cards = selected.slice();
       var r = rankOf(cards[0]);
-      if (!cards.every(function (c) { return rankOf(c) === r; })) { lbToast('Sélectionne des cartes de même valeur'); return; }
+      if (!cards.every(function (c) { return rankOf(c) === r; })) { lbToast('Sélectionne des cartes de même valeur'); if (window.Fx) Fx.sfx('error'); return; }
       if (st.pile) {
-        if (cards.length !== st.pile.count) { lbToast('Il faut ' + st.pile.count + ' carte(s)'); return; }
-        if (rankVal(cards[0]) < st.pile.rank) { lbToast('Il faut une valeur égale ou plus forte'); return; }
+        if (cards.length !== st.pile.count) { lbToast('Il faut ' + st.pile.count + ' carte(s)'); if (window.Fx) Fx.sfx('error'); return; }
+        if (rankVal(cards[0]) < st.pile.rank) { lbToast('Il faut une valeur égale ou plus forte'); if (window.Fx) Fx.sfx('error'); return; }
       }
+      if (window.Fx) Fx.vib(12);
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
         var hand = (cur.players[window.myPid].hand || []).slice();

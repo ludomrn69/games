@@ -7,6 +7,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
+  <script src="/daily.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
@@ -37,6 +38,33 @@
     .search-bar.has-value .s-clear { display: block; }
     .search-empty { text-align: center; color: var(--ink-light); font-size: 0.95rem; margin: 10px 0 4px; display: none; }
 
+    /* ── Hub : Défi du jour / Reprendre / Récents (au-dessus de la grille) ── */
+    .daily-hero { display: flex; align-items: center; gap: 12px; max-width: 640px; margin: 0 auto 14px; padding: 14px 18px;
+      border-radius: 18px; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; text-decoration: none;
+      box-shadow: 0 8px 26px rgba(196,116,90,0.35); transition: transform .18s; }
+    .daily-hero:hover { transform: translateY(-2px); }
+    .daily-hero .dh-emoji { font-size: 2rem; line-height: 1; }
+    .daily-hero .dh-t { font-weight: 800; font-size: 1.02rem; }
+    .daily-hero .dh-s { font-size: 0.8rem; opacity: 0.92; margin-top: 2px; }
+    .daily-hero .dh-badge { margin-left: auto; background: rgba(255,255,255,0.22); border-radius: 20px; padding: 4px 12px;
+      font-weight: 800; font-size: 0.8rem; white-space: nowrap; }
+    .hub-sec { margin: 0 auto 16px; max-width: 640px; }
+    .hub-title { font-size: 0.75rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink-light);
+      margin: 0 2px 8px; text-align: center; }
+    .hub-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .hub-chip { display: inline-flex; align-items: center; gap: 7px; background: var(--white); border: 1.5px solid var(--gold-light);
+      border-radius: 30px; padding: 7px 14px 7px 9px; text-decoration: none; color: var(--ink); font-weight: 700; font-size: 0.88rem;
+      box-shadow: var(--shadow); transition: transform .18s, border-color .18s; }
+    .hub-chip:hover { transform: translateY(-2px); border-color: var(--gold); }
+    .hub-chip .hc-emoji { font-size: 1.15rem; line-height: 1; }
+    .hub-chip .hc-sub { font-size: 0.72rem; color: var(--ink-light); font-weight: 600; }
+
+    /* Étoile « favori » sur chaque carte de jeu */
+    .fav-btn { position: absolute; top: 5px; right: 7px; border: none; background: none; cursor: pointer; font-size: 1.02rem;
+      color: var(--gold-light); padding: 2px 4px; line-height: 1; transition: transform .15s, color .15s; z-index: 2; }
+    .fav-btn:hover { transform: scale(1.25); color: var(--gold); }
+    .fav-btn.on { color: var(--gold); }
+
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
     .cat-title { grid-column: 1 / -1; font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; color: var(--ink);
       margin: 18px 2px 2px; padding-bottom: 6px; border-bottom: 1.5px solid var(--gold-light); display: flex; align-items: center; gap: 8px; }
@@ -66,20 +94,23 @@
       cursor: pointer; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-size: 0.85rem; white-space: nowrap; }
     .plane-check .pc-btn[disabled] { opacity: 0.55; cursor: default; }
 
-    /* ── Mode Playus Arena : mini-jeux réflexes façon appli mobile ── */
+    /* ── Mode Playus Arena : mini-jeux réflexes façon appli mobile ──
+       Harmonisé avec la charte : prune profonde + accents dorés (fini le néon
+       violet/rose qui jurait avec le crème du reste de la page). */
     .playus-section { margin-top: 46px; }
     .playus-banner { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-radius: 24px; margin-bottom: 18px;
-      background: linear-gradient(135deg, #5b4bdb 0%, #8b3fd6 55%, #c94b9e 100%); color: #fff;
-      box-shadow: 0 12px 34px rgba(91,75,219,0.38); position: relative; overflow: hidden; }
+      background: radial-gradient(130% 115% at 50% 0, #5a3f8a, #32224e); color: #fff;
+      border: 1px solid rgba(245,199,126,0.25);
+      box-shadow: 0 12px 34px rgba(50,34,78,0.4); position: relative; overflow: hidden; }
     .playus-banner::after { content: ''; position: absolute; inset: 0; background:
-      radial-gradient(circle at 85% 20%, rgba(255,255,255,0.22), transparent 40%); pointer-events: none; }
+      radial-gradient(circle at 85% 20%, rgba(242,193,78,0.18), transparent 45%); pointer-events: none; }
     .playus-banner .pb-emoji { font-size: 2.6rem; line-height: 1; }
-    .playus-banner .pb-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.45rem; }
+    .playus-banner .pb-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.45rem; color: #f5c77e; }
     .playus-banner .pb-sub { font-size: 0.82rem; opacity: 0.92; margin-top: 3px; }
-    .card.playus { background: linear-gradient(160deg, #2a2350, #17132e); border: 1px solid #3a3170; color: #fff; }
-    .card.playus:hover { box-shadow: 0 14px 30px rgba(139,63,214,0.35); }
+    .card.playus { background: linear-gradient(160deg, #3a2a5e, #221739); border: 1px solid #4a3a6e; color: #fff; }
+    .card.playus:hover { box-shadow: 0 14px 30px rgba(90,63,138,0.4); border-color: rgba(245,199,126,0.45); }
     .card.playus .name { color: #fff; }
-    .card.playus .players { color: #b3aae6; }
+    .card.playus .players { color: #c9b8ef; }
     .card.playus .off-badge { filter: grayscale(0.2); }
   </style>
 </head>
@@ -101,6 +132,9 @@
       <input id="game-search" type="search" placeholder="Rechercher un jeu…" autocomplete="off" aria-label="Rechercher un jeu">
       <button class="s-clear" id="search-clear" type="button" aria-label="Effacer">✕</button>
     </div>
+
+    <!-- Hub : défi du jour, parties à reprendre, joués récemment (masqué en recherche) -->
+    <div id="hub"></div>
 
     <div class="grid" id="grid"></div>
 
@@ -190,10 +224,22 @@
       { title: 'Plateau',             emoji: '🎲', keys: ['monopoly', 'ludo', 'blokus', 'aventuriers-du-rail'] }
     ];
     var byKey = {}; GAMES.forEach(function (g) { byKey[g.key] = g; });
-    var placed = {};
+
+    // ── Favoris (⭐ épinglés en tête de grille, mémorisés sur l'appareil) ────
+    var FAVS_KEY = 'games.favs';
+    function getFavs() { try { return JSON.parse(localStorage.getItem(FAVS_KEY)) || []; } catch (e) { return []; } }
+    function toggleFav(key) {
+      var f = getFavs(), i = f.indexOf(key);
+      if (i >= 0) f.splice(i, 1); else f.push(key);
+      try { localStorage.setItem(FAVS_KEY, JSON.stringify(f)); } catch (e) {}
+      buildGrid();
+      if (window._searchApply) window._searchApply(); // garde le filtre de recherche actif
+    }
     function cardHTML(g) {
       var cls = 'card' + (g.on ? '' : ' soon');
+      var fav = getFavs().indexOf(g.key) >= 0;
       var inner = (g.offline ? '<span class="off-badge" title="Jouable hors-ligne (solo / local)">✈️</span>' : '') +
+        '<button class="fav-btn' + (fav ? ' on' : '') + '" data-fav="' + g.key + '" title="' + (fav ? 'Retirer des favoris' : 'Ajouter aux favoris') + '" aria-label="Favori">' + (fav ? '★' : '☆') + '</button>' +
         '<div class="emoji">' + g.emoji + '</div><div class="name">' + g.name + '</div><div class="players">' + g.players + ' joueurs</div>';
       return g.on ? '<a class="' + cls + '" href="games/' + g.key + '.html">' + inner + '</a>'
                   : '<div class="' + cls + '">' + inner + '</div>';
@@ -203,14 +249,86 @@
       return '<h2 class="cat-title">' + emoji + ' ' + title + '</h2>' + list.map(cardHTML).join('');
     }
     var grid = document.getElementById('grid');
-    var html = '';
-    CATS.forEach(function (cat) {
-      var list = cat.keys.map(function (k) { placed[k] = true; return byKey[k]; }).filter(Boolean);
-      html += sectionHTML(cat.title, cat.emoji, list);
+    function buildGrid() {
+      var placed = {};
+      var html = '';
+      var favList = getFavs().map(function (k) { return byKey[k]; }).filter(Boolean);
+      html += sectionHTML('Favoris', '⭐', favList);
+      CATS.forEach(function (cat) {
+        var list = cat.keys.map(function (k) { placed[k] = true; return byKey[k]; }).filter(Boolean);
+        html += sectionHTML(cat.title, cat.emoji, list);
+      });
+      var others = GAMES.filter(function (g) { return !placed[g.key]; });
+      html += sectionHTML('Autres', '🎯', others);
+      grid.innerHTML = html;
+    }
+    buildGrid();
+    // Clic sur l'étoile : on bascule le favori SANS suivre le lien de la carte.
+    grid.addEventListener('click', function (e) {
+      var b = e.target.closest('.fav-btn');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      toggleFav(b.getAttribute('data-fav'));
     });
-    var others = GAMES.filter(function (g) { return !placed[g.key]; });
-    html += sectionHTML('Autres', '🎯', others);
-    grid.innerHTML = html;
+
+    // ── Hub au-dessus de la grille : défi du jour + reprendre + récents ─────
+    var DAILY_GAMES = ['sudoku', 'queens', 'tango', 'zip', 'patches', 'sutom'];
+    function dailyHeroHTML() {
+      if (!window.Daily) return '';
+      var day = Math.floor(Date.now() / 86400000);
+      var g = byKey[DAILY_GAMES[day % DAILY_GAMES.length]];
+      if (!g) return '';
+      var st = Daily.stateOf(g.key);
+      var badge = st.doneToday ? '✅ Fait' : ('Difficulté : ' + Daily.levelLabel());
+      if (st.streak > 0) badge += ' · série ' + st.streak + ' 🔥';
+      return '<a class="daily-hero" href="games/' + g.key + '.html?mode=solo&daily=1">' +
+        '<span class="dh-emoji">🗓️</span>' +
+        '<span><span class="dh-t">Défi du jour — ' + g.name + ' ' + g.emoji + '</span>' +
+        '<span class="dh-s" style="display:block">La même grille pour tout le monde, une seule par jour</span></span>' +
+        '<span class="dh-badge">' + badge + '</span></a>';
+    }
+    function resumeChipsHTML() {
+      var out = [];
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          var m = /^games\.resume\.([\w-]+)\.(solo|local)$/.exec(k);
+          if (!m || !byKey[m[1]]) continue;
+          var d = null;
+          try { d = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+          if (!d || !d.room || d.room.status !== 'playing') continue;
+          out.push({ g: byKey[m[1]], mode: m[2], ts: d.ts || 0 });
+        }
+      } catch (e) {}
+      out.sort(function (a, b) { return b.ts - a.ts; });
+      if (!out.length) return '';
+      var chips = out.slice(0, 4).map(function (r) {
+        return '<a class="hub-chip" href="games/' + r.g.key + '.html?mode=' + r.mode + '">' +
+          '<span class="hc-emoji">' + r.g.emoji + '</span>' + r.g.name +
+          '<span class="hc-sub">▶ ' + (r.mode === 'solo' ? 'reprendre le solo' : 'reprendre en local') + '</span></a>';
+      }).join('');
+      return '<div class="hub-sec"><div class="hub-title">⏸ Parties à reprendre</div><div class="hub-row">' + chips + '</div></div>';
+    }
+    function recentChipsHTML() {
+      var out = [];
+      GAMES.forEach(function (g) {
+        try {
+          var s = JSON.parse(localStorage.getItem('stats.' + g.key + '.v1'));
+          if (s && s.lastAt) out.push({ g: g, at: s.lastAt, plays: s.plays || 0 });
+        } catch (e) {}
+      });
+      out.sort(function (a, b) { return b.at - a.at; });
+      if (!out.length) return '';
+      var chips = out.slice(0, 6).map(function (r) {
+        return '<a class="hub-chip" href="games/' + r.g.key + '.html">' +
+          '<span class="hc-emoji">' + r.g.emoji + '</span>' + r.g.name +
+          (r.plays ? '<span class="hc-sub">' + r.plays + (r.plays > 1 ? ' parties' : ' partie') + '</span>' : '') + '</a>';
+      }).join('');
+      return '<div class="hub-sec"><div class="hub-title">🕘 Joués récemment</div><div class="hub-row">' + chips + '</div></div>';
+    }
+    var hubEl = document.getElementById('hub');
+    function buildHub() { if (hubEl) hubEl.innerHTML = dailyHeroHTML() + resumeChipsHTML() + recentChipsHTML(); }
+    buildHub();
 
     // ── Catalogue « Playus Arena » ────────────────────────────────────────────
     // Mini-jeux réflexes autonomes rangés dans games/playus/. On utilise « s: »
@@ -293,6 +411,9 @@
       function apply() {
         var q = norm(search.value.trim());
         bar.classList.toggle('has-value', !!search.value);
+        // Pendant une recherche, le hub (défi/reprendre/récents) laisse toute la place aux résultats.
+        var hub = document.getElementById('hub');
+        if (hub) hub.style.display = q ? 'none' : '';
         var anyVisible = false;
         // Grille principale : parcours en gardant le titre de catégorie courant.
         var currentTitle = null, groupHasVisible = false;
@@ -316,6 +437,7 @@
       }
       search.addEventListener('input', apply);
       if (clearBtn) clearBtn.addEventListener('click', function () { search.value = ''; apply(); search.focus(); });
+      window._searchApply = apply; // ré-appliqué après un re-rendu de la grille (favoris)
     })();
 
     var input = document.getElementById('join-code');

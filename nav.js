@@ -11,6 +11,11 @@
   function applyTheme(t) {
     if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
+    // Synchronise la couleur de la barre d'adresse mobile (meta posée par head.js).
+    try {
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', t === 'dark' ? '#0e0b12' : '#FDF6EC');
+    } catch (e) {}
   }
   function currentTheme() {
     try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }

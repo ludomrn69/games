@@ -38,12 +38,149 @@ body {
    et modales. Source unique — avant, chaque page recopiait ces règles. ── */
 .btn-primary { display: block; width: 100%; max-width: 320px; margin: 0 auto; padding: 0.85rem 2rem; border: none; border-radius: 60px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 4px 16px rgba(196,116,90,0.28); transition: transform .2s; }
 .btn-primary:hover { transform: translateY(-2px); }
+.btn-primary:active { transform: scale(0.97); }
 #s-results { align-items: center; justify-content: center; min-height: calc(100vh - 52px); padding: 40px 20px; text-align: center; }
-.res-emoji { font-size: 3.4rem; }
-.res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; }
+.res-emoji { font-size: 3.4rem; animation: resPop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.res-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.8rem; margin: 6px 0; animation: fadeUp 0.45s 0.12s ease both; }
 .res-rank { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; margin: 12px auto 22px; }
-.res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+.res-rank-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); animation: fadeUp 0.4s ease both; }
+/* Podium qui s'égrène : chaque ligne du classement arrive avec un léger décalage. */
+.res-rank-row:nth-child(1) { animation-delay: 0.20s; }
+.res-rank-row:nth-child(2) { animation-delay: 0.30s; }
+.res-rank-row:nth-child(3) { animation-delay: 0.40s; }
+.res-rank-row:nth-child(4) { animation-delay: 0.50s; }
+.res-rank-row:nth-child(5) { animation-delay: 0.58s; }
+.res-rank-row:nth-child(6) { animation-delay: 0.66s; }
+.res-rank-row:nth-child(7) { animation-delay: 0.72s; }
+.res-rank-row:nth-child(n+8) { animation-delay: 0.78s; }
+.res-rank-row:first-child { border: 1.5px solid var(--gold); box-shadow: 0 0 0 3px rgba(198,152,90,0.18), var(--shadow); }
 .res-rank-pos { font-weight: 800; width: 30px; font-size: 1.1rem; }
 .res-rank-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 .res-rank-name { flex: 1; text-align: left; font-weight: 700; }
 .res-rank-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+@keyframes resPop { 0% { transform: scale(0.2) rotate(-14deg); opacity: 0; } 62% { transform: scale(1.22) rotate(5deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+
+/* Les cartes de modale « sautent » doucement à l'ouverture (toutes les pages
+   utilisent la même paire de classes .modal / .modal-card). */
+.modal.active .modal-card { animation: fxPopIn 0.26s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+
+/* ══ TABLES DE JEU (feutre) ═══════════════════════════════════════════════════
+   La zone de jeu reçoit une vraie SURFACE (comme le tapis du Poker ou le plateau
+   sombre de Balatro) pendant que le chrome du site reste crème. Un jeu pose
+   .felt + une teinte (.felt-green, .felt-wine…) sur son conteneur central :
+   cartes, pions et jetons ressortent immédiatement. Identique en mode sombre
+   (une table est sombre par nature). */
+.felt {
+  --felt-hi: #2f7d55; --felt-lo: #1c5038; --felt-line: rgba(255,255,255,0.16);
+  background: radial-gradient(130% 115% at 50% 0, var(--felt-hi), var(--felt-lo));
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 20px;
+  box-shadow: inset 0 2px 18px rgba(0,0,0,0.42), var(--shadow);
+  color: #fff;
+}
+.felt-green { --felt-hi: #2f7d55; --felt-lo: #1a4a33; }
+.felt-wine  { --felt-hi: #8a3550; --felt-lo: #4e1d2d; }
+.felt-navy  { --felt-hi: #2e4f80; --felt-lo: #182c4e; }
+.felt-plum  { --felt-hi: #5a3f8a; --felt-lo: #32224e; }
+.felt-teal  { --felt-hi: #2c7a74; --felt-lo: #17474a; }
+.felt-slate { --felt-hi: #4a5568; --felt-lo: #272e3d; }
+.felt-wood  { --felt-hi: #8a5a34; --felt-lo: #55351d; }
+.felt-ember { --felt-hi: #8a4a2c; --felt-lo: #4e2717; }
+/* Sur feutre, les petites étiquettes (Caveat ou pas) passent en clair lisible. */
+.felt .felt-label { color: rgba(255,255,255,0.78); }
+.felt .felt-dim { color: rgba(255,255,255,0.62); }
+
+/* ══ BANDEAU DE TOUR ══════════════════════════════════════════════════════════
+   L'info « à qui de jouer » en DM Sans GRAS et bien visible (fini la cursive
+   pour l'info critique). .me quand c'est à toi : dégradé + halo qui pulse. */
+.turnbar {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: max-content; max-width: 92vw; margin: 6px auto;
+  padding: 6px 18px; border-radius: 30px;
+  font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.92rem;
+  background: var(--white); color: var(--ink-light);
+  box-shadow: var(--shadow); border: 1.5px solid transparent;
+  transition: background .25s, color .25s;
+}
+.turnbar.me {
+  background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff;
+  animation: turnPulse 1.6s ease-out infinite;
+}
+@keyframes turnPulse {
+  0% { box-shadow: 0 0 0 0 rgba(196,116,90,0.45); }
+  70% { box-shadow: 0 0 0 9px rgba(196,116,90,0); }
+  100% { box-shadow: 0 0 0 0 rgba(196,116,90,0); }
+}
+
+/* ══ DÉS À POINTS (pips) ══════════════════════════════════════════════════════
+   Un vrai dé (points disposés en grille 3×3) au lieu d'un chiffre dans un carré.
+   HTML généré par Fx.die(n) — 9 cases <i>, les visibles portent .on. */
+.pipdie {
+  /* Taille pilotée par --dpx (posée par Fx.die) : padding/gap calculés sur la
+     taille du DÉ — un % se calculerait sur le parent et casserait tout. */
+  --dpx: 30px;
+  display: inline-grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+  width: var(--dpx); height: var(--dpx);
+  padding: calc(var(--dpx) * 0.16); gap: calc(var(--dpx) * 0.06);
+  background: linear-gradient(145deg, #fff, #ece6da); border-radius: 22%;
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.18), 0 2px 5px rgba(0,0,0,0.28);
+  vertical-align: middle; flex-shrink: 0;
+}
+.pipdie i { border-radius: 50%; background: transparent; }
+.pipdie i.on { background: #2C2520; box-shadow: inset 0 1px 1px rgba(0,0,0,0.45); }
+.pipdie.roll { animation: dieRoll 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+@keyframes dieRoll {
+  0% { transform: rotate(-160deg) scale(0.35); opacity: 0.2; }
+  60% { transform: rotate(14deg) scale(1.12); opacity: 1; }
+  100% { transform: rotate(0) scale(1); }
+}
+
+/* ══ PIONS ════════════════════════════════════════════════════════════════════
+   Pion coloré à la couleur du joueur (var --pc), l'émoji de l'avatar en médaillon.
+   Remplace les emojis nus minuscules sur les plateaux (Monopoly, Petits chevaux). */
+.pawn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--pc, var(--gold)); border: 1.5px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.45);
+  font-size: 9px; line-height: 1; flex-shrink: 0;
+}
+
+/* ══ ANIMATIONS PARTAGÉES ═════════════════════════════════════════════════════
+   À poser sur des éléments FRAIS uniquement (nouvelle carte, nouveau pion) : les
+   pages qui re-rendent tout à chaque état ajoutent la classe seulement quand la
+   signature change (voir uno.html / skyjo.html pour le motif). */
+@keyframes dealIn { from { transform: translateY(30px) rotate(5deg) scale(0.82); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes flipIn { from { transform: rotateY(88deg) scale(1.06); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes fxPopIn { 0% { transform: scale(0.55); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes fxShake { 0%, 100% { transform: none; } 25% { transform: translateX(-5px); } 55% { transform: translateX(4px); } 80% { transform: translateX(-2px); } }
+.fx-deal { animation: dealIn 0.38s cubic-bezier(0.34, 1.45, 0.64, 1) both; }
+.fx-flip { animation: flipIn 0.34s ease-out both; }
+.fx-pop { animation: resPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.fx-shake { animation: fxShake 0.4s ease both; }
+/* Distribution en éventail : le conteneur .fx-dealwave égrène ses enfants. */
+.fx-dealwave > * { animation: dealIn 0.36s cubic-bezier(0.34, 1.45, 0.64, 1) both; }
+.fx-dealwave > *:nth-child(1) { animation-delay: 0.02s; } .fx-dealwave > *:nth-child(2) { animation-delay: 0.06s; }
+.fx-dealwave > *:nth-child(3) { animation-delay: 0.10s; } .fx-dealwave > *:nth-child(4) { animation-delay: 0.14s; }
+.fx-dealwave > *:nth-child(5) { animation-delay: 0.18s; } .fx-dealwave > *:nth-child(6) { animation-delay: 0.22s; }
+.fx-dealwave > *:nth-child(7) { animation-delay: 0.26s; } .fx-dealwave > *:nth-child(8) { animation-delay: 0.30s; }
+.fx-dealwave > *:nth-child(9) { animation-delay: 0.34s; } .fx-dealwave > *:nth-child(10) { animation-delay: 0.38s; }
+.fx-dealwave > *:nth-child(11) { animation-delay: 0.42s; } .fx-dealwave > *:nth-child(12) { animation-delay: 0.46s; }
+.fx-dealwave > *:nth-child(n+13) { animation-delay: 0.5s; }
+
+/* Émoji flottant (réactions en ligne + petites célébrations locales). */
+.fx-float {
+  position: fixed; z-index: 8800; pointer-events: none;
+  font-size: 2.1rem; line-height: 1; will-change: transform, opacity;
+  animation: fxFloatUp 2.4s ease-out both;
+}
+.fx-float .fx-float-name {
+  display: block; font-size: 0.62rem; font-weight: 800; text-align: center;
+  color: var(--ink); background: var(--white); border-radius: 20px; padding: 1px 7px;
+  box-shadow: var(--shadow); margin-top: 2px; font-family: 'DM Sans', sans-serif;
+}
+@keyframes fxFloatUp {
+  0% { transform: translateY(0) scale(0.5) rotate(0); opacity: 0; }
+  12% { transform: translateY(-4vh) scale(1.15) rotate(-6deg); opacity: 1; }
+  100% { transform: translateY(-46vh) scale(1) rotate(7deg); opacity: 0; }
+}

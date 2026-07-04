@@ -383,11 +383,15 @@
         banner.textContent = '🎲 ' + who + ' ' + lr.die + (lr.moved === false ? ' — aucun coup possible' : '');
       } else banner.textContent = '';
 
-      // Dé + contrôles
+      // Dé + contrôles — un vrai dé à POINTS (pips), animé au lancer.
       var dieEl = document.getElementById('lu-die');
       if (state.die != null) {
-        if (lastDieShown !== state.die) { dieEl.classList.remove('rolling'); void dieEl.offsetWidth; dieEl.classList.add('rolling'); }
-        dieEl.textContent = state.die;
+        var freshDie = lastDieShown !== state.die;
+        if (freshDie) {
+          dieEl.classList.remove('rolling'); void dieEl.offsetWidth; dieEl.classList.add('rolling');
+          if (window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+        }
+        dieEl.innerHTML = window.Fx ? Fx.die(state.die, 40) : String(state.die);
       } else { dieEl.textContent = '🎲'; }
       lastDieShown = state.die;
 
@@ -433,6 +437,7 @@
       var st = window.room || {};
       if (st.turn !== window.myPid || st.die == null) return;
       if (myColor(st) !== color) return;
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(12); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.die == null) return cur;
         if (cur.colorOf[window.myPid] !== color) return cur;

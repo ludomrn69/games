@@ -285,6 +285,7 @@
       doPlay(targeting, targetPid);
     }
     function doPlay(card, targetPid) {
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
         applyCard(cur, window.myPid, card, targetPid);

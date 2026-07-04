@@ -20,6 +20,9 @@
   // donc l'émoji final éventuel du titre pour ne pas le doubler visuellement.
   document.title = (title || '').replace(/[^\p{L}\p{N}!?'’.()\- ]+$/u, '').replace(/\s+$/, '') || title;
   add('meta', { name: 'robots', content: 'noindex, nofollow' });
+  // Barre d'adresse mobile aux couleurs du site (mise à jour au basculement par nav.js).
+  var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  add('meta', { name: 'theme-color', content: dark ? '#0e0b12' : '#FDF6EC' });
   add('link', { rel: 'icon', href: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>" + emoji + "</text></svg>" });
   // iOS ignore les icônes du manifest : l'« Ajouter à l'écran d'accueil » a besoin
   // d'un apple-touch-icon en PNG (sinon icône blanche). Voir icons/.

@@ -240,11 +240,12 @@
     function abbr(n) { return n.length > 26 ? n.slice(0, 25) + '…' : n; }
 
     function renderBoard(s) {
-      var toks = {}, hopAt = {}; // pos -> [emoji] ; cases où un pion vient d'arriver
+      var toks = {}, hopAt = {}; // pos -> [pion HTML] ; cases où un pion vient d'arriver
       window._moPrevPos = window._moPrevPos || {};
       s.order.forEach(function (pid) {
         if (s.bankrupt[pid]) return; var p = s.pos[pid] || 0;
-        (toks[p] = toks[p] || []).push(Room.emoji(pid));
+        // Vrai PION à la couleur du joueur (l'émoji nu de 11 px se perdait sur le plateau).
+        (toks[p] = toks[p] || []).push('<span class="pawn" style="--pc:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>');
         if (window._moPrevPos[pid] != null && window._moPrevPos[pid] !== p) hopAt[p] = true;
         window._moPrevPos[pid] = p;
       });
@@ -272,6 +273,7 @@
           if (h === 5) inner += '<div class="hh">🏨</div>'; else if (h > 0) inner += '<div class="hh">' + '🏠'.repeat(Math.min(h, 4)) + '</div>';
         }
         if (toks[i]) inner += '<div class="mo-toks">' + toks[i].map(function (e) { return '<span class="mo-tok' + (hopAt[i] ? ' hop' : '') + '">' + e + '</span>'; }).join('') + '</div>';
+        if (toks[i] && hopAt[i] && window.Fx) Fx.sfx('place'); // un pion vient d'arriver ici
         html += '<div class="' + cls + '" style="grid-row:' + g.r + ';grid-column:' + g.c + '" onclick="openDeed(' + i + ')">' + inner + '</div>';
       }
       // centre
@@ -280,11 +282,13 @@
       var turnLine = s.winner
         ? '<div class="mo-center-turn">🏆 ' + escapeHtml(Room.name(s.winner)) + '</div>'
         : '<div class="mo-center-turn"><span class="mo-center-av" style="background:' + Room.color(actor) + '">' + Room.emoji(actor) + '</span> Au tour de ' + escapeHtml(Room.name(actor)) + '</div>';
-      // Dés : format texte très lisible « 🎲 4 + 3 = 7 ».
+      // Dés : de VRAIS dés à points (pips) + le total, animés au lancer.
       var diceSig = (d[0] || 0) + 'x' + (d[1] || 0);
       var diceFresh = window._moDiceSig !== undefined && window._moDiceSig !== diceSig && (d[0] || d[1]);
       window._moDiceSig = diceSig;
-      var dice = (d[0] || d[1]) ? '<div class="mo-dice-text' + (diceFresh ? ' roll' : '') + '">🎲 ' + (d[0] || '–') + ' + ' + (d[1] || '–') + ' = <b>' + ((d[0] || 0) + (d[1] || 0)) + '</b>' + (d[0] && d[1] && d[0] === d[1] ? ' · double !' : '') + '</div>' : '';
+      if (diceFresh && window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+      var pip = function (v) { return window.Fx ? Fx.die(v, 30, diceFresh ? 'roll' : '') : ('<b>' + v + '</b>'); };
+      var dice = (d[0] || d[1]) ? '<div class="mo-dice-text' + (diceFresh ? ' roll' : '') + '" style="display:flex;align-items:center;gap:7px">' + pip(d[0] || 1) + pip(d[1] || 1) + ' = <b>' + ((d[0] || 0) + (d[1] || 0)) + '</b>' + (d[0] && d[1] && d[0] === d[1] ? ' · double !' : '') + '</div>' : '';
       html += '<div class="mo-center"><div class="logo">MONOPOLY</div>' +
         turnLine + dice +
         '<div class="evt">' + escapeHtml(evt) + '</div></div>';
@@ -298,7 +302,7 @@
           : 'Au tour de <b>' + escapeHtml(Room.name(a)) + '</b>' + (a === window.myPid ? ' (toi)' : ''));
       document.getElementById('mo-turn').innerHTML = txt;
       var d = s.dice || [0, 0];
-      document.getElementById('mo-dice').innerHTML = (d[0] ? '<span class="mo-die">' + d[0] + '</span><span class="mo-die">' + d[1] + '</span>' : '');
+      document.getElementById('mo-dice').innerHTML = (d[0] ? (window.Fx ? Fx.die(d[0], 22) + Fx.die(d[1], 22) : '<span class="mo-die">' + d[0] + '</span><span class="mo-die">' + d[1] + '</span>') : '');
     }
 
     function renderPlayers(s) {
@@ -418,6 +422,11 @@
 
     /* ━━━━━━━━━━ Actions ━━━━━━━━━━ */
     function act(what, arg) {
+      // Sons AVANT la transaction (elle peut se rejouer en cas de conflit).
+      if (window.Fx) {
+        if (what === 'buy') Fx.sfx('coin');
+        else if (what === 'payjail') Fx.sfx('coin');
+      }
       tx(function (cur) {
         var me = window.myPid;
         if (what === 'roll') ENG.roll(cur);

@@ -404,6 +404,18 @@
       var path = state.path || [];
       setHTML('dm-path', path.map(cardHTML).join('') || '<span class="dm-wait">La mine vous attend…</span>');
       var scroll = document.getElementById('dm-path'); if (scroll) scroll.scrollLeft = scroll.scrollWidth;
+      // Nouvelle carte révélée dans la galerie → flip + son (trésor ou danger).
+      if (window._dmPathN !== undefined && path.length > window._dmPathN && path.length) {
+        var lastCard = path[path.length - 1] || {};
+        var isHaz = lastCard.t === 'H';
+        if (window.Fx) {
+          Fx.sfx(isHaz ? 'error' : 'coin');
+          if (isHaz) Fx.vib([20, 30, 40]);
+          var els = scroll ? scroll.children : null;
+          if (els && els.length) els[els.length - 1].classList.add('fx-flip');
+        }
+      }
+      window._dmPathN = path.length;
 
       var hazHTML = HAZARDS.map(function (h) {
         var c = (state.hazSeen || {})[h.k] || 0;
