@@ -27,6 +27,8 @@
     .tu-card-emoji { font-size: 3rem; } .tu-card-name { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; margin: 6px 0; }
     .tu-card-cat { font-size: 0.82rem; color: var(--ink-light); }
     .tu-hint { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 28px; }
+    .tu-stage.felt .tu-hint { color: #ffd98a; }
+    .tu-stage.felt { color: #fff; }
     .tu-btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
     .tu-found { border: none; border-radius: 40px; padding: 0.8rem 1.8rem; font-weight: 800; font-size: 1rem; cursor: pointer; background: linear-gradient(135deg, var(--sage), #6f9e5e); color: #fff; }
     .tu-pass { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 40px; padding: 0.8rem 1.4rem; font-weight: 700; cursor: pointer; }
@@ -66,7 +68,7 @@
         </div>
       </div>
       <div class="tu-top" id="tu-top"></div>
-      <div class="tu-stage" id="tu-stage"></div>
+      <div class="tu-stage felt felt-wine" id="tu-stage" style="margin:8px auto;width:min(96vw,560px);border-radius:22px"></div>
     </div>
 
     <!-- ══ RESULTS ══ -->

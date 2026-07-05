@@ -567,7 +567,13 @@
     function render(s) {
       var me = window.myPid, order = s.order || [];
       setText('pk-phase', phaseLabel(s.phase) + ' · donne ' + (s.handNo || 1));
-      setText('pk-pot', '💰 Pot : ' + totalPot(s));
+      // Le pot GRIMPE (compteur animé) au lieu de sauter d'un coup.
+      var pot = totalPot(s), potPrev = window._pkPot;
+      var potEl = document.getElementById('pk-pot');
+      if (window.Fx && potEl && potPrev !== undefined && potPrev !== pot) {
+        Fx.count(potEl, potPrev, pot, { ms: 480, fmt: function (v) { return '💰 Pot : ' + v; } });
+      } else setText('pk-pot', '💰 Pot : ' + pot);
+      window._pkPot = pot;
       setText('pk-banner', s.banner || '');
       // cartes communes (5 emplacements) — les nouvelles se RETOURNENT (flop/turn/river)
       var boardN = (s.board || []).filter(function (c) { return c != null; }).length;

@@ -372,6 +372,18 @@
   function joinRoomByCode(code, fromUrl) {
     db().ref(ROOT + '/rooms/' + code).once('value').then(function (snap) {
       var room = snap.val();
+      // Sous-salon de SOIRÉE : l'URL porte &create=<jeu> — le premier arrivé crée
+      // le salon (transaction : un seul gagne), les autres le rejoignent normalement.
+      var wantCreate = null;
+      try { wantCreate = new URLSearchParams(location.search).get('create'); } catch (e) {}
+      if (!room && wantCreate && wantCreate === cfg().gameKey) {
+        setRoom(code);
+        window.roomRef.transaction(function (cur2) {
+          if (cur2) return; // déjà créé par un autre joueur → on abandonne, puis on rejoint
+          return { game: cfg().gameKey, status: 'waiting', host: window.myPid, createdAt: firebase.database.ServerValue.TIMESTAMP };
+        }, function () { ensureIdentityThenEnter(); });
+        return;
+      }
       if (!room) { lbToast('Salon introuvable'); if (fromUrl) window.showScreen('s-home'); return; }
       // Mauvais jeu pour cette page → on redirige vers la bonne page de jeu.
       if (room.game && room.game !== cfg().gameKey) {
@@ -578,10 +590,12 @@
   var _endFxDone = false;
   function playEndFx(room) {
     var ended = !!(room.winner || room.status === 'ended' || room.status === 'finished');
-    if (!ended) { _endFxDone = false; return; }
-    if (_endFxDone || !room.winner) return;
+    if (!ended) { _endFxDone = false; hideSoireeBack(); return; }
+    if (window._soireeCode) showSoireeBack(); // manche de Soirée finie → bouton retour
+    if (_endFxDone) return;
     _endFxDone = true;
-    if (!window.Sfx) return;
+    recordWinHistory(room);
+    if (!room.winner || !window.Sfx) return;
     if (room.winner === window.myPid) {
       Sfx.play('win');
       if (window.Fx) Fx.vib([60, 40, 120]);
@@ -589,6 +603,55 @@
       Sfx.play('lose');
     }
   }
+
+  // ── Palmarès du SALON : l'hôte archive le vainqueur de chaque partie. La salle
+  // d'attente affiche alors « dernières parties » + série en cours — le sel des
+  // revanches entre copains. (Nom/émoji figés à l'écriture : robuste aux départs.)
+  function recordWinHistory(room) {
+    if (room.host !== window.myPid || isOfflineMode() || !window.roomRef) return;
+    var w = room.winner || ((room.finishOrder || [])[0]) || null;
+    if (!w || !room.players || !room.players[w]) return;
+    var entry = { p: w, n: room.players[w].name || '?', e: room.players[w].emoji || '🏆', t: Date.now() };
+    window.roomRef.child('winHistory').transaction(function (arr) {
+      arr = arr || [];
+      var last = arr[arr.length - 1];
+      if (last && last.t && Date.now() - last.t < 4000) return; // double écriture (re-render) → abandon
+      arr.push(entry);
+      return arr.slice(-10);
+    });
+  }
+  function winHistoryHTML(room) {
+    var h = room.winHistory || [];
+    if (!h.length) return '';
+    var streak = 1;
+    for (var i = h.length - 2; i >= 0 && h[i].p === h[h.length - 1].p; i--) streak++;
+    var chips = h.slice(-5).map(function (x) {
+      return '<span title="' + esc(x.n) + '" style="font-size:1.05rem">' + (x.e || '🏆') + '</span>';
+    }).join('');
+    return '<div style="margin:0 auto 14px;max-width:340px;background:var(--white);border-radius:14px;padding:8px 14px;box-shadow:var(--shadow);font-size:0.82rem;color:var(--ink-light)">' +
+      '🏆 Dernières parties : ' + chips +
+      (streak >= 2 ? '<div style="margin-top:2px;font-weight:800;color:var(--terracotta)">🔥 ' + esc(h[h.length - 1].n) + ' en a gagné ' + streak + ' d\'affilée !</div>'
+        : '<div style="margin-top:2px">dernier vainqueur : <b>' + esc(h[h.length - 1].n) + '</b></div>') +
+      '</div>';
+  }
+
+  // ── Manche de SOIRÉE (tournoi multi-jeux, voir games/soiree.html) ──────────
+  // La page de jeu est ouverte avec ?soiree=CODE : à la fin de la manche, un
+  // bouton ramène tout le monde au salon Soirée qui comptabilise les points.
+  try { window._soireeCode = new URLSearchParams(location.search).get('soiree') || null; } catch (e) { window._soireeCode = null; }
+  function showSoireeBack() {
+    var b = document.getElementById('lb-soiree-back');
+    if (!b) {
+      b = document.createElement('button');
+      b.id = 'lb-soiree-back'; b.className = 'lb-peek-btn';
+      b.style.display = 'block'; b.style.bottom = '74px';
+      b.textContent = '🎉 Retour à la Soirée — manche suivante';
+      b.onclick = function () { location.href = '/games/soiree.html?room=' + encodeURIComponent(window._soireeCode); };
+      document.body.appendChild(b);
+    }
+    b.style.display = 'block';
+  }
+  function hideSoireeBack() { var b = document.getElementById('lb-soiree-back'); if (b) b.style.display = 'none'; }
 
   // ── Stats par jeu (localStorage) : enregistrées une fois par partie terminée ──
   var _statsEndRecorded = false;
@@ -662,6 +725,7 @@
         '<h1 class="lb-title" style="font-size:clamp(1.6rem,6vw,2.2rem)">' + esc(c.name || 'Jeu') + '</h1>' +
         '<div class="lb-code-card"><div class="lb-code-label">Code du salon</div><div class="lb-code">' + esc(window.roomCode || '') + '</div>' +
           '<div class="lb-code-actions"><button class="lb-btn small ghost" onclick="Lobby.shareRoom()">Partager le lien</button></div></div>' +
+        winHistoryHTML(room) +
         '<div class="lb-players">' + rows + '</div>' +
         botCtl +
         extra +

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Mode Soirée 🎉" data-emoji="🎉"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    /*
+      MODE SOIRÉE — tournoi multi-jeux. Le salon tire une séquence de jeux au
+      hasard ; chaque manche se joue dans un SOUS-SALON normal (code = code de la
+      soirée + n° de manche), puis tout le monde revient ici : +3 points au
+      vainqueur, classement cumulé, podium final.
+    */
+    .so-wrap { max-width: 560px; margin: 0 auto; padding: 14px 14px 60px; }
+    .so-head { text-align: center; margin: 8px 0 14px; }
+    .so-head .t { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; }
+    .so-head .s { font-size: 0.85rem; color: var(--ink-light); }
+
+    /* Carte de la manche en cours : sur feutre prune, comme une affiche. */
+    .so-now { text-align: center; padding: 22px 16px 24px; margin-bottom: 16px; }
+    .so-now .mn { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.72); }
+    .so-now .ge { font-size: 3rem; line-height: 1.1; margin: 8px 0 2px; }
+    .so-now .gn { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; color: #fff; }
+    .so-now .go { display: inline-block; margin-top: 14px; padding: 0.8rem 1.9rem; border-radius: 40px; text-decoration: none;
+      font-weight: 800; font-size: 1rem; color: #fff; background: linear-gradient(135deg, var(--terracotta), var(--gold));
+      box-shadow: 0 6px 20px rgba(196,116,90,0.45); animation: turnPulse 1.6s ease-out infinite; }
+    .so-now .wait { margin-top: 10px; font-size: 0.8rem; color: rgba(255,255,255,0.75); }
+
+    /* Classement cumulé */
+    .so-board { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .so-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); }
+    .so-row.first { border: 1.5px solid var(--gold); box-shadow: 0 0 0 3px rgba(198,152,90,0.18), var(--shadow); }
+    .so-pos { font-weight: 800; width: 26px; }
+    .so-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .so-nm { flex: 1; font-weight: 700; text-align: left; }
+    .so-pts { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    /* Programme de la soirée (manches passées / à venir) */
+    .so-seq { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 16px; }
+    .so-step { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem;
+      font-weight: 700; background: var(--white); color: var(--ink-light); box-shadow: var(--shadow); }
+    .so-step.done { opacity: 0.55; text-decoration: line-through; }
+    .so-step.now { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .so-lastwin { text-align: center; font-size: 0.85rem; color: var(--ink-light); margin-bottom: 14px; }
+    .so-lastwin b { color: var(--terracotta); }
+
+    .so-set-row { display: flex; gap: 8px; justify-content: center; }
+    .so-set-btn { min-width: 46px; padding: 0.5rem 0.8rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .so-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="so-wrap" id="so-wrap"></div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" id="so-replay" onclick="handleReplay()">↺ Nouvelle soirée</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+
+    /* ━━ Jeux éligibles (rapides, multijoueur) + bornes de joueurs ━━ */
+    var POOL = [
+      { k: 'uno',         n: 'Uno',            e: '🃏', min: 2, max: 8 },
+      { k: 'skyjo',       n: 'Skyjo',          e: '🎴', min: 2, max: 8 },
+      { k: 'sixnimmt',    n: '6 qui prend !',  e: '🐮', min: 2, max: 10 },
+      { k: 'president',   n: 'Président',      e: '🤵', min: 3, max: 8 },
+      { k: 'perudo',      n: 'Perudo',         e: '🎲', min: 2, max: 6 },
+      { k: 'diamants',    n: 'Diamants',       e: '💎', min: 2, max: 8 },
+      { k: 'nothanks',    n: 'No Thanks!',     e: '🙅', min: 3, max: 7 },
+      { k: 'trio',        n: 'Trio',           e: '🔢', min: 3, max: 6 },
+      { k: 'qwixx',       n: 'Qwixx',          e: '🎲', min: 2, max: 5 },
+      { k: 'papayoo',     n: 'Papayoo',        e: '🐔', min: 3, max: 6 },
+      { k: 'millebornes', n: 'Mille Bornes',   e: '🚗', min: 2, max: 4 },
+      { k: 'ludo',        n: 'Petits chevaux', e: '🐴', min: 2, max: 4 }
+    ];
+    var META = {}; POOL.forEach(function (g) { META[g.k] = g; });
+
+    GameRoom({
+      gameKey: 'soiree',
+      name: 'Mode Soirée',
+      emoji: '🎉',
+      tagline: 'Tournoi multi-jeux entre copains',
+      minPlayers: 2,
+      maxPlayers: 8,
+      rules: [
+        'Le salon tire une série de jeux au hasard (3 ou 5 manches)',
+        'Chaque manche se joue normalement, puis tout le monde revient ici',
+        '+3 points au vainqueur de chaque manche · classement cumulé',
+        'Podium final à la dernière manche 🏆'
+      ],
+      lobbyExtraHTML: lobbyExtraHTML,
+      onState: onState,
+      onStart: onStart
+    });
+
+    function lobbyExtraHTML(room) {
+      var sel = (room && room.rounds) || 3;
+      var isHost = room && room.host === window.myPid;
+      var btns = [3, 5].map(function (n) {
+        return '<button class="so-set-btn' + (n === sel ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setRounds(' + n + ')"' : ' disabled') + '>' + n + '</button>';
+      }).join('');
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">🎯 Nombre de manches</div><div class="so-set-row">' + btns + '</div></div>' +
+        '<div class="lb-set-hint">Les jeux sont tirés au hasard selon le nombre de joueurs</div></div>';
+    }
+    function setRounds(n) { if (window.roomRef) window.roomRef.child('rounds').set(n); }
+
+    function onStart(players, cur) {
+      var n = players.length;
+      var ok = POOL.filter(function (g) { return n >= g.min && n <= g.max; });
+      // mélange (Fisher-Yates)
+      for (var i = ok.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = ok[i]; ok[i] = ok[j]; ok[j] = t; }
+      var rounds = Math.min((cur && cur.rounds) || 3, ok.length);
+      var scores = {}; players.forEach(function (p) { scores[p.pid] = 0; });
+      return {
+        seq: ok.slice(0, rounds).map(function (g) { return g.k; }),
+        idx: 0, scores: scores, done: {}, lastWin: null
+      };
+    }
+
+    /* ━━ Récolte du résultat de la manche ━━
+       Le sous-salon a pour code CODE + n° de manche. Chaque client revenu ici lit
+       son résultat ; une transaction idempotente (done[idx]) crédite le vainqueur
+       une seule fois, quel que soit le client qui la déclenche. */
+    var _fetchAt = 0;
+    function subCode(state) { return window.roomCode + (state.idx + 1); }
+    function maybeCollect(state) {
+      if (!state.seq || state.idx == null || state.idx >= state.seq.length) return;
+      if (state.done && state.done[state.idx]) return;
+      var now = Date.now();
+      if (now - _fetchAt < 4000) return; // pas de rafale de lectures
+      _fetchAt = now;
+      var sub = subCode(state);
+      firebase.database().ref((window.GAMES_ROOT || 'games') + '/rooms/' + sub).once('value').then(function (snap) {
+        var s = snap.val();
+        if (!s) return;
+        var ended = !!(s.winner || s.status === 'ended' || s.status === 'finished');
+        if (!ended) return;
+        var w = s.winner || ((s.finishOrder || [])[0]) || null;
+        var wname = (w && s.players && s.players[w] && s.players[w].name) || null;
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || !cur.seq) return cur;
+          cur.done = cur.done || {};
+          if (cur.done[cur.idx]) return cur; // déjà comptée
+          var gk = cur.seq[cur.idx];
+          cur.done[cur.idx] = true;
+          if (w && cur.scores && cur.scores[w] != null) {
+            cur.scores[w] += 3;
+            cur.lastWin = { g: gk, n: wname || '?', p: w };
+          } else {
+            cur.lastWin = { g: gk, n: wname, p: null }; // vainqueur hors soirée (ordi…) → 0 pt
+          }
+          cur.idx += 1;
+          return cur;
+        });
+      }).catch(function () {});
+    }
+
+    /* ━━ Rendu ━━ */
+    function ranking(state) {
+      var sc = state.scores || {};
+      return (state.order || []).slice().sort(function (a, b) { return (sc[b] || 0) - (sc[a] || 0); });
+    }
+    function onState(snap) {
+      var state = snap.val() || {};
+      if (state.status !== 'playing') return;
+      if (state.seq && state.idx >= state.seq.length) { showPodium(state); return; }
+      showScreen('s-playing');
+      maybeCollect(state);
+      render(state);
+    }
+
+    function render(state) {
+      var host = document.getElementById('so-wrap');
+      var seq = state.seq || [], idx = state.idx || 0;
+      var g = META[seq[idx]] || { n: seq[idx], e: '🎲' };
+      var sub = subCode(state);
+      var goUrl = '/games/' + seq[idx] + '.html?room=' + sub + '&create=' + seq[idx] + '&soiree=' + window.roomCode;
+
+      var steps = seq.map(function (k, i) {
+        var m = META[k] || { n: k, e: '🎲' };
+        return '<span class="so-step' + (i < idx ? ' done' : i === idx ? ' now' : '') + '">' + m.e + ' ' + escapeHtml(m.n) + '</span>';
+      }).join('');
+
+      var lw = '';
+      if (state.lastWin) {
+        var lm = META[state.lastWin.g] || { n: state.lastWin.g };
+        lw = '<div class="so-lastwin">Manche ' + escapeHtml(lm.n) + ' : ' +
+          (state.lastWin.p ? '<b>' + escapeHtml(state.lastWin.n) + '</b> +3 pts 🎉' : (state.lastWin.n ? escapeHtml(state.lastWin.n) + ' (hors tournoi) — 0 pt' : 'manche sans vainqueur')) + '</div>';
+      }
+
+      var rows = ranking(state).map(function (pid, i) {
+        return '<div class="so-row' + (i === 0 && (state.scores[pid] || 0) > 0 ? ' first' : '') + '">' +
+          '<span class="so-pos">' + (i + 1) + '</span>' +
+          '<span class="so-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="so-nm">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="so-pts">' + (state.scores[pid] || 0) + ' pts</span></div>';
+      }).join('');
+
+      host.innerHTML =
+        '<div class="so-head"><div class="t">🎉 Soirée en cours</div><div class="s">Manche ' + (idx + 1) + ' / ' + seq.length + '</div></div>' +
+        '<div class="so-now felt felt-plum">' +
+          '<div class="mn">Prochaine manche</div>' +
+          '<div class="ge">' + g.e + '</div><div class="gn">' + escapeHtml(g.n) + '</div>' +
+          '<a class="go" href="' + goUrl + '">▶ Aller jouer</a>' +
+          '<div class="wait">Tout le monde clique : vous vous retrouvez dans le salon de la manche.<br>À la fin, touchez « Retour à la Soirée ».</div>' +
+        '</div>' +
+        lw +
+        '<div class="so-seq">' + steps + '</div>' +
+        '<div class="so-board">' + rows + '</div>';
+    }
+
+    var _podiumFx = false;
+    function showPodium(state) {
+      showScreen('s-results');
+      var rank = ranking(state);
+      var w = rank[0];
+      setTextSafe('res-title', w === window.myPid ? 'Tu remportes la soirée ! 🏆' : Room.name(w) + ' remporte la soirée !');
+      document.getElementById('res-rank').innerHTML = rank.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-sc">' + (state.scores[pid] || 0) + ' pts</span></div>';
+      }).join('');
+      document.getElementById('so-replay').style.display = (state.host === window.myPid) ? '' : 'none';
+      if (!_podiumFx) { _podiumFx = true; if (window.Sfx) Sfx.play(w === window.myPid ? 'big' : 'win'); }
+    }
+    function setTextSafe(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+    function handleReplay() { _podiumFx = false; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

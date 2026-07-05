@@ -45,7 +45,17 @@
     .uno-card.color-W { background: conic-gradient(from 45deg, var(--uno-r) 0deg 90deg, var(--uno-y) 90deg 180deg, var(--uno-g) 180deg 270deg, var(--uno-b) 270deg 360deg); }
     .uno-card.color-W .badge { background: rgba(0,0,0,0.55); border-radius: 6px; padding: 2px 5px; }
     .uno-card .symbol.small { font-size: 0.78em; }
-    .uno-draw-pile { background: linear-gradient(135deg, var(--ink), #4a3f37); color: #fff; cursor: pointer; transition: transform .15s; }
+    /* Dos de pioche : vrai dos de carte tissé + liseré (fini le glyphe 🂠 aléatoire selon l'appareil). */
+    .uno-draw-pile {
+      background-color: #b3402c;
+      background-image:
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.13) 0 3px, transparent 3px 9px),
+        repeating-linear-gradient(-45deg, rgba(255,255,255,0.13) 0 3px, transparent 3px 9px),
+        linear-gradient(135deg, #c9502f, #8e2a1f);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.28), inset 0 0 0 3px rgba(255,255,255,0.16);
+      color: rgba(255,255,255,0.92); font-family: 'Playfair Display', serif; font-style: italic; font-size: 1rem !important; letter-spacing: 1px;
+      cursor: pointer; transition: transform .15s;
+    }
     .uno-draw-pile:hover { transform: translateY(-3px); }
     .uno-draw-pile.pending { box-shadow: 0 0 0 3px var(--terracotta); animation: unoPulse 0.9s infinite; }
     @keyframes unoPulse { 50% { box-shadow: 0 0 0 6px var(--terracotta); } }
@@ -70,6 +80,9 @@
     .uno-card.in-hand { cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; }
     .uno-card.in-hand:hover { transform: translateY(-6px); box-shadow: 0 8px 18px rgba(0,0,0,0.22); }
     .uno-card.in-hand.unplayable { opacity: 0.45; cursor: not-allowed; }
+    /* Jump-in (règle maison) : la carte identique au dessus scintille hors tour. */
+    .uno-card.in-hand.jumpable { animation: unoJump 0.9s ease-in-out infinite alternate; box-shadow: 0 0 0 3px var(--gold), 0 6px 14px rgba(198,152,90,0.45); }
+    @keyframes unoJump { from { transform: translateY(0); } to { transform: translateY(-8px); } }
     .uno-actions { display: flex; gap: 8px; padding: 8px 14px calc(14px + env(safe-area-inset-bottom)); justify-content: center; flex-wrap: wrap; }
     .uno-action-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.5rem 1rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.88rem; cursor: pointer; }
     .uno-action-btn:disabled { opacity: 0.4; }
@@ -130,7 +143,7 @@
       <div class="uno-center felt felt-navy">
         <div class="uno-pile-col">
           <div class="uno-pile-label">Pioche (<span id="uno-pile-count">0</span>)</div>
-          <div class="uno-card lg uno-draw-pile" id="uno-draw-pile" onclick="drawCard()">🂠</div>
+          <div class="uno-card lg uno-draw-pile" id="uno-draw-pile" onclick="drawCard()">UNO</div>
         </div>
         <div class="uno-pile-col">
           <div class="uno-pile-label">Dessus <span class="uno-current-color" id="uno-current-color"></span></div>
@@ -182,6 +195,13 @@
       </div>
     </div>
   </div>
+  <div class="modal" id="modal-swap7">
+    <div class="modal-card">
+      <div class="modal-title">🔄 Ton 7 : échange ta main</div>
+      <div class="modal-sub">Choisis le joueur avec qui échanger toutes tes cartes.</div>
+      <div id="swap7-list"></div>
+    </div>
+  </div>
   <div class="modal" id="modal-history">
     <div class="modal-card">
       <div class="modal-title">Historique</div>
@@ -206,6 +226,7 @@
         <p>Pose une carte de la même <b>couleur</b> ou du même <b>chiffre/symbole</b> que celle du dessus.</p>
         <p style="margin-top:10px">⊘ saute le joueur suivant · ↺ inverse le sens · +2 / +4 font piocher le suivant · Joker change la couleur.</p>
         <p style="margin-top:10px">Quand il te reste 1 carte, clique <b>UNO !</b> sinon un autre peut te pénaliser (Contre-UNO). Premier à vider sa main gagne la manche.</p>
+        <p style="margin-top:10px"><b>Règles maison</b> (activables dans le salon) : <b>Cumul +4</b> — un +4 se contre avec un +4, le perdant pioche tout · <b>7-0</b> — un 7 échange ta main avec un joueur de ton choix, un 0 fait tourner toutes les mains · <b>Jump-in</b> — la carte strictement identique au dessus se pose même hors tour.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -272,6 +293,7 @@
       offlineTurn: function (r) {
         if (r.status === 'ended') return null;
         if (r.status === 'roundEnd') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
+        if (r.await7) return r.await7; // règle maison 7 : le poseur doit choisir
         return r.turn;
       },
       offlineEnter: function () { pendingWildCard = null; closeModal('modal-color'); if (window.room) renderPlaying(window.room); },
@@ -283,10 +305,28 @@
     // IA : décision dans uno-ai.js (partagée avec le banc). La page exécute l'action.
     function unoBot(state, pid) {
       if (state.status === 'roundEnd') { if (!((state.players[pid] || {}).nextReady)) setNextReady(); return; }
-      if (state.status !== 'playing' || state.turn !== pid) return;
+      if (state.status !== 'playing') return;
+      // Règle maison 7 : le bot doit choisir sa cible d'échange (la main la plus courte).
+      if (state.await7 === pid) {
+        var best = null, bn = 1e9;
+        (state.order || []).forEach(function (p) { if (p === pid) return; var n = ((state.players[p] || {}).hand || []).length; if (n < bn) { bn = n; best = p; } });
+        if (best) doSwap7(best);
+        return;
+      }
+      if (state.turn !== pid || state.await7) return;
       var hand = (((state.players[pid] || {}).hand) || []).slice();
       if (!hand.length) return;
       if (hand.length === 1 && !((state.players[pid] || {}).unoCalled)) { callUno(); return; }
+      // Cumul +4 (règle maison) : contrer avec un +4 si possible, sinon tout piocher.
+      if ((state.pendingDraw || 0) > 0 && state.pendingType === 'W4') {
+        if (hand.indexOf('W4') >= 0) {
+          var cnt = { R: 0, Y: 0, G: 0, B: 0 };
+          hand.forEach(function (c2) { var pc = parseCard(c2); if (pc && !pc.wild) cnt[pc.color]++; });
+          var bestCol = 'R'; ['Y', 'G', 'B'].forEach(function (c3) { if (cnt[c3] > cnt[bestCol]) bestCol = c3; });
+          unoBotPlay(hand, 'W4', bestCol);
+        } else drawCard();
+        return;
+      }
       var nextP = step(state.order || [], pid, state.dir || 1, 1);
       var act = window.UnoAI.decide({
         hand: hand, top: (state.discardPile || []).slice(-1)[0], currentColor: state.currentColor,
@@ -306,9 +346,26 @@
     function lobbyExtraHTML(room) {
       var sel = (room && room.maxWins) || 2;
       var btns = [1, 2, 3].map(function (n) { return '<button class="uno-set-btn' + (n === sel ? ' active' : '') + '" onclick="setMaxWins(' + n + ')">' + n + '</button>'; }).join('');
-      return '<div class="uno-settings"><div class="uno-settings-label">Manches gagnantes</div><div class="uno-set-row">' + btns + '</div></div>';
+      // Règles MAISON (réglées par l'hôte) : celles qu'on se dispute à chaque partie.
+      var o = (room && room.opts) || {};
+      var isHost = room && room.host === window.myPid;
+      function tog(k, label, title) {
+        return '<button class="uno-set-btn' + (o[k] ? ' active' : '') + '" title="' + title + '"' +
+          (isHost ? ' onclick="setOpt(\'' + k + '\')"' : ' disabled') + '>' + label + '</button>';
+      }
+      return '<div class="uno-settings"><div class="uno-settings-label">Manches gagnantes</div><div class="uno-set-row">' + btns + '</div></div>' +
+        '<div class="uno-settings"><div class="uno-settings-label">Règles maison' + (isHost ? '' : ' (réglées par l\'hôte)') + '</div><div class="uno-set-row">' +
+          tog('stack4', 'Cumul +4', 'Un +4 se contre avec un autre +4 (le malheureux suivant pioche tout)') +
+          tog('seven0', '7-0', '7 : échange ta main avec un joueur · 0 : toutes les mains tournent') +
+          tog('jumpin', 'Jump-in', 'La carte STRICTEMENT identique au dessus se pose hors tour') +
+        '</div></div>';
     }
     function setMaxWins(n) { if (window.roomRef) window.roomRef.child('maxWins').set(n); }
+    function setOpt(k) {
+      var o = (window.room && window.room.opts) || {};
+      if (window.roomRef) window.roomRef.child('opts/' + k).set(!o[k]);
+    }
+    function opts(st) { return (st && st.opts) || {}; }
 
     function newRoundSetup(order, firstPid) {
       var deck = shuffle(buildDeck());
@@ -423,12 +480,17 @@
       hand.classList.toggle('fx-dealwave', window._unoDealSig !== dealSig);
       window._unoDealSig = dealSig;
       myHand.slice().sort(cardSort).forEach(function (card) {
-        var playable = isMyTurn && canPlay(card, top, currentColor) && (!(state.pendingDraw > 0) || parseCard(card).action === 'D');
+        var pendOk = !(state.pendingDraw > 0) || (state.pendingType === 'W4' ? parseCard(card).draw4 : parseCard(card).action === 'D');
+        var playable = (isMyTurn && !state.await7 && canPlay(card, top, currentColor) && pendOk) || canJumpIn(state, card);
         var el = buildCardEl(card, { inHand: true });
         if (!playable) el.classList.add('unplayable');
+        if (!isMyTurn && canJumpIn(state, card)) el.classList.add('jumpable');
         el.onclick = function () { onCardTap(card); };
         hand.appendChild(el);
       });
+      // Règle maison 7 : c'est à MOI de choisir avec qui échanger ma main.
+      if (state.await7 === window.myPid && !document.getElementById('modal-swap7').classList.contains('active')) openSwap7(state);
+      if (state.await7 !== window.myPid) closeModal('modal-swap7');
 
       var passBtn = document.getElementById('btn-pass');
       passBtn.disabled = !(isMyTurn && state.drewThisTurn);
@@ -447,10 +509,26 @@
     }
 
     /* ━━ Actions ━━ */
+    // Jump-in possible ? Carte STRICTEMENT identique au dessus (même couleur, même
+    // symbole — jamais un joker), hors cumul et hors fin de manche.
+    function canJumpIn(st, card) {
+      if (!opts(st).jumpin || st.status !== 'playing' || (st.pendingDraw || 0) > 0 || st.await7) return false;
+      var top = (st.discardPile || []).slice(-1)[0];
+      return !!top && card === top && !parseCard(card).wild;
+    }
     function onCardTap(card) {
       var st = window.room || {};
-      if (st.status !== 'playing' || st.turn !== window.myPid) { if (st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); if (window.Fx) Fx.sfx('error'); } return; }
-      if ((st.pendingDraw || 0) > 0 && parseCard(card).action !== 'D') { lbToast('Cumul +' + st.pendingDraw + ' : pose un +2 ou pioche !'); if (window.Fx) Fx.sfx('error'); return; }
+      if (st.status !== 'playing') return;
+      if (st.turn !== window.myPid) {
+        if (canJumpIn(st, card)) { if (window.Fx) { Fx.sfx('big'); Fx.vib([15, 25, 15]); } playCard(card, parseCard(card).color, true); return; }
+        lbToast('Ce n\'est pas ton tour'); if (window.Fx) Fx.sfx('error'); return;
+      }
+      if (st.await7) { lbToast('Choisis d\'abord avec qui échanger ta main (7)'); return; }
+      var pend = st.pendingDraw || 0;
+      if (pend > 0) {
+        var p0 = parseCard(card);
+        if (st.pendingType === 'W4' ? !p0.draw4 : p0.action !== 'D') { lbToast('Cumul +' + pend + ' : pose un ' + (st.pendingType === 'W4' ? '+4' : '+2') + ' ou pioche !'); if (window.Fx) Fx.sfx('error'); return; }
+      }
       var top = (st.discardPile || []).slice(-1)[0];
       if (!canPlay(card, top, st.currentColor)) { lbToast('Carte non jouable'); if (window.Fx) Fx.sfx('error'); return; }
       if (window.Fx) Fx.vib(12);
@@ -471,22 +549,31 @@
       return { pile: shuffle(rest), discard: [top] };
     }
 
-    function playCard(card, chosenColor) {
+    function playCard(card, chosenColor, jump) {
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
-        var order = cur.order || [], dir = cur.dir || 1, me = window.myPid;
+        if (!cur || cur.status !== 'playing') return cur;
+        var me = window.myPid;
+        // Jump-in (règle maison) : hors tour, carte STRICTEMENT identique au dessus.
+        var jumping = jump && cur.turn !== me;
+        if (jumping) {
+          if (!canJumpIn(cur, card)) return cur;
+        } else if (cur.turn !== me || cur.await7) return cur;
+        var order = cur.order || [], dir = cur.dir || 1;
         var hand = ((cur.players[me] && cur.players[me].hand) || []).slice();
         var idx = hand.indexOf(card); if (idx < 0) return cur;
         var top = (cur.discardPile || []).slice(-1)[0];
         if (!canPlay(card, top, cur.currentColor)) return cur;
-        if ((cur.pendingDraw || 0) > 0 && parseCard(card).action !== 'D') return cur;
+        if ((cur.pendingDraw || 0) > 0) {
+          var pp = parseCard(card);
+          if (cur.pendingType === 'W4' ? !pp.draw4 : pp.action !== 'D') return cur;
+        }
         hand.splice(idx, 1);
         cur.players[me].hand = hand;
         cur.discardPile = (cur.discardPile || []).concat([card]);
         cur.currentColor = chosenColor;
         cur.drewThisTurn = false;
         if (hand.length !== 1) cur.players[me].unoCalled = false;
-        logEntry(cur, me, 'joue ' + cardLabel(card, parseCard(card).wild ? chosenColor : null));
+        logEntry(cur, me, (jumping ? '⚡ jump-in ! joue ' : 'joue ') + cardLabel(card, parseCard(card).wild ? chosenColor : null));
 
         if (hand.length === 0) {
           cur.scores = cur.scores || {};
@@ -501,7 +588,14 @@
 
         var p = parseCard(card);
         var pile = (cur.drawPile || []).slice(), discard = cur.discardPile;
-        if (p.wild && p.draw4) {
+        var o = opts(cur);
+        if (p.wild && p.draw4 && o.stack4) {
+          // Règle maison : le +4 se CUMULE — le suivant contre avec un +4 ou pioche tout.
+          cur.pendingDraw = (cur.pendingDraw || 0) + 4;
+          cur.pendingType = 'W4';
+          logEntry(cur, me, 'pose un +4 (cumul : ' + cur.pendingDraw + ')');
+          cur.turn = step(order, me, dir, 1);
+        } else if (p.wild && p.draw4) {
           var nxt = step(order, me, dir, 1);
           var r = reshuffleInto(pile, discard); pile = r.pile; discard = r.discard;
           var nh = (cur.players[nxt].hand || []).slice();
@@ -512,6 +606,7 @@
           cur.turn = step(order, me, dir, 2);
         } else if (p.action === 'D') {
           cur.pendingDraw = (cur.pendingDraw || 0) + 2;
+          cur.pendingType = 'D';
           logEntry(cur, me, 'pose un +2 (cumul : ' + cur.pendingDraw + ')');
           cur.turn = step(order, me, dir, 1);
         } else if (p.action === 'S') {
@@ -521,12 +616,56 @@
         } else if (p.action === 'V') {
           if (order.length === 2) { logEntry(cur, me, 'inverse (rejoue) ↺'); cur.turn = me; }
           else { cur.dir = -dir; logEntry(cur, me, 'inverse le sens ↺'); cur.turn = step(order, me, -dir, 1); }
-        } else {
+        } else if (o.seven0 && p.number === 7 && hand.length) {
+          // Règle maison 7 : le poseur choisit avec QUI échanger sa main (le tour
+          // reste suspendu jusqu'au choix — await7).
+          cur.await7 = me;
+          logEntry(cur, me, 'pose un 7 — il/elle choisit avec qui échanger sa main 🔄');
+          cur.turn = me; // reste actif le temps du choix (jump-in : on devient l'actif)
+        } else if (o.seven0 && p.number === 0 && hand.length) {
+          // Règle maison 0 : TOUTES les mains tournent dans le sens du jeu.
+          var hands0 = order.map(function (pid) { return (cur.players[pid].hand || []).slice(); });
+          order.forEach(function (pid, k) {
+            var from = (k - dir + order.length) % order.length; // ma nouvelle main = celle du voisin d'avant
+            cur.players[pid].hand = hands0[from];
+            cur.players[pid].unoCalled = false;
+          });
+          logEntry(cur, me, 'pose un 0 — toutes les mains tournent 🔁');
           cur.turn = step(order, me, dir, 1);
+        } else {
+          cur.turn = step(order, me, dir, 1); // jump-in compris : le jeu repart de moi
         }
         cur.drawPile = pile; cur.discardPile = discard;
         return cur;
       });
+    }
+
+    // Règle maison 7 : appliquer l'échange de mains choisi par le poseur du 7.
+    function doSwap7(target) {
+      closeModal('modal-swap7');
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.await7 !== window.myPid) return cur;
+        var me = window.myPid;
+        if (!cur.players[target] || target === me) return cur;
+        var a = (cur.players[me].hand || []).slice(), b = (cur.players[target].hand || []).slice();
+        cur.players[me].hand = b; cur.players[target].hand = a;
+        cur.players[me].unoCalled = false; cur.players[target].unoCalled = false;
+        logEntry(cur, me, 'échange sa main avec ' + escapeHtml((cur.players[target] || {}).name || '?') + ' 🔄');
+        cur.await7 = null;
+        cur.turn = step(cur.order || [], me, cur.dir || 1, 1);
+        return cur;
+      });
+      if (window.Fx) Fx.sfx('flip');
+    }
+    function openSwap7(state) {
+      var body = document.getElementById('swap7-list');
+      if (!body) return;
+      body.innerHTML = (state.order || []).filter(function (pid) { return pid !== window.myPid; }).map(function (pid) {
+        var n = ((state.players[pid] || {}).hand || []).length;
+        return '<button class="uno-action-btn" style="width:100%;margin-bottom:8px" onclick="doSwap7(\'' + pid + '\')">' +
+          Room.emoji(pid) + ' ' + escapeHtml(Room.name(pid)) + ' — ' + n + ' carte' + (n > 1 ? 's' : '') + '</button>';
+      }).join('');
+      openModal('modal-swap7');
     }
 
     function drawCard() {
@@ -544,9 +683,9 @@
           for (var k = 0; k < n; k++) { if (!pile.length) { var r = reshuffleInto(pile, discard); pile = r.pile; discard = r.discard; if (!pile.length) break; } h.push(pile.pop()); }
           cur.players[me].hand = h;
           if (h.length !== 1) cur.players[me].unoCalled = false;
-          cur.drawPile = pile; cur.discardPile = discard; cur.pendingDraw = 0; cur.drewThisTurn = false;
+          cur.drawPile = pile; cur.discardPile = discard; cur.pendingDraw = 0; cur.pendingType = null; cur.drewThisTurn = false;
           cur.turn = step(order, me, dir, 1);
-          logEntry(cur, me, 'pioche ' + n + ' (cumul +2)');
+          logEntry(cur, me, 'pioche ' + n + ' (cumul)');
           return cur;
         }
         if (!pile.length) { var r2 = reshuffleInto(pile, discard); pile = r2.pile; discard = r2.discard; if (!pile.length) return cur; }

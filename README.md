@@ -37,6 +37,7 @@ la synchro temps réel.
 
 | Jeu | Joueurs | Hors-ligne | Type |
 |---|---|:---:|---|
+| 🎉 Mode Soirée | 2–8 |  | tournoi multi-jeux |
 | 📝 Petit bac | 2–12 |  | mots |
 | 🔴 Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
 | ⚫ Reversi | 2 | ✈️ | réflexion (IA forte) |
@@ -83,6 +84,7 @@ la synchro temps réel.
 | 🚂 Aventuriers du Rail | 2–5 | ✈️ | plateau / réseau |
 | 🙅 No Thanks! | 2–7 | ✈️ | stop-ou-encore |
 | 🎲 Qwixx | 1–5 | ✈️ | dés / roll-and-write |
+| 🎲 Yam's | 1–6 | ✈️ | dés / combinaisons |
 
 <!-- GAMES:END -->
 

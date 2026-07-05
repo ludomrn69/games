@@ -312,8 +312,16 @@
         return '<div class="mo-pl' + (pid === a ? ' turn' : '') + (s.bankrupt[pid] ? ' broke' : '') + '">' +
           '<span class="mo-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           '<div class="mo-pl-info"><div class="mo-pl-nm">' + escapeHtml(Room.name(pid)) + (s.jail[pid] > 0 ? ' ⛓' : '') + '</div>' +
-          '<div class="mo-pl-cash">' + (s.bankrupt[pid] ? 'ruiné' : money(s.cash[pid]) + ' · ' + props + ' 🏘') + '</div></div></div>';
+          '<div class="mo-pl-cash">' + (s.bankrupt[pid] ? 'ruiné' : '<span id="mo-cash-' + pid + '">' + (s.cash[pid] || 0) + '</span> € · ' + props + ' 🏘') + '</div></div></div>';
       }).join('');
+      // L'argent qui change DÉFILE (loyer encaissé, achat…) au lieu de sauter.
+      var prev = window._moCash || {};
+      s.order.forEach(function (pid) {
+        var v = s.cash[pid] || 0;
+        if (window.Fx && prev[pid] !== undefined && prev[pid] !== v) Fx.count(document.getElementById('mo-cash-' + pid), prev[pid], v, { ms: 550 });
+        prev[pid] = v;
+      });
+      window._moCash = prev;
     }
 
     function renderLog(s) {

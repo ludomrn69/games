@@ -130,6 +130,9 @@
     .ba-scorebox { background: linear-gradient(135deg, #f2c14e, #e0972a); color: #2c2005; }
     .ba-times { color: #ffd98a; font-weight: 900; font-size: 1.15rem; }
     .ba-preview.flash .ba-scorecalc { animation: baPop .45s; }
+    /* Spectacle du score : la carte comptée s'illumine, le joker qui contribue flashe. */
+    .ba-board .ba-card.scoring { border-color: #f2c14e; box-shadow: 0 0 0 3px rgba(242,193,78,0.65), 0 6px 16px rgba(242,193,78,0.4); transform: translateY(-16px) scale(1.06); }
+    .ba-joker.jflash { animation: baPop .4s; border-color: #f2c14e; box-shadow: 0 0 0 3px rgba(242,193,78,0.5); }
     /* cartes plus grandes et charnues */
     .ba-board .ba-hand { gap: 9px; margin-bottom: 4px; }
     .ba-board .ba-card { width: clamp(50px, 13vw, 74px); border-width: 2px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); }
@@ -191,6 +194,7 @@
       <p style="color:var(--ink-light)">Choisis le blind à affronter</p>
       <div class="ba-blinds" id="bs-blinds"></div>
       <button class="ba-btn play" onclick="startBlind()">Jouer ce blind ▶</button>
+      <button class="ba-btn ghost" id="bs-skip" style="margin-left:8px" onclick="skipBlind()">🏷 Passer (tag surprise)</button>
     </div>
 
     <!-- Boutique -->
@@ -290,19 +294,27 @@
     }
     function handBase(key) { var h = HANDS[key], lvl = (G.levels[key] || 1); return { chips: h.chips + (lvl - 1) * h.lc, mult: h.mult + (lvl - 1) * h.lm, lvl: lvl }; }
     // Score complet d'une main jouée (jetons de base + cartes + jokers), boss inclus.
-    function scoreHand(cards) {
+    // `steps` (optionnel) : collecte chaque contribution pour le SPECTACLE du score
+    // (les jetons/mult qui s'accumulent carte par carte puis joker par joker).
+    function scoreHand(cards, steps) {
       var ev = evaluate(cards), hb = handBase(ev.key);
       var res = { key: ev.key, name: HANDS[ev.key].name, scoring: ev.scoring, chips: hb.chips, mult: hb.mult };
+      if (steps) steps.push({ t: 'base', chips: res.chips, mult: res.mult });
       ev.scoring.forEach(function (c) {
         if (G.boss === 'club' && c.s === '♣') return;                 // couleur débuffée par le boss
         res.chips += chipOf(c.r);
         if (c.enh === 'bonus') res.chips += 30;                        // carte améliorée (tarot Le Magicien)
         else if (c.enh === 'mult') res.mult += 4;                      // carte améliorée (tarot Le Diable)
+        if (steps) steps.push({ t: 'card', id: c.id, chips: res.chips, mult: res.mult });
       });
       var idsPlayed = {}; cards.forEach(function (c) { idsPlayed[c.id] = 1; });
       var held = (G.hand || []).filter(function (c) { return !idsPlayed[c.id]; });
       var ctx = { played: cards.length, money: G.money, discardsLeft: G.discardsLeft, jokers: G.jokers.length, deck: G.deck.length, held: held, plays: (G.handPlays || {})[ev.key] || 0 };
-      G.jokers.forEach(function (id) { (JOKERS[id].apply || function () {})(res, ctx, (G.jscale || {})[id] || 0); });
+      G.jokers.forEach(function (id) {
+        var c0 = res.chips, m0 = res.mult;
+        (JOKERS[id].apply || function () {})(res, ctx, (G.jscale || {})[id] || 0);
+        if (steps && (res.chips !== c0 || res.mult !== m0)) steps.push({ t: 'joker', id: id, chips: res.chips, mult: res.mult });
+      });
       res.score = Math.floor(res.chips * res.mult);
       return res;
     }
@@ -420,6 +432,20 @@
     function blindTarget(ante, idx) { var t = Math.round(BLIND_BASE[ante - 1] * BLIND_MULT[idx]); if (idx === 2 && G.bosses[ante] === 'wall') t = Math.round(t * 1.5); return t; }
 
     function showBlindScreen() { G.phase = 'blind'; route(); }
+    // Passer un blind (petit/grand seulement) : on renonce à la récompense du blind
+    // mais on gagne un TAG surprise — argent, tarot ou planète gratuite.
+    function skipBlind() {
+      if (G.blindIdx >= 2) return; // le boss ne se passe pas
+      var r = rnd(3), msg;
+      if (r === 0) { G.money += 5; msg = '🏷 Tag : +$5'; }
+      else if (r === 1 && G.consumables.length < 2) { var t = TAROT_POOL[rnd(TAROT_POOL.length)]; G.consumables.push(t); msg = '🏷 Tag : tarot gratuit — ' + TAROTS[t].name; }
+      else if (r === 2) { var k = HAND_ORDER[rnd(HAND_ORDER.length)]; G.levels[k] = (G.levels[k] || 1) + 1; msg = '🏷 Tag : ' + HANDS[k].name + ' passe niveau ' + G.levels[k]; }
+      else { G.money += 5; msg = '🏷 Tag : +$5'; }
+      if (window.Sfx) Sfx.play('coin');
+      toast(msg);
+      G.blindIdx++;
+      showBlindScreen(); save();
+    }
     function startBlind() {
       G.phase = 'play'; G.roundScore = 0; G.boss = (G.blindIdx === 2) ? G.bosses[G.ante] : null;
       G.handSize = 8; G.handsLeft = 4; G.discardsLeft = 3;
@@ -439,6 +465,7 @@
     function draw() { while (G.hand.length < G.handSize && G.deck.length) G.hand.push(G.deck.pop()); applySort(); }
 
     function toggleSel(id) {
+      if (ANIM) return;
       var i = G.sel.indexOf(id);
       if (i >= 0) G.sel.splice(i, 1);
       else { if (G.sel.length >= 5) { toast('5 cartes maximum'); return; } G.sel.push(id); }
@@ -447,21 +474,74 @@
     function selCards() { return G.sel.map(function (id) { return G.hand.filter(function (c) { return c.id === id; })[0]; }).filter(Boolean); }
 
     function playHand() {
+      if (ANIM) return; // spectacle en cours : on attend (ou on tape pour passer)
       var cards = selCards(); if (!cards.length) { toast('Choisis des cartes'); return; }
       var key = evaluate(cards).key; G.handPlays[key] = (G.handPlays[key] || 0) + 1; // compte cette main (Supernova)
-      var res = scoreHand(cards);
-      tickJokers(res, cards);                                  // jokers cumulatifs → main suivante
+      var steps = [];
+      var res = scoreHand(cards, steps);
+      if (window.Sfx) Sfx.play('place');
+      // LE SPECTACLE : les jetons/mult s'accumulent carte par carte puis joker par
+      // joker dans la boîte d'aperçu, PUIS la main est réellement encaissée.
+      runScoreShow(res, steps, function () { commitHand(res); });
+    }
+    function commitHand(res) {
+      tickJokers(res, selCards());                             // jokers cumulatifs → main suivante
       var before = G.roundScore; G.roundScore += res.score;
       G.lastHand = res.name + '  ' + res.chips + ' × ' + res.mult + ' = ' + res.score;
       G.lastHandData = { name: res.name, chips: res.chips, mult: res.mult, score: res.score };
       G.handsLeft--;
-      if (window.Sfx) Sfx.play('place');
       G.hand = G.hand.filter(function (c) { return G.sel.indexOf(c.id) < 0; }); G.sel = [];
       if (G.boss === 'hook') { for (var k = 0; k < 2 && G.hand.length; k++) G.hand.splice(rnd(G.hand.length), 1); }
       draw();
       if (G.roundScore >= G.target) { if (window.Sfx) Sfx.play('coin'); return beatBlind(); }
       if (G.handsLeft <= 0) { if (window.Sfx) Sfx.play('lose'); return gameOver(); }
       route(); animateCount(before, G.roundScore); save();
+    }
+
+    /* ── Spectacle du score : chaque contribution flashe sa carte / son joker et
+       fait monter les boîtes Jetons × Mult, avec un tick sonore. Un tap passe
+       l'animation. `done()` encaisse la main à la fin. ── */
+    var ANIM = false;
+    function runScoreShow(res, steps, done) {
+      var box = $('ba-handinfo');
+      if (!box || !steps.length || typeof requestAnimationFrame !== 'function') { done(); return; }
+      ANIM = true;
+      $('ba-play').disabled = true; $('ba-discard').disabled = true;
+      var stepMs = steps.length > 9 ? 150 : 210;
+      var i = 0, timer = null, finished = false;
+      box.innerHTML = '<div class="pv-hand">' + res.name + '</div>' +
+        '<div class="ba-scorecalc"><span class="ba-chipbox" id="shw-c">0</span><span class="ba-times">×</span><span class="ba-multbox" id="shw-m">0</span><span class="ba-times" id="shw-eq" style="display:none">=</span><span class="ba-scorebox" id="shw-s" style="display:none"></span></div>';
+      function setBoxes(st) {
+        var c = $('shw-c'), m = $('shw-m');
+        if (c) { c.textContent = st.chips; if (window.Fx) Fx.replay(c, 'fx-pop'); }
+        if (m) { m.textContent = st.mult; if (window.Fx) Fx.replay(m, 'fx-pop'); }
+      }
+      function highlight(st) {
+        if (st.t === 'card') { var el = document.querySelector('.ba-card[data-cid="' + st.id + '"]'); if (el) { el.classList.add('scoring'); if (window.Fx) Fx.replay(el, 'fx-pop'); } }
+        if (st.t === 'joker') { var j = document.querySelector('.ba-joker[data-jid="' + st.id + '"]'); if (j && window.Fx) Fx.replay(j, 'jflash'); }
+      }
+      function finish() {
+        if (finished) return; finished = true;
+        clearTimeout(timer);
+        document.removeEventListener('pointerdown', skip, true);
+        var last = steps[steps.length - 1]; setBoxes(last);
+        var eq = $('shw-eq'), s = $('shw-s');
+        if (eq) eq.style.display = ''; if (s) { s.style.display = ''; s.textContent = res.score.toLocaleString('fr'); if (window.Fx) Fx.replay(s, 'fx-pop'); }
+        if (window.Sfx) Sfx.play('coin');
+        ANIM = false;
+        setTimeout(done, 340);
+      }
+      function skip(e) { e.preventDefault(); finish(); }
+      function tick() {
+        if (finished) return;
+        if (i >= steps.length) { finish(); return; }
+        var st = steps[i++];
+        setBoxes(st); highlight(st);
+        if (window.Sfx && st.t !== 'base') Sfx.play('score');
+        timer = setTimeout(tick, stepMs);
+      }
+      document.addEventListener('pointerdown', skip, true);
+      tick();
     }
     function animateCount(from, to) {
       var el = $('ba-round'); if (!el || typeof requestAnimationFrame !== 'function') return;
@@ -483,6 +563,7 @@
       route(); save();
     }
     function discardCards() {
+      if (ANIM) return;
       if (G.discardsLeft <= 0) { toast('Plus de défausse'); return; }
       var cards = selCards(); if (!cards.length) { toast('Choisis des cartes à défausser'); return; }
       G.discardsLeft--; G.hand = G.hand.filter(function (c) { return G.sel.indexOf(c.id) < 0; }); G.sel = [];
@@ -547,17 +628,22 @@
       else if (G.phase === 'shop') { renderShop(); $('ba-shop').style.display = 'block'; }
       else { renderEnd(); $('ba-end').style.display = 'block'; }
     }
-    function jokerChip(id, sellable) { var j = JOKERS[id]; return '<div class="ba-joker' + (sellable ? ' sellable' : '') + '" onclick="showJoker(\'' + id + '\',' + !!sellable + ')"><span class="jn">' + j.name + '</span>' + j.desc + '</div>'; }
+    function jokerChip(id, sellable) { var j = JOKERS[id]; return '<div class="ba-joker' + (sellable ? ' sellable' : '') + '" data-jid="' + id + '" onclick="showJoker(\'' + id + '\',' + !!sellable + ')"><span class="jn">' + j.name + '</span>' + j.desc + '</div>'; }
     function cardHTML(c) {
       var sel = G.sel.indexOf(c.id) >= 0, deb = G.boss === 'club' && c.s === '♣';
       var badge = c.enh === 'bonus' ? '<div class="ba-enh chips">+30</div>' : c.enh === 'mult' ? '<div class="ba-enh mult">+4</div>' : '';
-      return '<div class="ba-card ' + (isRed(c.s) ? 'red' : 'black') + (sel ? ' sel' : '') + (deb ? ' debuff' : '') + (c.enh ? ' enh' : '') + '" onclick="toggleSel(' + c.id + ')">' + badge + '<div class="rk">' + rankName(c.r) + '</div><div class="su">' + c.s + '</div></div>';
+      return '<div class="ba-card ' + (isRed(c.s) ? 'red' : 'black') + (sel ? ' sel' : '') + (deb ? ' debuff' : '') + (c.enh ? ' enh' : '') + '" data-cid="' + c.id + '" onclick="toggleSel(' + c.id + ')">' + badge + '<div class="rk">' + rankName(c.r) + '</div><div class="su">' + c.s + '</div></div>';
     }
 
     function renderGame() {
       $('ba-ante').textContent = G.ante; $('ba-blind').textContent = BLIND_NAME[G.blindIdx] + (G.boss ? ' · ' + BOSSES[G.boss].name : '');
       $('ba-target').textContent = G.target.toLocaleString('fr'); $('ba-round').textContent = G.roundScore.toLocaleString('fr');
-      $('ba-hands').textContent = G.handsLeft; $('ba-disc').textContent = G.discardsLeft; $('ba-money').textContent = G.money;
+      $('ba-hands').textContent = G.handsLeft; $('ba-disc').textContent = G.discardsLeft;
+      // Argent : compteur animé quand il change (gain de blind, achat…)
+      var mPrev = window._baMoney;
+      if (window.Fx && mPrev !== undefined && mPrev !== G.money) Fx.count($('ba-money'), mPrev, G.money, { ms: 450 });
+      else $('ba-money').textContent = G.money;
+      window._baMoney = G.money;
       $('ba-bar').style.width = Math.min(100, 100 * G.roundScore / G.target) + '%';
       $('ba-jokers').innerHTML = (G.jokers.length ? G.jokers.map(function (id) { return jokerChip(id, false); }).join('') : '<span class="ba-slots">Pas encore de Joker</span>') + '<span class="ba-slots">' + G.jokers.length + '/5</span>';
       // consommables (tarots) : cliquer pour utiliser sur les cartes sélectionnées
@@ -596,6 +682,7 @@
           '<div class="bq">' + blindTarget(G.ante, i).toLocaleString('fr') + '</div><div class="br">récompense $' + BLIND_REWARD[i] + '</div></div>';
       }
       $('bs-blinds').innerHTML = html;
+      var sk = $('bs-skip'); if (sk) sk.style.display = (G.blindIdx < 2) ? '' : 'none';
     }
     function renderShop() {
       $('sh-money').textContent = G.money; $('sh-reroll-cost').textContent = G.shop.rerollCost;

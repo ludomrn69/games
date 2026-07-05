@@ -115,7 +115,7 @@
       <div class="sk-center felt felt-teal">
         <div class="sk-pile-col">
           <div class="sk-pile-label">Pioche (<span id="sk-pile-count">0</span>)</div>
-          <div class="sk-card back" id="sk-draw-pile" onclick="onDrawPileTap()">🂠</div>
+          <div class="sk-card back" id="sk-draw-pile" onclick="onDrawPileTap()"></div>
         </div>
         <div class="sk-pile-col">
           <div class="sk-pile-label">Défausse</div>
@@ -323,8 +323,16 @@
       setText('sk-round', 'Manche ' + (state.round || 1) + ' · seuil ' + (state.maxScore || 100));
       document.getElementById('sk-totals').innerHTML = ord.map(function (pid) {
         var t = (state.players[pid] && state.players[pid].totalScore) || 0;
-        return '<span style="color:' + Room.color(pid) + ';font-weight:700">' + t + '</span>';
+        return '<span style="color:' + Room.color(pid) + ';font-weight:700" id="sk-tot-' + pid + '">' + t + '</span>';
       }).join(' · ');
+      // Les totaux DÉFILENT quand une manche vient d'être comptée.
+      var tPrev = window._skTot || {};
+      ord.forEach(function (pid) {
+        var t = (state.players[pid] && state.players[pid].totalScore) || 0;
+        if (window.Fx && tPrev[pid] !== undefined && tPrev[pid] !== t) Fx.count(document.getElementById('sk-tot-' + pid), tPrev[pid], t, { ms: 600 });
+        tPrev[pid] = t;
+      });
+      window._skTot = tPrev;
 
       // Adversaires
       document.getElementById('sk-opps').innerHTML = ord.filter(function (p) { return p !== window.myPid; }).map(function (pid) {

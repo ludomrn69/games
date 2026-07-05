@@ -156,9 +156,14 @@
     function rankOf(card) { return card.slice(0, -1); }
     function suitOf(card) { return card.slice(-1); }
     var rankVal = window.PresidentAI.rankVal; // valeur de rang : centralisée dans president-ai.js
+    // RÉVOLUTION (carré posé) : l'ordre des cartes s'INVERSE jusqu'à la fin de la
+    // manche. rv() = valeur EFFECTIVE d'une carte selon l'état ; closerRank() = la
+    // carte qui ferme le pli (2 en temps normal, 3 en révolution).
+    function rv(st, card) { var v = rankVal(card); return (st && st.revolution) ? (RANKS.length - 1 - v) : v; }
+    function closerRank(st) { return (st && st.revolution) ? '3' : '2'; }
     function isRed(card) { var s = suitOf(card); return s === 'H' || s === 'D'; }
     function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-    function sortHand(h) { return h.slice().sort(function (a, b) { return rankVal(a) - rankVal(b) || SUITS.indexOf(suitOf(a)) - SUITS.indexOf(suitOf(b)); }); }
+    function sortHand(h, st) { return h.slice().sort(function (a, b) { return rv(st, a) - rv(st, b) || SUITS.indexOf(suitOf(a)) - SUITS.indexOf(suitOf(b)); }); }
 
     var COMBO_WORD = { 1: '', 2: 'paire de ', 3: 'brelan de ', 4: 'carré de ' };
     function comboLabel(cards) {
@@ -197,12 +202,18 @@
         'Valeur égale ou plus forte, même nombre de cartes, sinon tu passes',
         'Même hauteur = tu sautes le tour du suivant · carré (4) = pli coupé',
         'Le 2 ferme le pli (son poseur relance) · interdit de finir sur un 2',
+        'Carré (4 cartes) = ⚡ RÉVOLUTION : l\'ordre s\'inverse jusqu\'à la fin',
+        'À la revanche : le Trou du cul donne ses 2 meilleures cartes au Président',
         'Ordre : 3 < 4 < … < As < 2 (la plus forte)',
         'Premier à vider sa main = Président 👑, dernier = Trou du cul 💩'
       ],
       offline: { solo: true, local: true },
       bot: presBot,
-      offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
+      offlineTurn: function (r) {
+        if (r.status === 'ended') return null;
+        if (r.exchange && r.exchange.pending) { var ks = Object.keys(r.exchange.pending); if (ks.length) return ks[0]; }
+        return r.turn;
+      },
       offlineEnter: function () { selected = []; if (window.room) render(window.room); },
       onState: onState,
       onStart: onStart
@@ -210,7 +221,14 @@
 
     /* ━━ IA solo : mener bas, battre au moins cher en gardant les fortes, finir vite ━━ */
     function presBot(state, pid) {
-      if (state.status !== 'playing' || state.turn !== pid) return;
+      if (state.status !== 'playing') return;
+      // Phase d'échange : le bot (Président/Vice) rend ses plus FAIBLES cartes.
+      if (state.exchange && state.exchange.pending && state.exchange.pending[pid]) {
+        var hh = sortHand(((state.players[pid] || {}).hand) || []);
+        giveCardsFor(pid, hh.slice(0, state.exchange.pending[pid]));
+        return;
+      }
+      if (state.turn !== pid || state.exchange) return;
       var hand = sortHand(((state.players[pid] || {}).hand) || []);
       if (!hand.length) return;
       var move = presChooseMove(state, hand);
@@ -221,11 +239,12 @@
     // « facile/erreur » reste géré par window.Bots.shouldBlunder (coup légal au hasard).
     function presChooseMove(state, hand) {
       var pile = state.pile ? { rank: state.pile.rank, count: state.pile.count } : null;
+      var ctx = { rev: !!state.revolution, seen: state.seen || [] }; // révolution + mémoire des cartes tombées
       if (window.Bots && window.Bots.shouldBlunder(state)) {
-        var plays = window.PresidentAI.legalPlays(pile, hand);
+        var plays = window.PresidentAI.legalPlays(pile, hand, ctx);
         return plays.length ? plays[Math.floor(Math.random() * plays.length)] : null;
       }
-      return window.PresidentAI.chooseMove(pile, hand, 'hard');
+      return window.PresidentAI.chooseMove(pile, hand, 'hard', ctx);
     }
     function presBotPlay(pid, cards) {
       rref().transaction(function (cur) {
@@ -234,7 +253,7 @@
         for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
         var rk = rankOf(cards[0]);
         if (!cards.every(function (c) { return rankOf(c) === rk; })) return cur;
-        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) < cur.pile.rank) return cur; }
+        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rv(cur, cards[0]) < cur.pile.rank) return cur; }
         var play = applyPlay(cur, pid, cards, hand);
         resolveAfterPlay(cur, pid, play);
         return cur;
@@ -247,22 +266,29 @@
     //  • jouer une valeur ÉGALE (« même niveau ») → saute le joueur suivant ;
     //  • atteindre 4 cartes de la même valeur (carré) → coupe le pli.
     function applyPlay(cur, pid, cards, hand) {
-      var newRank = rankVal(cards[0]);
-      var isTwo = rankOf(cards[0]) === '2'; // le 2 ferme le pli (règle maison)
+      var newRank = rv(cur, cards[0]);
+      var closer = closerRank(cur);
+      var isCloser = rankOf(cards[0]) === closer; // 2 (ou 3 en révolution) ferme le pli
       var equal = !!(cur.pile && newRank === cur.pile.rank);
       var prevTotal = (cur.pile && equal) ? (cur.pile.total || cur.pile.count) : 0;
       var total = prevTotal + cards.length;
       cards.forEach(function (c) { hand.splice(hand.indexOf(c), 1); });
       cur.players[pid].hand = hand;
+      cur.seen = (cur.seen || []).concat(cards); // mémoire de la manche (IA compteuse)
       cur.pile = { by: pid, rank: newRank, count: cards.length, cards: cards, total: total };
       cur.lastPlayer = pid;
-      cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards) + (isTwo ? ' — le 2 ferme le pli' : (equal ? ' (même hauteur)' : ''));
+      cur.banner = Room.name(pid) + ' joue ' + comboLabel(cards) + (isCloser ? ' — le ' + closer + ' ferme le pli' : (equal ? ' (même hauteur)' : ''));
       if (hand.length === 0) {
-        // Interdit de finir sur un 2 : le joueur devient d'office Trou du cul 💩.
-        if (isTwo) { cur.forcedLast = pid; cur.banner = Room.name(pid) + ' finit sur un 2 → Trou du cul 💩 !'; }
+        // Interdit de finir sur la carte maîtresse : Trou du cul d'office 💩.
+        if (isCloser) { cur.forcedLast = pid; cur.banner = Room.name(pid) + ' finit sur un ' + closer + ' → Trou du cul 💩 !'; }
         else { cur.finishOrder = (cur.finishOrder || []).concat([pid]); cur.banner += ' et a fini !'; }
       }
-      var cut = total >= 4 || isTwo; // carré OU 2 → pli coupé, celui qui l'a posé relance
+      var cut = total >= 4 || isCloser; // carré OU carte maîtresse → pli coupé
+      // ⚡ RÉVOLUTION : un carré complété inverse l'ordre des cartes jusqu'à la fin.
+      if (total >= 4) {
+        cur.revolution = !cur.revolution;
+        cur.banner += ' — ⚡ RÉVOLUTION ! L\'ordre des cartes s\'inverse';
+      }
       return { skip: equal && !cut, cut: cut };
     }
 
@@ -274,11 +300,73 @@
       var hands = {}; order.forEach(function (p) { hands[p] = []; });
       full.forEach(function (card, i) { hands[order[i % order.length]].push(card); });
       order.forEach(function (p) { cur.players[p].hand = sortHand(hands[p]); });
-      var starter = order[Math.floor(Math.random() * order.length)];
+
+      // ── ÉCHANGE DE CARTES (revanche) : si les rôles de la partie précédente sont
+      // connus pour EXACTEMENT ces joueurs, le Trou du cul donne d'office ses 2
+      // meilleures cartes au Président (le Vice-trou 1 au Vice si ≥4 joueurs), puis
+      // Président/Vice choisissent quoi rendre. Le Trou du cul relancera. ──
+      var byRank = {}, rolesOk = order.length >= 3;
+      order.forEach(function (p) {
+        var lr = cur.players[p] && cur.players[p].lastRank;
+        if (lr == null || byRank[lr] !== undefined) rolesOk = false; else byRank[lr] = p;
+      });
+      for (var i2 = 0; i2 < order.length && rolesOk; i2++) if (byRank[i2] === undefined) rolesOk = false;
+      var exchange = null, starter, banner;
+      if (rolesOk) {
+        var n = order.length;
+        var pres = byRank[0], trou = byRank[n - 1];
+        var vice = n >= 4 ? byRank[1] : null, vtrou = n >= 4 ? byRank[n - 2] : null;
+        function giveBest(from, to, k) {
+          var fh = sortHand(cur.players[from].hand), given = fh.slice(-k); // k plus FORTES
+          cur.players[from].hand = fh.slice(0, fh.length - k);
+          cur.players[to].hand = sortHand(cur.players[to].hand.concat(given));
+          return given;
+        }
+        giveBest(trou, pres, 2);
+        if (vice && vtrou) giveBest(vtrou, vice, 1);
+        var pending = {}; pending[pres] = 2; if (vice) pending[vice] = 1;
+        var to = {}; to[pres] = trou; if (vice) to[vice] = vtrou;
+        exchange = { pending: pending, to: to };
+        starter = pres; // pour le chrono : le Président choisit d'abord quoi rendre
+        banner = '🔁 Échange — ' + Room.name(trou) + ' a donné ses 2 meilleures cartes à ' + Room.name(pres);
+      } else {
+        starter = order[Math.floor(Math.random() * order.length)];
+        banner = Room.name(starter) + ' commence — pose ce que tu veux';
+      }
       return {
         turn: starter, pile: null, passed: [], lastPlayer: null, finishOrder: [],
-        banner: Room.name(starter) + ' commence — pose ce que tu veux'
+        seen: [], revolution: false, exchange: exchange,
+        banner: banner
       };
+    }
+
+    // ── Rendre des cartes (phase d'échange) : `pid` donne `cards` à son binôme. ──
+    function giveCardsFor(pid, cards) {
+      rref().transaction(function (cur) {
+        var ex = cur && cur.exchange;
+        if (!cur || cur.status !== 'playing' || !ex || !ex.pending || !ex.pending[pid]) return cur;
+        if (cards.length !== ex.pending[pid]) return cur;
+        var hand = (cur.players[pid].hand || []).slice();
+        for (var i = 0; i < cards.length; i++) { var k = hand.indexOf(cards[i]); if (k < 0) return cur; hand.splice(k, 1); }
+        var dest = ex.to[pid];
+        cur.players[pid].hand = sortHand(hand);
+        cur.players[dest].hand = sortHand((cur.players[dest].hand || []).concat(cards));
+        delete ex.pending[pid];
+        cur.banner = Room.name(pid) + ' a rendu ' + cards.length + ' carte' + (cards.length > 1 ? 's' : '') + ' à ' + Room.name(dest);
+        var rest = Object.keys(ex.pending);
+        if (!rest.length) {
+          // Échange terminé : le Trou du cul (le binôme du Président) relance.
+          var trou = ex.to[Object.keys(ex.to)[0]];
+          Object.keys(ex.to).forEach(function (g) { if (cur.players[g] && cur.players[g].lastRank === 0) trou = ex.to[g]; });
+          cur.exchange = null;
+          cur.turn = trou;
+          cur.banner = '🔁 Échange terminé — ' + Room.name(trou) + ' (Trou du cul) commence';
+        } else {
+          cur.turn = rest[0];
+        }
+        return cur;
+      });
+      if (window.Fx) Fx.sfx('flip');
     }
 
     function onState(snap) {
@@ -347,13 +435,18 @@
           pileEl.querySelectorAll('.card').forEach(function (el, i) { el.classList.add('card-in'); el.style.animationDelay = (i * 0.05) + 's'; });
           if (window.Fx) Fx.sfx('place'); // on entend chaque pose, la sienne comme celle des autres
         }
+      } else if (state.exchange) {
+        pileEl.innerHTML = '<span class="pr-pile-empty">🔁 Échange des cartes en cours…</span>';
       } else {
-        pileEl.innerHTML = '<span class="pr-pile-empty">Nouveau pli — à ' + (isMyTurn ? 'toi' : escapeHtml(Room.name(turn))) + ' de poser</span>';
+        pileEl.innerHTML = '<span class="pr-pile-empty">Nouveau pli' + (state.revolution ? ' ⚡ (révolution)' : '') + ' — à ' + (isMyTurn ? 'toi' : escapeHtml(Room.name(turn))) + ' de poser</span>';
       }
+      // ⚡ Révolution en cours : rappel permanent dans l'étiquette du pli.
+      if (state.revolution && !state.exchange) setText('pr-mode', document.getElementById('pr-mode').textContent + ' · ⚡ RÉVOLUTION (ordre inversé)');
 
       // Ma main
-      var myHand = sortHand((state.players[window.myPid] && state.players[window.myPid].hand) || []);
+      var myHand = sortHand((state.players[window.myPid] && state.players[window.myPid].hand) || [], state);
       setText('pr-my-count', '(' + myHand.length + ')');
+      var exchMe = state.exchange && state.exchange.pending && state.exchange.pending[window.myPid];
       var selRank = selected.length ? rankOf(selected[0]) : null;
       var cont = document.getElementById('pr-hand');
       // Distribution en éventail quand la main vient d'être servie (nouvelle manche).
@@ -363,15 +456,23 @@
       cont.innerHTML = myHand.map(function (card) {
         var isSel = selected.indexOf(card) >= 0;
         // griser les cartes d'une autre valeur quand une sélection est en cours
-        var dim = (selRank && rankOf(card) !== selRank && !isSel) ? 'dim' : '';
+        // (jamais pendant l'échange : on rend les cartes qu'on veut)
+        var dim = (!exchMe && selRank && rankOf(card) !== selRank && !isSel) ? 'dim' : '';
         return cardHTML(card, (isSel ? 'sel ' : '') + dim);
       }).join('');
 
       // Boutons
       var playBtn = document.getElementById('pr-play-btn');
       var passBtn = document.getElementById('pr-pass-btn');
-      playBtn.disabled = !(isMyTurn && selected.length > 0);
-      passBtn.disabled = !(isMyTurn && state.pile); // on ne peut pas passer sur un nouveau pli
+      if (exchMe) {
+        playBtn.textContent = 'Donner ' + selected.length + '/' + exchMe + ' ↦';
+        playBtn.disabled = selected.length !== exchMe;
+        passBtn.disabled = true;
+      } else {
+        playBtn.textContent = 'Jouer';
+        playBtn.disabled = !(isMyTurn && selected.length > 0) || !!state.exchange;
+        passBtn.disabled = !(isMyTurn && state.pile) || !!state.exchange; // pas de passe sur un nouveau pli / pendant l'échange
+      }
 
       // Bouton « sauter l'absent » si le joueur dont c'est le tour est hors ligne
       var absentBtn = document.getElementById('pr-absent-btn');
@@ -382,13 +483,15 @@
 
     function toggleCard(card) {
       var st = window.room || {};
-      if (st.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); if (window.Fx) Fx.sfx('error'); return; }
+      var exch = st.exchange && st.exchange.pending && st.exchange.pending[window.myPid];
+      if (st.turn !== window.myPid && !exch) { lbToast('Ce n\'est pas ton tour'); if (window.Fx) Fx.sfx('error'); return; }
       if (window.Fx) { Fx.sfx('click'); Fx.vib(6); }
       var i = selected.indexOf(card);
       if (i >= 0) selected.splice(i, 1);
       else {
-        // garder une seule valeur sélectionnée à la fois
-        if (selected.length && rankOf(selected[0]) !== rankOf(card)) selected = [];
+        // garder une seule valeur sélectionnée à la fois (sauf pendant l'échange :
+        // on rend ce qu'on veut, valeurs mélangées autorisées)
+        if (!exch && selected.length && rankOf(selected[0]) !== rankOf(card)) selected = [];
         selected.push(card);
       }
       render(st);
@@ -397,22 +500,31 @@
     /* ━━ Actions ━━ */
     function playSelected() {
       var st = window.room || {};
+      // Phase d'ÉCHANGE : le bouton sert à RENDRE les cartes sélectionnées.
+      var exch = st.exchange && st.exchange.pending && st.exchange.pending[window.myPid];
+      if (exch) {
+        if (selected.length !== exch) { lbToast('Sélectionne exactement ' + exch + ' carte' + (exch > 1 ? 's' : '') + ' à rendre'); if (window.Fx) Fx.sfx('error'); return; }
+        var give = selected.slice(); selected = [];
+        giveCardsFor(window.myPid, give);
+        return;
+      }
+      if (st.exchange) { lbToast('Échange en cours…'); return; }
       if (st.turn !== window.myPid || !selected.length) return;
       var cards = selected.slice();
       var r = rankOf(cards[0]);
       if (!cards.every(function (c) { return rankOf(c) === r; })) { lbToast('Sélectionne des cartes de même valeur'); if (window.Fx) Fx.sfx('error'); return; }
       if (st.pile) {
         if (cards.length !== st.pile.count) { lbToast('Il faut ' + st.pile.count + ' carte(s)'); if (window.Fx) Fx.sfx('error'); return; }
-        if (rankVal(cards[0]) < st.pile.rank) { lbToast('Il faut une valeur égale ou plus forte'); if (window.Fx) Fx.sfx('error'); return; }
+        if (rv(st, cards[0]) < st.pile.rank) { lbToast('Il faut une valeur égale ou plus forte'); if (window.Fx) Fx.sfx('error'); return; }
       }
       if (window.Fx) Fx.vib(12);
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        if (!cur || cur.status !== 'playing' || cur.exchange || cur.turn !== window.myPid) return cur;
         var hand = (cur.players[window.myPid].hand || []).slice();
         for (var i = 0; i < cards.length; i++) if (hand.indexOf(cards[i]) < 0) return cur;
         var rk = rankOf(cards[0]);
         if (!cards.every(function (c) { return rankOf(c) === rk; })) return cur;
-        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rankVal(cards[0]) < cur.pile.rank) return cur; }
+        if (cur.pile) { if (cards.length !== cur.pile.count) return cur; if (rv(cur, cards[0]) < cur.pile.rank) return cur; }
         var play = applyPlay(cur, window.myPid, cards, hand);
         resolveAfterPlay(cur, window.myPid, play);
         return cur;
@@ -444,11 +556,12 @@
           resolvePass(cur, t);
         } else {
           // doit relancer : on pose sa plus petite carte
-          var sorted = sortHand(hand);
+          var sorted = sortHand(hand, cur);
           var low = sorted[0];
           hand.splice(hand.indexOf(low), 1);
           cur.players[t].hand = hand;
-          cur.pile = { by: t, rank: rankVal(low), count: 1, cards: [low] };
+          cur.seen = (cur.seen || []).concat([low]);
+          cur.pile = { by: t, rank: rv(cur, low), count: 1, cards: [low] };
           cur.lastPlayer = t;
           cur.banner = Room.name(t) + ' (absent) pose ' + comboLabel([low]);
           if (hand.length === 0) cur.finishOrder = (cur.finishOrder || []).concat([t]);
@@ -466,6 +579,7 @@
         if (active.length === 1) cur.finishOrder = (cur.finishOrder || []).concat(active);
         // Le joueur qui a fini sur un 2 est placé tout en dernier (Trou du cul).
         if (cur.forcedLast && (cur.finishOrder || []).indexOf(cur.forcedLast) < 0) cur.finishOrder = (cur.finishOrder || []).concat([cur.forcedLast]);
+        (cur.finishOrder || []).forEach(function (p, i) { if (cur.players[p]) cur.players[p].lastRank = i; });
         cur.status = 'ended'; cur.turn = null;
         return;
       }
@@ -523,8 +637,8 @@
       }).join('');
     }
 
-    function handleReplay() { selected = []; Lobby.resetToLobby([]); }
-    function doRestart() { closeModal('modal-restart'); selected = []; Lobby.resetToLobby([]); }
+    function handleReplay() { selected = []; Lobby.resetToLobby(['lastRank']); }
+    function doRestart() { closeModal('modal-restart'); selected = []; Lobby.resetToLobby(['lastRank']); }
 
     /* ━━ Clic main ━━ */
     document.getElementById('pr-hand').addEventListener('click', function (e) {

@@ -39,11 +39,11 @@
   addEventListener('resize',resize);
   var BEST='playus_towerstack_best',best=+localStorage.getItem(BEST)||0;
   function showBest(){bestEl.textContent=best?'⭐ '+best:'';}showBest();
-  var state,score,stack=[],cur,dir,speed,bh,camY=0,hue;
+  var state,score,stack=[],cur,dir,speed,bh,camY=0,hue,falling=[];
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function newBlock(){var top=stack[stack.length-1];hue=(hue+24)%360;
     cur={x:dir>0?-top.w:W,w:top.w,y:top.y-bh,color:'hsl('+hue+',65%,58%)'};speed=Math.max(3.5,W*0.011)+score*0.12;}
-  function start(){resize();score=0;bh=Math.max(26,H*0.045);hue=200;dir=1;camY=0;
+  function start(){resize();score=0;bh=Math.max(26,H*0.045);hue=200;dir=1;camY=0;falling=[];
     var w0=Math.min(W*0.5,200);stack=[{x:W/2-w0/2,w:w0,y:H-90,color:'hsl(200,65%,58%)'}];
     newBlock();state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');}
   function end(){state='over';document.getElementById('finalScore').textContent=score;
@@ -52,7 +52,10 @@
   stage.addEventListener('pointerdown',function(){if(state!=='play')return;
     var top=stack[stack.length-1];var left=Math.max(cur.x,top.x),right=Math.min(cur.x+cur.w,top.x+top.w);
     var overlap=right-left;
-    if(overlap<=0){end();return;}
+    if(overlap<=0){falling.push({x:cur.x,y:cur.y,w:cur.w,vy:-1.5,rot:0,vr:(Math.random()-0.5)*0.18,color:cur.color});end();return;}
+    // le morceau qui depasse est COUPE : il tombe (petite physique) au lieu de disparaitre
+    if(overlap<cur.w-0.5){var cutW=cur.w-overlap;var cutX=(cur.x<left)?cur.x:right;
+      falling.push({x:cutX,y:cur.y,w:cutW,vy:-1.2,rot:0,vr:(cutX<left?-1:1)*(0.06+Math.random()*0.12),color:cur.color});}
     cur.x=left;cur.w=overlap;stack.push({x:left,w:overlap,y:cur.y,color:cur.color});
     score++;scoreEl.textContent=score;vibrate(overlap>top.w-4?[15,25,15]:10);
     dir=-dir;newBlock();
@@ -65,11 +68,19 @@
     ctx.save();ctx.translate(0,camY);
     stack.forEach(function(b){ctx.fillStyle=b.color;ctx.fillRect(b.x,b.y,b.w,bh);
       ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(b.x,b.y,b.w,5);});
+    for(var fi=falling.length-1;fi>=0;fi--){var f=falling[fi];
+      f.vy+=0.55;f.y+=f.vy;f.rot+=f.vr;
+      if(f.y-camY>H+120){falling.splice(fi,1);continue;}
+      ctx.save();ctx.translate(f.x+f.w/2,f.y+bh/2);ctx.rotate(f.rot);ctx.globalAlpha=0.9;
+      ctx.fillStyle=f.color;ctx.fillRect(-f.w/2,-bh/2,f.w,bh);
+      ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(-f.w/2,-bh/2,f.w,5);ctx.restore();}
     if(state==='play'){ctx.fillStyle=cur.color;ctx.fillRect(cur.x,cur.y,cur.w,bh);ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(cur.x,cur.y,cur.w,5);}
     ctx.restore();
   }
   resize();frame();
 })();
 </script>
+<script src="../../sfx.js"></script>
+<script src="../../playus-extra.js"></script>
 </body>
 </html>
