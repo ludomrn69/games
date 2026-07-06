@@ -104,6 +104,22 @@
 
   var state,grid,houses,dests,cars,roads,score,gt,week,nextBuildT,dispatchT,colorsN,eraseMode,carSpeed,carsPerHouse;
   var demandMul,buildMul;                   // modulés par le défi du jour
+  var waterBlobs=[],landBlobs=[];           // terrain organique (généré par carte)
+
+  // Contour organique fermé (points relatifs 0..1) autour d'un centre.
+  function genBlob(cxr,cyr,rr,rng){var pts=[],N=10;for(var i=0;i<N;i++){var a=i/N*6.2832;var rad=rr*(0.68+rng()*0.6);pts.push({x:cxr+Math.cos(a)*rad,y:cyr+Math.sin(a)*rad*1.25});}return pts;}
+  function genTerrain(seed){
+    var t=mulberry32(seed>>>0||1);
+    waterBlobs=[genBlob(0.12,0.1,0.17,t),genBlob(0.9,0.86,0.2,t),genBlob(0.95,0.2,0.12,t)];
+    landBlobs=[genBlob(0.68,0.32,0.16,t),genBlob(0.25,0.75,0.15,t)];
+  }
+  function blobPath(pts){ // pts relatifs → chemin lissé absolu
+    var n=pts.length,P=pts.map(function(p){return {x:p.x*W,y:p.y*H};});
+    ctx.beginPath();
+    var mx=(P[n-1].x+P[0].x)/2,my=(P[n-1].y+P[0].y)/2;ctx.moveTo(mx,my);
+    for(var i=0;i<n;i++){var p=P[i],np=P[(i+1)%n];ctx.quadraticCurveTo(p.x,p.y,(p.x+np.x)/2,(p.y+np.y)/2);}
+    ctx.closePath();
+  }
   var DAILY=false,dayIdx=0,dayTwist=null,rnd=Math.random;
 
   function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;var t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
@@ -135,6 +151,7 @@
     }
     grid={};houses=[];dests=[];cars=[];roads=roads0;score=0;gt=0;week=1;
     nextBuildT=0;dispatchT=0;colorsN=colors0;eraseMode=false;carSpeed=speed0;carsPerHouse=1;
+    genTerrain(DAILY?daySeed():((Math.random()*1e9)|0));
     document.getElementById('eraseBtn').classList.remove('on');
     // départ : une maison + un bâtiment de même couleur
     spawnBuilding('house',0);spawnBuilding('dest',0);
@@ -307,19 +324,22 @@
   function drawBox(x,y,s,color,depth){
     var r=Math.min(6,s*0.2);
     ctx.save();
-    ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=s*0.22;ctx.shadowOffsetY=depth*0.6+s*0.05;
-    ctx.fillStyle=shade(color,0.6);rr(x-s/2,y-s/2+depth,s,s,r);ctx.fill();     // face avant (extrusion)
+    ctx.shadowColor='rgba(0,0,0,.24)';ctx.shadowBlur=s*0.22;ctx.shadowOffsetY=depth*0.6+s*0.06;
+    ctx.fillStyle=shade(color,0.52);rr(x-s/2,y-s/2+depth,s,s,r);ctx.fill();      // face avant (extrusion, bien sombre)
     ctx.shadowColor='transparent';
-    ctx.fillStyle=color;rr(x-s/2,y-s/2,s,s,r);ctx.fill();                       // face du dessus
-    ctx.fillStyle='rgba(255,255,255,.16)';rr(x-s/2,y-s/2,s,s*0.34,r);ctx.fill();// reflet
+    ctx.fillStyle=color;rr(x-s/2,y-s/2,s,s,r);ctx.fill();                        // face du dessus
+    ctx.fillStyle='rgba(255,255,255,.18)';rr(x-s/2,y-s/2,s,s*0.34,r);ctx.fill(); // reflet haut
+    ctx.fillStyle='rgba(0,0,0,.10)';rr(x-s/2,y+s*0.3,s,s*0.2,r);ctx.fill();      // ombre bas de la face du dessus
     ctx.restore();
   }
   function draw(){
     ctx.clearRect(0,0,W,H);
-    // taches organiques douces (relief léger, façon terrain de Mini Motorways)
-    var blobs=[[0.18,0.24,1.0,0],[0.78,0.4,1.2,1],[0.5,0.82,1.1,0],[0.88,0.14,0.7,1],[0.12,0.7,0.85,1]];
-    blobs.forEach(function(b){ctx.fillStyle=b[3]?(dark()?'rgba(255,255,255,.03)':'rgba(255,255,255,.18)'):(dark()?'rgba(0,0,0,.10)':'rgba(110,140,100,.08)');
-      ctx.beginPath();ctx.ellipse(W*b[0],H*b[1],CELL*3.2*b[2],CELL*2.4*b[2],0.6,0,7);ctx.fill();});
+    // terrain : zones d'herbe plus foncée puis plans d'EAU avec plage (côtes organiques)
+    landBlobs.forEach(function(b){ctx.fillStyle=dark()?'rgba(0,0,0,.10)':'rgba(120,150,105,.14)';blobPath(b);ctx.fill();});
+    waterBlobs.forEach(function(b){
+      blobPath(b);ctx.fillStyle=dark()?'#20303a':'#c9e4e6';ctx.fill();               // eau
+      ctx.strokeStyle=dark()?'rgba(220,210,180,.15)':'rgba(236,224,190,.7)';ctx.lineWidth=7;ctx.stroke(); // plage
+    });
     // grille très discrète
     ctx.strokeStyle=dark()?'rgba(255,255,255,.025)':'rgba(0,0,0,.03)';ctx.lineWidth=1;
     for(var c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(OX+c*CELL,OY);ctx.lineTo(OX+c*CELL,OY+ROWS*CELL);ctx.stroke();}
@@ -328,6 +348,14 @@
     var th=CELL*0.42;
     ctx.fillStyle=dark()?'#12151a':'#b3b9ac';paintRoadLayer(th+5);
     ctx.fillStyle=dark()?'#39404a':'#f8f5ec';paintRoadLayer(th);
+    // ronds-points aux carrefours chargés (3+ routes) : anneau + îlot central
+    for(var kk2 in grid){var g2=grid[kk2];if(g2.t!=='road')continue;
+      var deg=0;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var n=grid[key(g2.r+d[0],g2.c+d[1])];if(n&&n.t==='road')deg++;});
+      if(deg>=3){var rx=cx(g2.c),ry=cy(g2.r),ir=CELL*0.17;
+        ctx.fillStyle=dark()?'#12151a':'#b3b9ac';ctx.beginPath();ctx.arc(rx,ry,ir+2.5,0,7);ctx.fill();
+        ctx.fillStyle=dark()?'#39404a':'#f8f5ec';ctx.beginPath();ctx.arc(rx,ry,ir,0,7);ctx.fill();
+        ctx.fillStyle=dark()?'#243449':'#cfe4d0';ctx.beginPath();ctx.arc(rx,ry,ir*0.42,0,7);ctx.fill();}
+    }
     // voitures (petite auto arrondie avec ombre douce)
     cars.forEach(function(ca){
       var pts=pathPoints(ca.path);if(ca.seg>=pts.length-1)return;

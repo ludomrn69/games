@@ -18,6 +18,12 @@
   .stat .n{font-size:1.5rem;font-weight:800}
   .stat .l{font-size:.62rem;text-transform:uppercase;letter-spacing:1px;opacity:.55;font-weight:700}
   .grow{flex:1}
+  /* Horloge analogique (façon Mini Métro) */
+  .mclock{width:27px;height:27px;border-radius:50%;border:2.5px solid currentColor;position:relative;display:inline-block;opacity:.9;flex-shrink:0}
+  .mclock::after{content:'';position:absolute;width:3px;height:3px;border-radius:50%;background:currentColor;left:50%;top:50%;transform:translate(-50%,-50%)}
+  .mhand{position:absolute;left:50%;top:50%;width:2px;height:9px;background:currentColor;border-radius:2px;transform-origin:bottom center;transform:translate(-50%,-100%) rotate(0deg)}
+  .inv-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.9);border-radius:30px;padding:5px 12px;box-shadow:0 3px 12px rgba(0,0,0,.12);font-weight:800;font-size:.8rem}
+  body.dark .inv-chip{background:rgba(40,42,52,.92);color:#e7e7ee}
   .icon-btn{border:none;background:rgba(0,0,0,.06);color:inherit;width:40px;height:40px;border-radius:12px;font-size:1.1rem;cursor:pointer}
   body.dark .icon-btn{background:rgba(255,255,255,.08)}
   #stage{flex:1;width:100%;max-width:900px;position:relative}
@@ -54,7 +60,10 @@
 <body>
   <div class="hud">
     <a class="back" href="../index.html" aria-label="Retour">‹</a>
-    <div class="stat"><div class="n" id="day">Sem. 1</div><div class="l">Semaine</div></div>
+    <div class="stat" style="display:flex;align-items:center;gap:8px">
+      <span class="mclock"><span class="mhand" id="clockHand"></span></span>
+      <span style="text-align:left"><span class="n" id="day">LUN</span><span class="l" style="display:block">Jour</span></span>
+    </div>
     <div class="grow"></div>
     <div class="stat"><div class="n" id="score">0</div><div class="l">Passagers</div></div>
     <div class="grow"></div>
@@ -389,10 +398,19 @@
   function rr(c,x,y,w,h,r){c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);}
 
   // ── HUD & chips ─────────────────────────────────────────────────────────────
-  function updateHud(){document.getElementById('score').textContent=score;document.getElementById('day').textContent='Sem. '+week;}
+  var DAYS=['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
+  function updateHud(){
+    document.getElementById('score').textContent=score;
+    var dayLen=22/7;                                   // 1 semaine (22 s) = 7 jours
+    document.getElementById('day').textContent=DAYS[Math.floor(gt/dayLen)%7];
+    var hand=document.getElementById('clockHand');
+    if(hand){var frac=(gt%22)/22;hand.style.transform='translate(-50%,-100%) rotate('+(frac*360)+'deg)';}
+  }
   function updateChips(){
     var box=document.getElementById('lineChips');
-    box.innerHTML=lines.map(function(l,i){
+    var trainsN=lines.reduce(function(a,l){return a+l.trains.length;},0);
+    var inv='<span class="inv-chip">🚆 '+trainsN+' · 🚃 '+trainCap+'</span>';
+    box.innerHTML=inv+lines.map(function(l,i){
       return '<span class="line-chip"><span class="dot" style="background:'+l.color+'"></span>L'+(i+1)+
         '<button class="rm" data-i="'+i+'" aria-label="Supprimer">✕</button></span>';
     }).join('') + (pool>0?'<span class="line-chip" style="opacity:.6">+ '+pool+' ligne'+(pool>1?'s':'')+' dispo</span>':'');
