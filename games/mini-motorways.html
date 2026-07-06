@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Mini Motorways 🚗</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>" />
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#2a2a33;overflow:hidden;user-select:none;
+    background:#eaf0e6;display:flex;flex-direction:column;align-items:center;touch-action:none}
+  :root[data-theme="dark"] body,body.dark{background:#161a17;color:#e7e7ee}
+  .hud{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px;gap:8px;z-index:5}
+  .hud a.back{color:inherit;text-decoration:none;font-size:1.6rem;line-height:1;opacity:.7}
+  .hud a.back:hover{opacity:1}
+  .stat{text-align:center;line-height:1.05}
+  .stat .n{font-size:1.4rem;font-weight:800}
+  .stat .l{font-size:.6rem;text-transform:uppercase;letter-spacing:1px;opacity:.55;font-weight:700}
+  .grow{flex:1}
+  .icon-btn{border:none;background:rgba(0,0,0,.06);color:inherit;width:40px;height:40px;border-radius:12px;font-size:1.05rem;cursor:pointer}
+  .icon-btn.on{background:#37a86b;color:#fff}
+  body.dark .icon-btn{background:rgba(255,255,255,.08)}
+  body.dark .icon-btn.on{background:#37a86b}
+  #stage{flex:1;width:100%;max-width:900px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .hint{position:absolute;top:6px;left:0;right:0;text-align:center;font-size:.8rem;opacity:.55;pointer-events:none;font-weight:600}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;text-align:center;
+    padding:28px;background:rgba(234,240,230,.94);backdrop-filter:blur(6px);z-index:20}
+  body.dark .screen{background:rgba(22,26,23,.94)}
+  .screen.hidden{display:none}
+  .screen h1{font-size:2rem;font-weight:900}
+  .screen p{max-width:330px;line-height:1.5;opacity:.8;font-size:.95rem}
+  .big{font-size:3.4rem;font-weight:900;color:#e8582c}
+  .btn{border:none;border-radius:16px;padding:15px 38px;font-size:1.1rem;font-weight:800;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,#37a86b,#57c98b);box-shadow:0 8px 24px rgba(55,168,107,.4);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+  .choices{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .choice{border:2px solid rgba(0,0,0,.1);background:rgba(255,255,255,.7);border-radius:18px;padding:18px 16px;min-width:120px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:6px;font-family:inherit;color:inherit;transition:transform .12s,border-color .12s}
+  body.dark .choice{background:rgba(40,44,40,.7);border-color:rgba(255,255,255,.12)}
+  .choice:hover{transform:translateY(-3px);border-color:#37a86b}
+  .choice .ce{font-size:2rem}.choice .ct{font-weight:800}.choice .cs{font-size:.75rem;opacity:.65}
+  .road-badge{display:inline-flex;align-items:center;gap:4px}
+</style>
+</head>
+<body>
+  <div class="hud">
+    <a class="back" href="../index.html" aria-label="Retour">‹</a>
+    <div class="stat"><div class="n" id="week">Sem. 1</div><div class="l">Semaine</div></div>
+    <div class="grow"></div>
+    <div class="stat"><div class="n" id="score">0</div><div class="l">Trajets</div></div>
+    <div class="grow"></div>
+    <div class="stat"><div class="n road-badge">🛣️ <span id="roads">0</span></div><div class="l">Routes</div></div>
+    <button class="icon-btn" id="eraseBtn" aria-label="Gomme">🧽</button>
+    <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+  </div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint" id="hint">Trace des routes en glissant pour relier maisons et bâtiments de même couleur</div>
+
+    <div class="screen" id="start">
+      <h1>🚗 Mini Motorways</h1>
+      <p>Trace des routes pour relier chaque maison à un bâtiment de <b>même couleur</b>. Les voitures font la navette toutes seules. Si un bâtiment attend trop longtemps (jauge pleine), c'est fini&nbsp;! Optimise ton réseau le plus longtemps possible.</p>
+      <button class="btn" id="startBtn">Jouer</button>
+    </div>
+
+    <div class="screen hidden" id="weekScr">
+      <h1 id="weekTitle">Nouvelle semaine</h1>
+      <p>Tu reçois des routes. Choisis un bonus&nbsp;:</p>
+      <div class="choices" id="weekChoices"></div>
+    </div>
+
+    <div class="screen hidden" id="over">
+      <h1>Embouteillage&nbsp;!</h1>
+      <div class="big" id="finalScore">0</div>
+      <p id="overMsg">trajets réalisés</p>
+      <button class="btn" id="replayBtn">Rejouer</button>
+    </div>
+
+    <div class="screen hidden" id="paused">
+      <h1>⏸ Pause</h1>
+      <button class="btn" id="resumeBtn">Reprendre</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var W,H,DPR,CELL,COLS,ROWS,OX,OY;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;
+    cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);
+    CELL=Math.max(30,Math.min(46,Math.floor(Math.min(W,H)/13)));
+    COLS=Math.floor((W-8)/CELL);ROWS=Math.floor((H-8)/CELL);
+    OX=(W-COLS*CELL)/2;OY=(H-ROWS*CELL)/2;}
+  addEventListener('resize',function(){resize();});
+  try{if(localStorage.getItem('games-theme')==='dark')document.body.classList.add('dark');}catch(e){}
+
+  var COLORS=['#e8582c','#2c7be5','#f2b705','#8b5cf6','#37a86b','#e5439b'];
+  var PIN_CAP=9, OVER_LIMIT=36, BEST='mini_motorways_best';
+  var best=+localStorage.getItem(BEST)||0;
+
+  var state,grid,houses,dests,cars,roads,score,gt,week,nextBuildT,dispatchT,colorsN,eraseMode,carSpeed,carsPerHouse;
+
+  function key(r,c){return r+','+c;}
+  function inb(r,c){return r>=0&&c>=0&&r<ROWS&&c<COLS;}
+  function cx(c){return OX+c*CELL+CELL/2;}
+  function cy(r){return OY+r*CELL+CELL/2;}
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+
+  function reset(){
+    resize();
+    grid={};houses=[];dests=[];cars=[];roads=24;score=0;gt=0;week=1;
+    nextBuildT=0;dispatchT=0;colorsN=2;eraseMode=false;carSpeed=2.4;carsPerHouse=1;
+    document.getElementById('eraseBtn').classList.remove('on');
+    // départ : une maison + un bâtiment de même couleur
+    spawnBuilding('house',0);spawnBuilding('dest',0);
+    spawnBuilding('house',1);spawnBuilding('dest',1);
+    updateHud();
+  }
+
+  function occupied(r,c){var g=grid[key(r,c)];return g&&(g.t==='house'||g.t==='dest');}
+  function freeCell(){
+    for(var tries=0;tries<300;tries++){
+      var r=1+((Math.random()*(ROWS-2))|0), c=1+((Math.random()*(COLS-2))|0);
+      if(!grid[key(r,c)]){
+        // éviter d'enfermer : au moins 1 voisin libre
+        var open=0;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){if(inb(r+d[0],c+d[1])&&!occupied(r+d[0],c+d[1]))open++;});
+        if(open>=2) return {r:r,c:c};
+      }
+    }
+    return null;
+  }
+  function spawnBuilding(type,forceColor){
+    if(COLS<4)return;
+    var p=freeCell();if(!p)return;
+    var color = forceColor!=null?COLORS[forceColor]:COLORS[(Math.random()*colorsN)|0];
+    var o={r:p.r,c:p.c,t:type,color:color};
+    if(type==='dest'){o.pins=0;o.over=0;}
+    grid[key(p.r,p.c)]=o;
+    (type==='house'?houses:dests).push(o);
+  }
+
+  // ── Routes (peinture) ────────────────────────────────────────────────────────
+  function paintRoad(r,c){
+    if(!inb(r,c))return;var k=key(r,c),g=grid[k];
+    if(eraseMode){ if(g&&g.t==='road'){delete grid[k];roads++;updateHud();invalidateCars();} return; }
+    if(g)return; // occupé (bâtiment ou route)
+    if(roads<=0)return;
+    grid[k]={t:'road',r:r,c:c};roads--;updateHud();invalidateCars();
+  }
+  function invalidateCars(){ cars.forEach(function(ca){ca.recheck=true;}); }
+
+  // ── Pathfinding BFS sur les cases route ─────────────────────────────────────
+  function roadNeighborsOf(b){ // cases route adjacentes à un bâtiment
+    var out=[];[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var g=grid[key(b.r+d[0],b.c+d[1])];if(g&&g.t==='road')out.push(g);});
+    return out;
+  }
+  function findPath(house,dest){
+    // adjacence directe maison-bâtiment
+    if(Math.abs(house.r-dest.r)+Math.abs(house.c-dest.c)===1) return [house,dest];
+    var starts=roadNeighborsOf(house), goals={};
+    roadNeighborsOf(dest).forEach(function(g){goals[key(g.r,g.c)]=1;});
+    if(!starts.length||!Object.keys(goals).length)return null;
+    var q=[],prev={},seen={};
+    starts.forEach(function(s){var k=key(s.r,s.c);seen[k]=1;prev[k]=null;q.push(s);});
+    var found=null;
+    while(q.length){
+      var cur=q.shift(),ck=key(cur.r,cur.c);
+      if(goals[ck]){found=cur;break;}
+      var dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+      for(var i=0;i<dirs.length;i++){var nr=cur.r+dirs[i][0],nc=cur.c+dirs[i][1],nk=key(nr,nc);
+        var g=grid[nk];if(g&&g.t==='road'&&!seen[nk]){seen[nk]=1;prev[nk]=cur;q.push(g);}}
+    }
+    if(!found)return null;
+    var path=[];var n=found;while(n){path.unshift(n);n=prev[key(n.r,n.c)];}
+    return [house].concat(path,[dest]);
+  }
+
+  // ── Dispatch : envoie une voiture d'une maison vers un bâtiment en attente ───
+  function dispatch(){
+    // bâtiments les plus chargés d'abord
+    var pending=dests.filter(function(d){return d.pins>0;}).sort(function(a,b){return b.pins-a.pins;});
+    for(var i=0;i<pending.length;i++){
+      var d=pending[i];
+      // maisons de même couleur avec une voiture libre + chemin
+      var cands=houses.filter(function(h){return h.color===d.color&&(h.active||0)<carsPerHouse;});
+      var bestH=null,bestPath=null;
+      for(var j=0;j<cands.length;j++){
+        var p=findPath(cands[j],d);
+        if(p&&(!bestPath||p.length<bestPath.length)){bestPath=p;bestH=cands[j];}
+      }
+      if(bestH){
+        bestH.active=(bestH.active||0)+1;
+        cars.push({color:d.color,house:bestH,dest:d,path:bestPath,seg:0,t:0,phase:'toDest',valid:true});
+        d.reserved=(d.reserved||0)+1;
+      }
+    }
+  }
+
+  function pathPoints(path){return path.map(function(n){return {x:cx(n.c),y:cy(n.r)};});}
+
+  function update(dt){
+    gt+=dt;
+    // apparition de bâtiments
+    nextBuildT-=dt;
+    if(nextBuildT<=0){ spawnBuilding(Math.random()<0.5?'house':'dest'); nextBuildT=Math.max(3.5, 7-gt*0.04); }
+    if(gt>40&&colorsN<3)colorsN=3;
+    if(gt>90&&colorsN<4)colorsN=4;
+    if(gt>150&&colorsN<5)colorsN=5;
+    if(gt>220&&colorsN<6)colorsN=6;
+    // demande : les bâtiments réclament des trajets (pins)
+    dests.forEach(function(d){
+      d._t=(d._t||Math.random()*3)+dt;
+      var interval=Math.max(2.2, 5.5-gt*0.01);
+      if(d._t>=interval){d._t=0; if(d.pins+(d.reserved||0)<PIN_CAP+2) d.pins++;}
+    });
+    // dispatch régulier
+    dispatchT-=dt;
+    if(dispatchT<=0){dispatch();dispatchT=0.4;}
+    // semaine
+    if(gt>=week*24){startWeek();return;}
+
+    // déplacement des voitures
+    for(var i=cars.length-1;i>=0;i--){
+      var ca=cars[i];
+      if(ca.recheck){ // le réseau a changé : recalcule le chemin vers la cible courante
+        ca.recheck=false;
+        var np=findPath(ca.house,ca.dest);
+        if(np){ca.path=ca.phase==='toDest'?np:np.slice().reverse();ca.seg=Math.min(ca.seg,Math.max(0,ca.path.length-2));}
+      }
+      var pts=pathPoints(ca.path);
+      if(ca.seg>=pts.length-1){arriveCar(ca,i);continue;}
+      var A=pts[ca.seg],B=pts[ca.seg+1];
+      var seg=Math.hypot(B.x-A.x,B.y-A.y)||1;
+      ca.t += (carSpeed*CELL*dt)/seg;
+      while(ca.t>=1 && ca.seg<pts.length-1){ca.t-=1;ca.seg++;}
+      if(ca.seg>=pts.length-1){arriveCar(ca,i);continue;}
+    }
+
+    // saturation des bâtiments
+    for(var k=0;k<dests.length;k++){
+      var d=dests[k];
+      if(d.pins>=PIN_CAP){d.over+=dt;if(d.over>=OVER_LIMIT){gameOver();return;}}
+      else d.over=Math.max(0,d.over-dt*1.5);
+    }
+    updateHud();
+  }
+
+  function arriveCar(ca,i){
+    if(ca.phase==='toDest'){
+      if(ca.dest.pins>0){ca.dest.pins--;score++;}
+      ca.dest.reserved=Math.max(0,(ca.dest.reserved||0)-1);
+      // retour maison
+      ca.phase='toHome';ca.path=ca.path.slice().reverse();ca.seg=0;ca.t=0;
+      vibrate(4);
+    } else {
+      ca.house.active=Math.max(0,(ca.house.active||0)-1);
+      cars.splice(i,1);
+    }
+  }
+
+  // ── Rendu ────────────────────────────────────────────────────────────────────
+  function dark(){return document.body.classList.contains('dark');}
+  function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    var roadCol=dark()?'#3a4048':'#c7cdc2';
+    // grille discrète
+    ctx.strokeStyle=dark()?'rgba(255,255,255,.03)':'rgba(0,0,0,.04)';ctx.lineWidth=1;
+    for(var c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(OX+c*CELL,OY);ctx.lineTo(OX+c*CELL,OY+ROWS*CELL);ctx.stroke();}
+    for(var r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(OX,OY+r*CELL);ctx.lineTo(OX+COLS*CELL,OY+r*CELL);ctx.stroke();}
+    // routes : liens entre cases route adjacentes + stubs vers bâtiments
+    var th=CELL*0.5;
+    ctx.fillStyle=roadCol;
+    for(var kk in grid){var g=grid[kk];if(g.t!=='road')continue;
+      var x=cx(g.c),y=cy(g.r);
+      rr(x-th/2,y-th/2,th,th,6);ctx.fill();
+      [[0,1],[1,0]].forEach(function(d){var n=grid[key(g.r+d[0],g.c+d[1])];
+        if(n&&n.t==='road'){var x2=cx(n.c),y2=cy(n.r);
+          if(d[1])rr(x,y-th/2,x2-x,th,4);else rr(x-th/2,y,th,y2-y,4);ctx.fill();}});
+    }
+    // stubs bâtiment→route
+    [houses,dests].forEach(function(list){list.forEach(function(b){
+      roadNeighborsOf(b).forEach(function(n){var x=cx(b.c),y=cy(b.r),x2=cx(n.c),y2=cy(n.r);
+        ctx.fillStyle=roadCol;
+        if(y===y2)rr(Math.min(x,x2),y-th/2,Math.abs(x2-x),th,4);else rr(x-th/2,Math.min(y,y2),th,Math.abs(y2-y),4);ctx.fill();});
+    });});
+    // voitures
+    cars.forEach(function(ca){
+      var pts=pathPoints(ca.path);if(ca.seg>=pts.length-1)return;
+      var A=pts[ca.seg],B=pts[ca.seg+1];
+      var x=A.x+(B.x-A.x)*ca.t,y=A.y+(B.y-A.y)*ca.t,ang=Math.atan2(B.y-A.y,B.x-A.x);
+      ctx.save();ctx.translate(x,y);ctx.rotate(ang);
+      ctx.fillStyle=ca.color;rr(-CELL*0.2,-CELL*0.13,CELL*0.4,CELL*0.26,3);ctx.fill();
+      ctx.restore();
+    });
+    // maisons (carré) & bâtiments (rond + pins)
+    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.5;
+      ctx.fillStyle=h.color;rr(x-s/2,y-s/2,s,s,4);ctx.fill();
+      // petit toit
+      ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.moveTo(x-s/2,y-s/2);ctx.lineTo(x,y-s*0.85);ctx.lineTo(x+s/2,y-s/2);ctx.closePath();ctx.fill();
+    });
+    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.34;
+      // jauge de saturation
+      if(d.over>0){var f=Math.min(1,d.over/OVER_LIMIT);ctx.strokeStyle='#e8582c';ctx.lineWidth=3;
+        ctx.beginPath();ctx.arc(x,y,s+7,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
+      ctx.fillStyle=d.color;ctx.beginPath();ctx.arc(x,y,s,0,7);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.9)';ctx.beginPath();ctx.arc(x,y,s*0.4,0,7);ctx.fill();
+      // pins d'attente au-dessus
+      for(var p=0;p<Math.min(d.pins,PIN_CAP);p++){
+        var px=x-CELL*0.3+ (p%5)*(CELL*0.15), py=y-s-8-((p/5)|0)*7;
+        ctx.fillStyle=d.pins>=PIN_CAP?'#e8582c':d.color;
+        ctx.beginPath();ctx.arc(px,py,2.6,0,7);ctx.fill();
+      }
+    });
+  }
+
+  // ── HUD ──────────────────────────────────────────────────────────────────────
+  function updateHud(){document.getElementById('score').textContent=score;
+    document.getElementById('week').textContent='Sem. '+week;
+    document.getElementById('roads').textContent=roads;}
+
+  // ── Entrées ──────────────────────────────────────────────────────────────────
+  var painting=false;
+  function cellAt(e){var rct=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;
+    var x=t.clientX-rct.left-OX,y=t.clientY-rct.top-OY;return {r:Math.floor(y/CELL),c:Math.floor(x/CELL)};}
+  function down(e){if(state!=='play')return;painting=true;var p=cellAt(e);paintRoad(p.r,p.c);e.preventDefault();}
+  function move(e){if(!painting||state!=='play')return;var p=cellAt(e);paintRoad(p.r,p.c);e.preventDefault();}
+  function up(){painting=false;}
+  cv.addEventListener('mousedown',down);addEventListener('mousemove',move);addEventListener('mouseup',up);
+  cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',up);
+
+  document.getElementById('eraseBtn').onclick=function(){eraseMode=!eraseMode;this.classList.toggle('on',eraseMode);};
+
+  // ── Semaines ─────────────────────────────────────────────────────────────────
+  function startWeek(){
+    week++;state='week';roads+=12;updateHud();
+    var opts=[
+      {e:'🛣️',t:'+10 Routes',s:'plus de bitume',fn:function(){roads+=10;}},
+      {e:'🚙',t:'+1 Voiture',s:'par maison',fn:function(){carsPerHouse++;}},
+      {e:'⚡',t:'Vitesse +',s:'voitures plus vives',fn:function(){carSpeed+=0.7;}}
+    ];
+    document.getElementById('weekTitle').textContent='Semaine '+week+' 🎉  (+12 🛣️)';
+    document.getElementById('weekChoices').innerHTML=opts.map(function(o,i){
+      return '<button class="choice" data-i="'+i+'"><span class="ce">'+o.e+'</span><span class="ct">'+o.t+'</span><span class="cs">'+o.s+'</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#weekChoices .choice'),function(b){
+      b.onclick=function(){opts[+b.getAttribute('data-i')].fn();updateHud();hide('weekScr');state='play';};
+    });
+    show('weekScr');
+  }
+
+  // ── Écrans ──────────────────────────────────────────────────────────────────
+  function show(id){document.getElementById(id).classList.remove('hidden');}
+  function hide(id){document.getElementById(id).classList.add('hidden');}
+  function begin(){reset();hide('start');hide('over');state='play';}
+  function gameOver(){
+    state='over';document.getElementById('finalScore').textContent=score;
+    var msg='trajets réalisés';
+    if(score>best){best=score;try{localStorage.setItem(BEST,best);}catch(e){}msg='🏆 Record ! '+score+' trajets';}
+    document.getElementById('overMsg').textContent=msg;show('over');vibrate([40,60,140]);
+  }
+  document.getElementById('startBtn').onclick=begin;
+  document.getElementById('replayBtn').onclick=begin;
+  document.getElementById('pauseBtn').onclick=function(){if(state==='play'){state='pause';show('paused');}};
+  document.getElementById('resumeBtn').onclick=function(){if(state==='pause'){hide('paused');state='play';}};
+
+  var last=0;
+  function loop(ts){requestAnimationFrame(loop);var dt=Math.min(0.05,(ts-last)/1000)||0;last=ts;
+    if(state==='play')update(dt);
+    draw();
+  }
+  reset();state='start';requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -82,6 +82,8 @@ la synchro temps réel.
 | 💎 Diamants | 2–8 | ✈️ | stop-ou-encore |
 | 🎲 Perudo | 2–6 | ✈️ | dés / bluff |
 | 🚂 Aventuriers du Rail | 2–5 | ✈️ | plateau / réseau |
+| 🚇 Mini Métro | 1 | ✈️ | gestion / réseau (solo) |
+| 🚗 Mini Motorways | 1 | ✈️ | gestion / routes (solo) |
 | 🙅 No Thanks! | 2–7 | ✈️ | stop-ou-encore |
 | 🎲 Qwixx | 1–5 | ✈️ | dés / roll-and-write |
 | 🎲 Yam's | 1–6 | ✈️ | dés / combinaisons |
