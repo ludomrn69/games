@@ -70,7 +70,8 @@
     .mo-btn-row .btn-primary { width: auto; margin: 0; padding: 0.7rem 1.2rem; flex: 1 1 auto; min-width: 120px; }
 
     .mo-players { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 8px; }
-    .mo-pl { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; }
+    .mo-pl { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: transform .12s, border-color .12s; }
+    .mo-pl:hover { transform: translateY(-2px); border-color: var(--gold); }
     .mo-pl.turn { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(198,152,90,.3); }
     .mo-pl.broke { opacity: .5; filter: grayscale(1); }
     .mo-pl-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
@@ -110,6 +111,14 @@
     .mo-ov.active { display: flex; animation: fadeUp .3s ease both; }
     .mo-ov-card { background: var(--white); border-radius: 22px; padding: 30px 26px; text-align: center; max-width: 340px; width: 100%; box-shadow: var(--shadow-hover); }
     @media (min-width: 760px) { .mo-wrap{max-width:820px} .mo-board{width:min(62vw,72vh,600px)} }
+    /* Sur grand écran (PC) : deux colonnes — le plateau tient dans la hauteur de
+       l'écran (plus besoin de scroller pour le voir en entier) et le panneau
+       (joueurs, rues, journal) défile à côté. */
+    @media (min-width: 980px) {
+      .mo-wrap { flex-direction: row; align-items: flex-start; justify-content: center; max-width: 1180px; gap: 20px; }
+      .mo-board { width: min(48vw, calc(100vh - 140px), 660px); position: sticky; top: 100px; align-self: flex-start; }
+      .mo-panel { flex: 1 1 320px; max-width: 460px; }
+    }
   </style>
 </head>
 <body>
@@ -148,6 +157,7 @@
   <div class="modal" id="modal-mortg"><div class="modal-card" id="mortg-card"></div></div>
   <div class="modal" id="modal-trade"><div class="modal-card" id="trade-card"></div></div>
   <div class="modal" id="modal-tradein"><div class="modal-card" id="tradein-card"></div></div>
+  <div class="modal" id="modal-props"><div class="modal-card" id="props-card"></div></div>
 
   <div class="modal" id="modal-restart">
     <div class="modal-card" style="text-align:center">
@@ -309,7 +319,7 @@
       var a = ENG.actor(s);
       document.getElementById('mo-players').innerHTML = s.order.map(function (pid) {
         var props = 0; for (var i = 0; i < 40; i++) if (s.owners[i] === pid) props++;
-        return '<div class="mo-pl' + (pid === a ? ' turn' : '') + (s.bankrupt[pid] ? ' broke' : '') + '">' +
+        return '<div class="mo-pl' + (pid === a ? ' turn' : '') + (s.bankrupt[pid] ? ' broke' : '') + '" onclick="showPlayerProps(\'' + pid + '\')" title="Voir ses propriétés">' +
           '<span class="mo-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           '<div class="mo-pl-info"><div class="mo-pl-nm">' + escapeHtml(Room.name(pid)) + (s.jail[pid] > 0 ? ' ⛓' : '') + '</div>' +
           '<div class="mo-pl-cash">' + (s.bankrupt[pid] ? 'ruiné' : '<span id="mo-cash-' + pid + '">' + (s.cash[pid] || 0) + '</span> € · ' + props + ' 🏘') + '</div></div></div>';
@@ -390,11 +400,12 @@
           '<button class="btn-primary btn-ghost" onclick="act(\'pass\')">Passer</button></div>';
       } else if (s.phase === 'manage') {
         // Bâtir : visible s'il y a au moins une case constructible (monopole complet).
-        // Échange : seulement une fois TOUTES les rues vendues (règle voulue) ; ensuite
-        // on peut proposer n'importe quel échange (1+ propriétés ± argent, via l'UI).
+        // Échange : disponible dès qu'il reste au moins un adversaire en jeu. On peut
+        // proposer n'importe quel échange (1+ propriétés de chacun ± argent, via l'UI),
+        // y compris des propriétés qui complètent une couleur.
         var canBuild = canBuildAny(s, me);
         var partners = (s.order || []).filter(function (p) { return p !== me && !s.bankrupt[p]; });
-        var canTrade = allStreetsOwned(s) && partners.length > 0;
+        var canTrade = partners.length > 0;
         html = '<div class="hint">Gère ton tour, puis termine</div><div class="mo-btn-row">' +
           (canBuild ? '<button class="btn-primary" onclick="openBuild()">🏗 Bâtir</button>' : '') +
           '<button class="btn-primary btn-ghost" onclick="openMortg()">🏦 Hypothèques</button>' +
@@ -470,6 +481,43 @@
         '<div class="modal-sub">' + owner + '</div>' +
         '<div class="modal-btns"><button class="btn-primary" style="width:auto;padding:.5rem 1.3rem" onclick="closeModal(\'modal-deed\')">Fermer</button></div>';
       openModal('modal-deed');
+    }
+
+    /* ── Propriétés d'un joueur (clic sur sa carte, y compris la mienne) ── */
+    function showPlayerProps(pid) {
+      var s = window.room; if (!s || !s.owners) return;
+      var byKey = {}, order = [], count = 0;
+      for (var i = 0; i < 40; i++) {
+        if (s.owners[i] !== pid) continue;
+        count++;
+        var sp = B[i];
+        var k = sp.t === 'prop' ? sp.g : (sp.t === 'rail' ? '_rail' : (sp.t === 'util' ? '_util' : '_other'));
+        if (!byKey[k]) { byKey[k] = []; order.push(k); }
+        byKey[k].push(i);
+      }
+      var body;
+      if (!count) {
+        body = '<div class="modal-sub">Aucune propriété pour l\'instant.</div>';
+      } else {
+        body = '<div class="mo-rem-groups">' + order.map(function (k) {
+          var col = (k === '_rail' || k === '_util' || k === '_other') ? '#2C2520' : GC[k];
+          var full = GROUPS[k] && GROUPS[k].every(function (x) { return s.owners[x] === pid; });
+          var chips = byKey[k].map(function (i) {
+            var h = s.houses && s.houses[i] || 0;
+            var tag = h ? (h === 5 ? ' 🏨' : ' 🏠' + h) : '';
+            return '<span class="mo-rem-chip" onclick="closeModal(\'modal-props\');openDeed(' + i + ')">' +
+              abbr(B[i].n) + (s.mortg && s.mortg[i] ? ' 🏦' : '') + tag + '</span>';
+          }).join('');
+          return '<div class="mo-rem-group"><span class="mo-rem-bar" style="background:' + col + '"></span>' + chips +
+            (full ? ' <span style="font-size:.64rem;font-weight:800;color:var(--terracotta)">MONOPOLE</span>' : '') + '</div>';
+        }).join('') + '</div>';
+      }
+      document.getElementById('props-card').innerHTML =
+        '<div class="modal-title">' + Room.emoji(pid) + ' ' + escapeHtml(Room.name(pid)) + '</div>' +
+        '<div class="modal-sub">' + (s.bankrupt[pid] ? 'Ruiné · ' : '') + money(s.cash && s.cash[pid] || 0) + ' · ' + count + ' propriété' + (count > 1 ? 's' : '') + '</div>' +
+        body +
+        '<div class="modal-btns"><button class="btn-primary" style="width:auto;padding:.5rem 1.3rem" onclick="closeModal(\'modal-props\')">Fermer</button></div>';
+      openModal('modal-props');
     }
 
     /* ── Construire / vendre ── */
