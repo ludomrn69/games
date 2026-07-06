@@ -33,6 +33,12 @@
     .mo-cell .hh { position: absolute; bottom: 1px; right: 1px; font-size: 7px; }
     .mo-cell.mo-cell-me { box-shadow: inset 0 0 0 3px var(--terracotta); animation: moMePulse 1s ease-in-out infinite alternate; z-index: 2; }
     @keyframes moMePulse { from { box-shadow: inset 0 0 0 2px var(--terracotta); } to { box-shadow: inset 0 0 0 3px var(--gold); } }
+    /* Après le lancer de dés : ma case actuelle RESSORT fort (halo + premier plan +
+       petite pastille « 📍 ») pour repérer où j'ai atterri d'un coup d'œil. */
+    .mo-cell.mo-cell-here { z-index: 6; overflow: visible; box-shadow: inset 0 0 0 3px var(--terracotta), 0 0 0 3px var(--gold), 0 0 16px 5px rgba(216,74,58,.65); animation: moHere .85s ease-in-out infinite alternate; }
+    @keyframes moHere { from { box-shadow: inset 0 0 0 3px var(--terracotta), 0 0 0 2px var(--gold), 0 0 10px 3px rgba(216,74,58,.45); } to { box-shadow: inset 0 0 0 3px var(--gold), 0 0 0 4px var(--terracotta), 0 0 22px 8px rgba(216,74,58,.8); } }
+    .mo-cell.mo-cell-here .mo-here-pin { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); font-size: 13px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); animation: moPinBob .7s ease-in-out infinite alternate; pointer-events: none; z-index: 7; }
+    @keyframes moPinBob { from { transform: translateX(-50%) translateY(0); } to { transform: translateX(-50%) translateY(-3px); } }
     .mo-dice-text { font-weight: 800; font-size: 1.05rem; color: var(--ink); background: var(--cream); border-radius: 10px; padding: 4px 12px; }
     html[data-theme="dark"] .mo-dice-text { background: #2a2433; color: #e8dcc8; }
     .mo-remaining { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); }
@@ -266,8 +272,10 @@
       for (var i = 0; i < 40; i++) {
         var sp = B[i], g = gridPos(i);
         var corner = (i % 10 === 0);
-        var cls = 'mo-cell' + (corner ? ' corner' : '') + (s.mortg[i] ? ' mortg' : '') + (highlightMe && i === myPos ? ' mo-cell-me' : '');
-        var inner = '';
+        var iAmHere = highlightMe && i === myPos;
+        var afterRoll = iAmHere && s.phase !== 'roll'; // j'ai lancé → ma case ressort fort
+        var cls = 'mo-cell' + (corner ? ' corner' : '') + (s.mortg[i] ? ' mortg' : '') + (afterRoll ? ' mo-cell-here' : (iAmHere ? ' mo-cell-me' : ''));
+        var inner = afterRoll ? '<div class="mo-here-pin">📍</div>' : '';
         if (sp.t === 'prop') inner += '<div class="bar" style="background:' + GC[sp.g] + '"></div>';
         else if (sp.t === 'rail') inner += '<div class="bar" style="background:#2C2520"></div>';
         else if (sp.t === 'util') inner += '<div class="bar" style="background:#7e9bbf"></div>';

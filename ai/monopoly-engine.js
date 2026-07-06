@@ -434,20 +434,44 @@
     for (var i = 0; i < B.length; i++) { if (B[i].t === 'prop' && s.owners[i] == null) return false; }
     return true;
   }
-  // ── IA d'échange : compléter un monopole en achetant la dernière case ──────
+  // ── IA d'échange : le bot cherche à compléter un monopole ──────────────────
   // Comme pour les humains : pas d'échange tant que toutes les rues ne sont pas vendues.
-  function aiProposeTrade(s, pid) { norm(s);
-    if (!allStreetsOwned(s)) return null;
+  // Groupes où `who` est à UNE case du monopole (case manquante détenue par un autre).
+  function oneAwayGroups(s, who) {
+    var res = [];
     for (var g in GROUPS) {
       var idxs = GROUPS[g];
-      if (idxs.filter(function (i) { return s.owners[i] === pid; }).length !== idxs.length - 1) continue;
       if (groupHouses(s, g) > 0) continue;
-      var need = idxs.filter(function (i) { return s.owners[i] !== pid; })[0];
-      var o = s.owners[need]; if (o == null || s.bankrupt[o] || o === pid) continue;
-      var offer = Math.round(B[need].p * 1.3);
-      if ((s.cash[pid] || 0) < offer + 150) continue; // garder de quoi bâtir
-      var t = { from: pid, to: o, give: { props: [], cash: offer }, recv: { props: [need], cash: 0 } };
-      if (tradeValid(s, t)) return t;
+      if (idxs.filter(function (i) { return s.owners[i] === who; }).length !== idxs.length - 1) continue;
+      var need = idxs.filter(function (i) { return s.owners[i] !== who; })[0];
+      res.push({ g: g, need: need, owner: s.owners[need] });
+    }
+    return res;
+  }
+  function aiProposeTrade(s, pid) { norm(s);
+    if (!allStreetsOwned(s)) return null;
+    var mineNeeds = oneAwayGroups(s, pid).filter(function (n) { return n.owner != null && !s.bankrupt[n.owner] && n.owner !== pid; });
+    if (!mineNeeds.length) return null;
+    // 1) ÉCHANGE GAGNANT-GAGNANT : je donne à l'adversaire la case qui LUI complète une
+    //    couleur, contre celle qui me complète la mienne (+ cash d'appoint si besoin).
+    for (var a = 0; a < mineNeeds.length; a++) {
+      var mn = mineNeeds[a], o = mn.owner;
+      var theirNeeds = oneAwayGroups(s, o);
+      for (var b = 0; b < theirNeeds.length; b++) {
+        var tn = theirNeeds[b];
+        if (tn.g === mn.g || s.owners[tn.need] !== pid) continue; // c'est MOI qui détiens la case qui complète O
+        var giveCash = Math.max(0, B[mn.need].p - B[tn.need].p);  // je compense si je donne moins cher
+        if ((s.cash[pid] || 0) < giveCash + 100) continue;
+        var t = { from: pid, to: o, give: { props: [tn.need], cash: giveCash }, recv: { props: [mn.need], cash: 0 } };
+        if (tradeValid(s, t)) return t;
+      }
+    }
+    // 2) sinon, ACHAT CASH (offre généreuse) de la case qui me manque.
+    for (var c = 0; c < mineNeeds.length; c++) {
+      var m = mineNeeds[c], offer = Math.round(B[m.need].p * 1.4);
+      if ((s.cash[pid] || 0) < offer + 120) continue; // garder un coussin pour bâtir
+      var t2 = { from: pid, to: m.owner, give: { props: [], cash: offer }, recv: { props: [m.need], cash: 0 } };
+      if (tradeValid(s, t2)) return t2;
     }
     return null;
   }
