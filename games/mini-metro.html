@@ -66,6 +66,8 @@
       <h1>🚇 Mini Métro</h1>
       <p>Relie les stations par des lignes de métro. Les passagers (○ △ □…) veulent rejoindre une station de leur forme. Une station saturée trop longtemps&nbsp;= fin de partie. Tiens le plus longtemps&nbsp;!</p>
       <button class="btn" id="startBtn">Jouer</button>
+      <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#2c7be5,#37a86b);box-shadow:0 8px 24px rgba(44,123,229,.4)">🗓️ Défi du jour</button>
+      <div id="dailyInfo" style="font-size:.82rem;opacity:.72;max-width:300px"></div>
     </div>
 
     <div class="screen hidden" id="week">
@@ -107,14 +109,36 @@
   var BEST='mini_metro_best',best=+localStorage.getItem(BEST)||0;
 
   var state,stations,lines,pool,score,gt,week,nextStationT,spawnT,trainCap,shapesN;
+  var effCap,speedMul,spawnMul;            // modulés par le défi du jour
+  var DAILY=false,dayIdx=0,dayTwist=null,rnd=Math.random;
   var drag=null; // {from:station, x,y}
+
+  // Générateur pseudo-aléatoire seedé : en défi du jour, tout le monde a la MÊME carte.
+  function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;var t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+  // Défis du jour : une règle spéciale qui tourne selon la date.
+  var TWISTS=[
+    {name:'Départ minimal 🚉', desc:'une seule ligne au départ', lines:1},
+    {name:'Heure de pointe 🏃', desc:'les passagers affluent plus vite', spawnMul:0.6},
+    {name:'Trains poussifs 🐌', desc:'trains plus lents', speedMul:0.72},
+    {name:'Quais étroits 📏', desc:'stations vite saturées', cap:4},
+    {name:'Grande ville 🌆', desc:'beaucoup de formes différentes', shapes:5}
+  ];
+  function daySeed(){return (dayIdx*2654435761)>>>0 || 1;}
 
   function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
   function dist(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy);}
 
   function reset(){
     resize();
-    stations=[];lines=[];pool=3;score=0;gt=0;week=1;nextStationT=0;spawnT=3;trainCap=TRAIN_CAP0;shapesN=3;
+    var lines0=3, shapes0=3; effCap=CAP; speedMul=1; spawnMul=1;
+    if(DAILY && dayTwist){
+      if(dayTwist.lines!=null)lines0=dayTwist.lines;
+      if(dayTwist.shapes!=null)shapes0=dayTwist.shapes;
+      if(dayTwist.cap!=null)effCap=dayTwist.cap;
+      if(dayTwist.speedMul!=null)speedMul=dayTwist.speedMul;
+      if(dayTwist.spawnMul!=null)spawnMul=dayTwist.spawnMul;
+    }
+    stations=[];lines=[];pool=lines0;score=0;gt=0;week=1;nextStationT=0;spawnT=3;trainCap=TRAIN_CAP0;shapesN=shapes0;
     // 3 stations de départ, formes distinctes
     for(var i=0;i<3;i++) addStation(i);
     updateChips();updateHud();
@@ -123,12 +147,12 @@
   function freeSpot(){
     var m=70, top=70, bot=110;
     for(var tries=0;tries<200;tries++){
-      var x=m+Math.random()*(W-2*m), y=top+Math.random()*(H-top-bot);
+      var x=m+rnd()*(W-2*m), y=top+rnd()*(H-top-bot);
       var ok=true;
       for(var i=0;i<stations.length;i++) if(dist({x:x,y:y},stations[i])<78){ok=false;break;}
       if(ok) return {x:x,y:y};
     }
-    return {x:m+Math.random()*(W-2*m), y:top+Math.random()*(H-top-bot)};
+    return {x:m+rnd()*(W-2*m), y:top+rnd()*(H-top-bot)};
   }
   function addStation(forceShape){
     if(W<20) return;
@@ -137,8 +161,8 @@
     if(forceShape!=null) shape=SHAPES[forceShape%3];
     else {
       // formes courantes majoritaires, formes récentes rares (comme le vrai jeu)
-      var r=Math.random();
-      shape = r<0.62 ? SHAPES[(Math.random()*3)|0] : SHAPES[(Math.random()*shapesN)|0];
+      var r=rnd();
+      shape = r<0.62 ? SHAPES[(rnd()*3)|0] : SHAPES[(rnd()*shapesN)|0];
     }
     stations.push({x:p.x,y:p.y,shape:shape,pax:[],over:0,id:stations.length});
   }
@@ -187,9 +211,9 @@
     var shapesPresent={};stations.forEach(function(s){shapesPresent[s.shape]=1;});
     var present=Object.keys(shapesPresent);
     if(present.length<2) return;
-    var s=stations[(Math.random()*stations.length)|0];
+    var s=stations[(rnd()*stations.length)|0];
     var target;var guard=0;
-    do{ target=present[(Math.random()*present.length)|0]; guard++; }while(target===s.shape && guard<20);
+    do{ target=present[(rnd()*present.length)|0]; guard++; }while(target===s.shape && guard<20);
     if(target===s.shape) return;
     s.pax.push(target);
   }
@@ -205,7 +229,7 @@
     if(gt>160 && shapesN<6) shapesN=6;
     // apparition de passagers (cadence qui accélère)
     spawnT-=dt;
-    var rate=Math.max(0.55, 2.6 - gt*0.012);
+    var rate=Math.max(0.55, 2.6 - gt*0.012)*spawnMul;
     if(spawnT<=0){ spawnPassenger(); spawnT=rate; }
     // semaine = récompense toutes les 22 s
     if(gt >= week*22){ startWeek(); return; }
@@ -219,7 +243,7 @@
         if(tr.dwell>0){tr.dwell-=dt;continue;}
         var A=sts[tr.i],B=sts[tr.next];
         var seg=elbowLen(A,B)||1;
-        tr.t += (TRAIN_SPEED*dt)/seg;
+        tr.t += (TRAIN_SPEED*speedMul*dt)/seg;
         if(tr.t>=1){
           tr.t=0;tr.i=tr.next;
           arrive(tr,sts[tr.i]);
@@ -236,7 +260,7 @@
     // saturation des stations
     for(var i=0;i<stations.length;i++){
       var st=stations[i];
-      if(st.pax.length>CAP){ st.over+=dt; if(st.over>=OVER_LIMIT){ gameOver(); return; } }
+      if(st.pax.length>effCap){ st.over+=dt; if(st.over>=OVER_LIMIT){ gameOver(); return; } }
       else st.over=Math.max(0, st.over - dt*2);
     }
     updateHud();
@@ -345,7 +369,7 @@
       for(var p=0;p<st.pax.length;p++){
         var a=-Math.PI/2 + p*0.5, rr2=17+ (p>7?7:0);
         var px=st.x+Math.cos(a)*rr2, py=st.y+Math.sin(a)*rr2;
-        ctx.fillStyle=st.pax.length>CAP?'#e8582c':ink;
+        ctx.fillStyle=st.pax.length>effCap?'#e8582c':ink;
         shapePath(px,py,3,st.pax[p]);ctx.fill();
       }
     });
@@ -395,15 +419,38 @@
   // ── Écrans ──────────────────────────────────────────────────────────────────
   function show(id){document.getElementById(id).classList.remove('hidden');}
   function hide(id){document.getElementById(id).classList.add('hidden');}
-  function begin(){reset();hide('start');hide('over');state='play';}
+  var hintEl=document.getElementById('hint');
+  function setHint(t){if(hintEl)hintEl.textContent=t;}
+  function begin(){DAILY=false;rnd=Math.random;reset();setHint('Glisse d\'une station à une autre pour tracer une ligne');hide('start');hide('over');state='play';}
+  function dailyKey(){return 'mini_metro_daily_'+dayIdx;}
+  function startDaily(){
+    DAILY=true;dayIdx=Math.floor(Date.now()/86400000);dayTwist=TWISTS[dayIdx%TWISTS.length];
+    rnd=mulberry32(daySeed());
+    reset();setHint('🗓️ Défi du jour — '+dayTwist.name+' : '+dayTwist.desc);hide('start');hide('over');state='play';
+  }
+  function refreshDailyInfo(){
+    var el=document.getElementById('dailyInfo');if(!el)return;
+    var di=Math.floor(Date.now()/86400000), tw=TWISTS[di%TWISTS.length];
+    var db=0;try{db=+localStorage.getItem('mini_metro_daily_'+di)||0;}catch(e){}
+    el.innerHTML='Règle du jour : <b>'+tw.name+'</b> — '+tw.desc+(db?'<br>Ton record du jour : '+db+' passagers':'');
+  }
   function gameOver(){
     state='over';document.getElementById('finalScore').textContent=score;
-    var msg='passagers transportés';
-    if(score>best){best=score;try{localStorage.setItem(BEST,best);}catch(e){}msg='🏆 Record ! '+score+' passagers';}
+    var msg;
+    if(DAILY){
+      var dk=dailyKey(),db=0;try{db=+localStorage.getItem(dk)||0;}catch(e){}
+      if(score>db){db=score;try{localStorage.setItem(dk,db);}catch(e){}}
+      msg='🗓️ Défi du jour · record du jour : '+db+' passagers';refreshDailyInfo();
+    } else {
+      msg='passagers transportés';
+      if(score>best){best=score;try{localStorage.setItem(BEST,best);}catch(e){}msg='🏆 Record ! '+score+' passagers';}
+    }
     document.getElementById('overMsg').textContent=msg;show('over');vibrate([40,60,140]);
   }
   document.getElementById('startBtn').onclick=begin;
-  document.getElementById('replayBtn').onclick=begin;
+  document.getElementById('dailyBtn').onclick=startDaily;
+  document.getElementById('replayBtn').onclick=function(){DAILY?startDaily():begin();};
+  refreshDailyInfo();
   var pauseBtn=document.getElementById('pauseBtn');
   pauseBtn.onclick=function(){if(state==='play'){state='pause';show('paused');}};
   document.getElementById('resumeBtn').onclick=function(){if(state==='pause'){hide('paused');state='play';}};

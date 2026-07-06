@@ -63,6 +63,8 @@
       <h1>🚗 Mini Motorways</h1>
       <p>Trace des routes pour relier chaque maison à un bâtiment de <b>même couleur</b>. Les voitures font la navette toutes seules. Si un bâtiment attend trop longtemps (jauge pleine), c'est fini&nbsp;! Optimise ton réseau le plus longtemps possible.</p>
       <button class="btn" id="startBtn">Jouer</button>
+      <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#2c7be5,#8b5cf6);box-shadow:0 8px 24px rgba(44,123,229,.4)">🗓️ Défi du jour</button>
+      <div id="dailyInfo" style="font-size:.82rem;opacity:.72;max-width:300px"></div>
     </div>
 
     <div class="screen hidden" id="weekScr">
@@ -101,6 +103,19 @@
   var best=+localStorage.getItem(BEST)||0;
 
   var state,grid,houses,dests,cars,roads,score,gt,week,nextBuildT,dispatchT,colorsN,eraseMode,carSpeed,carsPerHouse;
+  var demandMul,buildMul;                   // modulés par le défi du jour
+  var DAILY=false,dayIdx=0,dayTwist=null,rnd=Math.random;
+
+  function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;var t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+  // Défis du jour : même carte pour tous (graine = n° du jour) + une règle qui tourne.
+  var TWISTS=[
+    {name:'Rationnement 🛣️', desc:'peu de routes au départ', roads:14},
+    {name:'Affluence 🚦', desc:'la demande grimpe plus vite', demandMul:0.68},
+    {name:'Boomtown 🏙️', desc:'les bâtiments apparaissent vite', buildMul:0.6},
+    {name:'Trafic dense 🐢', desc:'voitures plus lentes', speed:1.6},
+    {name:'Diversité 🎨', desc:'plus de couleurs, plus vite', colors:4}
+  ];
+  function daySeed(){return (dayIdx*2654435761)>>>0 || 1;}
 
   function key(r,c){return r+','+c;}
   function inb(r,c){return r>=0&&c>=0&&r<ROWS&&c<COLS;}
@@ -110,8 +125,16 @@
 
   function reset(){
     resize();
-    grid={};houses=[];dests=[];cars=[];roads=24;score=0;gt=0;week=1;
-    nextBuildT=0;dispatchT=0;colorsN=2;eraseMode=false;carSpeed=2.4;carsPerHouse=1;
+    var roads0=24, colors0=2, speed0=2.4; demandMul=1; buildMul=1;
+    if(DAILY && dayTwist){
+      if(dayTwist.roads!=null)roads0=dayTwist.roads;
+      if(dayTwist.colors!=null)colors0=dayTwist.colors;
+      if(dayTwist.speed!=null)speed0=dayTwist.speed;
+      if(dayTwist.demandMul!=null)demandMul=dayTwist.demandMul;
+      if(dayTwist.buildMul!=null)buildMul=dayTwist.buildMul;
+    }
+    grid={};houses=[];dests=[];cars=[];roads=roads0;score=0;gt=0;week=1;
+    nextBuildT=0;dispatchT=0;colorsN=colors0;eraseMode=false;carSpeed=speed0;carsPerHouse=1;
     document.getElementById('eraseBtn').classList.remove('on');
     // départ : une maison + un bâtiment de même couleur
     spawnBuilding('house',0);spawnBuilding('dest',0);
@@ -122,7 +145,7 @@
   function occupied(r,c){var g=grid[key(r,c)];return g&&(g.t==='house'||g.t==='dest');}
   function freeCell(){
     for(var tries=0;tries<300;tries++){
-      var r=1+((Math.random()*(ROWS-2))|0), c=1+((Math.random()*(COLS-2))|0);
+      var r=1+((rnd()*(ROWS-2))|0), c=1+((rnd()*(COLS-2))|0);
       if(!grid[key(r,c)]){
         // éviter d'enfermer : au moins 1 voisin libre
         var open=0;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){if(inb(r+d[0],c+d[1])&&!occupied(r+d[0],c+d[1]))open++;});
@@ -134,7 +157,7 @@
   function spawnBuilding(type,forceColor){
     if(COLS<4)return;
     var p=freeCell();if(!p)return;
-    var color = forceColor!=null?COLORS[forceColor]:COLORS[(Math.random()*colorsN)|0];
+    var color = forceColor!=null?COLORS[forceColor]:COLORS[(rnd()*colorsN)|0];
     var o={r:p.r,c:p.c,t:type,color:color};
     if(type==='dest'){o.pins=0;o.over=0;}
     grid[key(p.r,p.c)]=o;
@@ -204,15 +227,15 @@
     gt+=dt;
     // apparition de bâtiments
     nextBuildT-=dt;
-    if(nextBuildT<=0){ spawnBuilding(Math.random()<0.5?'house':'dest'); nextBuildT=Math.max(3.5, 7-gt*0.04); }
+    if(nextBuildT<=0){ spawnBuilding(rnd()<0.5?'house':'dest'); nextBuildT=Math.max(3.5, 7-gt*0.04)*buildMul; }
     if(gt>40&&colorsN<3)colorsN=3;
     if(gt>90&&colorsN<4)colorsN=4;
     if(gt>150&&colorsN<5)colorsN=5;
     if(gt>220&&colorsN<6)colorsN=6;
     // demande : les bâtiments réclament des trajets (pins)
     dests.forEach(function(d){
-      d._t=(d._t||Math.random()*3)+dt;
-      var interval=Math.max(2.2, 5.5-gt*0.01);
+      d._t=(d._t||rnd()*3)+dt;
+      var interval=Math.max(2.2, 5.5-gt*0.01)*demandMul;
       if(d._t>=interval){d._t=0; if(d.pins+(d.reserved||0)<PIN_CAP+2) d.pins++;}
     });
     // dispatch régulier
@@ -372,15 +395,38 @@
   // ── Écrans ──────────────────────────────────────────────────────────────────
   function show(id){document.getElementById(id).classList.remove('hidden');}
   function hide(id){document.getElementById(id).classList.add('hidden');}
-  function begin(){reset();hide('start');hide('over');state='play';}
+  var hintEl=document.getElementById('hint');
+  function setHint(t){if(hintEl)hintEl.textContent=t;}
+  function begin(){DAILY=false;rnd=Math.random;reset();setHint('Trace des routes en glissant pour relier maisons et bâtiments de même couleur');hide('start');hide('over');state='play';}
+  function dailyKey(){return 'mini_motorways_daily_'+dayIdx;}
+  function startDaily(){
+    DAILY=true;dayIdx=Math.floor(Date.now()/86400000);dayTwist=TWISTS[dayIdx%TWISTS.length];
+    rnd=mulberry32(daySeed());
+    reset();setHint('🗓️ Défi du jour — '+dayTwist.name+' : '+dayTwist.desc);hide('start');hide('over');state='play';
+  }
+  function refreshDailyInfo(){
+    var el=document.getElementById('dailyInfo');if(!el)return;
+    var di=Math.floor(Date.now()/86400000), tw=TWISTS[di%TWISTS.length];
+    var db=0;try{db=+localStorage.getItem('mini_motorways_daily_'+di)||0;}catch(e){}
+    el.innerHTML='Règle du jour : <b>'+tw.name+'</b> — '+tw.desc+(db?'<br>Ton record du jour : '+db+' trajets':'');
+  }
   function gameOver(){
     state='over';document.getElementById('finalScore').textContent=score;
-    var msg='trajets réalisés';
-    if(score>best){best=score;try{localStorage.setItem(BEST,best);}catch(e){}msg='🏆 Record ! '+score+' trajets';}
+    var msg;
+    if(DAILY){
+      var dk=dailyKey(),db=0;try{db=+localStorage.getItem(dk)||0;}catch(e){}
+      if(score>db){db=score;try{localStorage.setItem(dk,db);}catch(e){}}
+      msg='🗓️ Défi du jour · record du jour : '+db+' trajets';refreshDailyInfo();
+    } else {
+      msg='trajets réalisés';
+      if(score>best){best=score;try{localStorage.setItem(BEST,best);}catch(e){}msg='🏆 Record ! '+score+' trajets';}
+    }
     document.getElementById('overMsg').textContent=msg;show('over');vibrate([40,60,140]);
   }
   document.getElementById('startBtn').onclick=begin;
-  document.getElementById('replayBtn').onclick=begin;
+  document.getElementById('dailyBtn').onclick=startDaily;
+  document.getElementById('replayBtn').onclick=function(){DAILY?startDaily():begin();};
+  refreshDailyInfo();
   document.getElementById('pauseBtn').onclick=function(){if(state==='play'){state='pause';show('paused');}};
   document.getElementById('resumeBtn').onclick=function(){if(state==='pause'){hide('paused');state='play';}};
 
