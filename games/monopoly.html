@@ -400,12 +400,12 @@
           '<button class="btn-primary btn-ghost" onclick="act(\'pass\')">Passer</button></div>';
       } else if (s.phase === 'manage') {
         // Bâtir : visible s'il y a au moins une case constructible (monopole complet).
-        // Échange : disponible dès qu'il reste au moins un adversaire en jeu. On peut
-        // proposer n'importe quel échange (1+ propriétés de chacun ± argent, via l'UI),
-        // y compris des propriétés qui complètent une couleur.
+        // Échange : seulement une fois TOUTES les rues vendues (règle voulue) ; ensuite
+        // on peut proposer n'importe quel échange (1+ propriétés de chacun ± argent),
+        // y compris des couleurs complètes (les maisons sont revendues à la banque).
         var canBuild = canBuildAny(s, me);
         var partners = (s.order || []).filter(function (p) { return p !== me && !s.bankrupt[p]; });
-        var canTrade = partners.length > 0;
+        var canTrade = allStreetsOwned(s) && partners.length > 0;
         html = '<div class="hint">Gère ton tour, puis termine</div><div class="mo-btn-row">' +
           (canBuild ? '<button class="btn-primary" onclick="openBuild()">🏗 Bâtir</button>' : '') +
           '<button class="btn-primary btn-ghost" onclick="openMortg()">🏦 Hypothèques</button>' +
@@ -578,14 +578,23 @@
         '<div class="mo-seg" id="trade-seg">' + seg + '</div><div id="trade-body"></div>';
       openModal('modal-trade');
     }
-    function tradableProps(s, pid) { var a = []; for (var i = 0; i < 40; i++) { if (s.owners[i] !== pid || s.houses[i] > 0) continue; var g = B[i].g; if (g && GROUPS[g].some(function (k) { return s.houses[k] > 0; })) continue; a.push(i); } return a; }
+    // Toutes les propriétés du joueur sont proposables à l'échange, Y COMPRIS les
+    // couleurs complètes (avec maisons) : les maisons sont revendues à la banque au
+    // moment où l'échange est appliqué (cf. moteur applyTrade). On les montre donc
+    // toutes, avec un repère 🏠/🏦 pour l'état.
+    function tradableProps(s, pid) { var a = []; for (var i = 0; i < 40; i++) { if (s.owners[i] === pid) a.push(i); } return a; }
     function setTradeTarget(p) {
       tradeTarget = p;
       document.querySelectorAll('#trade-seg button').forEach(function (b) { b.classList.remove('active'); });
       var el = document.getElementById('tt-' + p); if (el) el.classList.add('active');
       var s = window.room, me = window.myPid;
       var mine = tradableProps(s, me), theirs = tradableProps(s, p);
-      function row(i, side) { var g = B[i].g; return '<label class="mo-chk"><input type="checkbox" data-side="' + side + '" value="' + i + '"><span class="bar2" style="width:5px;height:18px;border-radius:3px;background:' + (g ? GC[g] : '#2C2520') + '"></span>' + escapeHtml(B[i].n) + '</label>'; }
+      function row(i, side) {
+        var g = B[i].g, h = s.houses && s.houses[i] || 0;
+        var tag = (s.mortg && s.mortg[i] ? ' 🏦' : '') + (h ? (h === 5 ? ' 🏨' : ' 🏠' + h) : '');
+        var mono = g && GROUPS[g] && GROUPS[g].every(function (k) { return s.owners[k] === s.owners[i]; }) ? ' <b style="color:var(--terracotta);font-size:.7rem">MONOPOLE</b>' : '';
+        return '<label class="mo-chk"><input type="checkbox" data-side="' + side + '" value="' + i + '"><span class="bar2" style="width:5px;height:18px;border-radius:3px;background:' + (g ? GC[g] : '#2C2520') + '"></span>' + escapeHtml(B[i].n) + tag + mono + '</label>';
+      }
       document.getElementById('trade-body').innerHTML =
         '<div style="font-weight:700;margin:6px 0 4px">Tu donnes :</div><div class="mo-list">' + (mine.map(function (i) { return row(i, 'give'); }).join('') || '<span class="modal-sub">—</span>') + '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">+ cash <input class="mo-cash-in" id="trade-give-cash" type="number" min="0" value="0"></div>' +
@@ -602,7 +611,7 @@
       var rc = Math.max(0, parseInt((document.getElementById('trade-recv-cash') || {}).value, 10) || 0);
       var t = { from: me, to: tradeTarget, give: { props: give, cash: gc }, recv: { props: recv, cash: rc } };
       if (!give.length && !recv.length && !gc && !rc) { lbToast('Propose quelque chose'); return; }
-      if (!ENG.tradeValid(window.room, t)) { lbToast('Échange invalide (maisons ? cash ?)'); return; }
+      if (!ENG.tradeValid(window.room, t)) { lbToast('Échange invalide (pas assez de cash ?)'); return; }
       closeModal('modal-trade');
       if (isBotPid(window.room, tradeTarget)) {
         if (ENG.aiAcceptTrade(window.room, t)) {
@@ -611,7 +620,7 @@
         } else {
           var counter = ENG.aiCounterTrade(window.room, t);
           if (counter) { tx(function (cur) { cur.trade = counter; }); lbToast('🔄 ' + Room.name(tradeTarget) + ' fait une contre-offre'); }
-          else { tx(function (cur) { cur.trade = null; }); lbToast('❌ ' + Room.name(tradeTarget) + ' refuse (il ne lâche pas un monopole)'); }
+          else { tx(function (cur) { cur.trade = null; }); lbToast('❌ ' + Room.name(tradeTarget) + ' refuse l\'échange'); }
         }
       } else {
         tx(function (cur) { cur.trade = t; });
