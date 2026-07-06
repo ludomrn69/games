@@ -464,10 +464,24 @@
     (recv.props || []).forEach(function (i) { if (hasMonopoly(s, B[i].g, s.owners[i])) mono = true; });
     return mono ? (1.8 * bare + 0.5 * houseInv) : ((bare + houseInv) * 1.15);
   }
+  // Valeur, pour `pid`, de ce qu'il REÇOIT dans un échange (cash + rues) :
+  //  • prix nu de la rue en temps normal ;
+  //  • MOITIÉ prix si la rue est hypothéquée (elle ne rapporte rien et coûte à lever) ;
+  //  • BONUS (≈ ×2) si la rue lui COMPLÈTE une couleur — un monopole vaut bien plus que
+  //    la rue seule, donc le bot accepte plus volontiers une rue vraiment utile pour lui.
+  function tradeRecvValue(s, give, pid) {
+    var v = (give.cash || 0);
+    (give.props || []).forEach(function (i) {
+      var base = s.mortg[i] ? Math.floor(B[i].p / 2) : B[i].p;
+      var g = B[i].g;
+      if (g && GROUPS[g].every(function (k) { return k === i || s.owners[k] === pid; })) base += B[i].p;
+      v += base;
+    });
+    return v;
+  }
   // Le destinataire `t.to` évalue : accepte si la valeur reçue dépasse son prix demandé.
   function aiAcceptTrade(s, t) { norm(s);
-    var recvV = (t.give.cash || 0); (t.give.props || []).forEach(function (i) { recvV += B[i].p; });
-    return recvV >= tradeAsk(s, t.recv);
+    return tradeRecvValue(s, t.give, t.to) >= tradeAsk(s, t.recv);
   }
   // Si le bot (t.to) refuse, il peut faire une CONTRE-OFFRE : mêmes propriétés mais
   // il réclame le cash qui atteindrait son prix demandé (prime renforcée pour un
@@ -475,7 +489,7 @@
   function aiCounterTrade(s, t) { norm(s);
     if (!t || s.bankrupt[t.from] || s.bankrupt[t.to]) return null;
     var bot = t.to;
-    var recvV = (t.give.cash || 0); (t.give.props || []).forEach(function (i) { recvV += B[i].p; }); // ce que le bot reçoit
+    var recvV = tradeRecvValue(s, t.give, bot);             // ce que le bot reçoit (rues utiles valorisées)
     var target = Math.ceil(tradeAsk(s, t.recv));            // prix demandé par le bot pour ce qu'il cède
     if (recvV >= target) return null;                       // il accepterait déjà
     var extra = target - recvV;                             // cash en plus demandé à l'humain
@@ -570,6 +584,7 @@
     buildHouse: buildHouse, sellHouse: sellHouse, mortgage: mortgage, unmortgage: unmortgage,
     canBuildOn: canBuildOn, canSellOn: canSellOn, endTurn: endTurn,
     tradeValid: tradeValid, applyTrade: applyTrade, aiProposeTrade: aiProposeTrade, aiAcceptTrade: aiAcceptTrade, aiCounterTrade: aiCounterTrade,
+    tradeAsk: tradeAsk, tradeRecvValue: tradeRecvValue,
     useGetout: useGetout, payJail: payJail,
     actor: actor, alive: alive, rentOf: rentOf, netWorth: netWorth, hasMonopoly: hasMonopoly,
     ownedInGroup: ownedInGroup, countRails: countRails, countUtils: countUtils,

@@ -595,12 +595,56 @@
         var mono = g && GROUPS[g] && GROUPS[g].every(function (k) { return s.owners[k] === s.owners[i]; }) ? ' <b style="color:var(--terracotta);font-size:.7rem">MONOPOLE</b>' : '';
         return '<label class="mo-chk"><input type="checkbox" data-side="' + side + '" value="' + i + '"><span class="bar2" style="width:5px;height:18px;border-radius:3px;background:' + (g ? GC[g] : '#2C2520') + '"></span>' + escapeHtml(B[i].n) + tag + mono + '</label>';
       }
-      document.getElementById('trade-body').innerHTML =
+      var tb = document.getElementById('trade-body');
+      tb.innerHTML =
         '<div style="font-weight:700;margin:6px 0 4px">Tu donnes :</div><div class="mo-list">' + (mine.map(function (i) { return row(i, 'give'); }).join('') || '<span class="modal-sub">—</span>') + '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">+ cash <input class="mo-cash-in" id="trade-give-cash" type="number" min="0" value="0"></div>' +
         '<div style="font-weight:700;margin:6px 0 4px">Tu reçois :</div><div class="mo-list">' + (theirs.map(function (i) { return row(i, 'recv'); }).join('') || '<span class="modal-sub">—</span>') + '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">+ cash <input class="mo-cash-in" id="trade-recv-cash" type="number" min="0" value="0"></div>' +
+        '<div id="trade-verdict" style="margin:8px 0"></div>' +
         '<div class="modal-btns"><button class="btn-link" onclick="closeModal(\'modal-trade\')">Annuler</button><button class="btn-primary" style="width:auto;padding:.6rem 1.3rem" onclick="sendTrade()">Proposer</button></div>';
+      tb.addEventListener('input', updateTradeVerdict);
+      tb.addEventListener('change', updateTradeVerdict);
+      updateTradeVerdict();
+    }
+    // Ce que reflète l'échange en cours (cases cochées + montants saisis).
+    function currentTrade() {
+      var me = window.myPid, give = [], recv = [];
+      document.querySelectorAll('#trade-body input[type=checkbox]').forEach(function (c) { if (c.checked) { (c.dataset.side === 'give' ? give : recv).push(+c.value); } });
+      var gc = Math.max(0, parseInt((document.getElementById('trade-give-cash') || {}).value, 10) || 0);
+      var rc = Math.max(0, parseInt((document.getElementById('trade-recv-cash') || {}).value, 10) || 0);
+      return { from: me, to: tradeTarget, give: { props: give, cash: gc }, recv: { props: recv, cash: rc } };
+    }
+    // Indicateur en direct face à un BOT : combien il réclame pour ce que tu prends,
+    // combien vaut ton offre à ses yeux, et s'il accepterait en l'état.
+    function updateTradeVerdict() {
+      var el = document.getElementById('trade-verdict'); if (!el) return;
+      var s = window.room, t = currentTrade();
+      var empty = !t.give.props.length && !t.recv.props.length && !t.give.cash && !t.recv.cash;
+      if (!tradeTarget || empty) { el.innerHTML = ''; return; }
+      if (!isBotPid(s, tradeTarget)) { el.innerHTML = '<div class="modal-sub" style="text-align:left">👤 C\'est ' + escapeHtml(Room.name(tradeTarget)) + ' qui décidera d\'accepter ou non.</div>'; return; }
+      var ask = Math.ceil(ENG.tradeAsk(s, t.recv));
+      var offer = Math.round(ENG.tradeRecvValue(s, t.give, tradeTarget));
+      var ok = ENG.tradeValid(s, t) && ENG.aiAcceptTrade(s, t);
+      var takes = t.recv.props.length || t.recv.cash;
+      el.innerHTML = '<div style="border:1.5px solid ' + (ok ? 'var(--sage)' : 'var(--terracotta)') + ';border-radius:12px;padding:8px 10px;font-size:.82rem;line-height:1.5">' +
+        '🤖 <b>' + escapeHtml(Room.name(tradeTarget)) + '</b> réclame ≈ <b>' + money(ask) + '</b> pour ce que tu prends.<br>' +
+        'Ton offre vaut <b>' + money(offer) + '</b> à ses yeux.<br>' +
+        (ok ? '🟢 Il accepterait sans doute.' : '🔴 Insuffisant — ajoute du cash ou une rue utile pour lui.') +
+        (!ok && takes ? '<br><button class="mo-mini" style="margin-top:6px" onclick="fillFairCash()">💡 Ajuster mon cash au juste prix</button>' : '') +
+        '</div>';
+    }
+    // Complète le cash donné pour atteindre pile le prix demandé par le bot (si abordable).
+    function fillFairCash() {
+      var s = window.room, t = currentTrade();
+      if (!isBotPid(s, tradeTarget)) return;
+      var ask = Math.ceil(ENG.tradeAsk(s, t.recv));
+      var propsVal = ENG.tradeRecvValue(s, { props: t.give.props, cash: 0 }, tradeTarget);
+      var need = Math.max(0, ask - propsVal), myCash = s.cash[window.myPid] || 0;
+      var gcEl = document.getElementById('trade-give-cash');
+      if (need > myCash) { lbToast('Il faudrait ' + money(need) + ' — tu n\'as que ' + money(myCash)); if (gcEl) gcEl.value = myCash; }
+      else if (gcEl) gcEl.value = need;
+      updateTradeVerdict();
     }
     function sendTrade() {
       if (!tradeTarget) { lbToast('Choisis un joueur'); return; }
@@ -656,6 +700,7 @@
       var gcEl = document.getElementById('trade-give-cash'); if (gcEl) gcEl.value = (t.recv && t.recv.cash) || 0;
       var rcEl = document.getElementById('trade-recv-cash'); if (rcEl) rcEl.value = (t.give && t.give.cash) || 0;
       var titleEl = document.querySelector('#trade-card .modal-title'); if (titleEl) titleEl.textContent = '🔄 Contre-offre à ' + Room.name(t.from);
+      updateTradeVerdict();
     }
 
     /* ━━━━━━━━━━ Fin de partie ━━━━━━━━━━ */
