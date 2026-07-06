@@ -263,29 +263,35 @@
   // ── Rendu ────────────────────────────────────────────────────────────────────
   function dark(){return document.body.classList.contains('dark');}
   function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
-  function draw(){
-    ctx.clearRect(0,0,W,H);
-    var roadCol=dark()?'#3a4048':'#c7cdc2';
-    // grille discrète
-    ctx.strokeStyle=dark()?'rgba(255,255,255,.03)':'rgba(0,0,0,.04)';ctx.lineWidth=1;
-    for(var c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(OX+c*CELL,OY);ctx.lineTo(OX+c*CELL,OY+ROWS*CELL);ctx.stroke();}
-    for(var r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(OX,OY+r*CELL);ctx.lineTo(OX+COLS*CELL,OY+r*CELL);ctx.stroke();}
-    // routes : liens entre cases route adjacentes + stubs vers bâtiments
-    var th=CELL*0.5;
-    ctx.fillStyle=roadCol;
+  // Dessine tout le réseau routier à une largeur donnée (utilisé 2×: contour + ruban).
+  function paintRoadLayer(w){
+    var r=w/2, rad=Math.min(7,w*0.42);
     for(var kk in grid){var g=grid[kk];if(g.t!=='road')continue;
       var x=cx(g.c),y=cy(g.r);
-      rr(x-th/2,y-th/2,th,th,6);ctx.fill();
+      rr(x-r,y-r,w,w,rad);ctx.fill();
       [[0,1],[1,0]].forEach(function(d){var n=grid[key(g.r+d[0],g.c+d[1])];
         if(n&&n.t==='road'){var x2=cx(n.c),y2=cy(n.r);
-          if(d[1])rr(x,y-th/2,x2-x,th,4);else rr(x-th/2,y,th,y2-y,4);ctx.fill();}});
+          if(d[1])rr(x,y-r,x2-x,w,4);else rr(x-r,y,w,y2-y,4);ctx.fill();}});
     }
-    // stubs bâtiment→route
     [houses,dests].forEach(function(list){list.forEach(function(b){
       roadNeighborsOf(b).forEach(function(n){var x=cx(b.c),y=cy(b.r),x2=cx(n.c),y2=cy(n.r);
-        ctx.fillStyle=roadCol;
-        if(y===y2)rr(Math.min(x,x2),y-th/2,Math.abs(x2-x),th,4);else rr(x-th/2,Math.min(y,y2),th,Math.abs(y2-y),4);ctx.fill();});
+        if(y===y2)rr(Math.min(x,x2),y-r,Math.abs(x2-x),w,4);else rr(x-r,Math.min(y,y2),w,Math.abs(y2-y),4);ctx.fill();});
     });});
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // taches organiques douces (relief léger, façon terrain de Mini Motorways)
+    var blobs=[[0.18,0.24,1.0,0],[0.78,0.4,1.2,1],[0.5,0.82,1.1,0],[0.88,0.14,0.7,1],[0.12,0.7,0.85,1]];
+    blobs.forEach(function(b){ctx.fillStyle=b[3]?(dark()?'rgba(255,255,255,.03)':'rgba(255,255,255,.18)'):(dark()?'rgba(0,0,0,.10)':'rgba(110,140,100,.08)');
+      ctx.beginPath();ctx.ellipse(W*b[0],H*b[1],CELL*3.2*b[2],CELL*2.4*b[2],0.6,0,7);ctx.fill();});
+    // grille très discrète
+    ctx.strokeStyle=dark()?'rgba(255,255,255,.025)':'rgba(0,0,0,.03)';ctx.lineWidth=1;
+    for(var c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(OX+c*CELL,OY);ctx.lineTo(OX+c*CELL,OY+ROWS*CELL);ctx.stroke();}
+    for(var r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(OX,OY+r*CELL);ctx.lineTo(OX+COLS*CELL,OY+r*CELL);ctx.stroke();}
+    // routes : contour gris PUIS ruban blanc par-dessus (façon Mini Motorways)
+    var th=CELL*0.42;
+    ctx.fillStyle=dark()?'#12151a':'#b3b9ac';paintRoadLayer(th+5);
+    ctx.fillStyle=dark()?'#39404a':'#f8f5ec';paintRoadLayer(th);
     // voitures (petite auto arrondie avec ombre douce)
     cars.forEach(function(ca){
       var pts=pathPoints(ca.path);if(ca.seg>=pts.length-1)return;
