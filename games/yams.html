@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Yam's 🎲" data-emoji="🎲"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    /*
+      YAM'S — 5 dés, 3 lancers, 13 catégories. Le tapis vert accueille les dés
+      (pipdie de game.css) qu'on BLOQUE d'un tap entre deux lancers.
+    */
+    #s-playing { min-height: calc(100vh - 52px); }
+    .ya-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .ya-head { background: rgba(20,16,28,0.97); }
+    .ya-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
+    .ya-head-actions { display: flex; gap: 6px; }
+
+    .ya-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 10px 12px 2px; }
+    .ya-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 700; border: 2px solid transparent; }
+    .ya-opp.turn { border-color: var(--terracotta); }
+    .ya-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+    .ya-opp .tot { color: var(--terracotta); font-variant-numeric: tabular-nums; }
+
+    /* Bandeau de tour : gras et lisible, pulse quand c'est à toi. */
+    .ya-banner { display: flex; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: 92vw;
+      margin: 6px auto 4px; padding: 6px 18px; border-radius: 30px; font-weight: 800; font-size: 0.92rem;
+      background: var(--white); color: var(--ink-light); box-shadow: var(--shadow); transition: background .25s, color .25s; }
+    .ya-banner.me { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; animation: turnPulse 1.6s ease-out infinite; }
+
+    /* Tapis à dés */
+    .ya-table { margin: 6px auto 8px; width: min(94vw, 420px); padding: 16px 12px 14px; text-align: center; }
+    .ya-dice { display: flex; gap: 10px; justify-content: center; margin-bottom: 6px; }
+    .ya-die { position: relative; cursor: default; border-radius: 24%; transition: transform .15s; }
+    .ya-die.canhold { cursor: pointer; }
+    .ya-die.canhold:hover { transform: translateY(-3px); }
+    .ya-die.held { transform: translateY(6px); }
+    .ya-die.held::after { content: '📌'; position: absolute; top: -12px; right: -7px; font-size: 0.85rem; }
+    .ya-die.held .pipdie { box-shadow: 0 0 0 3px var(--gold), inset 0 -2px 3px rgba(0,0,0,0.18), 0 2px 5px rgba(0,0,0,0.28); }
+    .ya-hint { font-size: 0.76rem; color: rgba(255,255,255,0.75); min-height: 18px; }
+    .ya-roll { margin-top: 8px; border: none; border-radius: 40px; padding: 0.75rem 1.9rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1rem; cursor: pointer;
+      background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; box-shadow: 0 5px 18px rgba(196,116,90,0.4); }
+    .ya-roll:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Feuille de score */
+    .ya-sheet { max-width: 420px; margin: 0 auto; padding: 0 12px 40px; }
+    .ya-sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .ya-cat { display: flex; align-items: center; justify-content: space-between; gap: 6px; background: var(--white); border: 1.5px solid var(--gold-light);
+      border-radius: 12px; padding: 7px 11px; font-size: 0.84rem; font-weight: 700; box-shadow: var(--shadow); }
+    .ya-cat .pts { font-variant-numeric: tabular-nums; font-weight: 800; }
+    .ya-cat.filled { opacity: 0.72; background: var(--cream); }
+    .ya-cat.filled .pts { color: var(--sage); }
+    .ya-cat.zeroed .pts { color: #c0392b; }
+    .ya-cat.pickable { cursor: pointer; border-color: var(--gold); }
+    .ya-cat.pickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+    .ya-cat.pickable .pts { color: var(--terracotta); }
+    .ya-cat.pickable.zero .pts { color: var(--ink-light); }
+    .ya-tots { display: flex; justify-content: space-between; gap: 6px; margin: 8px 0 0; font-size: 0.84rem; font-weight: 800; color: var(--ink); }
+    .ya-tots span b { color: var(--terracotta); font-variant-numeric: tabular-nums; }
+    .ya-sec { grid-column: 1 / -1; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin: 6px 2px 0; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 400px; width: 100%; max-height: 84vh; overflow: auto; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
+    .modal-body b { color: var(--ink); }
+    @media (min-width: 760px) { .ya-sheet, .ya-table { max-width: 520px; } }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <!-- ══ PLAYING ══ -->
+    <div id="s-playing" class="screen">
+      <div class="ya-head">
+        <span class="ya-title-mini">Yam's</span>
+        <div class="ya-head-actions">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="ya-opps" id="ya-opps"></div>
+      <div class="ya-banner" id="ya-banner"></div>
+      <div class="ya-table felt felt-green">
+        <div class="ya-dice" id="ya-dice"></div>
+        <div class="ya-hint" id="ya-hint"></div>
+        <button class="ya-roll" id="ya-roll" onclick="rollDice()">🎲 Lancer</button>
+      </div>
+      <div class="ya-sheet">
+        <div class="ya-sheet-grid" id="ya-sheet"></div>
+        <div class="ya-tots" id="ya-tots"></div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ══ -->
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🎲</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir la feuille</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">🎲 Yam's</div>
+      <div class="modal-body">
+        <p>À ton tour : jusqu'à <b>3 lancers</b>. Entre deux lancers, <b>tape un dé pour le bloquer</b> 📌 (re-tape pour le libérer).</p>
+        <p style="margin-top:6px">Puis <b>choisis une case</b> de ta feuille : elle est remplie avec les dés actuels — une case ne se remplit qu'<b>une fois</b> (quitte à y mettre 0).</p>
+        <p style="margin-top:6px">• <b>Section haute</b> (1 → 6) : somme des dés de cette valeur. <b>+35 de bonus</b> si le total atteint 63.</p>
+        <p style="margin-top:6px">• <b>Brelan / Carré</b> : somme des 5 dés si 3 / 4 identiques · <b>Full</b> 25 · <b>Petite suite</b> (4 qui se suivent) 30 · <b>Grande suite</b> (5) 40 · <b>Yam's</b> (5 identiques) 50 · <b>Chance</b> : somme libre.</p>
+        <p style="margin-top:6px">Feuille pleine chez tout le monde → le plus gros total gagne.</p>
+      </div>
+      <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
+    </div>
+  </div>
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+
+    /* ━━ Catégories ━━ */
+    function counts(dice) { var c = [0, 0, 0, 0, 0, 0, 0]; (dice || []).forEach(function (v) { c[v]++; }); return c; }
+    function sum(dice) { return (dice || []).reduce(function (a, b) { return a + b; }, 0); }
+    function hasStraight(dice, len) {
+      var c = counts(dice), run = 0;
+      for (var v = 1; v <= 6; v++) { run = c[v] ? run + 1 : 0; if (run >= len) return true; }
+      return false;
+    }
+    var CATS = [
+      { k: 'u1', n: '⚀ Les 1', up: 1 }, { k: 'u2', n: '⚁ Les 2', up: 2 },
+      { k: 'u3', n: '⚂ Les 3', up: 3 }, { k: 'u4', n: '⚃ Les 4', up: 4 },
+      { k: 'u5', n: '⚄ Les 5', up: 5 }, { k: 'u6', n: '⚅ Les 6', up: 6 },
+      { k: 'brelan', n: 'Brelan', calc: function (d) { return counts(d).some(function (x) { return x >= 3; }) ? sum(d) : 0; } },
+      { k: 'carre', n: 'Carré', calc: function (d) { return counts(d).some(function (x) { return x >= 4; }) ? sum(d) : 0; } },
+      { k: 'full', n: 'Full (25)', calc: function (d) { var c = counts(d).filter(Boolean).sort(); return (c.length === 2 && c[0] === 2) || c[0] === 5 ? 25 : 0; } },
+      { k: 'ps', n: 'Petite suite (30)', calc: function (d) { return hasStraight(d, 4) ? 30 : 0; } },
+      { k: 'gs', n: 'Grande suite (40)', calc: function (d) { return hasStraight(d, 5) ? 40 : 0; } },
+      { k: 'yams', n: "Yam's (50)", calc: function (d) { return counts(d).some(function (x) { return x >= 5; }) ? 50 : 0; } },
+      { k: 'chance', n: 'Chance', calc: function (d) { return sum(d); } }
+    ];
+    CATS.forEach(function (c) { if (c.up) c.calc = function (d) { return counts(d)[c.up] * c.up; }; });
+    var CAT_BY_K = {}; CATS.forEach(function (c) { CAT_BY_K[c.k] = c; });
+    function upperSum(sheet) { var s = 0; [1, 2, 3, 4, 5, 6].forEach(function (v) { s += sheet['u' + v] || 0; }); return s; }
+    function totalOf(sheet) {
+      sheet = sheet || {};
+      var up = upperSum(sheet), t = 0;
+      CATS.forEach(function (c) { t += sheet[c.k] || 0; });
+      return t + (up >= 63 ? 35 : 0);
+    }
+    function sheetFull(sheet) { sheet = sheet || {}; return CATS.every(function (c) { return sheet[c.k] != null; }); }
+
+    /* ━━ Salon ━━ */
+    var prevStatus = null;
+    GameRoom({
+      gameKey: 'yams',
+      name: "Yam's",
+      emoji: '🎲',
+      tagline: '5 dés, 3 lancers, 13 cases',
+      minPlayers: 1,
+      maxPlayers: 6,
+      rules: [
+        '3 lancers par tour · bloque les dés que tu gardes 📌',
+        'Remplis UNE case de ta feuille à chaque tour (0 accepté)',
+        'Bonus +35 si la section haute (1→6) atteint 63',
+        'Feuille pleine partout → le plus gros total gagne'
+      ],
+      offline: { solo: true, local: true, soloMinBots: 0 },
+      bot: yamsBot,
+      onState: onState,
+      onStart: onStart,
+      turnSeconds: 60
+    });
+
+    function onStart(players) {
+      var order = players.map(function (p) { return p.pid; });
+      // `phase` reflète le n° de lancer : le pilote d'ordis (lobby.js) s'en sert
+      // pour détecter qu'il s'est passé quelque chose entre deux pas de bot.
+      return { turn: order[0], dice: null, rolls: 0, phase: 'r0', held: [false, false, false, false, false, false] };
+    }
+
+    // Remplit la case `k` pour `pid` puis fait avancer le tour (ou termine).
+    function applyChoose(cur, pid, k) {
+      var P = cur.players[pid];
+      P.sheet = P.sheet || {};
+      if (P.sheet[k] != null) return;
+      P.sheet[k] = CAT_BY_K[k].calc(cur.dice || []);
+      var order = cur.order || [], i0 = order.indexOf(pid), nxt = null;
+      for (var s = 1; s <= order.length; s++) {
+        var c2 = order[(i0 + s) % order.length];
+        if (!sheetFull(cur.players[c2] && cur.players[c2].sheet)) { nxt = c2; break; }
+      }
+      cur.dice = null; cur.rolls = 0; cur.phase = 'r0'; cur.held = [false, false, false, false, false, false];
+      if (nxt === null) {
+        var best = null, bs = -1;
+        order.forEach(function (p) { var t = totalOf(cur.players[p].sheet); cur.players[p].total = t; if (t > bs) { bs = t; best = p; } });
+        cur.winner = best; cur.status = 'ended'; cur.turn = null;
+      } else {
+        cur.turn = nxt;
+      }
+    }
+
+    /* ━━ Actions ━━ */
+    function d6() { return 1 + Math.floor(Math.random() * 6); }
+    function rollDice() {
+      var st = window.room || {};
+      if (st.status !== 'playing' || st.turn !== window.myPid || (st.rolls || 0) >= 3) return;
+      if (window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || (cur.rolls || 0) >= 3) return cur;
+        var held = cur.held || [], dice = (cur.dice || []).slice();
+        if (!cur.rolls || !dice.length) { dice = [d6(), d6(), d6(), d6(), d6()]; }
+        else { for (var i = 0; i < 5; i++) if (!held[i]) dice[i] = d6(); }
+        cur.dice = dice; cur.rolls = (cur.rolls || 0) + 1; cur.phase = 'r' + cur.rolls;
+        return cur;
+      });
+    }
+    function toggleHold(i) {
+      var st = window.room || {};
+      if (st.status !== 'playing' || st.turn !== window.myPid || !(st.rolls > 0) || st.rolls >= 3) return;
+      if (window.Fx) { Fx.sfx('click'); Fx.vib(6); }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || !(cur.rolls > 0)) return cur;
+        var held = (cur.held || [false, false, false, false, false]).slice();
+        held[i] = !held[i];
+        cur.held = held;
+        return cur;
+      });
+    }
+    function chooseCat(k) {
+      var st = window.room || {};
+      if (st.status !== 'playing' || st.turn !== window.myPid || !(st.rolls > 0)) return;
+      var cat = CAT_BY_K[k]; if (!cat) return;
+      var pts = cat.calc(st.dice || []);
+      if (window.Fx) { Fx.sfx(k === 'yams' && pts >= 50 ? 'big' : 'place'); Fx.vib(12); }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || !(cur.rolls > 0)) return cur;
+        applyChoose(cur, window.myPid, k);
+        return cur;
+      });
+    }
+
+    /* ━━ IA ━━ garde la valeur la plus prometteuse, vise les suites ouvertes,
+       choisit la case qui rapporte le plus (sacrifie intelligemment sinon). */
+    function yamsBot(state, pid) {
+      if (state.status !== 'playing' || state.turn !== pid) return;
+      // UN pas de bot = UNE transaction (lancer, relancer avec blocages, ou choisir).
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
+        var sheet = (cur.players[pid] || {}).sheet || {};
+        var dice = (cur.dice || []).slice(), rolls = cur.rolls || 0;
+        if (!rolls) {
+          cur.dice = [d6(), d6(), d6(), d6(), d6()]; cur.rolls = 1; cur.phase = 'r1';
+          return cur;
+        }
+        var pick = bestPick(dice, sheet);
+        var early = (pick.pts >= 40) || (pick.pts >= 25 && rolls >= 2);
+        if (rolls >= 3 || early) { applyChoose(cur, pid, pick.k); return cur; }
+        var want = holdsFor(dice, sheet);
+        for (var i = 0; i < 5; i++) if (!want[i]) dice[i] = d6();
+        cur.dice = dice; cur.held = want; cur.rolls = rolls + 1; cur.phase = 'r' + cur.rolls;
+        return cur;
+      });
+    }
+    function bestPick(dice, sheet) {
+      var easyMiss = window.Bots && Bots.level(window.room) === 'easy' && Math.random() < 0.4;
+      var open = CATS.filter(function (c) { return sheet[c.k] == null; });
+      if (easyMiss) { var r = open[Math.floor(Math.random() * open.length)]; return { k: r.k, pts: r.calc(dice) }; }
+      var best = null;
+      open.forEach(function (c) {
+        var pts = c.calc(dice);
+        var score = pts;
+        if (c.up) score += (pts >= c.up * 3 ? 4 : 0);            // remplir « à 3 dés » aide le bonus
+        if (pts === 0) score -= ({ yams: 9, gs: 7, ps: 5, carre: 4, full: 4 })[c.k] || (c.up ? (7 - c.up) * 0.5 : 1); // sacrifier au moins cher
+        if (!best || score > best.score) best = { k: c.k, pts: pts, score: score };
+      });
+      return best;
+    }
+    function holdsFor(dice, sheet) {
+      var c = counts(dice), hold = [false, false, false, false, false];
+      // Suites : si petite suite déjà là et grande ouverte, garder la suite.
+      if (hasStraight(dice, 4) && (sheet.gs == null || sheet.ps == null)) {
+        var kept = {}, run = [];
+        for (var v = 1; v <= 6; v++) { if (c[v]) run.push(v); else if (run.length >= 4) break; else run = []; }
+        run.forEach(function (v2) { kept[v2] = true; });
+        var used = {};
+        dice.forEach(function (v3, i) { if (kept[v3] && !used[v3]) { hold[i] = true; used[v3] = true; } });
+        return hold;
+      }
+      // Sinon : garder la valeur la plus fréquente (la plus haute en cas d'égalité).
+      var bestV = 1, bestN = 0;
+      for (var w = 1; w <= 6; w++) if (c[w] >= bestN) { bestN = c[w]; bestV = w; }
+      dice.forEach(function (v4, i2) { if (v4 === bestV) hold[i2] = true; });
+      return hold;
+    }
+
+    /* ━━ Rendu ━━ */
+    function onState(snap) {
+      var state = snap.val() || {};
+      var status = state.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') showScreen('s-playing');
+        render(state);
+      } else if (status === 'ended') { showResults(state); }
+      prevStatus = status;
+    }
+
+    function render(state) {
+      var me = window.myPid, isMyTurn = state.turn === me;
+      var dice = state.dice || [], rolls = state.rolls || 0, held = state.held || [];
+
+      // adversaires
+      document.getElementById('ya-opps').innerHTML = (state.order || []).map(function (pid) {
+        var P = state.players[pid] || {}, sh = P.sheet || {};
+        var filled = CATS.filter(function (c) { return sh[c.k] != null; }).length;
+        return '<span class="ya-opp' + (state.turn === pid ? ' turn' : '') + '">' +
+          '<span class="ya-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') +
+          ' <span class="tot">' + totalOf(sh) + '</span><span style="opacity:.55;font-weight:600">· ' + filled + '/13</span></span>';
+      }).join('');
+
+      // bandeau
+      var b = document.getElementById('ya-banner');
+      b.textContent = isMyTurn
+        ? (rolls === 0 ? 'À toi ! Lance les dés' : rolls < 3 ? 'Lancer ' + rolls + '/3 — bloque 📌 puis relance, ou choisis une case' : 'Choisis une case de ta feuille')
+        : 'Au tour de ' + Room.name(state.turn);
+      b.classList.toggle('me', isMyTurn);
+
+      // dés (fraîchement lancés → ils roulent)
+      var rollSig = rolls + '|' + dice.join(',');
+      var fresh = window._yaSig !== undefined && window._yaSig !== rollSig && dice.length;
+      window._yaSig = rollSig;
+      var dEl = document.getElementById('ya-dice');
+      if (dice.length) {
+        dEl.innerHTML = dice.map(function (v, i) {
+          var canHold = isMyTurn && rolls > 0 && rolls < 3;
+          return '<span class="ya-die' + (held[i] ? ' held' : '') + (canHold ? ' canhold' : '') + '"' +
+            (canHold ? ' onclick="toggleHold(' + i + ')"' : '') + '>' +
+            (window.Fx ? Fx.die(v, 46, fresh && !held[i] ? 'roll' : '') : v) + '</span>';
+        }).join('');
+      } else {
+        dEl.innerHTML = '<span style="color:rgba(255,255,255,0.65);font-size:0.9rem;padding:14px 0">' + (isMyTurn ? 'Lance les dés pour commencer ton tour' : 'En attente du lancer…') + '</span>';
+      }
+      setText('ya-hint', isMyTurn && rolls > 0 && rolls < 3 ? 'Tape un dé pour le bloquer 📌' : '');
+      var rollBtn = document.getElementById('ya-roll');
+      rollBtn.disabled = !(isMyTurn && rolls < 3);
+      rollBtn.textContent = '🎲 Lancer' + (isMyTurn ? ' (' + (3 - rolls) + ' restant' + (3 - rolls > 1 ? 's' : '') + ')' : '');
+
+      // feuille (la mienne)
+      var sheet = ((state.players[me] || {}).sheet) || {};
+      var canPick = isMyTurn && rolls > 0;
+      var html = '<div class="ya-sec">Section haute (bonus +35 à 63)</div>';
+      CATS.forEach(function (c, i) {
+        if (i === 6) html += '<div class="ya-sec">Combinaisons</div>';
+        var filled = sheet[c.k] != null;
+        var pot = canPick && !filled ? c.calc(dice) : null;
+        html += '<div class="ya-cat' + (filled ? ' filled' + (sheet[c.k] === 0 ? ' zeroed' : '') : '') +
+          (pot != null ? ' pickable' + (pot === 0 ? ' zero' : '') : '') + '"' +
+          (pot != null ? ' onclick="chooseCat(\'' + c.k + '\')"' : '') + '>' +
+          '<span>' + c.n + '</span><span class="pts">' + (filled ? sheet[c.k] : (pot != null ? '+' + pot : '·')) + '</span></div>';
+      });
+      document.getElementById('ya-sheet').innerHTML = html;
+      var up = upperSum(sheet);
+      document.getElementById('ya-tots').innerHTML =
+        '<span>Haut : <b>' + up + '</b>/63 ' + (up >= 63 ? '✅ +35' : '') + '</span>' +
+        '<span>Total : <b>' + totalOf(sheet) + '</b></span>';
+    }
+
+    function showResults(state) {
+      showScreen('s-results');
+      var order = (state.order || []).slice().sort(function (a, b) { return totalOf((state.players[b] || {}).sheet) - totalOf((state.players[a] || {}).sheet); });
+      var w = order[0], iWon = w === window.myPid;
+      setText('res-emoji', iWon ? '🏆' : '🎲');
+      setText('res-title', iWon ? 'Tu gagnes !' : Room.name(w) + ' gagne !');
+      document.getElementById('res-rank').innerHTML = order.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-sc">' + totalOf((state.players[pid] || {}).sheet) + '</span></div>';
+      }).join('');
+    }
+
+    function handleReplay() { Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>

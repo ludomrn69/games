@@ -211,6 +211,7 @@
       var state = window.room || {};
       if (state.status !== 'playing' || state.winner) return;
       if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner) return cur;
         if (cur.turn !== window.myPid) return cur;

@@ -241,6 +241,7 @@
     }
 
     function doPlace(i) {
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.phase !== 'placing') return cur;
         var mark = String((cur.order || []).indexOf(window.myPid));

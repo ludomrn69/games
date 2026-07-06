@@ -28,6 +28,7 @@
     .tm-pile { width: 120px; height: 150px; border-radius: 18px; background: linear-gradient(135deg, #6a4c93, #4a3270); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 3.4rem; font-family: 'Playfair Display', serif; box-shadow: 0 8px 24px rgba(74,50,112,0.4); }
     .tm-pile.empty { background: var(--white); color: var(--ink-light); font-size: 1rem; border: 2px dashed var(--gold-light); box-shadow: var(--shadow); }
     .tm-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.3rem; color: var(--terracotta); min-height: 30px; padding: 4px 12px; }
+    .tm-center.felt .tm-banner { color: #ffd98a; }
 
     .tm-hand-wrap { padding: 8px 12px calc(16px + env(safe-area-inset-bottom)); }
     .tm-hand-label { text-align: center; font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); margin-bottom: 6px; }
@@ -72,8 +73,8 @@
       </div>
       <div class="tm-status" id="tm-status"></div>
       <div class="tm-opps" id="tm-opps"></div>
-      <div class="tm-center">
-        <div class="tm-pile-label">Pile (dernière carte jouée)</div>
+      <div class="tm-center felt felt-slate" style="margin:6px auto;width:min(94vw,420px)">
+        <div class="tm-pile-label felt-label">Pile (dernière carte jouée)</div>
         <div class="tm-pile" id="tm-pile"></div>
         <div class="tm-banner" id="tm-banner"></div>
       </div>
@@ -243,6 +244,7 @@
     }
 
     function playMine() {
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(12); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing') return cur;
         var hand = handOf(cur, window.myPid); if (!hand.length) return cur;

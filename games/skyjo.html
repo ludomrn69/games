@@ -31,9 +31,10 @@
     .sk-mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
     .sk-mini-cell { width: 16px; height: 22px; border-radius: 3px; font-size: 0.6rem; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 
-    .sk-center { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 8px; }
+    /* Les piles vivent sur un TAPIS sarcelle (feutre, cf. game.css). */
+    .sk-center { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 14px 12px 16px; margin: 4px auto 6px; width: min(94vw, 380px); }
     .sk-pile-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .sk-pile-label { font-family: 'Caveat', cursive; font-size: 0.8rem; color: var(--ink-light); }
+    .sk-pile-label { font-family: 'Caveat', cursive; font-size: 0.8rem; color: rgba(255,255,255,0.78); }
     .sk-card { width: 46px; height: 64px; border-radius: 8px; font-weight: 900; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
     /* Dos de carte : motif tissé chaud (plus de fond noir) */
     .sk-card.back, .sk-cell.back {
@@ -51,7 +52,11 @@
     .v-low { background: #6ab04c; color: #fff; } .v-mid { background: #f0c419; color: #2C2520; } .v-high { background: #e05a4e; color: #fff; }
     .sk-empty { background: transparent; border: 2px dashed var(--gold-light); box-shadow: none; }
 
-    .sk-status { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 26px; padding: 0 14px; }
+    /* Consigne du tour : GRAS lisible, pulse quand c'est à toi d'agir. */
+    .sk-status { display: flex; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: 92vw;
+      margin: 4px auto; padding: 6px 18px; border-radius: 30px; font-weight: 800; font-size: 0.9rem; text-align: center;
+      background: var(--white); color: var(--ink-light); box-shadow: var(--shadow); transition: background .25s, color .25s; }
+    .sk-status.me { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; animation: turnPulse 1.6s ease-out infinite; }
     .sk-my-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 12px 12px; }
     .sk-my-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .sk-cell { width: 56px; height: 76px; border-radius: 9px; font-weight: 900; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.14); cursor: default; transition: transform .12s; }
@@ -107,10 +112,10 @@
         </div>
       </div>
       <div class="sk-opps" id="sk-opps"></div>
-      <div class="sk-center">
+      <div class="sk-center felt felt-teal">
         <div class="sk-pile-col">
           <div class="sk-pile-label">Pioche (<span id="sk-pile-count">0</span>)</div>
-          <div class="sk-card back" id="sk-draw-pile" onclick="onDrawPileTap()">🂠</div>
+          <div class="sk-card back" id="sk-draw-pile" onclick="onDrawPileTap()"></div>
         </div>
         <div class="sk-pile-col">
           <div class="sk-pile-label">Défausse</div>
@@ -318,8 +323,16 @@
       setText('sk-round', 'Manche ' + (state.round || 1) + ' · seuil ' + (state.maxScore || 100));
       document.getElementById('sk-totals').innerHTML = ord.map(function (pid) {
         var t = (state.players[pid] && state.players[pid].totalScore) || 0;
-        return '<span style="color:' + Room.color(pid) + ';font-weight:700">' + t + '</span>';
+        return '<span style="color:' + Room.color(pid) + ';font-weight:700" id="sk-tot-' + pid + '">' + t + '</span>';
       }).join(' · ');
+      // Les totaux DÉFILENT quand une manche vient d'être comptée.
+      var tPrev = window._skTot || {};
+      ord.forEach(function (pid) {
+        var t = (state.players[pid] && state.players[pid].totalScore) || 0;
+        if (window.Fx && tPrev[pid] !== undefined && tPrev[pid] !== t) Fx.count(document.getElementById('sk-tot-' + pid), tPrev[pid], t, { ms: 600 });
+        tPrev[pid] = t;
+      });
+      window._skTot = tPrev;
 
       // Adversaires
       document.getElementById('sk-opps').innerHTML = ord.filter(function (p) { return p !== window.myPid; }).map(function (pid) {
@@ -360,12 +373,16 @@
       var isMyTurn = state.turn === window.myPid;
       var drew = hasDrawn(state);
       var grid = document.getElementById('sk-my-grid'); grid.innerHTML = '';
+      // Cellules FRAÎCHEMENT révélées ou échangées → animation de retournement
+      // (on compare à l'état du rendu précédent, pas d'anim sur un simple re-rendu).
+      var prevFl = window._skPrevFl || [], prevG = window._skPrevG || [];
       for (var i = 0; i < 12; i++) {
         (function (i) {
           var cell = document.createElement('div');
           if (rm[i]) { cell.className = 'sk-cell sk-empty'; grid.appendChild(cell); return; }
           var faceUp = fl[i];
-          cell.className = 'sk-cell ' + (faceUp ? valueClass(g[i]) : 'back');
+          var fresh = faceUp && (prevFl[i] !== true || prevG[i] !== g[i]) && prevFl.length;
+          cell.className = 'sk-cell ' + (faceUp ? valueClass(g[i]) : 'back') + (fresh ? ' fx-flip' : '');
           cell.textContent = faceUp ? g[i] : '';
           // Interactivité
           var tappable = false;
@@ -378,6 +395,7 @@
           grid.appendChild(cell);
         })(i);
       }
+      window._skPrevFl = fl.slice(); window._skPrevG = g.slice();
     }
 
     function renderStatus(state) {
@@ -387,9 +405,12 @@
       var act = document.getElementById('sk-actions'); act.innerHTML = '';
       if (state.phase === 'flip2') {
         var me = state.players[window.myPid] || {};
-        st.textContent = flippedCount(me) < 2 ? 'Retourne ' + (2 - flippedCount(me)) + ' carte(s) pour commencer' : 'En attente des autres joueurs…';
+        var mustFlip = flippedCount(me) < 2;
+        st.textContent = mustFlip ? 'Retourne ' + (2 - flippedCount(me)) + ' carte(s) pour commencer' : 'En attente des autres joueurs…';
+        st.classList.toggle('me', mustFlip);
         return;
       }
+      st.classList.toggle('me', isMyTurn);
       if (!isMyTurn) { st.textContent = 'Au tour de ' + Room.name(state.turn) + '…'; return; }
       if (!drew) { st.textContent = 'Pioche une carte ou prends celle de la défausse'; return; }
       // J'ai une carte en main
@@ -405,6 +426,7 @@
 
     /* ━━ Actions ━━ */
     function initialFlip(idx) {
+      if (window.Fx) { Fx.sfx('flip'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'flip2') return cur;
         var me = window.myPid, p = cur.players[me];
@@ -425,6 +447,7 @@
     function onDrawPileTap() {
       var st = window.room || {};
       if (st.status !== 'playing' || st.phase === 'flip2' || st.turn !== window.myPid || hasDrawn(st) || localMode === 'flip') return;
+      if (window.Fx) { Fx.sfx('flip'); Fx.vib(8); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || hasDrawn(cur)) return cur;
         var pile = (cur.drawPile || []).slice();
@@ -436,6 +459,7 @@
     function takeFromDiscard() {
       var st = window.room || {};
       if (st.status !== 'playing' || st.turn !== window.myPid || hasDrawn(st)) return;
+      if (window.Fx) { Fx.sfx('flip'); Fx.vib(8); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || hasDrawn(cur)) return cur;
         var disc = (cur.discardPile || []).slice(); if (!disc.length) return cur;
@@ -451,6 +475,7 @@
       });
     }
     function replaceCell(idx) {
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(12); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || !hasDrawn(cur)) return cur;
         var me = window.myPid, p = cur.players[me];
@@ -465,6 +490,7 @@
       }, function () { localMode = 'idle'; });
     }
     function discardAndFlip(idx) {
+      if (window.Fx) { Fx.sfx('flip'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || cur.drawnFrom !== 'pile' || !hasDrawn(cur)) return cur;
         var me = window.myPid, p = cur.players[me];

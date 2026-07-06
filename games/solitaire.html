@@ -66,7 +66,7 @@
       </div>
       <div class="so-opps" id="so-opps"></div>
       <div class="so-banner" id="so-banner"></div>
-      <div class="so-board">
+      <div class="so-board felt felt-green" style="padding:12px 10px 20px;margin:6px auto;width:calc(100% - 16px)">
         <div class="so-top" id="so-top"></div>
         <div class="so-tab" id="so-tab"></div>
         <div class="so-actions"><button class="so-act" onclick="autoFound()">⬆️ Tout monter</button></div>
@@ -111,6 +111,7 @@
     var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'], SUITS = ['S', 'H', 'D', 'C'];
     var SUIT_GLYPH = { S: '♠', H: '♥', D: '♦', C: '♣' };
     function rankVal(card) { return RANKS.indexOf(card[0]) + 1; }
+    function rankLabel(card) { return card[0] === 'T' ? '10' : card[0]; }
     function suitOf(card) { return card[1]; }
     function isRed(card) { return card[1] === 'H' || card[1] === 'D'; }
 
@@ -245,6 +246,7 @@
       }
     }
     function tapCard(col, idx) {
+      if (window.Fx) Fx.sfx('click');
       var g = gOf(window.room, window.myPid); if (!g) return;
       var u = g.t[col].u; if (idx >= u.length) return;
       if (sel) { tapCol(col); return; }      // une sélection existe → cette colonne est la cible
@@ -271,7 +273,7 @@
     }
 
     /* ━━ Rendu ━━ */
-    function cardHTML(card, extra, onclick) { var cl = 'so-card ' + (isRed(card) ? 'red' : 'black') + (extra || ''); return '<div class="' + cl + '"' + (onclick ? ' onclick="' + onclick + '"' : '') + '><span class="rk">' + card[0] + '</span><span class="st">' + SUIT_GLYPH[suitOf(card)] + '</span></div>'; }
+    function cardHTML(card, extra, onclick) { var cl = 'so-card ' + (isRed(card) ? 'red' : 'black') + (extra || ''); return '<div class="' + cl + '"' + (onclick ? ' onclick="' + onclick + '"' : '') + '><span class="rk">' + rankLabel(card) + '</span><span class="st">' + SUIT_GLYPH[suitOf(card)] + '</span></div>'; }
     function render(state) {
       var me = window.myPid, order = state.order || [], g = gOf(state, me);
       setHTML('so-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
@@ -295,7 +297,7 @@
         if (!n) tab += '<div class="so-slot"></div>';
         var pos = 0;
         for (var d = 0; d < col.d.length; d++) { tab += '<div class="so-card down" style="top:' + pos + 'px"></div>'; pos += step; }
-        for (var u = 0; u < col.u.length; u++) { var selc = (sel && sel.from === c && u >= sel.idx) ? ' sel' : ''; tab += '<div class="so-card ' + (isRed(col.u[u]) ? 'red' : 'black') + selc + '" style="top:' + pos + 'px" onclick="event.stopPropagation();tapCard(' + c + ',' + u + ')"><span class="rk">' + col.u[u][0] + '</span><span class="st">' + SUIT_GLYPH[suitOf(col.u[u])] + '</span></div>'; pos += step; }
+        for (var u = 0; u < col.u.length; u++) { var selc = (sel && sel.from === c && u >= sel.idx) ? ' sel' : ''; tab += '<div class="so-card ' + (isRed(col.u[u]) ? 'red' : 'black') + selc + '" style="top:' + pos + 'px" onclick="event.stopPropagation();tapCard(' + c + ',' + u + ')"><span class="rk">' + rankLabel(col.u[u]) + '</span><span class="st">' + SUIT_GLYPH[suitOf(col.u[u])] + '</span></div>'; pos += step; }
         tab += '</div>';
       }
       setHTML('so-tab', tab);

@@ -156,7 +156,14 @@
     uno: 30, skyjo: 35, president: 35, papayoo: 40, millebornes: 40, trio: 25, blackjack: 25,
     blokus: 45, ludo: 25, monopoly: 60, cluedo: 45, 'bataille-navale': 30
   };
-  function turnSecondsFor() { var c = cfg() || {}; return c.turnSeconds || TURN_SECONDS_BY_GAME[c.gameKey] || TURN_SECONDS_DEFAULT; }
+  function turnSecondsFor() {
+    // Réglage du SALON prioritaire (choisi par l'hôte en salle d'attente) :
+    // nombre de secondes, ou 0 = chrono désactivé. Sinon défaut du jeu.
+    var r = window.room;
+    if (r && r.turnSeconds != null) return +r.turnSeconds;
+    var c = cfg() || {};
+    return c.turnSeconds || TURN_SECONDS_BY_GAME[c.gameKey] || TURN_SECONDS_DEFAULT;
+  }
   function isOfflineMode() { try { var m = new URLSearchParams(location.search).get('mode'); return m === 'solo' || m === 'local'; } catch (e) { return false; } }
   function turnClockEl() {
     var el = document.getElementById('lb-turnclock');
@@ -176,6 +183,8 @@
     if (clockSig !== _clockTurn) { _clockTurn = clockSig; _clockStart = Date.now(); _timedOutTurn = null; }
     if (_clockInt) clearInterval(_clockInt);
     var total = turnSecondsFor();
+    // Chrono désactivé par l'hôte (turnSeconds = 0) → pas de pastille, pas d'auto-jeu.
+    if (!total || total <= 0) { var e0 = document.getElementById('lb-turnclock'); if (e0) e0.style.display = 'none'; return; }
     var render = function () {
       var left = Math.max(0, total - Math.floor((Date.now() - _clockStart) / 1000));
       var el = turnClockEl(); el.style.display = 'block';
@@ -363,6 +372,18 @@
   function joinRoomByCode(code, fromUrl) {
     db().ref(ROOT + '/rooms/' + code).once('value').then(function (snap) {
       var room = snap.val();
+      // Sous-salon de SOIRÉE : l'URL porte &create=<jeu> — le premier arrivé crée
+      // le salon (transaction : un seul gagne), les autres le rejoignent normalement.
+      var wantCreate = null;
+      try { wantCreate = new URLSearchParams(location.search).get('create'); } catch (e) {}
+      if (!room && wantCreate && wantCreate === cfg().gameKey) {
+        setRoom(code);
+        window.roomRef.transaction(function (cur2) {
+          if (cur2) return; // déjà créé par un autre joueur → on abandonne, puis on rejoint
+          return { game: cfg().gameKey, status: 'waiting', host: window.myPid, createdAt: firebase.database.ServerValue.TIMESTAMP };
+        }, function () { ensureIdentityThenEnter(); });
+        return;
+      }
       if (!room) { lbToast('Salon introuvable'); if (fromUrl) window.showScreen('s-home'); return; }
       // Mauvais jeu pour cette page → on redirige vers la bonne page de jeu.
       if (room.game && room.game !== cfg().gameKey) {
@@ -375,13 +396,41 @@
       var iAmIn = !!players[window.myPid] || (room.order || []).indexOf(window.myPid) >= 0;
       var onlineCount = Object.keys(players).filter(function (k) { return players[k].online; }).length;
       var max = cfg().maxPlayers || 8;
-      if (!iAmIn && room.status !== 'waiting') { lbToast('La partie a déjà commencé'); if (fromUrl) window.showScreen('s-home'); return; }
+      // Partie déjà lancée et je n'en suis pas → on entre en SPECTATEUR (lecture
+      // seule) au lieu de refuser : on regarde, et on rejoint à la prochaine manche.
+      if (!iAmIn && room.status !== 'waiting') { startSpectate(code, fromUrl); return; }
       if (!iAmIn && onlineCount >= max) { lbToast('Salon complet'); if (fromUrl) window.showScreen('s-home'); return; }
       setRoom(code);
       if (!fromUrl) { try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {} }
       ensureIdentityThenEnter();
     }).catch(function () { lbToast('Connexion impossible'); });
   }
+
+  // ── Mode SPECTATEUR ────────────────────────────────────────────────────────
+  // On écoute le salon SANS y écrire (pas de nœud joueur, pas de présence) : le
+  // jeu se rend normalement, nos clics n'aboutissent pas (ce n'est jamais notre
+  // tour). Un bandeau l'explique ; on peut réagir avec les émojis. Dès le retour
+  // en salle d'attente, on devient un joueur normal (masterOnState).
+  function startSpectate(code, fromUrl) {
+    setRoom(code);
+    window.isSpectator = true;
+    if (!fromUrl) { try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {} }
+    showSpectatorBadge();
+    if (!window.listenersOn) { window.roomRef.on('value', masterOnState); window.listenersOn = true; }
+    armReactions();
+    lbToast('Partie en cours — tu regardes en spectateur');
+  }
+  function showSpectatorBadge() {
+    var b = document.getElementById('lb-spectator');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'lb-spectator'; b.className = 'lb-spectator';
+      b.innerHTML = '👁 <b>Spectateur</b> — tu entreras à la prochaine partie';
+      document.body.appendChild(b);
+    }
+    b.style.display = 'flex';
+  }
+  function removeSpectatorBadge() { var b = document.getElementById('lb-spectator'); if (b) b.style.display = 'none'; }
 
   // ── Identité (prénom + émoji) ──────────────────────────────────────────────
   function ensureIdentityThenEnter() {
@@ -485,6 +534,7 @@
       // sinon on laisse le jeu router vers son écran de jeu (reconnexion en cours).
       if (status === 'waiting') window.showScreen('s-lobby');
       if (!window.listenersOn) { window.roomRef.on('value', masterOnState); window.listenersOn = true; }
+      armReactions();
       if (c.afterJoin) try { c.afterJoin(); } catch (e) {}
     });
   }
@@ -494,6 +544,21 @@
     var room = snap.val() || {};
     window.room = room;
     var status = room.status || 'waiting';
+
+    // Mode SPECTATEUR : on regarde une partie en cours sans y participer. Dès
+    // que le salon repasse en attente (rejouer), on devient un vrai joueur.
+    if (window.isSpectator) {
+      if (status === 'waiting') {
+        window.isSpectator = false;
+        removeSpectatorBadge();
+        ensureIdentityThenEnter();
+        return;
+      }
+      if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
+      try { refreshReactUI(room); } catch (e) {}
+      try { updateTurnClock(room); } catch (e) {}
+      return; // ni pilotage d'ordis, ni stats, ni bip de tour
+    }
 
     maybeMigrateHost(room);
 
@@ -512,14 +577,87 @@
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
     try { refreshBotSpeedUI(); } catch (e) {}
+    try { refreshGameStatsUI(room); } catch (e) {}
+    try { refreshReactUI(room); } catch (e) {}
     try { window.Lobby.turnAlertFor(room); } catch (e) {}
+    try { playEndFx(room); } catch (e) {}
     try { recordStatsFor(room); } catch (e) {}
   }
+
+  // ── Son + vibration de FIN DE PARTIE (en ligne) ────────────────────────────
+  // Le mode hors-ligne le fait déjà (offline.js) ; ici on couvre les salons en
+  // ligne : fanfare si j'ai gagné, descente sinon — une seule fois par partie.
+  var _endFxDone = false;
+  function playEndFx(room) {
+    var ended = !!(room.winner || room.status === 'ended' || room.status === 'finished');
+    if (!ended) { _endFxDone = false; hideSoireeBack(); return; }
+    if (window._soireeCode) showSoireeBack(); // manche de Soirée finie → bouton retour
+    if (_endFxDone) return;
+    _endFxDone = true;
+    recordWinHistory(room);
+    if (!room.winner || !window.Sfx) return;
+    if (room.winner === window.myPid) {
+      Sfx.play('win');
+      if (window.Fx) Fx.vib([60, 40, 120]);
+    } else if (room.players && room.players[window.myPid]) {
+      Sfx.play('lose');
+    }
+  }
+
+  // ── Palmarès du SALON : l'hôte archive le vainqueur de chaque partie. La salle
+  // d'attente affiche alors « dernières parties » + série en cours — le sel des
+  // revanches entre copains. (Nom/émoji figés à l'écriture : robuste aux départs.)
+  function recordWinHistory(room) {
+    if (room.host !== window.myPid || isOfflineMode() || !window.roomRef) return;
+    var w = room.winner || ((room.finishOrder || [])[0]) || null;
+    if (!w || !room.players || !room.players[w]) return;
+    var entry = { p: w, n: room.players[w].name || '?', e: room.players[w].emoji || '🏆', t: Date.now() };
+    window.roomRef.child('winHistory').transaction(function (arr) {
+      arr = arr || [];
+      var last = arr[arr.length - 1];
+      if (last && last.t && Date.now() - last.t < 4000) return; // double écriture (re-render) → abandon
+      arr.push(entry);
+      return arr.slice(-10);
+    });
+  }
+  function winHistoryHTML(room) {
+    var h = room.winHistory || [];
+    if (!h.length) return '';
+    var streak = 1;
+    for (var i = h.length - 2; i >= 0 && h[i].p === h[h.length - 1].p; i--) streak++;
+    var chips = h.slice(-5).map(function (x) {
+      return '<span title="' + esc(x.n) + '" style="font-size:1.05rem">' + (x.e || '🏆') + '</span>';
+    }).join('');
+    return '<div style="margin:0 auto 14px;max-width:340px;background:var(--white);border-radius:14px;padding:8px 14px;box-shadow:var(--shadow);font-size:0.82rem;color:var(--ink-light)">' +
+      '🏆 Dernières parties : ' + chips +
+      (streak >= 2 ? '<div style="margin-top:2px;font-weight:800;color:var(--terracotta)">🔥 ' + esc(h[h.length - 1].n) + ' en a gagné ' + streak + ' d\'affilée !</div>'
+        : '<div style="margin-top:2px">dernier vainqueur : <b>' + esc(h[h.length - 1].n) + '</b></div>') +
+      '</div>';
+  }
+
+  // ── Manche de SOIRÉE (tournoi multi-jeux, voir games/soiree.html) ──────────
+  // La page de jeu est ouverte avec ?soiree=CODE : à la fin de la manche, un
+  // bouton ramène tout le monde au salon Soirée qui comptabilise les points.
+  try { window._soireeCode = new URLSearchParams(location.search).get('soiree') || null; } catch (e) { window._soireeCode = null; }
+  function showSoireeBack() {
+    var b = document.getElementById('lb-soiree-back');
+    if (!b) {
+      b = document.createElement('button');
+      b.id = 'lb-soiree-back'; b.className = 'lb-peek-btn';
+      b.style.display = 'block'; b.style.bottom = '74px';
+      b.textContent = '🎉 Retour à la Soirée — manche suivante';
+      b.onclick = function () { location.href = '/games/soiree.html?room=' + encodeURIComponent(window._soireeCode); };
+      document.body.appendChild(b);
+    }
+    b.style.display = 'block';
+  }
+  function hideSoireeBack() { var b = document.getElementById('lb-soiree-back'); if (b) b.style.display = 'none'; }
 
   // ── Stats par jeu (localStorage) : enregistrées une fois par partie terminée ──
   var _statsEndRecorded = false;
   function recordStatsFor(room) {
     if (!window.GameStats) return;
+    if (!room.players || !room.players[window.myPid]) return; // spectateur : pas de stats
     var ended = room.status === 'ended' || room.status === 'finished' || !!room.winner;
     if (!ended) { _statsEndRecorded = false; return; }
     if (_statsEndRecorded) return;
@@ -579,7 +717,7 @@
     var extra = '';
     if (c.lobbyExtraHTML) { try { extra = c.lobbyExtraHTML(room) || ''; } catch (e) {} }
     // Réglages « ordis » (ajouter des bots + difficulté), pour les jeux qui les supportent.
-    var botCtl = botControlsHTML(room);
+    var botCtl = botControlsHTML(room) + turnClockControlsHTML(room);
 
     host.innerHTML =
       '<div class="lb-wrap">' +
@@ -587,6 +725,7 @@
         '<h1 class="lb-title" style="font-size:clamp(1.6rem,6vw,2.2rem)">' + esc(c.name || 'Jeu') + '</h1>' +
         '<div class="lb-code-card"><div class="lb-code-label">Code du salon</div><div class="lb-code">' + esc(window.roomCode || '') + '</div>' +
           '<div class="lb-code-actions"><button class="lb-btn small ghost" onclick="Lobby.shareRoom()">Partager le lien</button></div></div>' +
+        winHistoryHTML(room) +
         '<div class="lb-players">' + rows + '</div>' +
         botCtl +
         extra +
@@ -652,16 +791,42 @@
     if (window.Bots.LEVELS.indexOf(level) < 0) return;
     if (window.roomRef) window.roomRef.child('difficulty').set(level);
   }
+
+  // ── Chrono de tour : réglage du SALON (hôte) ───────────────────────────────
+  // Jeux au tour par tour en ligne. « Auto » = défaut adapté au jeu (voir
+  // TURN_SECONDS_BY_GAME) ; « Off » (0) = personne n'est jamais pressé.
+  var TURN_CHOICES = [
+    { v: null, label: 'Auto' }, { v: 30, label: '30 s' }, { v: 60, label: '60 s' },
+    { v: 90, label: '90 s' }, { v: 0, label: 'Off' }
+  ];
+  function turnClockControlsHTML(room) {
+    var c = cfg();
+    if (!c.bot) return ''; // même population que le chrono lui-même
+    var isHost = room.host === window.myPid;
+    var cur = (room.turnSeconds == null) ? null : +room.turnSeconds;
+    var btns = TURN_CHOICES.map(function (ch) {
+      var active = (ch.v === null) ? cur === null : cur === ch.v;
+      return '<button type="button" class="lb-set-btn' + (active ? ' active' : '') + '"' +
+        (isHost ? ' onclick="Lobby.setTurnSeconds(' + (ch.v === null ? 'null' : ch.v) + ')"' : ' disabled') + '>' + ch.label + '</button>';
+    }).join('');
+    return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">⏱ Chrono de tour (en ligne)</div>' +
+      '<div class="lb-set-row">' + btns + '</div></div></div>';
+  }
+  function setTurnSeconds(v) {
+    if (!window.roomRef) return;
+    if (v === null || v === undefined) window.roomRef.child('turnSeconds').remove();
+    else window.roomRef.child('turnSeconds').set(Math.max(0, Math.min(300, +v || 0)));
+  }
   function setBotSpeed(sp) {
     if (window.Bots.SPEEDS.indexOf(sp) < 0) return;
     window.Bots.setSpeedPref(sp);                 // préférence appareil (repli hors-ligne)
     if (window.roomRef) window.roomRef.child('botSpeed').set(sp);
   }
 
-  // ── Contrôle de vitesse des ordis EN JEU (pastille flottante) ──────────────
-  // Visible pendant la partie dès qu'il y a des ordis : un clic fait défiler
-  // Posée → Humaine → Vive → Rapide. Fonctionne en ligne (room.botSpeed) et
-  // hors-ligne (préférence appareil + shim roomRef).
+  // ── Contrôle de vitesse des ordis EN JEU (curseur flottant) ────────────────
+  // Visible pendant la partie dès qu'il y a des ordis : un petit CURSEUR qu'on
+  // glisse (Posée → Humaine → Vive → Rapide). Fonctionne en ligne (room.botSpeed)
+  // et hors-ligne (préférence appareil + shim roomRef).
   function refreshBotSpeedUI() {
     var c = cfg(), room = window.room;
     var hasBots = !!(c.bot && room && room.players && Object.keys(room.players).some(function (k) { return room.players[k] && room.players[k].isBot; }));
@@ -669,21 +834,165 @@
     var el = document.getElementById('lb-botspeed');
     if (!hasBots || !playing || !isActive('s-playing')) { if (el) el.style.display = 'none'; return; }
     if (!el) {
-      el = document.createElement('button');
-      el.id = 'lb-botspeed'; el.className = 'lb-botspeed'; el.type = 'button';
-      el.title = 'Vitesse des ordis (clic pour changer)';
-      el.addEventListener('click', cycleBotSpeed);
+      el = document.createElement('div');
+      el.id = 'lb-botspeed'; el.className = 'lb-botspeed';
+      el.title = 'Vitesse des ordis (glisse le curseur)';
+      el.innerHTML = '<span class="lb-botspeed-ic">🤖</span>' +
+        '<input type="range" id="lb-botspeed-range" min="0" max="' + (window.Bots.SPEEDS.length - 1) + '" step="1" aria-label="Vitesse des ordis">' +
+        '<span class="lb-botspeed-lbl" id="lb-botspeed-lbl"></span>';
+      el.querySelector('#lb-botspeed-range').addEventListener('input', function () { onBotSpeedSlide(+this.value); });
       document.body.appendChild(el);
     }
     el.style.display = 'inline-flex';
-    el.textContent = '🤖 ' + window.Bots.SPEED_LABELS[window.Bots.speed(room)];
+    var rng = document.getElementById('lb-botspeed-range');
+    if (document.activeElement !== rng) rng.value = window.Bots.SPEEDS.indexOf(window.Bots.speed(room)); // pas de saut pendant le glissé
+    var lbl = document.getElementById('lb-botspeed-lbl'); if (lbl) lbl.textContent = window.Bots.SPEED_LABELS[window.Bots.speed(room)];
   }
-  function cycleBotSpeed() {
+  function onBotSpeedSlide(i) {
+    var order = window.Bots.SPEEDS, sp = order[Math.max(0, Math.min(order.length - 1, i))];
+    setBotSpeed(sp);
+    var lbl = document.getElementById('lb-botspeed-lbl'); if (lbl) lbl.textContent = window.Bots.SPEED_LABELS[sp];
+  }
+  function cycleBotSpeed() { // compat : gardé au cas où appelé ailleurs
     var order = window.Bots.SPEEDS, cur = window.Bots.speed(window.room);
-    var next = order[(order.indexOf(cur) + 1) % order.length];
-    setBotSpeed(next);
-    refreshBotSpeedUI();
-    lbToast('Vitesse des ordis : ' + window.Bots.SPEED_LABELS[next]);
+    onBotSpeedSlide((order.indexOf(cur) + 1) % order.length);
+  }
+
+  // ── Réactions emoji EN LIGNE (👏 😂 😮 …) ───────────────────────────────────
+  // Pendant une partie en ligne : un petit bouton flottant ouvre une rangée
+  // d'émojis ; toucher un émoji le fait FLOTTER sur l'écran de tous les joueurs
+  // (et des spectateurs). Éphémère : écrit sous rooms/<code>/rx, l'émetteur
+  // efface son nœud après quelques secondes — rien ne s'accumule dans la base.
+  var REACT_EMOJIS = ['👏', '😂', '😮', '😭', '🔥', '❤️'];
+  var _rxOn = false, _rxHandler = null, _rxLastSend = 0;
+  function myName() {
+    var p = window.Room && Room.me && Room.me();
+    if (p && p.name) return p.name;
+    var id = getIdentity();
+    return (id && id.name) || 'Spectateur';
+  }
+  function armReactions() {
+    if (_rxOn || !window.roomRef || isOfflineMode()) return;
+    _rxOn = true;
+    var born = Date.now();
+    _rxHandler = function (snap) {
+      var v = snap.val() || {};
+      if (!v.e || REACT_EMOJIS.indexOf(v.e) < 0) return;
+      if ((v.t || 0) < born - 15000) return; // réaction d'avant notre arrivée
+      if (window.Fx) Fx.float(v.e, { name: v.n || '' });
+      if (window.Sfx && v.n !== myName()) Sfx.play('flip');
+    };
+    try { window.roomRef.child('rx').on('child_added', _rxHandler); } catch (e) { _rxOn = false; }
+  }
+  function disarmReactions() {
+    if (!_rxOn || !window.roomRef) { _rxOn = false; return; }
+    try { window.roomRef.child('rx').off('child_added', _rxHandler); } catch (e) {}
+    _rxOn = false; _rxHandler = null;
+  }
+  function sendReaction(emoji) {
+    if (REACT_EMOJIS.indexOf(emoji) < 0 || !window.roomRef || isOfflineMode()) return;
+    var now = Date.now();
+    if (now - _rxLastSend < 700) return; // anti-rafale
+    _rxLastSend = now;
+    try {
+      var ref = window.roomRef.child('rx').push({ e: emoji, n: myName(), t: now });
+      setTimeout(function () { try { ref.remove(); } catch (e) {} }, 6000);
+    } catch (e) {}
+    var row = document.getElementById('lb-react-row');
+    if (row) row.classList.remove('open');
+  }
+  // Bouton flottant + rangée d'émojis : visibles en partie EN LIGNE dès qu'il y a
+  // au moins 2 humains dans le salon (spectateur compris — il peut réagir).
+  function refreshReactUI(room) {
+    room = room || window.room;
+    var el = document.getElementById('lb-react');
+    var playing = !!(room && room.status === 'playing');
+    var humans = 0;
+    if (room && room.players) Object.keys(room.players).forEach(function (k) { if (!room.players[k].isBot) humans++; });
+    var show = playing && !isOfflineMode() && (humans >= 2 || window.isSpectator) && isActive('s-playing');
+    if (!show) { if (el) el.style.display = 'none'; return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'lb-react'; el.className = 'lb-react';
+      var btns = REACT_EMOJIS.map(function (e2) {
+        return '<button type="button" class="lb-react-emo" onclick="Lobby.sendReaction(\'' + e2 + '\')">' + e2 + '</button>';
+      }).join('');
+      el.innerHTML = '<div class="lb-react-row" id="lb-react-row">' + btns + '</div>' +
+        '<button type="button" class="lb-react-fab" title="Réagir" onclick="document.getElementById(\'lb-react-row\').classList.toggle(\'open\')">😊</button>';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'flex';
+    armReactions();
+  }
+
+  // ── Stats de la partie EN COURS (bouton 📊 à côté de Règles/Rejouer) ────────
+  // Bouton injecté automatiquement dans l'en-tête de chaque jeu (à côté du « ? »)
+  // pendant la partie. Le contenu vient de cfg().stats(room) si le jeu en fournit,
+  // sinon d'un résumé GÉNÉRIQUE (joueurs, tour, chrono, scores détectés).
+  function refreshGameStatsUI(room) {
+    room = room || window.room;
+    var playing = !!(room && room.status === 'playing');
+    var btn = document.getElementById('game-stats-btn');
+    if (!playing || !isActive('s-playing')) { if (btn) btn.style.display = 'none'; return; }
+    if (!btn) {
+      var rulesBtn = document.querySelector('#s-playing .game-rules-btn');
+      if (!rulesBtn || !rulesBtn.parentNode) return; // jeu sans en-tête standard : on s'abstient
+      btn = document.createElement('button');
+      btn.id = 'game-stats-btn'; btn.className = 'game-rules-btn game-stats-btn';
+      btn.type = 'button'; btn.title = 'Statistiques de la partie'; btn.textContent = '📊';
+      btn.addEventListener('click', openGameStats);
+      rulesBtn.parentNode.insertBefore(btn, rulesBtn); // juste avant « ? »
+    }
+    btn.style.display = '';
+  }
+  function fmtDur(ms) {
+    if (!ms || ms < 0) return '—';
+    var s = Math.floor(ms / 1000), m = Math.floor(s / 60); s %= 60;
+    return m + ' min ' + (s < 10 ? '0' : '') + s + ' s';
+  }
+  function genericStats(room) {
+    var order = room.order || Object.keys(room.players || {});
+    var esc = window.esc || function (x) { return x; };
+    var NICE = { score: 'Score', penalty: 'Pénalité', heads: '🐮 Têtes', cash: '💰 Argent', money: '💰 Argent', points: 'Points', pts: 'Points', wins: 'Victoires', chips: '🪙 Jetons', trains: '🚃 Wagons', total: 'Total', lives: '❤️ Vies', tricks: 'Plis' };
+    var rows = order.map(function (pid) {
+      var p = (room.players && room.players[pid]) || {};
+      var nm = (window.Room && Room.name) ? Room.name(pid) : pid;
+      var em = (window.Room && Room.emoji) ? Room.emoji(pid) : '👤';
+      var stats = [];
+      Object.keys(NICE).forEach(function (k) { if (typeof p[k] === 'number') stats.push(NICE[k] + ' : <b>' + p[k] + '</b>'); });
+      if (Array.isArray(p.hand)) stats.push('Cartes en main : <b>' + p.hand.length + '</b>');
+      var meta = (p.isBot ? ' <span style="opacity:.6">(ordi)</span>' : '') + ((room.turn && room.turn === pid) ? ' <span style="color:var(--terracotta)">● à jouer</span>' : '');
+      return '<div style="display:flex;flex-direction:column;gap:2px;padding:7px 0;border-bottom:1px solid var(--gold-light)">' +
+        '<div style="font-weight:800">' + em + ' ' + esc(nm) + meta + '</div>' +
+        (stats.length ? '<div style="font-size:.82rem;color:var(--ink-light)">' + stats.join(' · ') + '</div>' : '') + '</div>';
+    }).join('');
+    var t0 = room.startedAt || room.startTime || room.createdAt || null;
+    var meta = [];
+    meta.push('Joueurs : <b>' + order.length + '</b>');
+    if (t0) meta.push('Durée : <b>' + fmtDur(Date.now() - t0) + '</b>');
+    if (room.round != null) meta.push('Manche : <b>' + room.round + '</b>');
+    if (room.difficulty) meta.push('Niveau ordis : <b>' + (window.Bots.LABELS[room.difficulty] || room.difficulty) + '</b>');
+    return '<div style="font-size:.85rem;color:var(--ink-light);margin-bottom:8px">' + meta.join(' · ') + '</div>' + rows;
+  }
+  function openGameStats() {
+    var room = window.room; if (!room) return;
+    var c = cfg(), html;
+    try { html = (typeof c.stats === 'function') ? c.stats(room) : genericStats(room); }
+    catch (e) { html = genericStats(room); }
+    var modal = document.getElementById('game-stats-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'game-stats-modal'; modal.className = 'modal';
+      modal.innerHTML = '<div class="modal-card" style="max-width:420px;width:100%;text-align:left">' +
+        '<div class="modal-title" style="text-align:center">📊 Stats de la partie</div>' +
+        '<div id="game-stats-body" style="max-height:60vh;overflow:auto"></div>' +
+        '<button class="btn-primary" style="width:auto;padding:.6rem 1.4rem;margin:14px auto 0;display:block" onclick="document.getElementById(\'game-stats-modal\').classList.remove(\'active\')">Fermer</button>' +
+        '</div>';
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.classList.remove('active'); });
+      document.body.appendChild(modal);
+    }
+    document.getElementById('game-stats-body').innerHTML = html;
+    modal.classList.add('active');
   }
   function setBotCount(n) {
     var c = cfg(), max = c.maxPlayers || 8;
@@ -877,6 +1186,7 @@
       });
     }
     if (window.listenersOn) { window.roomRef.off('value', masterOnState); window.listenersOn = false; }
+    disarmReactions();
     if (window.GamePresence) GamePresence.stop();
     if (c.onLeave) try { c.onLeave(); } catch (e) {}
     location.href = '/index.html';
@@ -921,7 +1231,10 @@
     setBotCount: setBotCount,
     setDifficulty: setDifficulty,
     setBotSpeed: setBotSpeed,
+    setTurnSeconds: setTurnSeconds,
+    sendReaction: sendReaction,
     refreshBotSpeedUI: refreshBotSpeedUI,
+    refreshGameStatsUI: refreshGameStatsUI,
     shareRoom: shareRoom,
     changeIdentity: changeIdentity,
     cancelChange: cancelChange,

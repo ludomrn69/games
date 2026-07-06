@@ -153,6 +153,23 @@
     var COLOR_HEX = { R: '#d63636', O: '#e8862e', Y: '#f1c40f', G: '#27ae60', B: '#2980b9', P: '#8e44ad', K: '#2c2520', W: '#e6e9ec', X: '#9a8c7a', L: '#7a5cc4' };
     var COLOR_NAME = { R: 'Rouge', O: 'Orange', Y: 'Jaune', G: 'Vert', B: 'Bleu', P: 'Violet', K: 'Noir', W: 'Blanc', L: 'Loco' };
     var cityById = {}; A.CITIES.forEach(function (c) { cityById[c.id] = c; });
+    // Voisins de route de chaque ville : sert à pousser l'étiquette du côté DÉGAGÉ
+    // (à l'opposé des lignes) pour éviter les chevauchements de noms sur la carte.
+    var cityNbr = {};
+    A.ROUTES.forEach(function (r) { (cityNbr[r.a] = cityNbr[r.a] || []).push(r.b); (cityNbr[r.b] = cityNbr[r.b] || []).push(r.a); });
+    function labelPos(c) {
+      var sx = 0, sy = 0, nb = cityNbr[c.id] || [];
+      nb.forEach(function (id) { var o = cityById[id]; var dx = o.x - c.x, dy = o.y - c.y, L = Math.sqrt(dx * dx + dy * dy) || 1; sx += dx / L; sy += dy / L; });
+      var L = Math.sqrt(sx * sx + sy * sy) || 1, lx = -sx / L, ly = -sy / L;
+      if (!nb.length) { lx = 0; ly = -1; }
+      var anchor;
+      // Aux bords, on force l'étiquette vers l'INTÉRIEUR pour ne pas la couper.
+      if (c.x < 13) { anchor = 'start'; lx = Math.max(0.4, lx); }
+      else if (c.x > 87) { anchor = 'end'; lx = Math.min(-0.4, lx); }
+      else anchor = lx > 0.35 ? 'start' : (lx < -0.35 ? 'end' : 'middle');
+      var off = 3.5, tx = Math.max(3, Math.min(97, c.x + lx * off)), ty = c.y + ly * off + 0.85;
+      return { x: tx, y: ty, anchor: anchor };
+    }
 
     var prevStatus = null, pickTickets = null;
 
@@ -220,11 +237,13 @@
       if (A.isClaimed(st, id)) { lbToast('Route déjà prise'); return; }
       var opts = A.paymentOptions(st, window.myPid, id);
       if (!opts.length) { lbToast('Pas assez de cartes pour cette route'); return; }
+      if (window.Fx) Fx.vib(10);
       if (opts.length === 1) { doClaim(id, opts[0]); return; }
       openPayChoice(id, opts);
     }
     function doClaim(id, payment) {
       closeModal('modal-pay');
+      if (window.Fx) { Fx.sfx('place'); Fx.vib([12, 18, 12]); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'play' || cur.turn !== window.myPid) return cur;
         if ((cur.players[window.myPid].drawn || 0) > 0) return cur;
@@ -329,12 +348,15 @@
           (claimable ? '<title>Réclamer ' + a.n + ' — ' + b.n + '</title>' : '') + '</line>';
         if (claimable) svg += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="#fff" stroke-width="0.5" stroke-dasharray="0.6 1.2" opacity="0.95" pointer-events="none"/>';
       });
-      // villes : médaillon doré
+      // villes : médaillon doré (tous les points d'abord…)
       A.CITIES.forEach(function (c) {
         svg += '<circle cx="' + c.x + '" cy="' + c.y + '" r="1.9" fill="#f3d27a" stroke="#7a5a2a" stroke-width="0.5"/>' +
           '<circle cx="' + c.x + '" cy="' + c.y + '" r="0.7" fill="#fff" opacity="0.85"/>';
-        var anchor = c.x < 15 ? 'start' : c.x > 85 ? 'end' : 'middle';
-        svg += '<text class="tr-city-label" x="' + c.x + '" y="' + (c.y - 2.6) + '" font-size="2.5" text-anchor="' + anchor + '" style="paint-order:stroke;stroke:#f6efdd;stroke-width:0.8">' + escapeHtml(c.n) + '</text>';
+      });
+      // …puis les noms PAR-DESSUS tout, poussés du côté dégagé, avec un halo net.
+      A.CITIES.forEach(function (c) {
+        var lp = labelPos(c);
+        svg += '<text class="tr-city-label" x="' + lp.x.toFixed(1) + '" y="' + lp.y.toFixed(1) + '" font-size="2.5" text-anchor="' + lp.anchor + '" style="paint-order:stroke;stroke:#f6efdd;stroke-width:1.2">' + escapeHtml(c.n) + '</text>';
       });
       svg += '</svg>';
       setHTML('tr-map-wrap', svg);

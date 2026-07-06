@@ -39,8 +39,12 @@
 
     .pd-myzone { max-width: 460px; margin: 8px auto 0; padding: 0 14px calc(18px + env(safe-area-inset-bottom)); text-align: center; }
     .pd-mylabel { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); margin-bottom: 4px; }
-    .pd-myhand { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
+    /* Mes dés reposent sur un petit TAPIS bois (le gobelet du Perudo). */
+    .pd-myhand { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; padding: 12px 14px; }
     .pd-myhand .pd-die { font-size: 2.4rem; }
+    /* Dé « touché » par l'enchère en cours : cerclé terracotta, points rouges. */
+    .pipdie.hit { box-shadow: 0 0 0 2.5px var(--terracotta), 0 2px 5px rgba(0,0,0,0.28); }
+    .pipdie.hit i.on { background: #c0392b; }
     .pd-picker { background: var(--white); border-radius: 18px; padding: 12px; box-shadow: var(--shadow); margin-bottom: 10px; }
     .pd-qty { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px; }
     .pd-qty button { width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid var(--gold-light); background: var(--cream); font-size: 1.4rem; font-weight: 800; cursor: pointer; color: var(--ink); }
@@ -140,7 +144,9 @@
     /* ━━ Constantes ━━ */
     var START_DICE = 5;
     var DIE = { 1: '⚀', 2: '⚁', 3: '⚂', 4: '⚃', 5: '⚄', 6: '⚅' };
-    function faceHTML(f) { return f === 1 ? '<span class="die">⚀</span>' : '<span class="die">' + DIE[f] + '</span>'; }
+    // Dé à POINTS (pipdie de game.css) — les glyphes ⚀⚁ rendaient petit et inégal selon l'appareil.
+    function dieHTML(f, px, extra) { return window.Fx ? Fx.die(f, px || 26, extra) : DIE[f]; }
+    function faceHTML(f) { return '<span class="die" style="vertical-align:-6px;display:inline-block">' + dieHTML(f, 26) + '</span>'; }
 
     var prevStatus = null, pick = null; // pick : enchère en cours de composition (locale)
 
@@ -246,6 +252,7 @@
       });
     }
     function callDudo() {
+      if (window.Fx) { Fx.sfx('big'); Fx.vib([25, 40, 60]); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
         if (!cur.bid) return cur;
@@ -266,6 +273,7 @@
     }
     // CALZA : parier que l'enchère est EXACTEMENT juste. Exact → +1 dé (max 5) ; sinon −1 dé.
     function callCalza() {
+      if (window.Fx) { Fx.sfx('big'); Fx.vib([25, 40, 60]); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
         if (!cur.bid || cur.bid.by === window.myPid) return cur;
@@ -335,10 +343,10 @@
     }
 
     /* ━━ Rendu ━━ */
-    function diceRow(dice, hitFace, noJoker) {
+    function diceRow(dice, hitFace, noJoker, px) {
       return (dice || []).slice().sort(function (a, b) { return a - b; }).map(function (v) {
         var hit = (v === hitFace) || (!noJoker && hitFace && hitFace !== 1 && v === 1);
-        return '<span class="pd-die' + (hit ? ' hit' : '') + '">' + DIE[v] + '</span>';
+        return dieHTML(v, px || 24, hit ? 'hit' : '');
       }).join('');
     }
     function render(state) {
@@ -392,8 +400,12 @@
       }
       // Phase enchères
       var myTurn = state.turn === me && myAlive;
+      // Mes dés viennent d'être relancés (nouvelle manche) → petit bruit de gobelet.
+      var diceSig = myDice.join(',');
+      if (window._pdDiceSig !== undefined && window._pdDiceSig !== diceSig && myDice.length && window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+      window._pdDiceSig = diceSig;
       var handHTML = myAlive
-        ? '<div class="pd-mylabel">Tes dés (cachés des autres)</div><div class="pd-myhand">' + (myDice.length ? diceRow(myDice, myTurn && pick ? pick.face : 0) : '—') + '</div>'
+        ? '<div class="pd-mylabel">Tes dés (cachés des autres)</div><div class="pd-myhand felt felt-wood">' + (myDice.length ? diceRow(myDice, myTurn && pick ? pick.face : 0, state.palifico, 38) : '—') + '</div>'
         : '<div class="pd-wait">☠️ Tu es éliminé·e — tu regardes la fin de la partie.</div>';
       if (!myTurn) {
         host.innerHTML = handHTML + (myAlive ? '<div class="pd-wait">Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>' : '');
@@ -405,7 +417,7 @@
       if (pal && state.bid) pick.face = state.bid.face;
       var faces = [1, 2, 3, 4, 5, 6].map(function (f) {
         var locked = pal && state.bid && f !== state.bid.face;
-        return '<button class="pd-face' + (pick.face === f ? ' sel' : '') + '" ' + (locked ? 'disabled style="opacity:.35"' : 'onclick="setFace(' + f + ')"') + '>' + (f === 1 ? '<span>⚀</span>' : DIE[f]) + '</button>';
+        return '<button class="pd-face' + (pick.face === f ? ' sel' : '') + '" ' + (locked ? 'disabled style="opacity:.35"' : 'onclick="setFace(' + f + ')"') + '>' + dieHTML(f, 26) + '</button>';
       }).join('');
       var canCalza = state.bid && state.bid.by !== me;
       host.innerHTML = handHTML +
@@ -418,7 +430,7 @@
         '<div class="pd-actions">' +
           '<button class="pd-act dudo" ' + (state.bid ? '' : 'disabled') + ' onclick="callDudo()">🚫 Dudo !</button>' +
           '<button class="pd-act calza" ' + (canCalza ? '' : 'disabled') + ' onclick="callCalza()" title="Parier que l\'enchère est exactement juste">🎯 Calza</button>' +
-          '<button class="pd-act bid" onclick="submitBid()">Miser ' + pick.qty + ' × ' + DIE[pick.face] + '</button>' +
+          '<button class="pd-act bid" onclick="submitBid()">Miser ' + pick.qty + ' ×&nbsp;' + dieHTML(pick.face, 19) + '</button>' +
         '</div>';
     }
     function bestFace(dice) { var t = {}; (dice || []).forEach(function (v) { if (v !== 1) t[v] = (t[v] || 0) + 1; }); var best = 2, n = -1; for (var f = 2; f <= 6; f++) if ((t[f] || 0) > n) { n = t[f] || 0; best = f; } return best; }
@@ -426,7 +438,8 @@
     function setFace(f) { if (!pick) return; pick.face = f; render(window.room); }
     function submitBid() {
       if (!pick) return;
-      if (!isHigher(pick, window.room.bid, window.room.palifico)) { lbToast('Enchère trop basse'); return; }
+      if (!isHigher(pick, window.room.bid, window.room.palifico)) { lbToast('Enchère trop basse'); if (window.Fx) Fx.sfx('error'); return; }
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(12); }
       var q = pick.qty, f = pick.face; pick = null; makeBid(q, f);
     }
 

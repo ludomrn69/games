@@ -11,6 +11,11 @@
   function applyTheme(t) {
     if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
+    // Synchronise la couleur de la barre d'adresse mobile (meta posée par head.js).
+    try {
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', t === 'dark' ? '#0e0b12' : '#FDF6EC');
+    } catch (e) {}
   }
   function currentTheme() {
     try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
@@ -87,9 +92,31 @@
   }
 
   // ── Service worker : disponibilité hors-ligne après une première visite ────
+  // + toast « nouvelle version » : quand un SW mis à jour prend la main (le site
+  // a changé depuis le chargement), on propose de recharger tout de suite.
   function registerSW() {
     if (!('serviceWorker' in navigator)) return;
-    try { navigator.serviceWorker.register('/sw.js').catch(function () {}); } catch (e) {}
+    try {
+      var hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register('/sw.js').catch(function () {});
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!hadController) { hadController = true; return; } // 1ʳᵉ installation : rien à dire
+        showUpdateToast();
+      });
+    } catch (e) {}
+  }
+  function showUpdateToast() {
+    if (document.getElementById('sw-update-toast')) return;
+    var t = document.createElement('div');
+    t.id = 'sw-update-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9500;display:flex;align-items:center;gap:10px;' +
+      'background:var(--ink);color:var(--cream);padding:10px 12px 10px 18px;border-radius:30px;font-family:"DM Sans",sans-serif;' +
+      'font-size:0.88rem;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,0.3);max-width:92vw';
+    t.innerHTML = '✨ Nouvelle version du site disponible' +
+      '<button style="border:none;border-radius:30px;padding:6px 14px;cursor:pointer;font-family:inherit;font-weight:700;font-size:0.82rem;' +
+      'background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;white-space:nowrap">↻ Recharger</button>';
+    t.querySelector('button').onclick = function () { location.reload(); };
+    document.body.appendChild(t);
   }
 
   applyTheme(currentTheme());

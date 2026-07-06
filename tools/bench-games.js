@@ -140,15 +140,16 @@ function pct(x, n) { return (100 * x / n).toFixed(0) + '%'; }
   }
   function playGame(isAI) {
     var hands = AI.deal(4), pile = null, lastPlayer = null, finish = [], passes = 0, idx = 0, guard = 0;
+    var seen = []; // cartes tombées : l'IA « difficile » les compte (comme en jeu)
     function activeCount() { var n = 0; for (var p = 0; p < 4; p++) if (hands[p].length) n++; return n; }
     while (activeCount() > 1 && guard++ < 5000) {
       var p = idx % 4;
       if (!hands[p].length) { idx++; continue; }
       if (pile && p === lastPlayer) { pile = null; passes = 0; }       // retour au meneur → relance
-      var move = isAI[p] ? AI.chooseMove(pile, hands[p], 'hard') : randomLegal(pile, hands[p]);
+      var move = isAI[p] ? AI.chooseMove(pile, hands[p], 'hard', { seen: seen }) : randomLegal(pile, hands[p]);
       if (!pile && !move) move = AI.legalPlays(null, hands[p])[0];      // interdit de passer en menant
       if (move && move.length) {
-        move.forEach(function (c) { hands[p].splice(hands[p].indexOf(c), 1); });
+        move.forEach(function (c) { hands[p].splice(hands[p].indexOf(c), 1); seen.push(c); });
         pile = { rank: AI.rankVal(move[0]), count: move.length }; lastPlayer = p; passes = 0;
         if (!hands[p].length) finish.push(p);
       } else { passes++; }

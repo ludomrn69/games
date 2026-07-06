@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Poker ♠️" data-emoji="♠️"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="/firebase-init.js"></script>
+  <style>
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: stretch; }
+    .pk-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    html[data-theme="dark"] .pk-header { background: rgba(20,16,28,0.97); }
+    .pk-phase { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; white-space: nowrap; }
+    .pk-title { justify-self: center; font-family: 'Playfair Display', serif; font-weight: 800; }
+    .pk-actions-top { display: flex; gap: 6px; align-items: center; justify-self: end; }
+
+    .pk-felt { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 14px 12px 150px; box-sizing: border-box; }
+    /* Tapis central : cartes communes + pot */
+    .pk-board { background: radial-gradient(120% 120% at 50% 0, #2f7d55, #1f5a3d); border: 3px solid #17422d; border-radius: 22px; padding: 16px 14px; box-shadow: inset 0 3px 14px rgba(0,0,0,0.35), var(--shadow); text-align: center; margin-bottom: 14px; }
+    .pk-pot { color: #ffe9a8; font-weight: 800; font-size: 0.95rem; margin-bottom: 8px; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+    .pk-community { display: flex; gap: 6px; justify-content: center; min-height: 74px; align-items: center; }
+    .pk-banner { color: #eafff1; font-family: 'Caveat', cursive; font-size: 1.15rem; margin-top: 8px; min-height: 22px; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+
+    .pk-card { width: 46px; height: 66px; border-radius: 8px; background: #fff; border: 1px solid #d8cdb8; box-shadow: 0 2px 5px rgba(0,0,0,0.25); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; color: #20232b; line-height: 1; }
+    .pk-card.red { color: #d63b3b; }
+    .pk-card .su { font-size: 1rem; }
+    .pk-card.back { background: repeating-linear-gradient(45deg, #b3543f, #b3543f 6px, #9c4634 6px, #9c4634 12px); border-color: #8a3e2d; }
+    .pk-card.sm { width: 30px; height: 43px; font-size: 0.82rem; border-radius: 6px; } .pk-card.sm .su { font-size: 0.72rem; }
+    .pk-card.win { box-shadow: 0 0 0 3px var(--gold), 0 2px 5px rgba(0,0,0,0.25); }
+
+    .pk-seats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 480px) { .pk-seats { grid-template-columns: 1fr; } }
+    .pk-seat { background: var(--white); border: 1.5px solid var(--gold-light); border-radius: 16px; padding: 10px 12px; box-shadow: var(--shadow); position: relative; }
+    .pk-seat.me { border-color: var(--terracotta); }
+    .pk-seat.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-light), var(--shadow); }
+    .pk-seat.folded { opacity: 0.5; }
+    .pk-seat.out { opacity: 0.4; filter: grayscale(0.6); }
+    .pk-seat-top { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+    .pk-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0; }
+    .pk-name { font-weight: 800; font-size: 0.9rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pk-badge { font-size: 0.62rem; font-weight: 800; padding: 1px 6px; border-radius: 20px; background: var(--cream); color: var(--ink-light); }
+    .pk-badge.btn { background: #2c2520; color: #fff; } .pk-badge.sb { background: #7aa7d8; color: #fff; } .pk-badge.bb { background: #d8905a; color: #fff; }
+    .pk-stack { font-weight: 800; color: var(--gold); font-size: 0.9rem; white-space: nowrap; }
+    .pk-seat-mid { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .pk-hole { display: flex; gap: 5px; }
+    .pk-bet { font-size: 0.78rem; font-weight: 700; color: var(--terracotta); min-height: 18px; }
+    .pk-lastact { font-size: 0.72rem; color: var(--ink-light); font-style: italic; }
+    .pk-combo { font-size: 0.72rem; color: var(--sage); font-weight: 700; margin-top: 3px; }
+
+    /* Barre d'action (fixée en bas) */
+    .pk-bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(253,246,236,0.98); backdrop-filter: blur(10px); border-top: 1px solid var(--gold-light); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); z-index: 200; }
+    html[data-theme="dark"] .pk-bar { background: rgba(20,16,28,0.98); }
+    .pk-bar-inner { max-width: 720px; margin: 0 auto; }
+    .pk-bar-info { text-align: center; font-size: 0.82rem; color: var(--ink-light); margin-bottom: 8px; min-height: 18px; }
+    .pk-btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .pk-btn { border: none; border-radius: 30px; padding: 0.7rem 1.2rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.92rem; cursor: pointer; box-shadow: var(--shadow); }
+    .pk-btn.fold { background: #e0e0e0; color: #333; } html[data-theme="dark"] .pk-btn.fold { background: #3a3342; color: #eee; }
+    .pk-btn.call { background: linear-gradient(135deg, #4a8f5c, #3a7a4c); color: #fff; }
+    .pk-btn.raise { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .pk-btn.next { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    .pk-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+    .pk-raise-row { display: flex; gap: 8px; align-items: center; justify-content: center; margin-bottom: 8px; }
+    .pk-raise-row input[type=range] { flex: 1; max-width: 260px; accent-color: var(--terracotta); }
+    .pk-raise-amt { font-weight: 800; color: var(--terracotta); min-width: 70px; text-align: center; }
+    .pk-quick { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
+    .pk-quick button { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+    .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .modal.active { display: flex; }
+    .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 400px; width: 100%; }
+    .modal-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.2rem; margin-bottom: 10px; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 18px; }
+    .modal-body { text-align: left; font-size: 0.88rem; color: var(--ink-light); line-height: 1.6; } .modal-body b { color: var(--ink); }
+    .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .res-emoji { font-size: 3rem; text-align: center; }
+    .res-title { text-align: center; font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.4rem; margin: 8px 0 16px; }
+    .res-rank-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gold-light); }
+    .res-rank-pos { font-weight: 800; width: 22px; } .res-rank-av { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .res-rank-name { flex: 1; font-weight: 700; } .res-rank-sc { font-weight: 800; color: var(--gold); }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="pk-header">
+        <span class="pk-phase" id="pk-phase"></span>
+        <span class="pk-title">♠️ Poker</span>
+        <div class="pk-actions-top">
+          <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
+          <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
+        </div>
+      </div>
+      <div class="pk-felt">
+        <div class="pk-board">
+          <div class="pk-pot" id="pk-pot"></div>
+          <div class="pk-community" id="pk-community"></div>
+          <div class="pk-banner" id="pk-banner"></div>
+        </div>
+        <div class="pk-seats" id="pk-seats"></div>
+      </div>
+      <div class="pk-bar" id="pk-bar"></div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank" style="max-width:420px;margin:0 auto"></div>
+      <button class="btn-primary" style="margin-top:16px" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modal-restart">
+    <div class="modal-card">
+      <div class="modal-title">Nouvelle partie ?</div>
+      <div class="modal-sub">La partie en cours sera perdue, retour au salon.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-restart')">Annuler</button>
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.4rem" onclick="doRestart()">Oui</button></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-rules">
+    <div class="modal-card">
+      <div class="modal-title">♠️ Texas Hold'em</div>
+      <div class="modal-body">
+        <p>Chacun reçoit <b>2 cartes fermées</b>. On dévoile 5 cartes communes au fil de 4 tours : <b>pré-flop</b>, <b>flop</b> (3), <b>turn</b> (1), <b>river</b> (1).</p>
+        <p style="margin-top:8px">À chaque tour tu peux <b>te coucher</b>, <b>suivre/checker</b>, ou <b>relancer</b>. Les mises vont au <b>pot</b>.</p>
+        <p style="margin-top:8px">Blinds obligatoires : petite (SB) et grosse (BB) tournent à chaque donne. La grosse blind fixe la mise minimale.</p>
+        <p style="margin-top:8px">À l'<b>abattage</b> (river suivie), la <b>meilleure main de 5 cartes</b> (parmi tes 2 + les 5 du tapis) l'emporte :</p>
+        <p style="margin-top:4px">Quinte flush &gt; Carré &gt; Full &gt; Couleur &gt; Suite &gt; Brelan &gt; Deux paires &gt; Paire &gt; Carte haute.</p>
+        <p style="margin-top:8px">Plus de jetons = éliminé. Le <b>dernier joueur avec des jetons</b> gagne. Va <b>tapis</b> quand tu n'as plus assez pour suivre (pots annexes gérés).</p>
+      </div>
+      <button class="btn-primary" style="width:auto;padding:0.6rem 1.4rem;margin:14px auto 0" onclick="closeModal('modal-rules')">Compris</button>
+    </div>
+  </div>
+
+  <script>
+    /* ━━━━━━━━━━━━━━━━━━━━ POKER — Texas Hold'em No-Limit ━━━━━━━━━━━━━━━━━━━━ */
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+
+    var START_STACK = 1000, SB = 10, BB = 20;
+    var RANK_LBL = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    var SUIT_GLYPH = ['♠', '♥', '♦', '♣'];
+    function cardRank(c) { return c % 13; }               // 0..12 (2..As)
+    function cardSuit(c) { return Math.floor(c / 13); }   // 0..3
+    function isRed(c) { var s = cardSuit(c); return s === 1 || s === 2; }
+    function shuffledDeck() {
+      var d = []; for (var i = 0; i < 52; i++) d.push(i);
+      for (var j = d.length - 1; j > 0; j--) { var k = Math.floor(Math.random() * (j + 1)); var t = d[j]; d[j] = d[k]; d[k] = t; }
+      return d;
+    }
+
+    /* ── Évaluation d'une main : meilleure combinaison de 5 parmi 7 ──
+       Renvoie un tableau comparable [catégorie, départage…] (plus grand = mieux).
+       Catégories : 8 quinte flush, 7 carré, 6 full, 5 couleur, 4 suite, 3 brelan,
+       2 deux paires, 1 paire, 0 carte haute. Rangs en 2..14 (As=14). */
+    function uniqDesc(arr) {
+      var seen = {}, out = [];
+      arr.slice().sort(function (a, b) { return b - a; }).forEach(function (r) { if (!seen[r]) { seen[r] = 1; out.push(r); } });
+      return out;
+    }
+    function straightTop(present) { // present : objet {rang:true}
+      var p = {}; for (var k in present) p[k] = true;
+      if (p[14]) p[1] = true; // As bas (roue A-2-3-4-5)
+      for (var hi = 14; hi >= 5; hi--) { var ok = true; for (var i = 0; i < 5; i++) { if (!p[hi - i]) { ok = false; break; } } if (ok) return hi; }
+      return 0;
+    }
+    function handRank(cards) {
+      var ranks = [], cnt = {}, bySuit = [[], [], [], []], suitCnt = [0, 0, 0, 0];
+      for (var i = 0; i < cards.length; i++) {
+        var c = cards[i], r = 2 + cardRank(c), s = cardSuit(c);
+        ranks.push(r); cnt[r] = (cnt[r] || 0) + 1; bySuit[s].push(r); suitCnt[s]++;
+      }
+      var flushSuit = -1; for (var s2 = 0; s2 < 4; s2++) if (suitCnt[s2] >= 5) flushSuit = s2;
+      if (flushSuit >= 0) {
+        var fr = {}; bySuit[flushSuit].forEach(function (r) { fr[r] = true; });
+        var sf = straightTop(fr); if (sf) return [8, sf];
+      }
+      var byCount = {}; // effectif -> [rangs]
+      Object.keys(cnt).forEach(function (rk) { var r = +rk, n = cnt[r]; (byCount[n] = byCount[n] || []).push(r); });
+      Object.keys(byCount).forEach(function (n) { byCount[n].sort(function (a, b) { return b - a; }); });
+      var quads = byCount[4] || [], trips = byCount[3] || [], pairs = byCount[2] || [];
+      var distinct = uniqDesc(ranks);
+      if (quads.length) { var q = quads[0]; return [7, q, first(distinct, [q])]; }
+      if (trips.length && (pairs.length || trips.length > 1)) { var t = trips[0]; var pp = trips.length > 1 ? trips[1] : pairs[0]; return [6, t, pp]; }
+      if (flushSuit >= 0) { var fl = bySuit[flushSuit].slice().sort(function (a, b) { return b - a; }).slice(0, 5); return [5].concat(fl); }
+      var st = straightTop(cnt); if (st) return [4, st];
+      if (trips.length) { var t2 = trips[0]; return [3, t2].concat(firstN(distinct, [t2], 2)); }
+      if (pairs.length >= 2) { var a = pairs[0], b = pairs[1]; return [2, a, b].concat(firstN(distinct, [a, b], 1)); }
+      if (pairs.length === 1) { var p1 = pairs[0]; return [1, p1].concat(firstN(distinct, [p1], 3)); }
+      return [0].concat(distinct.slice(0, 5));
+    }
+    function first(distinct, excl) { for (var i = 0; i < distinct.length; i++) if (excl.indexOf(distinct[i]) < 0) return distinct[i]; return 0; }
+    function firstN(distinct, excl, n) { var out = []; for (var i = 0; i < distinct.length && out.length < n; i++) if (excl.indexOf(distinct[i]) < 0) out.push(distinct[i]); return out; }
+    function cmpRank(a, b) { var n = Math.max(a.length, b.length); for (var i = 0; i < n; i++) { var x = a[i] || 0, y = b[i] || 0; if (x !== y) return x - y; } return 0; }
+    var COMBO_NAME = ['Carte haute', 'Paire', 'Deux paires', 'Brelan', 'Suite', 'Couleur', 'Full', 'Carré', 'Quinte flush'];
+
+    /* ── État de jeu ────────────────────────────────────────────────────── */
+    var prevStatus = null, nextHandTimer = null, raiseVal = null;
+
+    GameRoom({
+      gameKey: 'poker',
+      name: 'Poker',
+      emoji: '♠️',
+      tagline: "Texas Hold'em — le vrai",
+      minPlayers: 2,
+      maxPlayers: 6,
+      rules: [
+        "Texas Hold'em No-Limit : 2 cartes fermées + 5 communes",
+        'Tours de mise : pré-flop, flop, turn, river',
+        'Se coucher / suivre / relancer · blinds tournantes',
+        "Meilleure main de 5 cartes à l'abattage",
+        'Plus de jetons = éliminé, le dernier debout gagne'
+      ],
+      offline: { solo: true, local: true },
+      bot: pokerBot,
+      offlineTurn: function (room) { return actor(room); },
+      onState: onState,
+      onStart: onStart
+    });
+
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var stacks = {}; order.forEach(function (p) { stacks[p] = START_STACK; });
+      var base = { order: order, stacks: stacks, sb: SB, bb: BB, handNo: 0, buttonPid: order[order.length - 1] };
+      startHand(base);
+      return base;
+    }
+
+    // Joueurs encore en lice dans la PARTIE (jetons > 0 ou déjà engagés cette main)
+    function liveInGame(cur) { return (cur.order || []).filter(function (p) { return (cur.stacks[p] || 0) > 0; }); }
+    function nextLive(cur, fromPid, pool) {
+      pool = pool || cur.order;
+      var i = pool.indexOf(fromPid);
+      for (var k = 1; k <= pool.length; k++) { var p = pool[(i + k) % pool.length]; return p; }
+      return null;
+    }
+    function nextIn(cur, fromPid) { // prochain joueur ENCORE dans la main (non couché, jetons possibles)
+      var order = cur.order, i = order.indexOf(fromPid);
+      for (var k = 1; k <= order.length; k++) { var p = order[(i + k) % order.length]; if (cur.inHand[p]) return p; }
+      return null;
+    }
+
+    function startHand(cur) {
+      var live = liveInGame(cur);
+      if (live.length <= 1) { cur.winner = live[0] || null; cur.status = 'ended'; return; }
+      cur.handNo = (cur.handNo || 0) + 1;
+      // bouton : prochain joueur avec des jetons
+      cur.buttonPid = nextWithChips(cur, cur.buttonPid);
+      cur.deck = shuffledDeck(); cur.pos = 0;
+      cur.board = []; cur.hole = {}; cur.inHand = {}; cur.allIn = {};
+      cur.bet = {}; cur.committed = {}; cur.acted = {}; cur.lastAct = {};
+      cur.results = null; cur.showAll = false;
+      live.forEach(function (p) { cur.inHand[p] = true; cur.allIn[p] = false; cur.bet[p] = 0; cur.committed[p] = 0; cur.hole[p] = [cur.deck[cur.pos++], cur.deck[cur.pos++]]; });
+      // Blinds
+      var sbPid, bbPid, firstAct;
+      if (live.length === 2) { // heads-up : le bouton est SB et parle en premier au pré-flop
+        sbPid = cur.buttonPid; bbPid = nextWithChips(cur, cur.buttonPid);
+        firstAct = sbPid;
+      } else {
+        sbPid = nextWithChips(cur, cur.buttonPid); bbPid = nextWithChips(cur, sbPid);
+        firstAct = nextWithChips(cur, bbPid);
+      }
+      postBlind(cur, sbPid, cur.sb); postBlind(cur, bbPid, cur.bb);
+      cur.curBet = cur.bb; cur.minRaise = cur.bb; cur.sbPid = sbPid; cur.bbPid = bbPid;
+      cur.phase = 'preflop';
+      cur.turn = firstAct;
+      // la blind postée n'est pas une action volontaire → ces joueurs doivent encore parler
+      cur.acted[sbPid] = false; cur.acted[bbPid] = false;
+      cur.banner = 'Nouvelle donne — blinds ' + cur.sb + '/' + cur.bb;
+      // Si un blind est déjà tapis, ajuster : passer directement si personne ne peut agir
+      skipToActable(cur);
+    }
+    function nextWithChips(cur, fromPid) {
+      var order = cur.order, i = order.indexOf(fromPid);
+      for (var k = 1; k <= order.length; k++) { var p = order[(i + k) % order.length]; if ((cur.stacks[p] || 0) > 0) return p; }
+      return fromPid;
+    }
+    function postBlind(cur, pid, amt) {
+      var pay = Math.min(amt, cur.stacks[pid]);
+      cur.stacks[pid] -= pay; cur.bet[pid] = pay; cur.committed[pid] += pay;
+      if (cur.stacks[pid] === 0) cur.allIn[pid] = true;
+    }
+
+    /* ── Qui doit agir ? (null si personne : abattage / donne terminée) ── */
+    function actor(cur) {
+      if (!cur || cur.status !== 'playing' || cur.winner) return null;
+      if (cur.phase === 'showdown' || cur.phase === 'handover') return null;
+      return cur.turn || null;
+    }
+
+    function contenders(cur) { return cur.order.filter(function (p) { return cur.inHand[p]; }); }
+    function canAct(cur, p) { return cur.inHand[p] && !cur.allIn[p]; }
+
+    // La ronde de mise est-elle close ? (tous les joueurs actifs ont parlé et égalisé)
+    function roundClosed(cur) {
+      var conts = contenders(cur);
+      if (conts.length <= 1) return true;
+      for (var i = 0; i < conts.length; i++) {
+        var p = conts[i];
+        if (cur.allIn[p]) continue;
+        if (!cur.acted[p]) return false;
+        if ((cur.bet[p] || 0) !== cur.curBet) return false;
+      }
+      return true;
+    }
+
+    // Avance le tour au prochain joueur devant parler ; sinon fait progresser la donne.
+    function advance(cur) {
+      // Un seul joueur en lice → il rafle le pot immédiatement.
+      if (contenders(cur).length <= 1) { awardUncontested(cur); return; }
+      if (!roundClosed(cur)) {
+        var nx = cur.turn;
+        for (var k = 0; k < cur.order.length; k++) {
+          nx = nextIn(cur, nx);
+          if (nx && canAct(cur, nx) && !(cur.acted[nx] && (cur.bet[nx] || 0) === cur.curBet)) { cur.turn = nx; return; }
+        }
+      }
+      // ronde close → carte(s) suivante(s)
+      nextStreet(cur);
+    }
+    function skipToActable(cur) {
+      // Après les blinds : si le 1er à parler ne peut pas agir, on tourne / on avance.
+      if (!canAct(cur, cur.turn)) advance(cur);
+    }
+
+    function awardUncontested(cur) {
+      var winner = contenders(cur)[0];
+      var total = totalPot(cur);
+      cur.stacks[winner] += total;
+      cur.results = { pots: [{ amount: total, winners: [winner], desc: null }], reveal: {}, uncontested: true };
+      cur.banner = Room.name(winner) + ' remporte ' + total + ' (tout le monde s\'est couché)';
+      endHand(cur);
+    }
+    function totalPot(cur) { var t = 0; cur.order.forEach(function (p) { t += (cur.committed[p] || 0); }); return t; }
+
+    function nextStreet(cur) {
+      // réinitialise la ronde de mise
+      cur.order.forEach(function (p) { cur.bet[p] = 0; cur.acted[p] = false; });
+      cur.curBet = 0; cur.minRaise = cur.bb;
+      var live = contenders(cur), actable = live.filter(function (p) { return !cur.allIn[p]; });
+      if (cur.phase === 'preflop') { deal(cur, 3); cur.phase = 'flop'; }
+      else if (cur.phase === 'flop') { deal(cur, 1); cur.phase = 'turn'; }
+      else if (cur.phase === 'turn') { deal(cur, 1); cur.phase = 'river'; }
+      else { doShowdown(cur); return; }
+      cur.banner = phaseLabel(cur.phase);
+      // Si ≤1 joueur peut encore miser (le reste est tapis) → dérouler jusqu'à l'abattage.
+      if (actable.length <= 1) { nextStreet(cur); return; }
+      // premier à parler post-flop : 1er joueur en lice après le bouton
+      var startP = cur.buttonPid;
+      for (var k = 0; k < cur.order.length; k++) { startP = nextIn(cur, startP); if (canAct(cur, startP)) { cur.turn = startP; break; } }
+    }
+    function deal(cur, n) { for (var i = 0; i < n; i++) cur.board.push(cur.deck[cur.pos++]); }
+    function phaseLabel(ph) { return ph === 'preflop' ? 'Pré-flop' : ph === 'flop' ? 'Flop' : ph === 'turn' ? 'Turn' : ph === 'river' ? 'River' : ph === 'showdown' ? 'Abattage' : ''; }
+
+    /* ── Abattage : meilleures mains + pots annexes ── */
+    function doShowdown(cur) {
+      cur.phase = 'showdown'; cur.showAll = true;
+      var conts = contenders(cur);
+      var scores = {}; conts.forEach(function (p) { scores[p] = handRank(cur.hole[p].concat(cur.board)); });
+      // Niveaux de mise distincts (pour pots principal + annexes)
+      var levels = []; cur.order.forEach(function (p) { var c = cur.committed[p] || 0; if (c > 0 && levels.indexOf(c) < 0) levels.push(c); });
+      levels.sort(function (a, b) { return a - b; });
+      var prev = 0, pots = [], reveal = {};
+      conts.forEach(function (p) { reveal[p] = { cards: cur.hole[p], combo: COMBO_NAME[scores[p][0]] }; });
+      levels.forEach(function (L) {
+        var layer = L - prev, size = 0, eligible = [];
+        cur.order.forEach(function (p) { if ((cur.committed[p] || 0) >= L) size += layer; });
+        conts.forEach(function (p) { if ((cur.committed[p] || 0) >= L) eligible.push(p); });
+        prev = L;
+        if (size <= 0) return;
+        if (!eligible.length) { if (pots.length) pots[pots.length - 1].amount += size; return; }
+        // meilleur(s) parmi les éligibles
+        var best = null; eligible.forEach(function (p) { if (best === null || cmpRank(scores[p], scores[best]) > 0) best = p; });
+        var winners = eligible.filter(function (p) { return cmpRank(scores[p], scores[best]) === 0; });
+        pots.push({ amount: size, winners: winners, desc: COMBO_NAME[scores[best][0]] });
+      });
+      // Distribution (le reste éventuel va au 1er gagnant après le bouton)
+      pots.forEach(function (pot) {
+        var share = Math.floor(pot.amount / pot.winners.length), rem = pot.amount - share * pot.winners.length;
+        pot.winners.forEach(function (p) { cur.stacks[p] += share; });
+        for (var r = 0; r < rem; r++) { cur.stacks[pot.winners[r % pot.winners.length]] += 1; }
+      });
+      cur.results = { pots: pots, reveal: reveal };
+      var main = pots[pots.length - 1] || pots[0];
+      if (main) cur.banner = main.winners.map(function (p) { return Room.name(p); }).join(', ') + ' gagne avec ' + main.desc;
+      endHand(cur);
+    }
+
+    function endHand(cur) {
+      cur.phase = 'handover'; cur.turn = null;
+      var live = liveInGame(cur);
+      if (live.length <= 1) { cur.winner = live[0] || null; cur.status = 'ended'; }
+    }
+
+    /* ── Actions du joueur (via transaction ; asPid pour les bots) ── */
+    function tx(pid, fn) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        if (actor(cur) !== pid) return cur;
+        fn(cur); return cur;
+      });
+    }
+    function fold(asPid) {
+      var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('place'); Fx.vib(8); }
+      tx(pid, function (cur) {
+        cur.inHand[pid] = false; cur.acted[pid] = true; cur.lastAct[pid] = 'Se couche';
+        advance(cur);
+      });
+    }
+    function checkCall(asPid) {
+      var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('coin'); Fx.vib(10); }
+      tx(pid, function (cur) {
+        var need = cur.curBet - (cur.bet[pid] || 0);
+        if (need > 0) {
+          var pay = Math.min(need, cur.stacks[pid]);
+          cur.stacks[pid] -= pay; cur.bet[pid] += pay; cur.committed[pid] += pay;
+          if (cur.stacks[pid] === 0) cur.allIn[pid] = true;
+          cur.lastAct[pid] = (cur.allIn[pid] ? 'Tapis ' : 'Suit ') + cur.bet[pid];
+        } else { cur.lastAct[pid] = 'Check'; }
+        cur.acted[pid] = true;
+        advance(cur);
+      });
+    }
+    // Relance JUSQU'À `to` (mise cumulée cette ronde). Bornée à [minRaiseTo, tapis].
+    function raiseTo(to, asPid) {
+      var pid = asPid || window.myPid;
+      if (!asPid && window.Fx) { Fx.sfx('coin'); Fx.vib([12, 20, 12]); }
+      tx(pid, function (cur) {
+        var maxTo = (cur.bet[pid] || 0) + cur.stacks[pid]; // tapis
+        var minTo = cur.curBet + cur.minRaise;
+        if (maxTo <= cur.curBet) { return; } // ne peut rien faire de plus que suivre
+        if (to > maxTo) to = maxTo;
+        if (to < minTo) to = Math.min(minTo, maxTo); // sinon tapis « court » autorisé
+        var add = to - (cur.bet[pid] || 0);
+        cur.stacks[pid] -= add; cur.committed[pid] += add;
+        var raiseSize = to - cur.curBet;
+        if (raiseSize >= cur.minRaise) cur.minRaise = raiseSize; // relance pleine → nouveau min
+        cur.bet[pid] = to; cur.curBet = to;
+        if (cur.stacks[pid] === 0) cur.allIn[pid] = true;
+        cur.lastAct[pid] = (cur.allIn[pid] ? 'Tapis ' : 'Relance ') + to;
+        // tous les autres doivent reparler
+        cur.order.forEach(function (p) { if (p !== pid && cur.inHand[p] && !cur.allIn[p]) cur.acted[p] = false; });
+        cur.acted[pid] = true;
+        advance(cur);
+      });
+    }
+    window.fold = fold; window.checkCall = checkCall; window.raiseTo = raiseTo;
+
+    function doNextHand(asPid) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
+        if (cur.phase !== 'handover') return cur;
+        startHand(cur); return cur;
+      });
+    }
+    window.doNextHand = doNextHand;
+
+    /* ━━ IA ━━ Décision : force de main + cotes du pot + agressivité mesurée. ── */
+    function pokerBot(cur, pid) {
+      if (cur.phase === 'handover') { doNextHand(pid); return; }
+      if (actor(cur) !== pid) return;
+      var toCall = cur.curBet - (cur.bet[pid] || 0);
+      var stack = cur.stacks[pid], pot = totalPot(cur);
+      var strength = botStrength(cur, pid); // 0..1
+      var easy = window.Bots && window.Bots.shouldBlunder(cur);
+      if (easy) strength = Math.max(0, Math.min(1, strength + (Math.random() - 0.5) * 0.5));
+      var potOdds = toCall > 0 ? toCall / (pot + toCall) : 0;
+      // Décision
+      if (toCall <= 0) {
+        // personne n'a misé : check, ou value/semi-bluff bet
+        if (strength > 0.68 || (strength > 0.5 && Math.random() < 0.4)) {
+          raiseTo(cur.curBet + betSize(cur, pot, strength), pid);
+        } else checkCall(pid);
+        return;
+      }
+      // face à une mise
+      if (strength < potOdds - 0.05 && strength < 0.5) { fold(pid); return; }
+      // relance de valeur
+      if (strength > 0.8 && stack > toCall && Math.random() < 0.7) {
+        raiseTo(cur.curBet + betSize(cur, pot, strength), pid); return;
+      }
+      if (strength >= potOdds || toCall <= cur.bb) { checkCall(pid); return; }
+      fold(pid);
+    }
+    function betSize(cur, pot, strength) {
+      var base = Math.round(pot * (0.5 + strength * 0.5)); // ½ à 1× pot
+      base = Math.max(cur.minRaise, Math.round(base / cur.bb) * cur.bb);
+      return base;
+    }
+    // Force estimée 0..1 : pré-flop = heuristique cartes ; post-flop = catégorie de main.
+    function botStrength(cur, pid) {
+      var hole = cur.hole[pid];
+      if (!cur.board || cur.board.length === 0) return preflopStrength(hole);
+      var rk = handRank(hole.concat(cur.board)), cat = rk[0];
+      var opps = contenders(cur).length - 1;
+      var s;
+      if (cat >= 6) s = 0.97;                 // full+
+      else if (cat === 5) s = 0.9;            // couleur
+      else if (cat === 4) s = 0.85;           // suite
+      else if (cat === 3) s = 0.78;           // brelan
+      else if (cat === 2) s = 0.62;           // deux paires
+      else if (cat === 1) {                    // paire — dépend de sa hauteur
+        var pr = rk[1]; s = 0.34 + (pr - 2) / 12 * 0.22;
+        // paire supérieure au board = plus forte
+      } else s = 0.15 + (rk[1] - 2) / 12 * 0.12; // carte haute
+      // ajuste selon le nombre d'adversaires
+      s = Math.pow(s, 1 + opps * 0.12);
+      return Math.max(0, Math.min(1, s));
+    }
+    function preflopStrength(hole) {
+      var r1 = cardRank(hole[0]) + 2, r2 = cardRank(hole[1]) + 2, suited = cardSuit(hole[0]) === cardSuit(hole[1]);
+      var hi = Math.max(r1, r2), lo = Math.min(r1, r2), gap = hi - lo;
+      var s;
+      if (r1 === r2) s = 0.5 + (r1 - 2) / 12 * 0.48;        // paires : 0.5 → ~0.98
+      else {
+        s = (hi - 2) / 12 * 0.34 + (lo - 2) / 12 * 0.14;
+        if (suited) s += 0.08;
+        if (gap === 1) s += 0.06; else if (gap === 2) s += 0.03;
+        if (hi === 14) s += 0.05;
+      }
+      return Math.max(0.05, Math.min(0.97, s));
+    }
+
+    /* ━━ Rendu ━━ */
+    function onState(snap) {
+      var s = snap.val() || {};
+      var status = s.status || 'waiting';
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') showScreen('s-playing');
+        render(s);
+        scheduleNextHand(s);
+      } else if (status === 'ended') {
+        showResults(s);
+      }
+      prevStatus = status;
+    }
+
+    // Enchaîne automatiquement la donne suivante après l'abattage (hôte / solo).
+    function scheduleNextHand(s) {
+      if (nextHandTimer) { clearTimeout(nextHandTimer); nextHandTimer = null; }
+      if (s.phase !== 'handover' || s.winner) return;
+      var iDrive = (!s.host || s.host === window.myPid);
+      if (!iDrive) return;
+      nextHandTimer = setTimeout(function () {
+        nextHandTimer = null;
+        if (window.room && window.room.phase === 'handover' && !window.room.winner) doNextHand(window.myPid);
+      }, 4200);
+    }
+
+    function cardHTML(c, cls) {
+      if (c == null) return '<div class="pk-card back ' + (cls || '') + '"></div>';
+      return '<div class="pk-card ' + (isRed(c) ? 'red ' : '') + (cls || '') + '"><span>' + RANK_LBL[cardRank(c)] + '</span><span class="su">' + SUIT_GLYPH[cardSuit(c)] + '</span></div>';
+    }
+
+    function render(s) {
+      var me = window.myPid, order = s.order || [];
+      setText('pk-phase', phaseLabel(s.phase) + ' · donne ' + (s.handNo || 1));
+      // Le pot GRIMPE (compteur animé) au lieu de sauter d'un coup.
+      var pot = totalPot(s), potPrev = window._pkPot;
+      var potEl = document.getElementById('pk-pot');
+      if (window.Fx && potEl && potPrev !== undefined && potPrev !== pot) {
+        Fx.count(potEl, potPrev, pot, { ms: 480, fmt: function (v) { return '💰 Pot : ' + v; } });
+      } else setText('pk-pot', '💰 Pot : ' + pot);
+      window._pkPot = pot;
+      setText('pk-banner', s.banner || '');
+      // cartes communes (5 emplacements) — les nouvelles se RETOURNENT (flop/turn/river)
+      var boardN = (s.board || []).filter(function (c) { return c != null; }).length;
+      var prevN = (window._pkBoardNo === (s.handNo || 1)) ? (window._pkBoardN || 0) : 0;
+      window._pkBoardN = boardN; window._pkBoardNo = (s.handNo || 1);
+      var comm = '';
+      for (var i = 0; i < 5; i++) {
+        var fresh = (s.board && s.board[i] != null && i >= prevN && boardN > prevN);
+        comm += (s.board && s.board[i] != null) ? cardHTML(s.board[i], fresh ? 'fx-flip' : '') : '<div class="pk-card back" style="opacity:.35"></div>';
+      }
+      if (boardN > prevN && prevN >= 0 && window.Fx && boardN) Fx.sfx('flip');
+      setHTML('pk-community', comm);
+
+      var reveal = (s.results && s.results.reveal) || {};
+      setHTML('pk-seats', order.map(function (pid) {
+        var out = (s.stacks[pid] || 0) <= 0 && !s.inHand[pid];
+        var folded = s.inHand && s.inHand[pid] === false && (s.stacks[pid] || 0) > 0;
+        var active = actor(s) === pid;
+        var badges = '';
+        if (pid === s.buttonPid) badges += '<span class="pk-badge btn">D</span>';
+        if (pid === s.sbPid) badges += ' <span class="pk-badge sb">SB</span>';
+        if (pid === s.bbPid) badges += ' <span class="pk-badge bb">BB</span>';
+        // cartes : les miennes visibles ; les autres cachées sauf abattage
+        var holeHTML = '';
+        var hc = s.hole && s.hole[pid];
+        if (hc) {
+          var showCards = (pid === me) || (s.showAll && reveal[pid]);
+          holeHTML = '<div class="pk-hole">' + hc.map(function (c) { return cardHTML(showCards ? c : null, 'sm' + (isWinnerCard(s, pid) ? ' win' : '')); }).join('') + '</div>';
+        } else if (!out) { holeHTML = '<div class="pk-hole"><div class="pk-card back sm" style="opacity:.3"></div><div class="pk-card back sm" style="opacity:.3"></div></div>'; }
+        var betLine = (s.bet && s.bet[pid]) ? '<div class="pk-bet">mise : ' + s.bet[pid] + '</div>' : '<div class="pk-bet"></div>';
+        var lastLine = (s.lastAct && s.lastAct[pid] && !folded) ? '<div class="pk-lastact">' + escapeHtml(s.lastAct[pid]) + '</div>' : (folded ? '<div class="pk-lastact">couché</div>' : '');
+        var comboLine = (s.showAll && reveal[pid]) ? '<div class="pk-combo">' + reveal[pid].combo + '</div>' : '';
+        return '<div class="pk-seat' + (pid === me ? ' me' : '') + (active ? ' active' : '') + (folded ? ' folded' : '') + (out ? ' out' : '') + '">' +
+          '<div class="pk-seat-top"><span class="pk-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="pk-name">' + escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '</span>' + badges + '</div>' +
+          '<div class="pk-seat-mid"><div>' + holeHTML + comboLine + betLine + lastLine + '</div>' +
+          '<span class="pk-stack">' + (out ? 'éliminé' : (s.stacks[pid] || 0) + ' 🪙') + '</span></div>' +
+          '</div>';
+      }).join(''));
+
+      renderBar(s);
+    }
+    function isWinnerCard(s, pid) { return !!(s.results && !s.results.uncontested && s.results.pots && s.results.pots.some(function (pt) { return pt.winners.indexOf(pid) >= 0; })); }
+
+    function renderBar(s) {
+      var me = window.myPid, bar = document.getElementById('pk-bar');
+      if (s.phase === 'handover') {
+        var iDrive = (!s.host || s.host === me);
+        bar.innerHTML = '<div class="pk-bar-inner"><div class="pk-bar-info">Fin de la donne</div>' +
+          '<div class="pk-btn-row"><button class="pk-btn next" onclick="doNextHand(window.myPid)"' + (iDrive ? '' : ' disabled') + '>Donne suivante ▶</button></div></div>';
+        return;
+      }
+      if (actor(s) !== me) {
+        bar.innerHTML = '<div class="pk-bar-inner"><div class="pk-bar-info">⏳ Au tour de ' + escapeHtml(Room.name(actor(s)) || '…') + '</div></div>';
+        return;
+      }
+      var toCall = s.curBet - (s.bet[me] || 0);
+      var stack = s.stacks[me], pot = totalPot(s);
+      var callLbl = toCall <= 0 ? 'Check' : (toCall >= stack ? 'Tapis (' + stack + ')' : 'Suivre ' + toCall);
+      var minTo = s.curBet + s.minRaise, maxTo = (s.bet[me] || 0) + stack;
+      var canRaise = maxTo > s.curBet && stack > 0;
+      var html = '<div class="pk-bar-inner">';
+      html += '<div class="pk-bar-info">Pot ' + pot + ' · ' + (toCall > 0 ? 'à suivre : ' + toCall : 'personne n\'a misé') + ' · tes jetons : ' + stack + '</div>';
+      if (canRaise) {
+        if (raiseVal == null || raiseVal < minTo || raiseVal > maxTo) raiseVal = Math.min(maxTo, Math.max(minTo, s.curBet + Math.max(s.bb, Math.round(pot / 2))));
+        html += '<div class="pk-quick">' +
+          quickBtn('½ pot', clampTo(s, s.curBet + Math.round((pot + toCall) / 2), minTo, maxTo)) +
+          quickBtn('Pot', clampTo(s, s.curBet + (pot + toCall), minTo, maxTo)) +
+          quickBtn('2× pot', clampTo(s, s.curBet + 2 * (pot + toCall), minTo, maxTo)) +
+          quickBtn('Tapis', maxTo) + '</div>';
+        html += '<div class="pk-raise-row"><input type="range" id="pk-range" min="' + minTo + '" max="' + maxTo + '" step="' + s.bb + '" value="' + raiseVal + '" oninput="pkRange(this.value)"><span class="pk-raise-amt" id="pk-raise-amt">' + raiseVal + '</span></div>';
+      }
+      html += '<div class="pk-btn-row">';
+      html += '<button class="pk-btn fold" onclick="fold(window.myPid)">Se coucher</button>';
+      html += '<button class="pk-btn call" onclick="checkCall(window.myPid)">' + callLbl + '</button>';
+      if (canRaise) html += '<button class="pk-btn raise" onclick="raiseTo(pkRaiseVal(),window.myPid)">' + (toCall > 0 ? 'Relancer' : 'Miser') + '</button>';
+      html += '</div></div>';
+      bar.innerHTML = html;
+    }
+    function clampTo(s, to, minTo, maxTo) { return Math.max(minTo, Math.min(maxTo, Math.round(to / s.bb) * s.bb)); }
+    function quickBtn(lbl, to) { return '<button onclick="pkSetRaise(' + to + ')">' + lbl + '<br><small>' + to + '</small></button>'; }
+    function pkRange(v) { raiseVal = +v; var el = document.getElementById('pk-raise-amt'); if (el) el.textContent = v; }
+    function pkSetRaise(to) { raiseVal = to; var r = document.getElementById('pk-range'); if (r) r.value = to; var el = document.getElementById('pk-raise-amt'); if (el) el.textContent = to; }
+    function pkRaiseVal() { return raiseVal; }
+    window.pkRange = pkRange; window.pkSetRaise = pkSetRaise; window.pkRaiseVal = pkRaiseVal;
+
+    /* ━━ Résultats (partie terminée) ━━ */
+    function showResults(s) {
+      if (nextHandTimer) { clearTimeout(nextHandTimer); nextHandTimer = null; }
+      showScreen('s-results');
+      var win = s.winner;
+      setText('res-emoji', win === window.myPid ? '🏆' : '♠️');
+      setText('res-title', win === window.myPid ? 'Tu remportes la table ! 🏆' : (win ? Room.name(win) + ' rafle tous les jetons' : 'Partie terminée'));
+      var order = (s.order || []).slice().sort(function (a, b) { return (s.stacks[b] || 0) - (s.stacks[a] || 0); });
+      setHTML('res-rank', order.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-sc">' + (s.stacks[pid] || 0) + ' 🪙</span></div>';
+      }).join(''));
+    }
+
+    function handleReplay() { if (nextHandTimer) { clearTimeout(nextHandTimer); nextHandTimer = null; } Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); if (nextHandTimer) { clearTimeout(nextHandTimer); nextHandTimer = null; } Lobby.resetToLobby([]); }
+    window.handleReplay = handleReplay; window.doRestart = doRestart;
+  </script>
+</body>
+</html>

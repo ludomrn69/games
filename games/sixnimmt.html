@@ -216,6 +216,7 @@
 
     /* ━━ Sélection ━━ */
     function pickCard(val) {
+      if (window.Fx) { Fx.sfx('click'); Fx.vib(8); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'select') return cur;
         if (cur.picks && (window.myPid in cur.picks)) return cur;
@@ -278,6 +279,7 @@
 
     // Prendre une rangée (carte trop basse).
     function chooseRow(rowIdx) {
+      if (window.Fx) { Fx.sfx('error'); Fx.vib([15, 25, 30]); }
       rref().transaction(function (cur) {
         if (!cur || cur.phase !== 'chooseRow' || cur.pendingLow !== window.myPid) return cur;
         var q = cur.resolveQueue, item = q[0];
@@ -329,14 +331,21 @@
       // Adversaires
       setHTML('sn-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
         var hasPicked = state.picks && (pid in state.picks);
+        // Têtes ramassées PENDANT la manche en cours (remis à 0 à chaque manche) :
+        // affichées en direct à côté du total, pour suivre qui prend cher ce tour-ci.
+        var rh = headsOf(state, pid);
         return '<div class="sn-opp' + (hasPicked ? ' picked' : '') + '">' +
           '<span class="sn-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           escapeHtml(Room.name(pid)) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
+          (rh > 0 ? ' <span class="sn-row-heads">+' + rh + '🐮</span>' : '') +
           (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✓</span>' : ' …') : '') + '</div>';
       }).join(''));
       setText('sn-banner', state.banner || '');
 
-      // 4 rangées
+      // 4 rangées — un petit son quand elles bougent (résolution des cartes posées)
+      var rowsSig = JSON.stringify(state.rows || []);
+      if (window._snRowsSig !== undefined && window._snRowsSig !== rowsSig && window.Fx) Fx.sfx('place');
+      window._snRowsSig = rowsSig;
       var chooseMine = (state.phase === 'chooseRow' && state.pendingLow === me);
       setHTML('sn-rows', (state.rows || []).map(function (row, ri) {
         var slots = row.map(function (v, k) { return ncard(v, (k === 4 ? ' slot6' : '')); }).join('');

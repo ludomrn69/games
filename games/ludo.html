@@ -24,10 +24,11 @@
     .lu-chip .home { font-size: 0.72rem; color: var(--ink-light); }
 
     .lu-board-wrap { display: flex; justify-content: center; padding: 6px 8px; }
-    .lu-board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(15, minmax(0, 1fr)); width: min(96vw, 460px); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
+    .lu-board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(15, minmax(0, 1fr)); width: min(94vw, 420px, 62vh); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
     .lu-cell { aspect-ratio: 1; border: 0.5px solid rgba(120,110,100,0.12); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1px; position: relative; }
     .lu-cell.blank { border-color: transparent; }
     .lu-cell.track { background: #fbf6ec; }
+    html[data-theme="dark"] .lu-cell.track { background: #241e2e; }
     html[data-theme="dark"] .lu-cell.track { background: #2a2336; }
     .lu-cell.yR { background: rgba(224,90,78,0.16); } .lu-cell.yB { background: rgba(62,124,177,0.16); }
     .lu-cell.yG { background: rgba(52,168,83,0.16); } .lu-cell.yY { background: rgba(230,184,0,0.18); }
@@ -68,7 +69,7 @@
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
-    @media (min-width: 760px) { .lu-board{width:min(70vw,600px)} }
+    @media (min-width: 760px) { .lu-board{width:min(58vw,500px,64vh)} }
   </style>
 </head>
 <body>
@@ -383,11 +384,15 @@
         banner.textContent = '🎲 ' + who + ' ' + lr.die + (lr.moved === false ? ' — aucun coup possible' : '');
       } else banner.textContent = '';
 
-      // Dé + contrôles
+      // Dé + contrôles — un vrai dé à POINTS (pips), animé au lancer.
       var dieEl = document.getElementById('lu-die');
       if (state.die != null) {
-        if (lastDieShown !== state.die) { dieEl.classList.remove('rolling'); void dieEl.offsetWidth; dieEl.classList.add('rolling'); }
-        dieEl.textContent = state.die;
+        var freshDie = lastDieShown !== state.die;
+        if (freshDie) {
+          dieEl.classList.remove('rolling'); void dieEl.offsetWidth; dieEl.classList.add('rolling');
+          if (window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+        }
+        dieEl.innerHTML = window.Fx ? Fx.die(state.die, 40) : String(state.die);
       } else { dieEl.textContent = '🎲'; }
       lastDieShown = state.die;
 
@@ -433,6 +438,7 @@
       var st = window.room || {};
       if (st.turn !== window.myPid || st.die == null) return;
       if (myColor(st) !== color) return;
+      if (window.Fx) { Fx.sfx('place'); Fx.vib(12); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.die == null) return cur;
         if (cur.colorOf[window.myPid] !== color) return cur;
@@ -440,10 +446,12 @@
         var target = legalTarget(cur, color, p, d);
         if (target == null) return cur;
         arr[t] = target; cur.tokens[color] = arr;
-        // capture sur la piste (hors cases sûres)
+        // capture sur la piste (hors cases sûres). Exception : en SORTANT de son
+        // écurie sur SA propre case de départ, on mange l'adversaire qui y stationne.
         if (target <= 50) {
           var li = (COLOR_INFO[color].start + target) % 52;
-          if (!SAFE[li]) {
+          var ownStart = (li === COLOR_INFO[color].start); // ma case de départ à moi
+          if (!SAFE[li] || ownStart) {
             Object.keys(cur.tokens).forEach(function (oc) {
               if (oc === color) return;
               var oa = (cur.tokens[oc] || []).slice(), changed = false;
@@ -479,7 +487,8 @@
         arr[bestT] = bestTarget; cur.tokens[color] = arr;
         if (bestTarget <= 50) {
           var li = (COLOR_INFO[color].start + bestTarget) % 52;
-          if (!SAFE[li]) Object.keys(cur.tokens).forEach(function (oc) {
+          var ownStart = (li === COLOR_INFO[color].start);
+          if (!SAFE[li] || ownStart) Object.keys(cur.tokens).forEach(function (oc) {
             if (oc === color) return;
             var oa = (cur.tokens[oc] || []).slice(), ch = false;
             for (var k = 0; k < oa.length; k++) { var op = oa[k]; if (op >= 0 && op <= 50 && (COLOR_INFO[oc].start + op) % 52 === li) { oa[k] = -1; ch = true; } }

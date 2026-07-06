@@ -15,8 +15,45 @@
     .lg-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
     .lg-head-actions { display: flex; gap: 6px; }
 
-    .lg-phase { text-align: center; padding: 10px; }
-    .lg-phase-night { background: linear-gradient(135deg, #2c2540, #1a1530); color: #e8dcc8; }
+    .lg-phase { text-align: center; padding: 10px; position: relative; z-index: 2; }
+    .lg-phase-night { background: linear-gradient(135deg, #2c2540, #1a1530); color: #e8dcc8; border-radius: 0 0 18px 18px; }
+
+    /* ── AMBIANCE NUIT : tout l'écran plonge dans le bleu nuit (ciel étoilé,
+       lune), transitions douces ; le jour revient avec un lever de soleil. ── */
+    #s-playing { position: relative; transition: background 1.2s ease; }
+    #s-playing.lg-night { background: radial-gradient(120% 90% at 50% -10%, #232a52 0%, #141833 55%, #0d0f22 100%); }
+    #s-playing.lg-night .lg-banner { color: #ffd98a; }
+    #lg-sky { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+    #lg-sky .lg-moon { position: absolute; top: 66px; right: 9%; width: 54px; height: 54px; border-radius: 50%;
+      background: radial-gradient(circle at 62% 36%, #fdf6dc, #e8d9a8 62%, #c9b878);
+      box-shadow: 0 0 34px 10px rgba(250,238,190,0.35), inset -10px -8px 0 rgba(160,140,90,0.28);
+      opacity: 0; transform: translateY(-22px) scale(0.85); transition: opacity 1.2s ease, transform 1.4s ease; }
+    #s-playing.lg-night #lg-sky .lg-moon { opacity: 1; transform: none; }
+    #lg-sky .lg-stars, #lg-sky .lg-stars.s2 { position: absolute; inset: 0; opacity: 0; transition: opacity 1.4s ease;
+      background-image:
+        radial-gradient(1.6px 1.6px at 12% 18%, #fff 50%, transparent 51%),
+        radial-gradient(1.3px 1.3px at 32% 9%, #ffeec9 50%, transparent 51%),
+        radial-gradient(1.8px 1.8px at 54% 22%, #fff 50%, transparent 51%),
+        radial-gradient(1.2px 1.2px at 71% 12%, #cfe0ff 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 88% 27%, #fff 50%, transparent 51%),
+        radial-gradient(1.3px 1.3px at 22% 38%, #ffe9b8 50%, transparent 51%),
+        radial-gradient(1.6px 1.6px at 44% 33%, #fff 50%, transparent 51%),
+        radial-gradient(1.2px 1.2px at 64% 42%, #fff 50%, transparent 51%); }
+    #lg-sky .lg-stars.s2 { transform: scale(1.6) rotate(8deg); transform-origin: top; animation: lgTwinkle 3.2s ease-in-out infinite alternate; }
+    #s-playing.lg-night #lg-sky .lg-stars { opacity: 0.9; }
+    #s-playing.lg-night #lg-sky .lg-stars.s2 { opacity: 0.5; }
+    @keyframes lgTwinkle { from { opacity: 0.25; } to { opacity: 0.65; } }
+    /* Lever de soleil : voile chaud qui balaie l'écran puis s'évanouit. */
+    #lg-sky.dawn::after { content: ''; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(255,196,110,0.55), rgba(255,240,200,0.25) 45%, transparent 75%);
+      animation: lgDawn 1.6s ease-out both; }
+    @keyframes lgDawn { 0% { opacity: 0; transform: translateY(28%); } 35% { opacity: 1; } 100% { opacity: 0; transform: none; } }
+    /* La nuit, les textes posés directement sur le fond passent en clair. */
+    #s-playing.lg-night .lg-instruct, #s-playing.lg-night .lg-wait { color: #cfd4f0; }
+    #s-playing.lg-night .lg-instruct b { color: #fff; }
+    #s-playing.lg-night .lg-instruct .lg-you.wait { color: #aab2dd; }
+    /* Le contenu passe AU-DESSUS du ciel (l'overlay est positionné, z:0). */
+    #s-playing > *:not(#lg-sky) { position: relative; z-index: 1; }
     .lg-phase-icon { font-size: 2rem; } .lg-phase-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.2rem; }
     .lg-role { display: inline-flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 4px 14px; box-shadow: var(--shadow); font-weight: 700; margin-top: 6px; }
     html[data-theme="dark"] .lg-role { background: #2a2333; }
@@ -38,6 +75,9 @@
     .lg-pcard.pick { cursor: pointer; border-color: var(--terracotta); }
     .lg-pcard.pick:hover { background: rgba(196,116,90,0.08); }
     .lg-pcard.me { background: linear-gradient(135deg, rgba(198,152,90,0.16), rgba(196,116,90,0.1)); }
+    /* La nuit, la carte « moi » garde un fond CLAIR (le dégradé translucide seul
+       devenait noir sur le ciel nocturne, texte illisible). */
+    #s-playing.lg-night .lg-pcard.me { background: linear-gradient(135deg, rgba(198,152,90,0.25), rgba(196,116,90,0.16)), var(--white); }
     .lg-pav { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin: 0 auto 4px; }
     .lg-pname { font-size: 0.78rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .lg-ptag { font-size: 0.66rem; color: var(--ink-light); margin-top: 2px; min-height: 14px; }
@@ -191,6 +231,30 @@
       if (status === 'playing') { if (prevStatus !== 'playing') showScreen('s-playing'); render(state); }
       else if (status === 'ended') showResults(state);
       prevStatus = status;
+    }
+
+    /* ── Ciel jour/nuit : overlay lune + étoiles, sons d'ambiance aux transitions. ── */
+    var _lgNight = null;
+    function applyNightMood(night) {
+      var scr = document.getElementById('s-playing');
+      if (!scr) return;
+      var sky = document.getElementById('lg-sky');
+      if (!sky) {
+        sky = document.createElement('div'); sky.id = 'lg-sky';
+        sky.innerHTML = '<div class="lg-moon"></div><div class="lg-stars"></div><div class="lg-stars s2"></div>';
+        scr.insertBefore(sky, scr.firstChild);
+      }
+      scr.classList.toggle('lg-night', night);
+      if (_lgNight !== null && _lgNight !== night) {
+        if (!night) { // lever de soleil
+          sky.classList.remove('dawn'); void sky.offsetWidth; sky.classList.add('dawn');
+          try { if (window.Sfx && Sfx.on()) { Sfx.tone({ f: 300, to: 640, dur: 0.7, type: 'triangle', vol: 0.12 }); Sfx.tone({ f: 450, to: 900, dur: 0.55, type: 'sine', vol: 0.08, delay: 0.15 }); } } catch (e) {}
+        } else { // la nuit tombe
+          try { if (window.Sfx && Sfx.on()) { Sfx.tone({ f: 260, to: 110, dur: 1.0, type: 'sine', vol: 0.16 }); Sfx.tone({ f: 130, to: 65, dur: 1.2, type: 'sine', vol: 0.10, delay: 0.2 }); } } catch (e) {}
+          if (window.Fx) Fx.vib([30, 60, 30]);
+        }
+      }
+      _lgNight = night;
     }
 
     /* ━━ Transitions ━━ */
@@ -428,6 +492,7 @@
     function render(state) {
       var me = window.myPid, myRole = roleOf(state, me), iAmAlive = P(state, me).alive;
       var night = (state.phase === 'wolves' || state.phase === 'seer' || state.phase === 'witch');
+      applyNightMood(night);
       var ph = document.getElementById('lg-phase');
       ph.className = 'lg-phase' + (night ? ' lg-phase-night' : '');
       ph.innerHTML = '<div class="lg-phase-icon">' + (night ? '🌙' : '☀️') + '</div>' +

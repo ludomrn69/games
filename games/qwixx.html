@@ -19,6 +19,13 @@
     .qx-die { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.05rem; box-shadow: 0 2px 6px rgba(0,0,0,0.2); color: #fff; }
     .qx-die.w { background: #fff; color: #2c2520; border: 1.5px solid #cbb994; }
     .qx-die.red { background: #d63636; } .qx-die.yellow { background: #f1c40f; color: #3a2a05; } .qx-die.green { background: #27ae60; } .qx-die.blue { background: #2980b9; }
+    /* Dés à POINTS colorés (pipdie de game.css, teinté par ligne). */
+    .pipdie.qx-red { background: linear-gradient(145deg, #e04848, #c22f2f); }
+    .pipdie.qx-yellow { background: linear-gradient(145deg, #f5cf3a, #e0b40f); }
+    .pipdie.qx-green { background: linear-gradient(145deg, #35bd6f, #219a52); }
+    .pipdie.qx-blue { background: linear-gradient(145deg, #3a93d1, #2372a5); }
+    .pipdie.qx-red i.on, .pipdie.qx-green i.on, .pipdie.qx-blue i.on { background: #fff; }
+    .pipdie.qx-yellow i.on { background: #3a2a05; }
     .qx-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
 
     .qx-board { max-width: 640px; margin: 4px auto; padding: 0 8px; }
@@ -216,6 +223,7 @@
     /* ━━ Actions ━━ */
     // Phase blanche : chaque joueur marque la somme blanche dans une ligne (rowKey) ou passe (null).
     function markWhite(rowKey) {
+      if (window.Fx && rowKey) { Fx.sfx('place'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'white') return cur;
         var me = window.myPid;
@@ -234,6 +242,7 @@
     }
     // Phase couleur : l'actif marque (1 blanc + 1 couleur) ou passe.
     function markColor(row, idx) {
+      if (window.Fx && row) { Fx.sfx('place'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'color' || cur.turn !== window.myPid) return cur;
         if (row) { if (!canMark(cur, window.myPid, row, idx)) return cur; applyMark(cur, window.myPid, row, idx); cur.activeMarked = true; }
@@ -292,10 +301,20 @@
     function render(state) {
       var me = window.myPid, dice = state.dice || {};
       setText('qx-round-label', '🎲 Qwixx');
-      setHTML('qx-dice', '<div class="qx-die w">' + (dice.w1 || '?') + '</div><div class="qx-die w">' + (dice.w2 || '?') + '</div>' +
+      // Dés à points, animés (+ bruit de lancer) quand un nouveau jet arrive.
+      var diceSig = [dice.w1, dice.w2, dice.red, dice.yellow, dice.green, dice.blue].join(',');
+      var freshRoll = window._qxDiceSig !== undefined && window._qxDiceSig !== diceSig && dice.w1;
+      window._qxDiceSig = diceSig;
+      if (freshRoll && window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+      var pip = function (v, extra) {
+        if (!window.Fx || !v) return '<div class="qx-die ' + (extra || 'w') + '">' + (v || '?') + '</div>';
+        return Fx.die(v, 34, (extra || '') + (freshRoll ? ' roll' : ''));
+      };
+      setHTML('qx-dice', pip(dice.w1) + pip(dice.w2) +
         ['red', 'yellow', 'green', 'blue'].map(function (c) {
           var locked = state.locks && state.locks[c]; // ligne verrouillée = dé retiré du jeu
-          return '<div class="qx-die ' + c + '"' + (locked ? ' style="opacity:.25;filter:grayscale(1)" title="Dé retiré (ligne verrouillée)"' : '') + '>' + (locked ? '✕' : (dice[c] || '?')) + '</div>';
+          if (locked) return '<div class="qx-die ' + c + '" style="opacity:.25;filter:grayscale(1)" title="Dé retiré (ligne verrouillée)">✕</div>';
+          return pip(dice[c], 'qx-' + c);
         }).join(''));
       var wsum = (dice.w1 || 0) + (dice.w2 || 0);
 

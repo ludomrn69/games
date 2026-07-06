@@ -132,13 +132,29 @@ html[data-theme="dark"] .game-restart-btn {
 /* Pastille flottante de vitesse des ordis (en jeu, quand il y a des ordis). */
 .lb-botspeed {
   position: fixed; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 1200;
-  display: none; align-items: center; gap: 6px;
-  padding: 7px 13px; border-radius: 30px; cursor: pointer;
+  display: none; align-items: center; gap: 8px;
+  padding: 6px 13px; border-radius: 30px;
   border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink);
-  font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.8rem;
+  font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.78rem;
   box-shadow: 0 3px 12px rgba(44,37,32,0.2);
 }
 .lb-botspeed:hover { border-color: var(--terracotta); }
+.lb-botspeed .lb-botspeed-ic { font-size: 0.95rem; }
+.lb-botspeed .lb-botspeed-lbl { min-width: 68px; white-space: nowrap; }
+/* Le « trait » : un curseur qu'on glisse (petit rond) pour régler la vitesse. */
+.lb-botspeed input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 82px; height: 6px; margin: 0;
+  border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--terracotta));
+  outline: none; cursor: pointer;
+}
+.lb-botspeed input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--terracotta); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.3); cursor: grab;
+}
+.lb-botspeed input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; background: var(--terracotta);
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.3); cursor: grab;
+}
 
 /* Pastilles « Défi du jour » : difficulté / série, bien lisibles sous le bouton. */
 .lb-daily-badge {
@@ -254,4 +270,41 @@ html[data-theme="dark"] .game-restart-btn {
   border: none; border-radius: 30px; padding: 6px 14px; cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.82rem; white-space: nowrap;
   background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff;
+}
+
+/* ── Réactions emoji en partie (bouton flottant + rangée dépliable) ────────── */
+.lb-react {
+  position: fixed; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 1200;
+  display: none; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+.lb-react-fab {
+  width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--gold-light);
+  background: var(--white); font-size: 1.35rem; cursor: pointer;
+  box-shadow: 0 3px 12px rgba(44,37,32,0.22);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s;
+}
+.lb-react-fab:hover { transform: scale(1.08); border-color: var(--gold); }
+.lb-react-row {
+  display: flex; gap: 6px; padding: 7px 9px; border-radius: 30px;
+  background: var(--white); border: 1.5px solid var(--gold-light);
+  box-shadow: 0 4px 16px rgba(44,37,32,0.22);
+  opacity: 0; transform: translateY(8px) scale(0.9); transform-origin: bottom right;
+  pointer-events: none; transition: opacity 0.18s, transform 0.18s;
+}
+.lb-react-row.open { opacity: 1; transform: none; pointer-events: auto; }
+.lb-react-emo {
+  width: 38px; height: 38px; border: none; border-radius: 50%; background: transparent;
+  font-size: 1.35rem; cursor: pointer; line-height: 1; padding: 0;
+  transition: transform 0.12s;
+}
+.lb-react-emo:hover { transform: scale(1.25); }
+
+/* ── Bandeau spectateur (partie en cours rejointe en lecture seule) ────────── */
+.lb-spectator {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%); z-index: 900;
+  display: none; align-items: center; gap: 6px; max-width: 92vw;
+  background: var(--ink); color: var(--cream); padding: 7px 16px; border-radius: 30px;
+  font-family: 'DM Sans', sans-serif; font-size: 0.82rem; box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

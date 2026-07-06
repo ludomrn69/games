@@ -37,6 +37,7 @@ la synchro temps réel.
 
 | Jeu | Joueurs | Hors-ligne | Type |
 |---|---|:---:|---|
+| 🎉 Mode Soirée | 2–8 |  | tournoi multi-jeux |
 | 📝 Petit bac | 2–12 |  | mots |
 | 🔴 Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
 | ⚫ Reversi | 2 | ✈️ | réflexion (IA forte) |
@@ -46,6 +47,7 @@ la synchro temps réel.
 | 🔍 Lynx | 2–12 |  | observation |
 | 🎨 Pictionary | 2–12 |  | dessin |
 | 🂡 Blackjack | 1–6 | ✈️ | cartes / 21 |
+| ♠️ Poker | 2–6 | ✈️ | cartes / Texas Hold'em |
 | 🃏 Uno | 2–8 | ✈️ | cartes |
 | 🎴 Skyjo | 2–8 | ✈️ | cartes |
 | 🧩 Blokus | 2–4 | ✈️ | placement |
@@ -75,13 +77,14 @@ la synchro temps réel.
 | 🃏 Balatro | 1 | ✈️ | roguelike poker (solo) |
 | 🚗 Mille Bornes | 2–4 | ✈️ | cartes / course |
 | 🐺 Loup-Garou | 4–12 | ✈️ | déduction sociale (IA) |
-| ⏱️ Time's Up | 1–12 | ✈️ | équipes (+ solo chrono) |
+| ⏱️ Time's Up | 4–12 | ✈️ | équipes (4 min · + solo chrono) |
 | 💰 La Bonne Paye | 2–6 | ✈️ | gestion / cartes |
 | 💎 Diamants | 2–8 | ✈️ | stop-ou-encore |
 | 🎲 Perudo | 2–6 | ✈️ | dés / bluff |
 | 🚂 Aventuriers du Rail | 2–5 | ✈️ | plateau / réseau |
 | 🙅 No Thanks! | 2–7 | ✈️ | stop-ou-encore |
 | 🎲 Qwixx | 1–5 | ✈️ | dés / roll-and-write |
+| 🎲 Yam's | 1–6 | ✈️ | dés / combinaisons |
 
 <!-- GAMES:END -->
 
