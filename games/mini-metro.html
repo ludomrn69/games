@@ -29,7 +29,10 @@
   .line-chip .dot{width:16px;height:6px;border-radius:4px}
   .line-chip .rm{border:none;background:none;cursor:pointer;font-size:.85rem;opacity:.5;color:inherit;padding:2px 4px}
   .line-chip .rm:hover{opacity:1}
-  .hint{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:.82rem;opacity:.55;pointer-events:none;font-weight:600}
+  .palette{position:absolute;top:8px;left:0;right:0;display:flex;gap:9px;justify-content:center;align-items:center;pointer-events:none;z-index:3}
+  .pdot{width:15px;height:15px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.22)}
+  .pdot.empty{background:transparent!important;border:2.5px solid;opacity:.38;box-shadow:none}
+  .hint{position:absolute;top:32px;left:0;right:0;text-align:center;font-size:.82rem;opacity:.55;pointer-events:none;font-weight:600}
   .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;text-align:center;
     padding:28px;background:rgba(236,225,196,.94);backdrop-filter:blur(6px);z-index:20}
   body.dark .screen{background:rgba(20,22,28,.94)}
@@ -59,6 +62,7 @@
   </div>
   <div id="stage">
     <canvas id="cv"></canvas>
+    <div class="palette" id="palette"></div>
     <div class="hint" id="hint">Glisse d'une station à une autre pour tracer une ligne</div>
     <div class="lines" id="lineChips"></div>
 
@@ -331,11 +335,19 @@
     ctx.strokeStyle=dark()?'rgba(120,150,190,.16)':'rgba(122,162,200,.30)';
     ctx.lineWidth=Math.max(26,Math.min(W,H)*0.06);ctx.lineJoin='round';ctx.lineCap='round';
     ctx.beginPath();ctx.moveTo(-30,H*0.30);ctx.bezierCurveTo(W*0.35,H*0.44,W*0.55,H*0.18,W+30,H*0.52);ctx.stroke();
-    // lignes octilinéaires à coins arrondis
+    // lignes octilinéaires à coins arrondis + caps de terminus
     lines.forEach(function(line){
       if(line.st.length<2)return;
+      var op=octiPoints(line.st);
       ctx.strokeStyle=line.color;ctx.lineWidth=7;ctx.lineJoin='round';ctx.lineCap='round';
-      strokeRounded(octiPoints(line.st),13);
+      strokeRounded(op,13);
+      // petite barre perpendiculaire à chaque extrémité (terminus)
+      ctx.fillStyle=line.color;
+      [[op[0],op[1]],[op[op.length-1],op[op.length-2]]].forEach(function(pr){
+        var e=pr[0],n=pr[1],ang=Math.atan2(n.y-e.y,n.x-e.x)+Math.PI/2;
+        ctx.save();ctx.translate(e.x,e.y);ctx.rotate(ang);
+        ctx.beginPath();rr(ctx,-9,-3.5,18,7,3.5);ctx.fill();ctx.restore();
+      });
     });
     // tracé en cours (pointillé octilinéaire)
     if(drag){ctx.strokeStyle=dark()?'rgba(255,255,255,.4)':'rgba(0,0,0,.3)';ctx.lineWidth=5;ctx.lineCap='round';ctx.setLineDash([2,10]);
@@ -387,6 +399,14 @@
     Array.prototype.forEach.call(box.querySelectorAll('.rm'),function(b){
       b.onclick=function(e){e.stopPropagation();removeLine(lines[+b.getAttribute('data-i')]);};
     });
+    // Palette en haut : chaque COULEUR = une LIGNE (pleine = en service, creuse = dispo).
+    var pal=document.getElementById('palette');
+    if(pal){
+      var used={};lines.forEach(function(l){used[l.color]=1;});
+      var avail=[];for(var c=0;c<LINE_COLORS.length && avail.length<pool;c++){if(!used[LINE_COLORS[c]])avail.push(LINE_COLORS[c]);}
+      pal.innerHTML=lines.map(function(l){return '<span class="pdot" style="background:'+l.color+'"></span>';}).join('')
+        + avail.map(function(c){return '<span class="pdot empty" style="border-color:'+c+'"></span>';}).join('');
+    }
   }
 
   // ── Entrées (souris + tactile) ──────────────────────────────────────────────

@@ -301,6 +301,19 @@
         if(y===y2)rr(Math.min(x,x2),y-r,Math.abs(x2-x),w,4);else rr(x-r,Math.min(y,y2),w,Math.abs(y2-y),4);ctx.fill();});
     });});
   }
+  // Assombrit une couleur hex (pour les faces en relief).
+  function shade(hex,f){var n=parseInt(hex.slice(1),16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;return 'rgb('+((r*f)|0)+','+((g*f)|0)+','+((b*f)|0)+')';}
+  // Bâtiment en CUBE 3D : face avant sombre (extrusion) + face du dessus + reflet.
+  function drawBox(x,y,s,color,depth){
+    var r=Math.min(6,s*0.2);
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=s*0.22;ctx.shadowOffsetY=depth*0.6+s*0.05;
+    ctx.fillStyle=shade(color,0.6);rr(x-s/2,y-s/2+depth,s,s,r);ctx.fill();     // face avant (extrusion)
+    ctx.shadowColor='transparent';
+    ctx.fillStyle=color;rr(x-s/2,y-s/2,s,s,r);ctx.fill();                       // face du dessus
+    ctx.fillStyle='rgba(255,255,255,.16)';rr(x-s/2,y-s/2,s,s*0.34,r);ctx.fill();// reflet
+    ctx.restore();
+  }
   function draw(){
     ctx.clearRect(0,0,W,H);
     // taches organiques douces (relief léger, façon terrain de Mini Motorways)
@@ -327,27 +340,16 @@
       ctx.fillStyle='rgba(255,255,255,.55)';rr(CELL*0.01,-CELL*0.08,CELL*0.12,CELL*0.16,CELL*0.04);ctx.fill(); // pare-brise
       ctx.restore();
     });
-    // maisons : petit pictogramme « maison » (corps + toit) avec ombre douce
-    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.46;
-      ctx.save();
-      ctx.shadowColor='rgba(0,0,0,.22)';ctx.shadowBlur=CELL*0.14;ctx.shadowOffsetY=CELL*0.05;
-      ctx.fillStyle=h.color;
-      rr(x-s*0.5,y-s*0.18,s,s*0.68,3);ctx.fill();                    // corps
-      ctx.shadowColor='transparent';
-      ctx.beginPath();ctx.moveTo(x-s*0.6,y-s*0.12);ctx.lineTo(x,y-s*0.6);ctx.lineTo(x+s*0.6,y-s*0.12);ctx.closePath();ctx.fill(); // toit
-      ctx.fillStyle='rgba(255,255,255,.32)';rr(x-s*0.13,y+s*0.06,s*0.26,s*0.32,1.5);ctx.fill(); // porte
-      ctx.restore();
+    // maisons : petit CUBE 3D
+    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.44;
+      drawBox(x,y,s,h.color,s*0.28);
     });
-    // bâtiments : immeuble carré arrondi + file de « pins » de demande au-dessus
-    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.62;
+    // bâtiments : GROS cube 3D (façade claire) + file de « pins » de demande au-dessus
+    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.62,dep=s*0.26;
       if(d.over>0){var f=Math.min(1,d.over/OVER_LIMIT);ctx.strokeStyle='#e8582c';ctx.lineWidth=3;
-        ctx.beginPath();ctx.arc(x,y,s*0.74,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
-      ctx.save();
-      ctx.shadowColor='rgba(0,0,0,.24)';ctx.shadowBlur=CELL*0.16;ctx.shadowOffsetY=CELL*0.06;
-      ctx.fillStyle=d.color;rr(x-s/2,y-s/2,s,s,5);ctx.fill();
-      ctx.shadowColor='transparent';
-      ctx.fillStyle='rgba(255,255,255,.9)';rr(x-s*0.19,y-s*0.19,s*0.38,s*0.38,2.5);ctx.fill(); // façade
-      ctx.restore();
+        ctx.beginPath();ctx.arc(x,y,s*0.82,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
+      drawBox(x,y,s,d.color,dep);
+      ctx.fillStyle='rgba(255,255,255,.9)';rr(x-s*0.18,y-s*0.18,s*0.36,s*0.36,2.5);ctx.fill(); // façade (sur la face du dessus)
       // pins d'attente (petites barres arrondies façon jauge)
       for(var p=0;p<Math.min(d.pins,PIN_CAP);p++){
         var px=x-CELL*0.30+ (p%5)*(CELL*0.15), py=y-s/2-CELL*0.14-((p/5)|0)*CELL*0.15;
