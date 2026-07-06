@@ -451,26 +451,32 @@
     }
     return null;
   }
-  // Le destinataire `t.to` évalue : accepte si la valeur reçue dépasse ce qu'il cède.
-  // Il PEUT désormais céder une couleur complète à lui, mais réclame alors une nette
-  // prime (≈ +60 %) — un monopole, ça se paie cher. La valeur cédée compte aussi
-  // l'investissement en maisons (revendues à la banque lors de l'échange).
+  // Prix minimum que le bot (t.to) réclame pour céder ce qu'on lui demande (t.recv) :
+  //  • couleur COMPLÈTE : ≈ 1,8× la valeur NUE des rues + la moitié de l'investissement
+  //    en maisons (l'autre moitié lui est remboursée par la banque lors de l'échange) ;
+  //  • simple rue : sa valeur (rue + maisons éventuelles) + 15 %.
+  // Barème calibré par simulation (des centaines de parties rejouées) : à ce prix,
+  // l'échange d'un monopole est équitable — le vendeur n'y perd pas et l'acheteur y
+  // gagne un peu — alors qu'une prime de +60 % faisait payer l'acheteur trop cher.
+  function tradeAsk(s, recv) {
+    var bare = (recv.cash || 0), houseInv = 0, mono = false;
+    (recv.props || []).forEach(function (i) { bare += B[i].p; houseInv += (s.houses[i] || 0) * (B[i].h || 0); });
+    (recv.props || []).forEach(function (i) { if (hasMonopoly(s, B[i].g, s.owners[i])) mono = true; });
+    return mono ? (1.8 * bare + 0.5 * houseInv) : ((bare + houseInv) * 1.15);
+  }
+  // Le destinataire `t.to` évalue : accepte si la valeur reçue dépasse son prix demandé.
   function aiAcceptTrade(s, t) { norm(s);
     var recvV = (t.give.cash || 0); (t.give.props || []).forEach(function (i) { recvV += B[i].p; });
-    var giveV = (t.recv.cash || 0); (t.recv.props || []).forEach(function (i) { giveV += B[i].p + (s.houses[i] || 0) * (B[i].h || 0); });
-    var givesMonopoly = (t.recv.props || []).some(function (i) { return hasMonopoly(s, B[i].g, t.to); });
-    return recvV >= giveV * (givesMonopoly ? 1.6 : 1.15);
+    return recvV >= tradeAsk(s, t.recv);
   }
   // Si le bot (t.to) refuse, il peut faire une CONTRE-OFFRE : mêmes propriétés mais
-  // il réclame le cash qui rendrait l'échange rentable (prime renforcée s'il doit
-  // céder un monopole). Renvoie un trade RETOURNÉ (du bot vers l'humain), ou null.
+  // il réclame le cash qui atteindrait son prix demandé (prime renforcée pour un
+  // monopole). Renvoie un trade RETOURNÉ (du bot vers l'humain), ou null.
   function aiCounterTrade(s, t) { norm(s);
     if (!t || s.bankrupt[t.from] || s.bankrupt[t.to]) return null;
     var bot = t.to;
-    var givesMonopoly = (t.recv.props || []).some(function (i) { return hasMonopoly(s, B[i].g, bot); });
     var recvV = (t.give.cash || 0); (t.give.props || []).forEach(function (i) { recvV += B[i].p; }); // ce que le bot reçoit
-    var giveV = (t.recv.cash || 0); (t.recv.props || []).forEach(function (i) { giveV += B[i].p + (s.houses[i] || 0) * (B[i].h || 0); }); // ce que le bot cède (maisons incluses)
-    var target = Math.ceil(giveV * (givesMonopoly ? 1.6 : 1.15));
+    var target = Math.ceil(tradeAsk(s, t.recv));            // prix demandé par le bot pour ce qu'il cède
     if (recvV >= target) return null;                       // il accepterait déjà
     var extra = target - recvV;                             // cash en plus demandé à l'humain
     if ((t.give.cash || 0) + extra > (s.cash[t.from] || 0)) return null; // l'humain ne peut pas payer
