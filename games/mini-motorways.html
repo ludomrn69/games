@@ -286,32 +286,44 @@
         ctx.fillStyle=roadCol;
         if(y===y2)rr(Math.min(x,x2),y-th/2,Math.abs(x2-x),th,4);else rr(x-th/2,Math.min(y,y2),th,Math.abs(y2-y),4);ctx.fill();});
     });});
-    // voitures
+    // voitures (petite auto arrondie avec ombre douce)
     cars.forEach(function(ca){
       var pts=pathPoints(ca.path);if(ca.seg>=pts.length-1)return;
       var A=pts[ca.seg],B=pts[ca.seg+1];
       var x=A.x+(B.x-A.x)*ca.t,y=A.y+(B.y-A.y)*ca.t,ang=Math.atan2(B.y-A.y,B.x-A.x);
       ctx.save();ctx.translate(x,y);ctx.rotate(ang);
-      ctx.fillStyle=ca.color;rr(-CELL*0.2,-CELL*0.13,CELL*0.4,CELL*0.26,3);ctx.fill();
+      ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=CELL*0.10;ctx.shadowOffsetY=CELL*0.03;
+      ctx.fillStyle=ca.color;rr(-CELL*0.19,-CELL*0.12,CELL*0.38,CELL*0.24,CELL*0.08);ctx.fill();
+      ctx.shadowColor='transparent';
+      ctx.fillStyle='rgba(255,255,255,.55)';rr(CELL*0.01,-CELL*0.08,CELL*0.12,CELL*0.16,CELL*0.04);ctx.fill(); // pare-brise
       ctx.restore();
     });
-    // maisons (carré) & bâtiments (rond + pins)
-    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.5;
-      ctx.fillStyle=h.color;rr(x-s/2,y-s/2,s,s,4);ctx.fill();
-      // petit toit
-      ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.moveTo(x-s/2,y-s/2);ctx.lineTo(x,y-s*0.85);ctx.lineTo(x+s/2,y-s/2);ctx.closePath();ctx.fill();
+    // maisons : petit pictogramme « maison » (corps + toit) avec ombre douce
+    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.46;
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.22)';ctx.shadowBlur=CELL*0.14;ctx.shadowOffsetY=CELL*0.05;
+      ctx.fillStyle=h.color;
+      rr(x-s*0.5,y-s*0.18,s,s*0.68,3);ctx.fill();                    // corps
+      ctx.shadowColor='transparent';
+      ctx.beginPath();ctx.moveTo(x-s*0.6,y-s*0.12);ctx.lineTo(x,y-s*0.6);ctx.lineTo(x+s*0.6,y-s*0.12);ctx.closePath();ctx.fill(); // toit
+      ctx.fillStyle='rgba(255,255,255,.32)';rr(x-s*0.13,y+s*0.06,s*0.26,s*0.32,1.5);ctx.fill(); // porte
+      ctx.restore();
     });
-    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.34;
-      // jauge de saturation
+    // bâtiments : immeuble carré arrondi + file de « pins » de demande au-dessus
+    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.62;
       if(d.over>0){var f=Math.min(1,d.over/OVER_LIMIT);ctx.strokeStyle='#e8582c';ctx.lineWidth=3;
-        ctx.beginPath();ctx.arc(x,y,s+7,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
-      ctx.fillStyle=d.color;ctx.beginPath();ctx.arc(x,y,s,0,7);ctx.fill();
-      ctx.fillStyle='rgba(255,255,255,.9)';ctx.beginPath();ctx.arc(x,y,s*0.4,0,7);ctx.fill();
-      // pins d'attente au-dessus
+        ctx.beginPath();ctx.arc(x,y,s*0.74,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.24)';ctx.shadowBlur=CELL*0.16;ctx.shadowOffsetY=CELL*0.06;
+      ctx.fillStyle=d.color;rr(x-s/2,y-s/2,s,s,5);ctx.fill();
+      ctx.shadowColor='transparent';
+      ctx.fillStyle='rgba(255,255,255,.9)';rr(x-s*0.19,y-s*0.19,s*0.38,s*0.38,2.5);ctx.fill(); // façade
+      ctx.restore();
+      // pins d'attente (petites barres arrondies façon jauge)
       for(var p=0;p<Math.min(d.pins,PIN_CAP);p++){
-        var px=x-CELL*0.3+ (p%5)*(CELL*0.15), py=y-s-8-((p/5)|0)*7;
+        var px=x-CELL*0.30+ (p%5)*(CELL*0.15), py=y-s/2-CELL*0.14-((p/5)|0)*CELL*0.15;
         ctx.fillStyle=d.pins>=PIN_CAP?'#e8582c':d.color;
-        ctx.beginPath();ctx.arc(px,py,2.6,0,7);ctx.fill();
+        rr(px-CELL*0.045,py-CELL*0.065,CELL*0.09,CELL*0.13,CELL*0.03);ctx.fill();
       }
     });
   }

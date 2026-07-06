@@ -275,7 +275,7 @@
     // lignes (traits épais)
     lines.forEach(function(line){
       if(line.st.length<2)return;
-      ctx.strokeStyle=line.color;ctx.lineWidth=6;ctx.lineJoin='round';ctx.lineCap='round';
+      ctx.strokeStyle=line.color;ctx.lineWidth=8;ctx.lineJoin='round';ctx.lineCap='round';
       ctx.beginPath();ctx.moveTo(line.st[0].x,line.st[0].y);
       for(var i=1;i<line.st.length;i++)ctx.lineTo(line.st[i].x,line.st[i].y);
       ctx.stroke();
@@ -291,8 +291,9 @@
         var x=A.x+(B.x-A.x)*tr.t, y=A.y+(B.y-A.y)*tr.t;
         var ang=Math.atan2(B.y-A.y,B.x-A.x);
         ctx.save();ctx.translate(x,y);ctx.rotate(ang);
-        ctx.fillStyle=line.color;ctx.strokeStyle=bg;ctx.lineWidth=2;
-        ctx.beginPath();rr(ctx,-11,-7,22,14,4);ctx.fill();ctx.stroke();
+        ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
+        ctx.fillStyle=line.color;ctx.beginPath();rr(ctx,-12,-7.5,24,15,5);ctx.fill();
+        ctx.shadowColor='transparent';ctx.strokeStyle=bg;ctx.lineWidth=2.5;ctx.stroke();
         // passagers à bord (petits points)
         ctx.rotate(-ang);
         for(var p=0;p<tr.pax.length;p++){var px=-8+ (p%3)*8, py=-4+((p/3)|0)*8;
@@ -306,8 +307,11 @@
       if(st.over>0){var f=Math.min(1,st.over/OVER_LIMIT);
         ctx.strokeStyle='#e8582c';ctx.lineWidth=3;ctx.beginPath();
         ctx.arc(st.x,st.y,20,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
-      ctx.fillStyle=bg;ctx.strokeStyle=ink;ctx.lineWidth=3;
-      shapePath(st.x,st.y,13,st.shape);ctx.fill();ctx.stroke();
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=7;ctx.shadowOffsetY=2;
+      ctx.fillStyle=bg;shapePath(st.x,st.y,14,st.shape);ctx.fill();
+      ctx.shadowColor='transparent';ctx.strokeStyle=ink;ctx.lineWidth=3.2;ctx.stroke();
+      ctx.restore();
       // passagers en attente autour
       for(var p=0;p<st.pax.length;p++){
         var a=-Math.PI/2 + p*0.5, rr2=22+ (p>7?8:0);
