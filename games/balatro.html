@@ -161,11 +161,16 @@
     .ba-hands-table { color: #efe8ff; } .ba-hands-table td { border-color: rgba(255,255,255,0.12); }
     .ba-link { color: #b9a9e0; }
 
-    /* ═══ RÉPLIQUE fidèle de la colonne de gauche de Balatro ═══
-       Police « blocky » (monospace lourd), panneaux charbon arrondis, accents vifs
-       (jetons bleus, mult rouge, or). Table verte pendant le jeu. ═══ */
+    /* ═══ RÉPLIQUE fidèle de Balatro ═══
+       Police PIXEL auto-hébergée (Pixelify Sans, OFL) → marche sans connexion.
+       Panneaux charbon arrondis, accents vifs (jetons bleus, mult rouge, or),
+       table verte pendant le jeu. ═══ */
+    @font-face { font-family: 'Pixelify Sans'; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/pixelifysans-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2212, U+2215; }
+    @font-face { font-family: 'Pixelify Sans'; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/pixelifysans-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+2C60-2C7F, U+A720-A7FF; }
+    /* Toute l'UI Balatro passe en police pixel (on garde une pile de repli sûre). */
+    .ba-wrap, .ba-btn, .ba-sort button, .modal .ba-btn { font-family: 'Pixelify Sans', ui-monospace, 'Courier New', monospace; }
     body.ba-play { background: radial-gradient(1200px 900px at 50% 18%, #2f7a5a, #1e5540 58%, #123a2c) fixed; }
-    .ba-side { font-family: ui-monospace, 'Cascadia Mono', 'Courier New', monospace; display: flex; flex-direction: column; gap: 8px; }
+    .ba-side { font-family: 'Pixelify Sans', ui-monospace, 'Courier New', monospace; display: flex; flex-direction: column; gap: 8px; }
     @media (min-width: 860px) { .ba-side { flex: 0 0 272px; width: 272px; } }
     .bl-header { background: linear-gradient(#caa23a, #a97d1e); color: #fff; text-align: center; font-weight: 800; font-size: 1.18rem; letter-spacing: 0.5px; padding: 9px 8px; border-radius: 11px; border: 2px solid rgba(0,0,0,0.28); text-shadow: 0 2px 0 rgba(0,0,0,0.35); box-shadow: inset 0 2px 0 rgba(255,255,255,0.25); }
     .bl-goal { display: flex; align-items: center; gap: 10px; background: linear-gradient(#4c3f1e, #3a2f14); border: 2px solid rgba(0,0,0,0.3); border-radius: 12px; padding: 12px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.4); }
@@ -181,14 +186,14 @@
     .bl-round-lab { flex: 0 0 auto; color: #fff; font-weight: 800; font-size: 0.92rem; line-height: 1.05; }
     .bl-round-val { flex: 1; text-align: right; color: #fff; font-weight: 900; font-size: 1.9rem; text-shadow: 0 2px 0 rgba(0,0,0,0.35); font-variant-numeric: tabular-nums; }
     .bl-hand { background: #23272f !important; border: 2px solid rgba(0,0,0,0.3); border-radius: 12px; padding: 10px !important; min-height: 96px !important; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.45); }
-    .bl-hand .pv-hand { font-family: ui-monospace, 'Courier New', monospace; font-size: 1.35rem; font-weight: 900; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+    .bl-hand .pv-hand { font-family: 'Pixelify Sans', ui-monospace, monospace; font-size: 1.35rem; font-weight: 900; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
     .bl-hand .pv-lvl { color: #cfc3ee; font-weight: 800; font-size: 0.8rem; }
     .bl-hand .pv-empty { color: rgba(255,255,255,0.5); font-size: 0.85rem; text-align: center; }
     .bl-hand .ba-scorecalc { gap: 6px; }
     .bl-hand .ba-chipbox, .bl-hand .ba-multbox, .bl-hand .ba-scorebox { min-width: 52px; font-size: 1.55rem; border-radius: 8px; }
     .bl-hand .ba-times { color: #ec5a41; font-weight: 900; font-size: 1.2rem; }
     .bl-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; grid-template-areas: "info mains disc" "info money money" "opt mise manche"; gap: 6px; }
-    .bl-btn { border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; font-family: ui-monospace,'Courier New',monospace; font-weight: 800; color: #fff; cursor: pointer; text-shadow: 0 2px 0 rgba(0,0,0,0.3); line-height: 1.1; box-shadow: inset 0 2px 0 rgba(255,255,255,0.18); }
+    .bl-btn { border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; font-family: 'Pixelify Sans', ui-monospace, monospace; font-weight: 800; color: #fff; cursor: pointer; text-shadow: 0 2px 0 rgba(0,0,0,0.3); line-height: 1.1; box-shadow: inset 0 2px 0 rgba(255,255,255,0.18); }
     .bl-btn.info { grid-area: info; background: linear-gradient(#e8503f, #c23325); font-size: 0.94rem; }
     .bl-btn.opt { grid-area: opt; background: linear-gradient(#f0a52a, #d0821a); font-size: 0.94rem; }
     .bl-cell { background: #2b2f38; border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; padding: 6px 4px; text-align: center; box-shadow: inset 0 2px 6px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; gap: 2px; }
@@ -197,6 +202,22 @@
     .bl-cell-lab { color: #fff; font-weight: 700; font-size: 0.72rem; }
     .bl-cell-val { font-weight: 900; font-size: 1.4rem; text-shadow: 0 2px 0 rgba(0,0,0,0.3); font-variant-numeric: tabular-nums; }
     .bl-cell-val.blue { color: #4a9fe0; } .bl-cell-val.red { color: #ec5a41; } .bl-cell-val.gold { color: #f0b83a; }
+
+    /* ── Paquet Céleste (booster de planètes) ── */
+    .pack-card-modal { max-width: 560px; background: linear-gradient(160deg, #1b1436, #241a44) !important; color: #efe8ff; border: 2px solid #4a3a6e; }
+    .pack-card-modal .modal-title { color: #fff; font-family: 'Pixelify Sans', ui-monospace, monospace; }
+    .pack-cards { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .pack-planet-card { width: 118px; background: linear-gradient(#2a3a58, #1e2b44); border: 2px solid #6d84b4; border-radius: 12px; padding: 10px 8px; cursor: pointer; text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,0.4); transition: transform .12s, box-shadow .12s; font-family: 'Pixelify Sans', ui-monospace, monospace; }
+    .pack-planet-card:hover { transform: translateY(-6px); box-shadow: 0 8px 18px rgba(120,160,255,0.4); border-color: #a9c0f0; }
+    .pack-planet-card.starred { border-color: #f0c04e; box-shadow: 0 0 0 2px rgba(240,192,78,0.5), 0 3px 10px rgba(0,0,0,0.4); }
+    .pack-planet { width: 56px; height: 56px; border-radius: 50%; margin: 2px auto 8px; box-shadow: inset -6px -6px 10px rgba(0,0,0,0.35), 0 2px 5px rgba(0,0,0,0.4); }
+    .pack-name { font-weight: 800; color: #dfe8ff; font-size: 0.95rem; }
+    .pack-hand { color: #f0c04e; font-weight: 800; font-size: 0.82rem; margin-top: 2px; }
+    .pack-eff { color: #b9c8ea; font-size: 0.72rem; margin-top: 4px; line-height: 1.3; }
+    .pack-eff .up { color: #4a9fe0; font-weight: 800; } .pack-eff .um { color: #ec5a41; font-weight: 800; }
+    .pack-star { color: #f0c04e; font-size: 0.66rem; font-weight: 800; margin-top: 3px; }
+    .ba-shop-item.celest { border-color: #7b8fe0; }
+    .ba-shop-item.celest .si-name { color: #9fb0f0; }
   </style>
 </head>
 <body>
@@ -288,8 +309,9 @@
       <p style="max-width:460px;margin:8px auto 0;font-size:0.9rem">
         Un <b>roguelike de poker</b>. Joue des mains de poker pour atteindre l'objectif de chaque blind.
         Chaque main vaut <span class="ba-chips">Jetons</span> × <span class="ba-mult">Mult</span>.
-        Entre les manches, achète des <b>Jokers</b> qui transforment ton score, et des <b>planètes</b>
-        qui améliorent tes mains. Survis jusqu'à l'<b>Ante 8</b> !</p>
+        Entre les manches, achète des <b>Jokers</b> qui transforment ton score, et ouvre des
+        <b>Paquets Célestes</b> pour faire monter tes mains de niveau (elles deviennent de plus
+        en plus puissantes). Survis jusqu'à l'<b>Ante 8</b> !</p>
       <div style="margin-top:18px"><button class="ba-btn play" onclick="newGame()">Commencer</button></div>
       <button class="ba-link" id="ba-resume" style="display:none" onclick="resumeGame()">↩ Reprendre la partie en cours</button>
     </div>
@@ -306,6 +328,15 @@
   <div class="modal" id="ba-modal-joker">
     <div class="modal-card"><div class="modal-title" id="jk-title">Joker</div><p id="jk-desc" style="text-align:center;color:var(--ink-light)"></p>
       <div style="text-align:center;margin-top:14px" id="jk-actions"></div></div>
+  </div>
+  <!-- Paquet Céleste : choisis 1 planète pour faire monter une main de niveau -->
+  <div class="modal" id="ba-modal-pack">
+    <div class="modal-card pack-card-modal">
+      <div class="modal-title">🌌 Paquet Céleste</div>
+      <div style="text-align:center;color:#cbbcf0;font-size:0.86rem;margin-bottom:12px" id="pack-sub">Choisis 1 planète</div>
+      <div class="pack-cards" id="pack-cards"></div>
+      <div style="text-align:center;margin-top:14px"><button class="ba-btn ghost" onclick="closePack()">Passer</button></div>
+    </div>
   </div>
 
   <script>
@@ -430,7 +461,9 @@
       green:     { name: 'Joker Vert',   cost: 4, desc: '+1 Mult à chaque main jouée', apply: function (r, c, n) { r.mult += n; }, tick: function (n) { return n + 1; } },
       runner:    { name: 'Coureur',      cost: 5, desc: '+15 Jetons cumulés à chaque Suite', apply: function (r, c, n) { r.chips += n; }, tick: function (n, r) { return (r.key === 'STR' || r.key === 'SF') ? n + 15 : n; } },
       squarej:   { name: 'Joker Carré',  cost: 4, desc: '+4 Jetons cumulés par main de 4 cartes', apply: function (r, c, n) { r.chips += n; }, tick: function (n, r, c) { return c.played === 4 ? n + 4 : n; } },
-      supernova: { name: 'Supernova',    cost: 5, desc: '+Mult = nombre de fois cette main jouée', apply: function (r, c) { r.mult += c.plays; } }
+      supernova: { name: 'Supernova',    cost: 5, desc: '+Mult = nombre de fois cette main jouée', apply: function (r, c) { r.mult += c.plays; } },
+      // Utilitaire (aucun effet de score) : garantit ta main la plus jouée dans un Paquet Céleste.
+      astronomer:{ name: 'Astronome',    cost: 6, desc: 'Un Paquet Céleste contient TOUJOURS la planète de ta main la plus jouée', apply: function () {} }
     };
     var JOKER_POOL = Object.keys(JOKERS);
 
@@ -650,9 +683,9 @@
       var pool = JOKER_POOL.filter(function (id) { return G.jokers.indexOf(id) < 0; });
       shuffle(pool);
       var js = pool.slice(0, 2);
-      var planetKeys = shuffle(HAND_ORDER.slice()).slice(0, 2);
       var tarots = [shuffle(TAROT_POOL.slice())[0]];
-      G.shop = { jokers: js, planets: planetKeys, tarots: tarots, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
+      // Le levelling des mains passe désormais par un PAQUET CÉLESTE (booster de planètes).
+      G.shop = { jokers: js, tarots: tarots, celestial: true, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
     }
     function reroll() {
       if (G.money < G.shop.rerollCost) { toast('Pas assez d\'argent'); return; }
@@ -668,6 +701,41 @@
       if (G.money < 3) { toast('Pas assez d\'argent'); return; }
       G.money -= 3; G.levels[key] = (G.levels[key] || 1) + 1; G.shop.bought['p_' + key] = true; if (window.Sfx) Sfx.play('coin'); toast(PLANETS[key] + ' : ' + HANDS[key].name + ' niv. ' + G.levels[key]); route(); save();
     }
+    /* ━━ Paquet Céleste (booster de planètes) ━━ */
+    var PLANET_BG = { HIGH: '#b8a898', PAIR: '#c08a4a', TWO: '#7fd0e0', THREE: '#e8c07a', STR: '#e0c060', FLUSH: '#d8a060', FULL: '#4a90d0', FOUR: '#d0533a', SF: '#3f60d0' };
+    function planetBg(key) { return 'radial-gradient(circle at 34% 30%, ' + (PLANET_BG[key] || '#8899bb') + ', #0f1730)'; }
+    // Main la plus jouée (par nombre de fois) ; à égalité, la plus forte ; sinon Carte haute.
+    function mostPlayedHand() { var best = null, bestN = 0; HAND_ORDER.forEach(function (k) { var n = (G.handPlays[k] || 0); if (n > bestN) { bestN = n; best = k; } }); return best || 'HIGH'; }
+    function openCelestialPack(cost) {
+      if (!G.shop || G.shop.bought['pack']) return;
+      if (G.money < cost) { toast('Pas assez d\'argent'); return; }
+      G.money -= cost; G.shop.bought['pack'] = true; if (window.Sfx) Sfx.play('coin');
+      // 4 planètes distinctes au hasard. L'Astronome GARANTIT la main la plus jouée.
+      var picks = shuffle(HAND_ORDER.slice()).slice(0, 4), star = null;
+      if (G.jokers.indexOf('astronomer') >= 0) { star = mostPlayedHand(); if (picks.indexOf(star) < 0) picks[picks.length - 1] = star; }
+      G._packOpts = picks; G._packStar = star;
+      route(); save();                                        // maj boutique (paquet ouvert, argent)
+      renderPack(); openModal('ba-modal-pack');
+    }
+    function renderPack() {
+      $('pack-sub').textContent = G._packStar ? 'Choisis 1 planète — ⭐ = ta main la plus jouée (Astronome)' : 'Choisis 1 planète pour faire monter une main de niveau';
+      $('pack-cards').innerHTML = (G._packOpts || []).map(function (key) {
+        var lvl = G.levels[key] || 1, h = HANDS[key], star = (key === G._packStar);
+        return '<div class="pack-planet-card' + (star ? ' starred' : '') + '" onclick="pickPlanet(\'' + key + '\')">' +
+          '<div class="pack-planet" style="background:' + planetBg(key) + '"></div>' +
+          '<div class="pack-name">' + PLANETS[key] + '</div><div class="pack-hand">' + h.name + '</div>' +
+          '<div class="pack-eff">niv.' + lvl + ' → ' + (lvl + 1) + '<br><span class="um">+' + h.lm + ' Mult</span> · <span class="up">+' + h.lc + ' Jetons</span></div>' +
+          (star ? '<div class="pack-star">⭐ la + jouée</div>' : '') + '</div>';
+      }).join('');
+    }
+    function pickPlanet(key) {
+      G.levels[key] = (G.levels[key] || 1) + 1;
+      if (window.Sfx) Sfx.play('coin');
+      toast('🪐 ' + PLANETS[key] + ' — ' + HANDS[key].name + ' niveau ' + G.levels[key]);
+      closePack();
+    }
+    function closePack() { closeModal('ba-modal-pack'); G._packOpts = null; G._packStar = null; route(); save(); }
+
     function buyTarot(id) {
       if (G.consumables.length >= 2) { toast('2 consommables maximum'); return; }
       if (G.money < TAROTS[id].cost) { toast('Pas assez d\'argent'); return; }
@@ -774,7 +842,14 @@
         html += '<div class="ba-shop-item"><div class="si-name">🃏 ' + j.name + '</div><div class="si-desc">' + j.desc + '</div>' +
           '<button class="si-buy" ' + (bought || owned ? 'disabled' : '') + ' onclick="buyJoker(\'' + id + '\')">' + (bought ? 'Acheté ✓' : '$' + j.cost) + '</button></div>';
       });
-      G.shop.planets.forEach(function (key) {
+      // Paquet Céleste : ouvre 4 planètes, choisis-en 1 (le levelling des mains).
+      if (G.shop.celestial) {
+        var pb = G.shop.bought['pack'];
+        html += '<div class="ba-shop-item celest"><div class="si-name">🌌 Paquet Céleste</div><div class="si-desc">Ouvre 4 planètes, choisis-en 1 pour faire monter une main de niveau (plus tu montes, plus tes mains sont puissantes).</div>' +
+          '<button class="si-buy" ' + (pb ? 'disabled' : '') + ' onclick="openCelestialPack(4)">' + (pb ? 'Ouvert ✓' : '$4') + '</button></div>';
+      }
+      // Planètes individuelles (anciennes sauvegardes seulement).
+      (G.shop.planets || []).forEach(function (key) {
         var bought = G.shop.bought['p_' + key];
         html += '<div class="ba-shop-item planet"><div class="si-name">🪐 ' + PLANETS[key] + '</div><div class="si-desc">' + HANDS[key].name + ' niveau +1 (actuel ' + (G.levels[key] || 1) + ')</div>' +
           '<button class="si-buy" ' + (bought ? 'disabled' : '') + ' onclick="buyPlanet(\'' + key + '\')">' + (bought ? 'Acheté ✓' : '$3') + '</button></div>';

@@ -18,10 +18,10 @@
 */
 // La version est estampillée automatiquement (empreinte du contenu mis en cache)
 // par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
-var CACHE = 'jeux-0e7ce515d6';
+var CACHE = 'jeux-271e88106b';
 var ASSETS = [
   './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
-  'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',
+  'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/pixelifysans-latin-ext.woff2', 'fonts/pixelifysans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',
   'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
   'avatars.js', 'common.js', 'daily.js', 'firebase-init.js', 'fx.js', 'head.js', 'lobby.js', 'nav.js', 'offline.js', 'playus-extra.js', 'presence.js', 'puzzle.js', 'sfx.js', 'stats.js',
   'ai/aventuriers-engine.js', 'ai/bataille-navale-ai.js', 'ai/blokus-ai.js', 'ai/cluedo-engine.js', 'ai/dames-ai.js', 'ai/mastermind-ai.js', 'ai/millebornes-ai.js', 'ai/monopoly-engine.js', 'ai/morpion-ai.js', 'ai/p4-ai.js', 'ai/papayoo-ai.js', 'ai/president-ai.js', 'ai/reversi-ai.js', 'ai/sixnimmt-ai.js', 'ai/skyjo-ai.js', 'ai/trio-ai.js', 'ai/uno-ai.js',
