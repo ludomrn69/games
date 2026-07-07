@@ -59,7 +59,9 @@
     .uno-draw-pile:hover { transform: translateY(-3px); }
     .uno-draw-pile.pending { box-shadow: 0 0 0 3px var(--terracotta); animation: unoPulse 0.9s infinite; }
     @keyframes unoPulse { 50% { box-shadow: 0 0 0 6px var(--terracotta); } }
-    .uno-current-color { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--gold-light); }
+    /* Pastille de couleur active : un <span>, il lui FAUT display:inline-block sinon
+       width/height sont ignorés → elle s'affichait en fin trait blanc vertical. */
+    .uno-current-color { display: inline-block; vertical-align: middle; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--gold-light); }
     .uno-current-color.R { background: var(--uno-r); } .uno-current-color.Y { background: var(--uno-y); }
     .uno-current-color.G { background: var(--uno-g); } .uno-current-color.B { background: var(--uno-b); }
     /* Bandeau de tour : l'info critique en GRAS lisible (pulse quand c'est à toi). */
