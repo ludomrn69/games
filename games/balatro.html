@@ -683,9 +683,10 @@
       var pool = JOKER_POOL.filter(function (id) { return G.jokers.indexOf(id) < 0; });
       shuffle(pool);
       var js = pool.slice(0, 2);
+      var planetKeys = shuffle(HAND_ORDER.slice()).slice(0, 2);   // planètes à l'unité (comme le vrai jeu)
       var tarots = [shuffle(TAROT_POOL.slice())[0]];
-      // Le levelling des mains passe désormais par un PAQUET CÉLESTE (booster de planètes).
-      G.shop = { jokers: js, tarots: tarots, celestial: true, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
+      // Boutique fidèle : 2 Jokers + 2 planètes + 1 tarot en cartes, plus un PAQUET CÉLESTE.
+      G.shop = { jokers: js, planets: planetKeys, tarots: tarots, celestial: true, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
     }
     function reroll() {
       if (G.money < G.shop.rerollCost) { toast('Pas assez d\'argent'); return; }
@@ -848,10 +849,11 @@
         html += '<div class="ba-shop-item celest"><div class="si-name">🌌 Paquet Céleste</div><div class="si-desc">Ouvre 4 planètes, choisis-en 1 pour faire monter une main de niveau (plus tu montes, plus tes mains sont puissantes).</div>' +
           '<button class="si-buy" ' + (pb ? 'disabled' : '') + ' onclick="openCelestialPack(4)">' + (pb ? 'Ouvert ✓' : '$4') + '</button></div>';
       }
-      // Planètes individuelles (anciennes sauvegardes seulement).
+      // Planètes à l'unité (achetables directement, comme dans le vrai jeu).
       (G.shop.planets || []).forEach(function (key) {
-        var bought = G.shop.bought['p_' + key];
-        html += '<div class="ba-shop-item planet"><div class="si-name">🪐 ' + PLANETS[key] + '</div><div class="si-desc">' + HANDS[key].name + ' niveau +1 (actuel ' + (G.levels[key] || 1) + ')</div>' +
+        var bought = G.shop.bought['p_' + key], h = HANDS[key], lvl = (G.levels[key] || 1);
+        html += '<div class="ba-shop-item planet"><div class="si-name">🪐 ' + PLANETS[key] + '</div>' +
+          '<div class="si-desc"><b>' + h.name + '</b> · niv.' + lvl + ' → ' + (lvl + 1) + '<br>+' + h.lm + ' Mult, +' + h.lc + ' Jetons</div>' +
           '<button class="si-buy" ' + (bought ? 'disabled' : '') + ' onclick="buyPlanet(\'' + key + '\')">' + (bought ? 'Acheté ✓' : '$3') + '</button></div>';
       });
       (G.shop.tarots || []).forEach(function (id) {
