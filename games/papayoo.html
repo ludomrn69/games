@@ -38,11 +38,17 @@
     .pa-trick-who { font-size: 0.66rem; color: var(--ink-light); max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .card { width: 50px; height: 72px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0; position: relative; }
-    .card .rk { font-size: 1.25rem; line-height: 1; font-family: 'Playfair Display', serif; }
+    .card .rk { font-size: 1.4rem; line-height: 1; font-family: 'Playfair Display', serif; }
     .card .st { font-size: 1.05rem; line-height: 1; margin-top: 2px; }
     .card.win { outline: 3px solid var(--sage); }
-    .card .pts { position: absolute; top: 2px; right: 3px; font-size: 0.6rem; font-weight: 800; color: #d6584e; }
+    .card .pts { position: absolute; top: 2px; right: 3px; font-size: 0.62rem; font-weight: 800; color: #d6584e; }
     .card.pap { box-shadow: 0 0 0 2px #d6584e, 0 2px 8px rgba(0,0,0,0.2); }
+    /* Couleur Payoo (1→20) : ce sont les cartes à POINTS → cartes NOIRES, nombre bien
+       visible (= le nombre de points) et badge doré. */
+    .card.payoo { background: #22232b; border-color: #101018; }
+    html[data-theme="dark"] .card.payoo { background: #14141a; }
+    .card.payoo .rk { color: #fff; }
+    .card.payoo .pts { color: #ffcf4d; }
     html[data-theme="dark"] .card { background: #f4efe7; }
 
     .pa-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
@@ -131,7 +137,7 @@
     <div class="modal-card">
       <div class="modal-title">🐔 Papayoo</div>
       <div class="modal-body">
-        <p>• 4 couleurs (1→10) sans valeur + une couleur <b>Payoo</b> (1→20) qui compte des points de <b>pénalité</b> égaux à sa valeur.</p>
+        <p>• 4 couleurs (1→10) sans valeur + une couleur <b>Payoo</b> (les cartes <b>noires</b> 🐔 1→20) qui compte des points de <b>pénalité</b> égaux à sa valeur.</p>
         <p style="margin-top:6px">• Le <b>Papayoo</b> (le 7 d'une couleur tirée au sort) vaut <b>40 points</b> !</p>
         <p style="margin-top:6px">• On suit la couleur demandée si on peut. Le plus fort de cette couleur <b>ramasse le pli</b> et tous ses points.</p>
         <p style="margin-top:6px">• On enchaîne les donnes. Quand un joueur dépasse le seuil, la partie s'arrête : le <b>plus petit score gagne</b>.</p>
@@ -390,8 +396,9 @@
       var s = suitOf(card), v = valOf(card);
       var p = cardPoints(card, papSuit);
       var isPap = (card === papSuit + '7');
+      var payoo = isPayoo(card);                                // la couleur Payoo = cartes NOIRES à points (1→20)
       var ptsBadge = p ? '<span class="pts">' + p + '</span>' : '';
-      return '<div class="card' + (isPap ? ' pap' : '') + (extra || '') + '">' + ptsBadge +
+      return '<div class="card' + (payoo ? ' payoo' : '') + (isPap ? ' pap' : '') + (extra || '') + '">' + ptsBadge +
         '<span class="rk">' + v + '</span><span class="st">' + SUIT_EMOJI[s] + '</span></div>';
     }
     function render(state) {
