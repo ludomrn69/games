@@ -116,7 +116,8 @@
   var waterBlobs=[],landBlobs=[],water={};  // terrain organique + cases d'eau
   var inv={bridge:0,motorway:0,roundabout:0,light:0}; // déblocages accumulés (compteurs)
   var tool='road';                          // outil actif
-  function isRoad(g){return g&&(g.t==='road'||g.t==='bridge'||g.t==='motorway');}
+  var motorways=[],mwStart=null,mwEnd=null;  // autoroutes = liaisons point-à-point surélevées
+  function isRoad(g){return g&&(g.t==='road'||g.t==='bridge');}
   // Point (relatif 0..1) dans un contour → sert à repérer les cases d'EAU.
   function pointInBlob(px,py,pts){var inside=false;for(var i=0,j=pts.length-1;i<pts.length;j=i++){var xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y;if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;}return inside;}
   function computeWater(){water={};if(!COLS||!ROWS||!W)return;for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var px=cx(c)/W,py=cy(r)/H;for(var b=0;b<waterBlobs.length;b++){if(pointInBlob(px,py,waterBlobs[b])){water[key(r,c)]=1;break;}}}}
@@ -168,6 +169,7 @@
     grid={};houses=[];dests=[];cars=[];roads=roads0;score=0;gt=0;week=1;
     nextBuildT=0;dispatchT=0;colorsN=colors0;carSpeed=speed0;carsPerHouse=1;
     inv={bridge:2,motorway:0,roundabout:0,light:0};   // 2 ponts offerts au départ
+    motorways=[];mwStart=null;mwEnd=null;
     genTerrain(DAILY?daySeed():((Math.random()*1e9)|0));
     selectTool('road');
     // départ : une maison + un bâtiment de même couleur
@@ -202,14 +204,26 @@
   function refundCell(g){ if(g.t==='road')roads++; else if(g.t==='bridge')inv.bridge++; else if(g.t==='motorway')inv.motorway++; if(g.feature)inv[g.feature]++; }
   function paintTool(r,c){
     if(!inb(r,c))return;var k=key(r,c),g=grid[k];
-    if(tool==='erase'){ if(isRoad(g)){refundCell(g);delete grid[k];afterEdit();} return; }
+    if(tool==='erase'){
+      if(isRoad(g)){refundCell(g);delete grid[k];afterEdit();return;}
+      for(var mi=0;mi<motorways.length;mi++){var m=motorways[mi];if((m.a.r===r&&m.a.c===c)||(m.b.r===r&&m.b.c===c)){inv.motorway+=m.cost;motorways.splice(mi,1);afterEdit();return;}}
+      return;
+    }
     if(tool==='roundabout'||tool==='light'){ if(isRoad(g)&&!g.feature&&inv[tool]>0){g.feature=tool;inv[tool]--;afterEdit();} return; }
     if(g)return;                                     // case occupée
     if(tool==='road'){ if(water[k]||roads<=0)return; grid[k]={t:'road',r:r,c:c};roads--; }
     else if(tool==='bridge'){ if(!water[k]||inv.bridge<=0)return; grid[k]={t:'bridge',r:r,c:c};inv.bridge--; }   // pont : sur l'eau
-    else if(tool==='motorway'){ if(inv.motorway<=0)return; grid[k]={t:'motorway',r:r,c:c};inv.motorway--; }       // autoroute : partout (eau incluse)
-    else return;
+    else return;                                     // l'autoroute se pose par glisser A→B (cf. finalizeMotorway)
     afterEdit();
+  }
+  // Autoroute : liaison surélevée entre deux points (glisser d'un bout à l'autre).
+  function finalizeMotorway(a,b){
+    if(!a||!b||(a.r===b.r&&a.c===b.c)||!inb(a.r,a.c)||!inb(b.r,b.c))return;
+    var cost=Math.max(1,Math.round(Math.hypot(b.r-a.r,b.c-a.c)));
+    if(inv.motorway<cost){ var t=inv.motorway/cost; if(t<0.5)return; b={r:Math.round(a.r+(b.r-a.r)*t),c:Math.round(a.c+(b.c-a.c)*t)}; cost=inv.motorway; }
+    if(cost<1)return;
+    motorways.push({a:{r:a.r,c:a.c},b:{r:b.r,c:b.c},cost:cost});
+    inv.motorway-=cost;afterEdit();
   }
   function afterEdit(){updateHud();renderToolbar();invalidateCars();}
   function invalidateCars(){ cars.forEach(function(ca){ca.recheck=true;}); }
@@ -222,21 +236,32 @@
   function findPath(house,dest){
     // adjacence directe maison-bâtiment
     if(Math.abs(house.r-dest.r)+Math.abs(house.c-dest.c)===1) return [house,dest];
-    var starts=roadNeighborsOf(house), goals={};
-    roadNeighborsOf(dest).forEach(function(g){goals[key(g.r,g.c)]=1;});
-    if(!starts.length||!Object.keys(goals).length)return null;
-    var q=[],prev={},seen={};
-    starts.forEach(function(s){var k=key(s.r,s.c);seen[k]=1;prev[k]=null;q.push(s);});
-    var found=null;
+    var starts=roadNeighborsOf(house), goalsArr=roadNeighborsOf(dest), goals={};
+    goalsArr.forEach(function(g){goals[key(g.r,g.c)]=1;});
+    if(!starts.length||!goalsArr.length)return null;
+    // BFS général : nœuds = cases route OU extrémités d'autoroute (qui sautent d'un
+    // bout à l'autre). Les autoroutes passent AU-DESSUS de tout, sans toucher la grille.
+    function cnode(r,c){return {k:'c'+r+','+c,kind:'cell',r:r,c:c};}
+    function enode(mi,side){var ep=side==='a'?motorways[mi].a:motorways[mi].b;return {k:'e'+mi+side,kind:'ep',mw:mi,side:side,r:ep.r,c:ep.c};}
+    var q=[],prev={},seen={},found=null;
+    starts.forEach(function(s){var nd=cnode(s.r,s.c);seen[nd.k]=1;prev[nd.k]=null;q.push(nd);});
     while(q.length){
-      var cur=q.shift(),ck=key(cur.r,cur.c);
-      if(goals[ck]){found=cur;break;}
-      var dirs=[[1,0],[-1,0],[0,1],[0,-1]];
-      for(var i=0;i<dirs.length;i++){var nr=cur.r+dirs[i][0],nc=cur.c+dirs[i][1],nk=key(nr,nc);
-        var g=grid[nk];if(isRoad(g)&&!seen[nk]){seen[nk]=1;prev[nk]=cur;q.push(g);}}
+      var cur=q.shift();
+      if(cur.kind==='cell'&&goals[key(cur.r,cur.c)]){found=cur;break;}
+      var nbrs=[];
+      if(cur.kind==='cell'){
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var g=grid[key(cur.r+d[0],cur.c+d[1])];if(isRoad(g))nbrs.push(cnode(g.r,g.c));});
+        motorways.forEach(function(m,mi){[['a',m.a],['b',m.b]].forEach(function(pr){if(Math.abs(pr[1].r-cur.r)+Math.abs(pr[1].c-cur.c)<=1)nbrs.push(enode(mi,pr[0]));});});
+      } else {
+        nbrs.push(enode(cur.mw,cur.side==='a'?'b':'a'));           // l'autre bout via l'autoroute
+        var ep=cur.side==='a'?motorways[cur.mw].a:motorways[cur.mw].b;
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var g=grid[key(ep.r+d[0],ep.c+d[1])];if(isRoad(g))nbrs.push(cnode(g.r,g.c));});
+      }
+      for(var i=0;i<nbrs.length;i++){var nd=nbrs[i];if(!seen[nd.k]){seen[nd.k]=1;prev[nd.k]=cur;q.push(nd);}}
     }
     if(!found)return null;
-    var path=[];var n=found;while(n){path.unshift(n);n=prev[key(n.r,n.c)];}
+    var nodes=[],n=found;while(n){nodes.unshift(n);n=prev[n.k];}
+    var path=nodes.map(function(nd){return {r:nd.r,c:nd.c,mw:nd.kind==='ep'};});
     return [house].concat(path,[dest]);
   }
 
@@ -284,9 +309,9 @@
     // semaine
     if(gt>=week*24){startWeek();return;}
 
-    // charge de trafic par case (pour la congestion aux carrefours)
+    // charge de trafic par case route (pour la congestion aux carrefours)
     var load={};
-    cars.forEach(function(ca){var nd=ca.path[Math.min(ca.seg,ca.path.length-1)];if(isRoad(nd)){var lk=key(nd.r,nd.c);load[lk]=(load[lk]||0)+1;}});
+    cars.forEach(function(ca){var nd=ca.path[Math.min(ca.seg,ca.path.length-1)];if(nd&&!nd.mw){var g=grid[key(nd.r,nd.c)];if(isRoad(g)){var lk=key(nd.r,nd.c);load[lk]=(load[lk]||0)+1;}}});
     // déplacement des voitures
     for(var i=cars.length-1;i>=0;i--){
       var ca=cars[i];
@@ -299,10 +324,10 @@
       if(ca.seg>=pts.length-1){arriveCar(ca,i);continue;}
       var A=pts[ca.seg],B=pts[ca.seg+1];
       var seg=Math.hypot(B.x-A.x,B.y-A.y)||1;
-      // facteur de vitesse : autoroute = rapide ; carrefour saturé sans rond-point/feu = lent
-      var node=ca.path[ca.seg], f=1;
-      if(node&&node.t==='motorway')f=1.9;
-      else if(isRoad(node)&&!node.feature&&(load[key(node.r,node.c)]||0)>1)f=0.45;
+      // facteur de vitesse : sur l'autoroute = rapide ; carrefour saturé sans rond-point/feu = lent
+      var node=ca.path[ca.seg], nxt=ca.path[ca.seg+1], f=1;
+      if(node&&nxt&&node.mw&&nxt.mw)f=2.3;
+      else if(node){var gc=grid[key(node.r,node.c)];if(isRoad(gc)&&!gc.feature&&(load[key(node.r,node.c)]||0)>1)f=0.45;}
       ca.t += (carSpeed*f*CELL*dt)/seg;
       while(ca.t>=1 && ca.seg<pts.length-1){ca.t-=1;ca.seg++;}
       if(ca.seg>=pts.length-1){arriveCar(ca,i);continue;}
@@ -373,16 +398,15 @@
   }
   // Assombrit une couleur hex (pour les faces en relief).
   function shade(hex,f){var n=parseInt(hex.slice(1),16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;return 'rgb('+((r*f)|0)+','+((g*f)|0)+','+((b*f)|0)+')';}
-  // Bâtiment en CUBE 3D : face avant sombre (extrusion) + face du dessus + reflet.
+  // Bâtiment coloré arrondi, léger relief (extrusion douce + reflet), sans façade.
   function drawBox(x,y,s,color,depth){
-    var r=Math.min(6,s*0.2);
+    var r=s*0.28;
     ctx.save();
-    ctx.shadowColor='rgba(0,0,0,.24)';ctx.shadowBlur=s*0.22;ctx.shadowOffsetY=depth*0.6+s*0.06;
-    ctx.fillStyle=shade(color,0.52);rr(x-s/2,y-s/2+depth,s,s,r);ctx.fill();      // face avant (extrusion, bien sombre)
+    ctx.shadowColor='rgba(0,0,0,.18)';ctx.shadowBlur=s*0.2;ctx.shadowOffsetY=s*0.08;
+    ctx.fillStyle=shade(color,0.72);rr(x-s/2,y-s/2+depth,s,s,r);ctx.fill();      // côté (extrusion douce)
     ctx.shadowColor='transparent';
-    ctx.fillStyle=color;rr(x-s/2,y-s/2,s,s,r);ctx.fill();                        // face du dessus
-    ctx.fillStyle='rgba(255,255,255,.18)';rr(x-s/2,y-s/2,s,s*0.34,r);ctx.fill(); // reflet haut
-    ctx.fillStyle='rgba(0,0,0,.10)';rr(x-s/2,y+s*0.3,s,s*0.2,r);ctx.fill();      // ombre bas de la face du dessus
+    ctx.fillStyle=color;rr(x-s/2,y-s/2,s,s,r);ctx.fill();                        // dessus
+    ctx.fillStyle='rgba(255,255,255,.15)';rr(x-s/2,y-s/2,s,s*0.42,r);ctx.fill();// reflet doux
     ctx.restore();
   }
   function draw(){
@@ -407,11 +431,23 @@
     ctx.fillStyle=dark()?'#39404a':'#f8f5ec';paintRoadLayer(th);
     // ponts : bords BIEN épais (surélevés au-dessus de l'eau)
     overlayLayer('bridge',th,dark()?'#05070a':'#7c8178',dark()?'#39404a':'#f8f5ec');
-    // autoroutes : GROS trait jaune épais, bord fin sombre (rapide, passe au-dessus de tout)
-    overlayLayer('motorway',th*1.15,dark()?'#8a6a1a':'#c99a1e',dark()?'#e0b23a':'#f6c92b');
     // ronds-points & feux placés par le joueur
     drawFeatures();
-    // voitures (petite auto arrondie avec ombre douce)
+    // maisons : petit bâtiment coloré arrondi (sources)
+    houses.forEach(function(h){drawBox(cx(h.c),cy(h.r),CELL*0.42,h.color,CELL*0.1);});
+    // usines : bâtiment coloré nettement plus GRAND + file de « voitures » en attente
+    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.72;
+      if(d.over>0){var f=Math.min(1,d.over/OVER_LIMIT);ctx.strokeStyle='#e8582c';ctx.lineWidth=3;
+        ctx.beginPath();ctx.arc(x,y,s*0.85,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
+      drawBox(x,y,s,d.color,CELL*0.13);
+      var np=Math.min(d.pins,PIN_CAP);
+      for(var p=0;p<np;p++){var px=x-CELL*0.42+ (p%4)*(CELL*0.17), py=y+CELL*0.42+((p/4)|0)*CELL*0.14;
+        ctx.fillStyle=d.pins>=PIN_CAP?'#e5484d':d.color;
+        rr(px-CELL*0.06,py-CELL*0.035,CELL*0.12,CELL*0.07,CELL*0.02);ctx.fill();}   // petite voiture en file
+    });
+    // AUTOROUTES : liaisons surélevées, dessinées AU-DESSUS des routes/bâtiments
+    drawMotorways();
+    // voitures (par-dessus tout : visibles sur routes ET sur l'autoroute)
     cars.forEach(function(ca){
       var pts=pathPoints(ca.path);if(ca.seg>=pts.length-1)return;
       var A=pts[ca.seg],B=pts[ca.seg+1];
@@ -420,27 +456,25 @@
       ctx.shadowColor='rgba(0,0,0,.20)';ctx.shadowBlur=CELL*0.10;ctx.shadowOffsetY=CELL*0.03;
       ctx.fillStyle=ca.color;rr(-CELL*0.19,-CELL*0.12,CELL*0.38,CELL*0.24,CELL*0.08);ctx.fill();
       ctx.shadowColor='transparent';
-      ctx.fillStyle='rgba(255,255,255,.55)';rr(CELL*0.01,-CELL*0.08,CELL*0.12,CELL*0.16,CELL*0.04);ctx.fill(); // pare-brise
+      ctx.fillStyle='rgba(255,255,255,.55)';rr(CELL*0.01,-CELL*0.08,CELL*0.12,CELL*0.16,CELL*0.04);ctx.fill();
       ctx.restore();
     });
-    // maisons : PETIT cube 3D (sources)
-    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.4;
-      drawBox(x,y,s,h.color,s*0.3);
-    });
-    // usines : GROS cube 3D (nettement plus grand que les maisons) + pins sur le TOIT
-    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.72,dep=s*0.24;
-      if(d.over>0){var f=Math.min(1,d.over/OVER_LIMIT);ctx.strokeStyle='#e8582c';ctx.lineWidth=3;
-        ctx.beginPath();ctx.arc(x,y,s*0.78,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
-      drawBox(x,y,s,d.color,dep);
-      ctx.fillStyle='rgba(255,255,255,.9)';rr(x-s*0.16,y-s*0.14,s*0.32,s*0.32,2.5);ctx.fill(); // façade sur la face du dessus
-      // pins de demande POSÉS SUR LE TOIT (petites pastilles rondes, en haut du toit)
-      var np=Math.min(d.pins,PIN_CAP);
-      for(var p=0;p<np;p++){
-        var px=x-CELL*0.22+ (p%4)*(CELL*0.145), py=y-s*0.34+((p/4)|0)*CELL*0.13;
-        ctx.fillStyle=d.pins>=PIN_CAP?'#e5484d':'#2b2b2b';
-        ctx.beginPath();ctx.arc(px,py,CELL*0.048,0,7);ctx.fill();
-      }
-    });
+  }
+  // ── Autoroutes : gros trait jaune SURÉLEVÉ (ombre portée), passe au-dessus de tout
+  function drawMwLine(a,b,preview){
+    var A={x:cx(a.c),y:cy(a.r)},B={x:cx(b.c),y:cy(b.r)};
+    if(preview)ctx.globalAlpha=0.5;
+    ctx.lineCap='round';
+    ctx.strokeStyle='rgba(0,0,0,.16)';ctx.lineWidth=CELL*0.5;ctx.beginPath();ctx.moveTo(A.x,A.y+CELL*0.16);ctx.lineTo(B.x,B.y+CELL*0.16);ctx.stroke(); // ombre portée (élevé)
+    ctx.strokeStyle=dark()?'#8a6a1a':'#c99a1e';ctx.lineWidth=CELL*0.5;ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();           // bord doré
+    ctx.strokeStyle=dark()?'#e6b93f':'#f6c92b';ctx.lineWidth=CELL*0.34;ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();          // ruban jaune
+    [A,B].forEach(function(P){ctx.fillStyle=dark()?'#c99a1e':'#c99a1e';ctx.beginPath();ctx.arc(P.x,P.y,CELL*0.24,0,7);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(P.x,P.y,CELL*0.1,0,7);ctx.fill();});                                                              // ronds aux extrémités
+    if(preview)ctx.globalAlpha=1;
+  }
+  function drawMotorways(){
+    motorways.forEach(function(m){drawMwLine(m.a,m.b,false);});
+    if(tool==='motorway'&&mwStart&&mwEnd)drawMwLine(mwStart,mwEnd,true);
   }
 
   // ── HUD & barre d'outils ─────────────────────────────────────────────────────
@@ -471,9 +505,13 @@
   var painting=false;
   function cellAt(e){var rct=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;
     var x=t.clientX-rct.left-OX,y=t.clientY-rct.top-OY;return {r:Math.floor(y/CELL),c:Math.floor(x/CELL)};}
-  function down(e){if(state!=='play')return;painting=true;var p=cellAt(e);paintTool(p.r,p.c);e.preventDefault();}
-  function move(e){if(!painting||state!=='play')return;var p=cellAt(e);paintTool(p.r,p.c);e.preventDefault();}
-  function up(){painting=false;}
+  function down(e){if(state!=='play')return;var p=cellAt(e);
+    if(tool==='motorway'){mwStart=p;mwEnd=p;painting=true;e.preventDefault();return;}
+    painting=true;paintTool(p.r,p.c);e.preventDefault();}
+  function move(e){if(state!=='play')return;
+    if(tool==='motorway'&&mwStart){mwEnd=cellAt(e);e.preventDefault();return;}
+    if(!painting)return;var p=cellAt(e);paintTool(p.r,p.c);e.preventDefault();}
+  function up(){ if(tool==='motorway'&&mwStart){finalizeMotorway(mwStart,mwEnd||mwStart);mwStart=null;mwEnd=null;} painting=false;}
   cv.addEventListener('mousedown',down);addEventListener('mousemove',move);addEventListener('mouseup',up);
   cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',up);
 
