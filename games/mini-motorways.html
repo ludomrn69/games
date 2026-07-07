@@ -42,6 +42,15 @@
   .choice:hover{transform:translateY(-3px);border-color:#37a86b}
   .choice .ce{font-size:2rem}.choice .ct{font-weight:800}.choice .cs{font-size:.75rem;opacity:.65}
   .road-badge{display:inline-flex;align-items:center;gap:4px}
+  .toolbar{position:absolute;left:0;right:0;bottom:12px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:0 8px;z-index:4}
+  .tool{display:flex;flex-direction:column;align-items:center;gap:1px;background:rgba(255,255,255,.93);border:2px solid transparent;border-radius:14px;
+    padding:5px 9px;cursor:pointer;font-family:inherit;color:inherit;box-shadow:0 3px 12px rgba(0,0,0,.14);min-width:44px}
+  .tool .te{font-size:1.15rem;line-height:1}
+  .tool .tc{font-size:.6rem;font-weight:800;opacity:.75;white-space:nowrap}
+  .tool.on{border-color:#37a86b;background:#fff}
+  .tool:disabled{opacity:.4;cursor:default}
+  body.dark .tool{background:rgba(40,44,40,.93);color:#e7e7ee}
+  body.dark .tool.on{background:rgba(55,80,55,.6)}
 </style>
 </head>
 <body>
@@ -52,16 +61,16 @@
     <div class="stat"><div class="n" id="score">0</div><div class="l">Trajets</div></div>
     <div class="grow"></div>
     <div class="stat"><div class="n road-badge">🛣️ <span id="roads">0</span></div><div class="l">Routes</div></div>
-    <button class="icon-btn" id="eraseBtn" aria-label="Gomme">🧽</button>
     <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
   </div>
   <div id="stage">
     <canvas id="cv"></canvas>
     <div class="hint" id="hint">Trace des routes en glissant pour relier maisons et bâtiments de même couleur</div>
+    <div class="toolbar" id="toolbar"></div>
 
     <div class="screen" id="start">
       <h1>🚗 Mini Motorways</h1>
-      <p>Trace des routes pour relier chaque maison à un bâtiment de <b>même couleur</b>. Les voitures font la navette toutes seules. Si un bâtiment attend trop longtemps (jauge pleine), c'est fini&nbsp;! Optimise ton réseau le plus longtemps possible.</p>
+      <p>Trace des routes pour relier chaque maison à un bâtiment de <b>même couleur</b>. Les voitures font la navette toutes seules. Chaque semaine tu débloques des <b>ponts</b> 🌉 (traverser l'eau), des <b>autoroutes</b> 🛤️ (rapides), des <b>ronds-points</b> 🔄 et des <b>feux</b> 🚦 (fluidifier les carrefours). Si un bâtiment attend trop longtemps, c'est fini&nbsp;!</p>
       <button class="btn" id="startBtn">Jouer</button>
       <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#2c7be5,#8b5cf6);box-shadow:0 8px 24px rgba(44,123,229,.4)">🗓️ Défi du jour</button>
       <div id="dailyInfo" style="font-size:.82rem;opacity:.72;max-width:300px"></div>
@@ -95,16 +104,22 @@
     CELL=Math.max(30,Math.min(46,Math.floor(Math.min(W,H)/13)));
     COLS=Math.floor((W-8)/CELL);ROWS=Math.floor((H-8)/CELL);
     OX=(W-COLS*CELL)/2;OY=(H-ROWS*CELL)/2;}
-  addEventListener('resize',function(){resize();});
+  addEventListener('resize',function(){resize();computeWater();});
   try{if(localStorage.getItem('games-theme')==='dark')document.body.classList.add('dark');}catch(e){}
 
   var COLORS=['#e8582c','#2c7be5','#f2b705','#8b5cf6','#37a86b','#e5439b'];
   var PIN_CAP=9, OVER_LIMIT=36, BEST='mini_motorways_best';
   var best=+localStorage.getItem(BEST)||0;
 
-  var state,grid,houses,dests,cars,roads,score,gt,week,nextBuildT,dispatchT,colorsN,eraseMode,carSpeed,carsPerHouse;
+  var state,grid,houses,dests,cars,roads,score,gt,week,nextBuildT,dispatchT,colorsN,carSpeed,carsPerHouse;
   var demandMul,buildMul;                   // modulés par le défi du jour
-  var waterBlobs=[],landBlobs=[];           // terrain organique (généré par carte)
+  var waterBlobs=[],landBlobs=[],water={};  // terrain organique + cases d'eau
+  var inv={bridge:0,motorway:0,roundabout:0,light:0}; // déblocages accumulés (compteurs)
+  var tool='road';                          // outil actif
+  function isRoad(g){return g&&(g.t==='road'||g.t==='bridge'||g.t==='motorway');}
+  // Point (relatif 0..1) dans un contour → sert à repérer les cases d'EAU.
+  function pointInBlob(px,py,pts){var inside=false;for(var i=0,j=pts.length-1;i<pts.length;j=i++){var xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y;if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;}return inside;}
+  function computeWater(){water={};if(!COLS||!ROWS||!W)return;for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var px=cx(c)/W,py=cy(r)/H;for(var b=0;b<waterBlobs.length;b++){if(pointInBlob(px,py,waterBlobs[b])){water[key(r,c)]=1;break;}}}}
 
   // Contour organique fermé (points relatifs 0..1) autour d'un centre.
   function genBlob(cxr,cyr,rr,rng){var pts=[],N=10;for(var i=0;i<N;i++){var a=i/N*6.2832;var rad=rr*(0.68+rng()*0.6);pts.push({x:cxr+Math.cos(a)*rad,y:cyr+Math.sin(a)*rad*1.25});}return pts;}
@@ -112,6 +127,7 @@
     var t=mulberry32(seed>>>0||1);
     waterBlobs=[genBlob(0.12,0.1,0.17,t),genBlob(0.9,0.86,0.2,t),genBlob(0.95,0.2,0.12,t)];
     landBlobs=[genBlob(0.68,0.32,0.16,t),genBlob(0.25,0.75,0.15,t)];
+    computeWater();
   }
   function blobPath(pts){ // pts relatifs → chemin lissé absolu
     var n=pts.length,P=pts.map(function(p){return {x:p.x*W,y:p.y*H};});
@@ -150,9 +166,10 @@
       if(dayTwist.buildMul!=null)buildMul=dayTwist.buildMul;
     }
     grid={};houses=[];dests=[];cars=[];roads=roads0;score=0;gt=0;week=1;
-    nextBuildT=0;dispatchT=0;colorsN=colors0;eraseMode=false;carSpeed=speed0;carsPerHouse=1;
+    nextBuildT=0;dispatchT=0;colorsN=colors0;carSpeed=speed0;carsPerHouse=1;
+    inv={bridge:2,motorway:0,roundabout:0,light:0};   // 2 ponts offerts au départ
     genTerrain(DAILY?daySeed():((Math.random()*1e9)|0));
-    document.getElementById('eraseBtn').classList.remove('on');
+    selectTool('road');
     // départ : une maison + un bâtiment de même couleur
     spawnBuilding('house',0);spawnBuilding('dest',0);
     spawnBuilding('house',1);spawnBuilding('dest',1);
@@ -163,7 +180,7 @@
   function freeCell(){
     for(var tries=0;tries<300;tries++){
       var r=1+((rnd()*(ROWS-2))|0), c=1+((rnd()*(COLS-2))|0);
-      if(!grid[key(r,c)]){
+      if(!grid[key(r,c)] && !water[key(r,c)]){
         // éviter d'enfermer : au moins 1 voisin libre
         var open=0;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){if(inb(r+d[0],c+d[1])&&!occupied(r+d[0],c+d[1]))open++;});
         if(open>=2) return {r:r,c:c};
@@ -181,19 +198,25 @@
     (type==='house'?houses:dests).push(o);
   }
 
-  // ── Routes (peinture) ────────────────────────────────────────────────────────
-  function paintRoad(r,c){
+  // ── Placement des tuiles selon l'outil actif ────────────────────────────────
+  function refundCell(g){ if(g.t==='road')roads++; else if(g.t==='bridge')inv.bridge++; else if(g.t==='motorway')inv.motorway++; if(g.feature)inv[g.feature]++; }
+  function paintTool(r,c){
     if(!inb(r,c))return;var k=key(r,c),g=grid[k];
-    if(eraseMode){ if(g&&g.t==='road'){delete grid[k];roads++;updateHud();invalidateCars();} return; }
-    if(g)return; // occupé (bâtiment ou route)
-    if(roads<=0)return;
-    grid[k]={t:'road',r:r,c:c};roads--;updateHud();invalidateCars();
+    if(tool==='erase'){ if(isRoad(g)){refundCell(g);delete grid[k];afterEdit();} return; }
+    if(tool==='roundabout'||tool==='light'){ if(isRoad(g)&&!g.feature&&inv[tool]>0){g.feature=tool;inv[tool]--;afterEdit();} return; }
+    if(g)return;                                     // case occupée
+    if(tool==='road'){ if(water[k]||roads<=0)return; grid[k]={t:'road',r:r,c:c};roads--; }
+    else if(tool==='bridge'){ if(!water[k]||inv.bridge<=0)return; grid[k]={t:'bridge',r:r,c:c};inv.bridge--; }   // pont : sur l'eau
+    else if(tool==='motorway'){ if(inv.motorway<=0)return; grid[k]={t:'motorway',r:r,c:c};inv.motorway--; }       // autoroute : partout (eau incluse)
+    else return;
+    afterEdit();
   }
+  function afterEdit(){updateHud();renderToolbar();invalidateCars();}
   function invalidateCars(){ cars.forEach(function(ca){ca.recheck=true;}); }
 
-  // ── Pathfinding BFS sur les cases route ─────────────────────────────────────
-  function roadNeighborsOf(b){ // cases route adjacentes à un bâtiment
-    var out=[];[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var g=grid[key(b.r+d[0],b.c+d[1])];if(g&&g.t==='road')out.push(g);});
+  // ── Pathfinding BFS sur le réseau (route / pont / autoroute) ─────────────────
+  function roadNeighborsOf(b){ // cases praticables adjacentes à un bâtiment
+    var out=[];[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var g=grid[key(b.r+d[0],b.c+d[1])];if(isRoad(g))out.push(g);});
     return out;
   }
   function findPath(house,dest){
@@ -210,7 +233,7 @@
       if(goals[ck]){found=cur;break;}
       var dirs=[[1,0],[-1,0],[0,1],[0,-1]];
       for(var i=0;i<dirs.length;i++){var nr=cur.r+dirs[i][0],nc=cur.c+dirs[i][1],nk=key(nr,nc);
-        var g=grid[nk];if(g&&g.t==='road'&&!seen[nk]){seen[nk]=1;prev[nk]=cur;q.push(g);}}
+        var g=grid[nk];if(isRoad(g)&&!seen[nk]){seen[nk]=1;prev[nk]=cur;q.push(g);}}
     }
     if(!found)return null;
     var path=[];var n=found;while(n){path.unshift(n);n=prev[key(n.r,n.c)];}
@@ -261,6 +284,9 @@
     // semaine
     if(gt>=week*24){startWeek();return;}
 
+    // charge de trafic par case (pour la congestion aux carrefours)
+    var load={};
+    cars.forEach(function(ca){var nd=ca.path[Math.min(ca.seg,ca.path.length-1)];if(isRoad(nd)){var lk=key(nd.r,nd.c);load[lk]=(load[lk]||0)+1;}});
     // déplacement des voitures
     for(var i=cars.length-1;i>=0;i--){
       var ca=cars[i];
@@ -273,7 +299,11 @@
       if(ca.seg>=pts.length-1){arriveCar(ca,i);continue;}
       var A=pts[ca.seg],B=pts[ca.seg+1];
       var seg=Math.hypot(B.x-A.x,B.y-A.y)||1;
-      ca.t += (carSpeed*CELL*dt)/seg;
+      // facteur de vitesse : autoroute = rapide ; carrefour saturé sans rond-point/feu = lent
+      var node=ca.path[ca.seg], f=1;
+      if(node&&node.t==='motorway')f=1.9;
+      else if(isRoad(node)&&!node.feature&&(load[key(node.r,node.c)]||0)>1)f=0.45;
+      ca.t += (carSpeed*f*CELL*dt)/seg;
       while(ca.t>=1 && ca.seg<pts.length-1){ca.t-=1;ca.seg++;}
       if(ca.seg>=pts.length-1){arriveCar(ca,i);continue;}
     }
@@ -306,17 +336,40 @@
   // Dessine tout le réseau routier à une largeur donnée (utilisé 2×: contour + ruban).
   function paintRoadLayer(w){
     var r=w/2, rad=Math.min(7,w*0.42);
-    for(var kk in grid){var g=grid[kk];if(g.t!=='road')continue;
+    for(var kk in grid){var g=grid[kk];if(!isRoad(g))continue;
       var x=cx(g.c),y=cy(g.r);
       rr(x-r,y-r,w,w,rad);ctx.fill();
       [[0,1],[1,0]].forEach(function(d){var n=grid[key(g.r+d[0],g.c+d[1])];
-        if(n&&n.t==='road'){var x2=cx(n.c),y2=cy(n.r);
+        if(isRoad(n)){var x2=cx(n.c),y2=cy(n.r);
           if(d[1])rr(x,y-r,x2-x,w,4);else rr(x-r,y,w,y2-y,4);ctx.fill();}});
     }
     [houses,dests].forEach(function(list){list.forEach(function(b){
       roadNeighborsOf(b).forEach(function(n){var x=cx(b.c),y=cy(b.r),x2=cx(n.c),y2=cy(n.r);
         if(y===y2)rr(Math.min(x,x2),y-r,Math.abs(x2-x),w,4);else rr(x-r,Math.min(y,y2),w,Math.abs(y2-y),4);ctx.fill();});
     });});
+  }
+  // Surcouche pour un TYPE de tuile (pont/autoroute) : bords épais puis remplissage.
+  function overlayLayer(type,w,edgeCol,fillCol){
+    [ [w+5,edgeCol], [w,fillCol] ].forEach(function(pass){
+      if(!pass[1])return;var ww=pass[0],r=ww/2,rad=Math.min(6,ww*0.4);ctx.fillStyle=pass[1];
+      for(var kk in grid){var g=grid[kk];if(g.t!==type)continue;var x=cx(g.c),y=cy(g.r);
+        rr(x-r,y-r,ww,ww,rad);ctx.fill();
+        [[0,1],[1,0],[0,-1],[-1,0]].forEach(function(d){var n=grid[key(g.r+d[0],g.c+d[1])];
+          if(isRoad(n)){var x2=cx(n.c),y2=cy(n.r);
+            if(d[1])rr(Math.min(x,x2),y-r,Math.abs(x2-x),ww,4);else if(d[0])rr(x-r,Math.min(y,y2),ww,Math.abs(y2-y),4);ctx.fill();}});
+      }
+    });
+  }
+  function drawFeatures(){
+    for(var kk in grid){var g=grid[kk];if(!g.feature)continue;var x=cx(g.c),y=cy(g.r);
+      if(g.feature==='roundabout'){var ir=CELL*0.17;
+        ctx.fillStyle=dark()?'#12151a':'#9aa094';ctx.beginPath();ctx.arc(x,y,ir+2.5,0,7);ctx.fill();
+        ctx.fillStyle=dark()?'#39404a':'#f8f5ec';ctx.beginPath();ctx.arc(x,y,ir,0,7);ctx.fill();
+        ctx.fillStyle=dark()?'#243449':'#cfe4d0';ctx.beginPath();ctx.arc(x,y,ir*0.45,0,7);ctx.fill();}
+      else if(g.feature==='light'){
+        ctx.fillStyle='#2a2a2a';rr(x-CELL*0.055,y-CELL*0.15,CELL*0.11,CELL*0.3,CELL*0.05);ctx.fill();
+        ['#e5484d','#f2b705','#37a86b'].forEach(function(col,i){ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y-CELL*0.09+i*CELL*0.09,CELL*0.028,0,7);ctx.fill();});}
+    }
   }
   // Assombrit une couleur hex (pour les faces en relief).
   function shade(hex,f){var n=parseInt(hex.slice(1),16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;return 'rgb('+((r*f)|0)+','+((g*f)|0)+','+((b*f)|0)+')';}
@@ -348,14 +401,12 @@
     var th=CELL*0.42;
     ctx.fillStyle=dark()?'#12151a':'#b3b9ac';paintRoadLayer(th+5);
     ctx.fillStyle=dark()?'#39404a':'#f8f5ec';paintRoadLayer(th);
-    // ronds-points aux carrefours chargés (3+ routes) : anneau + îlot central
-    for(var kk2 in grid){var g2=grid[kk2];if(g2.t!=='road')continue;
-      var deg=0;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var n=grid[key(g2.r+d[0],g2.c+d[1])];if(n&&n.t==='road')deg++;});
-      if(deg>=3){var rx=cx(g2.c),ry=cy(g2.r),ir=CELL*0.17;
-        ctx.fillStyle=dark()?'#12151a':'#b3b9ac';ctx.beginPath();ctx.arc(rx,ry,ir+2.5,0,7);ctx.fill();
-        ctx.fillStyle=dark()?'#39404a':'#f8f5ec';ctx.beginPath();ctx.arc(rx,ry,ir,0,7);ctx.fill();
-        ctx.fillStyle=dark()?'#243449':'#cfe4d0';ctx.beginPath();ctx.arc(rx,ry,ir*0.42,0,7);ctx.fill();}
-    }
+    // ponts : bords BIEN épais (surélevés au-dessus de l'eau)
+    overlayLayer('bridge',th,dark()?'#05070a':'#7c8178',dark()?'#39404a':'#f8f5ec');
+    // autoroutes : ruban chaud, bords épais (rapide, passe au-dessus de tout)
+    overlayLayer('motorway',th*0.92,'#233',dark()?'#caa24a':'#f2a83c');
+    // ronds-points & feux placés par le joueur
+    drawFeatures();
     // voitures (petite auto arrondie avec ombre douce)
     cars.forEach(function(ca){
       var pts=pathPoints(ca.path);if(ca.seg>=pts.length-1)return;
@@ -387,37 +438,61 @@
     });
   }
 
-  // ── HUD ──────────────────────────────────────────────────────────────────────
+  // ── HUD & barre d'outils ─────────────────────────────────────────────────────
   function updateHud(){document.getElementById('score').textContent=score;
     document.getElementById('week').textContent='Sem. '+week;
     document.getElementById('roads').textContent=roads;}
+
+  var TOOLS=[
+    {id:'road',e:'🛣️',n:'Route'},
+    {id:'bridge',e:'🌉',n:'Pont'},
+    {id:'motorway',e:'🛤️',n:'Autoroute'},
+    {id:'roundabout',e:'🔄',n:'Rond-pt'},
+    {id:'light',e:'🚦',n:'Feu'},
+    {id:'erase',e:'🧽',n:'Gomme'}
+  ];
+  function toolCount(id){if(id==='road')return roads;if(id==='erase')return null;return inv[id]||0;}
+  function selectTool(id){tool=id;renderToolbar();}
+  function renderToolbar(){
+    var tb=document.getElementById('toolbar');if(!tb)return;
+    tb.innerHTML=TOOLS.map(function(t){var c=toolCount(t.id),dis=(c===0&&t.id!=='road'&&t.id!=='erase');
+      return '<button class="tool'+(tool===t.id?' on':'')+'" data-tool="'+t.id+'"'+(dis?' disabled':'')+'>'+
+        '<span class="te">'+t.e+'</span><span class="tc">'+t.n+(c!=null?' '+c:'')+'</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(tb.querySelectorAll('.tool'),function(b){b.onclick=function(){selectTool(b.getAttribute('data-tool'));};});
+  }
 
   // ── Entrées ──────────────────────────────────────────────────────────────────
   var painting=false;
   function cellAt(e){var rct=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;
     var x=t.clientX-rct.left-OX,y=t.clientY-rct.top-OY;return {r:Math.floor(y/CELL),c:Math.floor(x/CELL)};}
-  function down(e){if(state!=='play')return;painting=true;var p=cellAt(e);paintRoad(p.r,p.c);e.preventDefault();}
-  function move(e){if(!painting||state!=='play')return;var p=cellAt(e);paintRoad(p.r,p.c);e.preventDefault();}
+  function down(e){if(state!=='play')return;painting=true;var p=cellAt(e);paintTool(p.r,p.c);e.preventDefault();}
+  function move(e){if(!painting||state!=='play')return;var p=cellAt(e);paintTool(p.r,p.c);e.preventDefault();}
   function up(){painting=false;}
   cv.addEventListener('mousedown',down);addEventListener('mousemove',move);addEventListener('mouseup',up);
   cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',up);
 
-  document.getElementById('eraseBtn').onclick=function(){eraseMode=!eraseMode;this.classList.toggle('on',eraseMode);};
-
   // ── Semaines ─────────────────────────────────────────────────────────────────
   function startWeek(){
-    week++;state='week';roads+=12;updateHud();
-    var opts=[
-      {e:'🛣️',t:'+10 Routes',s:'plus de bitume',fn:function(){roads+=10;}},
+    week++;state='week';roads+=8;updateHud();renderToolbar();
+    var pool=[
+      {e:'🛣️',t:'+12 Routes',s:'plus de bitume',fn:function(){roads+=12;}},
+      {e:'🌉',t:'+3 Ponts',s:'traverser l’eau',fn:function(){inv.bridge+=3;}},
+      {e:'🛤️',t:'+4 Autoroute',s:'rapide, passe l’eau',fn:function(){inv.motorway+=4;}},
+      {e:'🔄',t:'+2 Ronds-points',s:'fluidifie un carrefour',fn:function(){inv.roundabout+=2;}},
+      {e:'🚦',t:'+2 Feux',s:'fluidifie un carrefour',fn:function(){inv.light+=2;}},
       {e:'🚙',t:'+1 Voiture',s:'par maison',fn:function(){carsPerHouse++;}},
-      {e:'⚡',t:'Vitesse +',s:'voitures plus vives',fn:function(){carSpeed+=0.7;}}
+      {e:'⚡',t:'Vitesse +',s:'voitures plus vives',fn:function(){carSpeed+=0.6;}}
     ];
-    document.getElementById('weekTitle').textContent='Semaine '+week+' 🎉  (+12 🛣️)';
-    document.getElementById('weekChoices').innerHTML=opts.map(function(o,i){
+    // toujours proposer les routes + 2 déblocages tirés au hasard
+    var picks=[pool[0]], rest=pool.slice(1);
+    for(var n=0;n<2 && rest.length;n++){ picks.push(rest.splice((Math.random()*rest.length)|0,1)[0]); }
+    document.getElementById('weekTitle').textContent='Semaine '+week+' 🎉  (+8 🛣️)';
+    document.getElementById('weekChoices').innerHTML=picks.map(function(o,i){
       return '<button class="choice" data-i="'+i+'"><span class="ce">'+o.e+'</span><span class="ct">'+o.t+'</span><span class="cs">'+o.s+'</span></button>';
     }).join('');
     Array.prototype.forEach.call(document.querySelectorAll('#weekChoices .choice'),function(b){
-      b.onclick=function(){opts[+b.getAttribute('data-i')].fn();updateHud();hide('weekScr');state='play';};
+      b.onclick=function(){picks[+b.getAttribute('data-i')].fn();updateHud();renderToolbar();hide('weekScr');state='play';};
     });
     show('weekScr');
   }
