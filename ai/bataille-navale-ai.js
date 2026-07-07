@@ -22,21 +22,29 @@
       remainingSizes : tailles des bateaux pas encore coulés (ex. [5,4,3,2])
       sunkCells      : objet { index: true } des cases de bateaux déjà coulés
       level          : 'easy' | 'normal' | 'hard'
-    BattleshipAI.placeFleet(sizes, rnd) → [{ size, cells:[...] }]  (placement aléatoire légal)
-    BattleshipAI.cellsFor(size, idx, dir) → [cells] | null
-    BattleshipAI.FLEET → tailles de la flotte standard ([5,4,3,3,2])
+    BattleshipAI.placeFleet(specs, rnd) → [{ size, cells:[...] }]  (placement aléatoire légal)
+    BattleshipAI.cellsFor(spec, idx, dir) → [cells] | null   (spec = longueur OU { w, l })
+    BattleshipAI.FLEET → flotte standard : Porte-avions 2×4 + lignes 4,3,3,2
 
   Utilisé par games/bataille-navale.html ET par tools/bench-games.js (auto-jeu).
 */
 (function (root) {
   'use strict';
   var SIZE = 10, CELLS = SIZE * SIZE;
-  var FLEET = [5, 4, 3, 3, 2];
+  // Un bateau est décrit soit par une LONGUEUR (bateau-ligne, 1 case de large), soit
+  // par une forme rectangulaire { w, l } (largeur × longueur). Le Porte-avions est un
+  // rectangle 2×4 (8 cases) ; les autres restent des lignes.
+  var FLEET = [{ w: 2, l: 4 }, 4, 3, 3, 2];
 
-  function cellsFor(size, idx, dir) {
-    var r = Math.floor(idx / SIZE), c = idx % SIZE, cells = [];
-    for (var k = 0; k < size; k++) {
-      var rr = dir === 'v' ? r + k : r, cc = dir === 'h' ? c + k : c;
+  function shapeOf(spec) { return (typeof spec === 'number') ? { w: 1, l: spec } : spec; }
+  // Cases occupées si on pose la forme `spec` avec son coin en `idx`, orientée `dir`
+  // ('h' : longueur le long des colonnes ; 'v' : longueur le long des lignes).
+  function cellsFor(spec, idx, dir) {
+    var sp = shapeOf(spec);
+    var rows = dir === 'v' ? sp.l : sp.w, cols = dir === 'v' ? sp.w : sp.l;
+    var r0 = Math.floor(idx / SIZE), c0 = idx % SIZE, cells = [];
+    for (var dr = 0; dr < rows; dr++) for (var dc = 0; dc < cols; dc++) {
+      var rr = r0 + dr, cc = c0 + dc;
       if (rr >= SIZE || cc >= SIZE) return null;
       cells.push(rr * SIZE + cc);
     }
@@ -44,10 +52,11 @@
   }
 
   // Placement aléatoire légal (bateaux non chevauchants). rnd() ∈ [0,1) injectable.
-  function placeFleet(sizes, rnd) {
+  // `specs` : longueurs et/ou formes { w, l } (cf. FLEET). `size` renvoyé = nb de cases.
+  function placeFleet(specs, rnd) {
     rnd = rnd || Math.random;
     var occ = {}, ships = [];
-    sizes.forEach(function (sz) {
+    specs.forEach(function (sz) {
       var ok = false, tries = 0;
       while (!ok && tries++ < 3000) {
         var dir = rnd() < 0.5 ? 'h' : 'v', idx = Math.floor(rnd() * CELLS);
@@ -56,7 +65,7 @@
         var clash = false; for (var k = 0; k < cells.length; k++) if (occ[cells[k]]) { clash = true; break; }
         if (clash) continue;
         cells.forEach(function (c) { occ[c] = true; });
-        ships.push({ size: sz, cells: cells });
+        ships.push({ size: cells.length, cells: cells });
         ok = true;
       }
     });
@@ -120,7 +129,9 @@
         }
       }
     }
-    var minSize = Math.min.apply(null, sizes);
+    // Plus petite DIMENSION (une forme rectangulaire compte par sa plus petite arête) :
+    // sert au damier (parité), valable tant qu'aucun bateau ne tient sur une seule case.
+    var minSize = Math.min.apply(null, sizes.map(function (sz) { return (typeof sz === 'number') ? sz : Math.min(sz.w, sz.l); }));
     var bc = -1, bw = -1;
     for (var c2 = 0; c2 < CELLS; c2++) {
       if (tried(c2)) continue;

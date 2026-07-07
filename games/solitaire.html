@@ -59,6 +59,8 @@
         <span class="so-title-mini">Solitaire</span>
         <span class="so-timer" id="so-timer">⏱ 0:00</span>
         <div class="so-head-actions">
+          <button class="game-restart-btn" id="so-hint" onclick="hint()" title="Indice : le meilleur coup à jouer">💡</button>
+          <button class="game-restart-btn" id="so-auto" onclick="autoFound()" title="Tout monter vers les familles">⬆️</button>
           <button class="game-restart-btn" id="so-undo" onclick="undoMove()" title="Annuler le dernier coup" disabled>↩</button>
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
@@ -69,7 +71,6 @@
       <div class="so-board felt felt-green" style="padding:12px 10px 20px;margin:6px auto;width:calc(100% - 16px)">
         <div class="so-top" id="so-top"></div>
         <div class="so-tab" id="so-tab"></div>
-        <div class="so-actions"><button class="so-act" onclick="autoFound()">⬆️ Tout monter</button></div>
       </div>
     </div>
 
@@ -270,6 +271,33 @@
         return false;
       }
       var guard = 0; while (once() && guard++ < 60) {} sel = null;
+    }
+
+    /* ── Indice : cherche le meilleur coup, l'annonce et présélectionne la carte ──
+       Petit « solveur » glouton, dans l'ordre d'utilité : monter en famille, libérer
+       une carte cachée, jouer la défausse, poser un Roi sur une colonne vide, sinon
+       piocher. Objectif : aider quand on est vraiment bloqué. */
+    function cardName(card) { return rankLabel(card) + SUIT_GLYPH[suitOf(card)]; }
+    function findHint() {
+      var g = gOf(window.room, window.myPid); if (!g) return null;
+      // 1) Monter en famille (défausse puis sommets de colonnes).
+      if (g.waste.length && canFound(g, g.waste[g.waste.length - 1])) { var w0 = g.waste[g.waste.length - 1]; return { msg: 'Monte le ' + cardName(w0) + ' en famille', sel: { from: 'waste', idx: g.waste.length - 1 } }; }
+      for (var c = 0; c < 7; c++) { var u = g.t[c].u; if (u.length && canFound(g, u[u.length - 1])) return { msg: 'Monte le ' + cardName(u[u.length - 1]) + ' en famille', sel: { from: c, idx: u.length - 1 } }; }
+      // 2) Déplacer une suite pour RETOURNER une carte cachée dessous.
+      for (var c1 = 0; c1 < 7; c1++) { var col = g.t[c1]; if (col.d.length && col.u.length) { var head = col.u[0]; for (var c2 = 0; c2 < 7; c2++) { if (c2 !== c1 && canTab(g, head, c2)) return { msg: 'Déplace le ' + cardName(head) + ' sur la colonne ' + (c2 + 1) + ' (ça retourne une carte)', sel: { from: c1, idx: 0 } }; } } }
+      // 3) Poser la carte de la défausse sur une colonne.
+      if (g.waste.length) { var w = g.waste[g.waste.length - 1]; for (var c3 = 0; c3 < 7; c3++) { if (canTab(g, w, c3)) return { msg: 'Pose le ' + cardName(w) + ' sur la colonne ' + (c3 + 1), sel: { from: 'waste', idx: g.waste.length - 1 } }; } }
+      // 4) Roi de la défausse vers une colonne vide.
+      if (g.waste.length) { var wk = g.waste[g.waste.length - 1]; if (rankVal(wk) === 13) { for (var c4 = 0; c4 < 7; c4++) { if (!g.t[c4].u.length && !g.t[c4].d.length) return { msg: 'Place le ' + cardName(wk) + ' sur la colonne vide ' + (c4 + 1), sel: { from: 'waste', idx: g.waste.length - 1 } }; } } }
+      // 5) Sinon : piocher.
+      if (g.stock.length || g.waste.length) return { msg: 'Retourne une carte de la pioche', sel: null };
+      return null;
+    }
+    function hint() {
+      var h = findHint();
+      if (!h) { if (window.lbToast) lbToast('Aucun coup évident — relance une partie'); return; }
+      if (window.lbToast) lbToast('💡 ' + h.msg);
+      sel = h.sel; render(window.room);
     }
 
     /* ━━ Rendu ━━ */

@@ -174,7 +174,7 @@
       { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true, type: 'cartes simultanées' },
       { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true, type: 'déduction (IA solveur)' },
       { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true, type: 'coopératif / timing' },
-      { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true, type: 'puzzle / course (IA)' },
+      { key: '2048',            name: '2048',            emoji: '🔢', players: '1',    on: false, offline: true, type: 'puzzle / solo' },
       { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
       { key: 'queens',          name: 'Queens',          emoji: '👑', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
       { key: 'tango',           name: 'Tango',           emoji: '🌙', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
@@ -193,13 +193,12 @@
       { key: 'mini-metro',      name: 'Mini Métro',      emoji: '🚇', players: '1',    on: true, offline: true, type: 'gestion / réseau (solo)' },
       { key: 'mini-motorways',  name: 'Mini Motorways',  emoji: '🚗', players: '1',    on: true, offline: true, type: 'gestion / routes (solo)' },
       { key: 'nothanks',        name: 'No Thanks!',       emoji: '🙅', players: '2–7',  on: true, offline: true, type: 'stop-ou-encore' },
-      { key: 'qwixx',           name: 'Qwixx',           emoji: '🎲', players: '1–5',  on: true, offline: true, type: 'dés / roll-and-write' },
       { key: 'yams',            name: "Yam's",           emoji: '🎲', players: '1–6',  on: true, offline: true, type: 'dés / combinaisons' }
     ];
     // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
     // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
     var CATS = [
-      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'reversi', 'dames', 'morpion', 'mastermind', 'sudoku', 'queens', 'tango', 'zip', 'patches', '2048', 'qwixx', 'yams'] },
+      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'reversi', 'dames', 'morpion', 'mastermind', 'sudoku', 'queens', 'tango', 'zip', 'patches', '2048', 'yams'] },
       { title: 'Cartes',              emoji: '🃏', keys: ['solitaire', 'balatro', 'blackjack', 'uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye', 'nothanks'] },
       { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale', 'diamants', 'perudo'] },
       { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'sutom', 'crack-list', 'pictionary', 'telephone-dessine'] },

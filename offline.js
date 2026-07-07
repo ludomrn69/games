@@ -162,8 +162,9 @@
     var controls = '';
     if (mode === 'solo') {
       if (max > 2 && !noBots) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
-      // Difficulté (des ordis, ou de la grille pour un solo pur).
-      if (max - 1 >= 1) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
+      // Difficulté (des ordis, ou de la grille pour un solo pur). Un jeu sans niveau
+      // de difficulté (ex. 2048) peut la masquer via offline:{ noDiff:true }.
+      if (max - 1 >= 1 && !(noBots && off.noDiff)) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
       if (!noBots && cfg.bot) controls += speedRow();   // vitesse des ordis (pas pour un solo-chrono pur)
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
@@ -321,12 +322,18 @@
     } catch (e) {}
   }
   function clearResume() { try { localStorage.removeItem(resumeKey()); } catch (e) {} }
+  // Au-delà de ce délai, une partie interrompue n'est plus proposée (on l'efface) :
+  // reprendre un truc vieux de plusieurs jours n'a plus de sens.
+  var RESUME_MAX_AGE = 48 * 3600 * 1000; // 48 h
   function resumeAgeLabel(ts) {
     var m = Math.max(0, Math.round((Date.now() - (ts || 0)) / 60000));
     if (m < 1) return 'sauvegardée à l\'instant';
     if (m < 60) return 'interrompue il y a ' + m + ' min';
     var h = Math.round(m / 60);
-    return 'interrompue il y a ' + h + ' h';
+    if (h < 24) return 'interrompue il y a ' + h + ' h';
+    // Au-delà de 24 h, on parle en JOURS (plus lisible que « il y a 114 h »).
+    var j = Math.round(h / 24);
+    return 'interrompue il y a ' + j + ' jour' + (j > 1 ? 's' : '');
   }
   function loadResume() {
     if (!canResume()) return null;
@@ -334,6 +341,8 @@
       var raw = localStorage.getItem(resumeKey()); if (!raw) return null;
       var d = JSON.parse(raw);
       if (!d || !d.room || d.room.game !== cfg.gameKey || d.room.status !== 'playing') return null;
+      // Trop vieux (> 48 h) : on efface et on ne propose pas la reprise.
+      if (d.ts && (Date.now() - d.ts) > RESUME_MAX_AGE) { clearResume(); return null; }
       return d;
     } catch (e) { return null; }
   }

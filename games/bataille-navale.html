@@ -139,7 +139,7 @@
     <div class="modal-card">
       <div class="modal-title">Bataille navale</div>
       <div class="modal-body">
-        <p>Chacun place ses <b>5 bateaux</b> en secret : Porte-avions (5), Croiseur (4), Contre-torpilleur (3), Sous-marin (3), Torpilleur (2).</p>
+        <p>Chacun place ses <b>5 bateaux</b> en secret : Porte-avions (2×4, un gros rectangle), Croiseur (4), Contre-torpilleur (3), Sous-marin (3), Torpilleur (2). Le bouton <b>Sens</b> fait pivoter le porte-avions.</p>
         <p style="margin-top:10px">Puis chacun son tour, tu tires sur une case adverse. <b>Touché</b> : tu rejoues. <b>Manqué</b> : à l'autre.</p>
         <p style="margin-top:10px">Le premier à <b>couler toute la flotte</b> ennemie gagne.</p>
       </div>
@@ -150,9 +150,11 @@
   <div class="lb-toast" id="lb-toast"></div>
 
   <script>
+    // Le Porte-avions est un rectangle 2×4 (8 cases) ; les autres bateaux sont des
+    // lignes. `shape` = longueur (ligne) ou { w, l } (rectangle) ; `size` = nb de cases.
     var FLEET = [
-      { name: 'Porte-avions', size: 5 }, { name: 'Croiseur', size: 4 },
-      { name: 'Contre-torpilleur', size: 3 }, { name: 'Sous-marin', size: 3 }, { name: 'Torpilleur', size: 2 }
+      { name: 'Porte-avions', size: 8, shape: { w: 2, l: 4 } }, { name: 'Croiseur', size: 4, shape: 4 },
+      { name: 'Contre-torpilleur', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 }, { name: 'Torpilleur', size: 2, shape: 2 }
     ];
     var localFleet = [], selectedIdx = 0, orientation = 'h', placedDone = false, prevStatus = null;
     function rref() { return window.roomRef; }
@@ -162,7 +164,7 @@
     function oppPid(state) { return ((state || window.room || {}).order || []).filter(function (p) { return p !== window.myPid; })[0]; }
     function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
 
-    function freshFleet() { return FLEET.map(function (s) { return { name: s.name, size: s.size, cells: [], placed: false }; }); }
+    function freshFleet() { return FLEET.map(function (s) { return { name: s.name, size: s.size, shape: s.shape, cells: [], placed: false }; }); }
     // Géométrie des bateaux : centralisée dans bataille-navale-ai.js.
     var cellsFor = window.BattleshipAI.cellsFor;
     function overlaps(cells, exceptIdx) {
@@ -208,7 +210,7 @@
       if (t >= 0) fire(t);
     }
     function bnBotPlace(pid) {
-      var placed = window.BattleshipAI.placeFleet(FLEET.map(function (s) { return s.size; }));
+      var placed = window.BattleshipAI.placeFleet(FLEET.map(function (s) { return s.shape; }));
       var ships = placed.map(function (p, i) { return { n: FLEET[i].name, cells: p.cells }; });
       rref().child('players/' + pid).update({ ships: ships, placed: true }, function () {
         rref().transaction(function (cur) {
@@ -242,7 +244,7 @@
     function initPlacement(state) {
       var mine = state.players && state.players[window.myPid];
       if (mine && mine.placed && mine.ships) {
-        localFleet = FLEET.map(function (s, i) { var dbs = (mine.ships && mine.ships[i]) || {}; var cells = (dbs.cells || []).slice(); return { name: s.name, size: s.size, cells: cells, placed: cells.length === s.size }; });
+        localFleet = FLEET.map(function (s, i) { var dbs = (mine.ships && mine.ships[i]) || {}; var cells = (dbs.cells || []).slice(); return { name: s.name, size: s.size, shape: s.shape, cells: cells, placed: cells.length === s.size }; });
         placedDone = true; selectedIdx = -1;
       } else { localFleet = freshFleet(); placedDone = false; selectedIdx = 0; }
       renderPlacement(state);
@@ -254,7 +256,7 @@
       if (selectedIdx < 0 || selectedIdx >= localFleet.length || localFleet[selectedIdx].placed) { var ns = -1; for (var n = 0; n < localFleet.length; n++) if (!localFleet[n].placed) { ns = n; break; } selectedIdx = ns; }
       if (selectedIdx < 0) { lbToast('Tous tes bateaux sont placés'); return; }
       var ship = localFleet[selectedIdx];
-      var cells = cellsFor(ship.size, idx, orientation);
+      var cells = cellsFor(ship.shape, idx, orientation);
       if (!cells) { lbToast('Le bateau dépasse'); return; }
       if (overlaps(cells, selectedIdx)) { lbToast('Ça chevauche'); return; }
       ship.cells = cells; ship.placed = true;
@@ -264,7 +266,7 @@
     function autoPlace() {
       if (placedDone) return;
       localFleet.forEach(function (s) { s.cells = []; s.placed = false; });
-      for (var s = 0; s < localFleet.length; s++) { var ok = false, tries = 0; while (!ok && tries < 800) { tries++; var dir = Math.random() < 0.5 ? 'h' : 'v'; var idx = Math.floor(Math.random() * 100); var cells = cellsFor(localFleet[s].size, idx, dir); if (!cells || overlaps(cells, s)) continue; localFleet[s].cells = cells; localFleet[s].placed = true; ok = true; } }
+      for (var s = 0; s < localFleet.length; s++) { var ok = false, tries = 0; while (!ok && tries < 800) { tries++; var dir = Math.random() < 0.5 ? 'h' : 'v'; var idx = Math.floor(Math.random() * 100); var cells = cellsFor(localFleet[s].shape, idx, dir); if (!cells || overlaps(cells, s)) continue; localFleet[s].cells = cells; localFleet[s].placed = true; ok = true; } }
       selectedIdx = -1; renderPlacement(window.room);
     }
     function clearFleet() { if (placedDone) return; localFleet.forEach(function (s) { s.cells = []; s.placed = false; }); selectedIdx = 0; renderPlacement(window.room); }

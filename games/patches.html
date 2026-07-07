@@ -286,11 +286,14 @@
       if (dragBound) return; dragBound = true;
       var wrap = document.getElementById('pt-wrap');
       function cellAt(x, y) { var el = document.elementFromPoint(x, y); var c = el && el.closest && el.closest('.pt-cell'); return c ? { x: +c.dataset.x, y: +c.dataset.y } : null; }
-      wrap.addEventListener('pointerdown', function (e) { var c = cellAt(e.clientX, e.clientY); if (!c) return; drag = { ax: c.x, ay: c.y, bx: c.x, by: c.y }; showPrev(); e.preventDefault(); });
-      wrap.addEventListener('pointermove', function (e) { if (!drag) return; var c = cellAt(e.clientX, e.clientY); if (c) { drag.bx = c.x; drag.by = c.y; showPrev(); } e.preventDefault(); });
+      // On mémorise la BOÎTE ENGLOBANTE de TOUTES les cases survolées depuis l'appui
+      // (min/max), pas seulement départ→pointeur : ainsi, partant de l'indice, on peut
+      // balayer en arrière PUIS en avant sans perdre la partie « arrière » du patch.
+      wrap.addEventListener('pointerdown', function (e) { var c = cellAt(e.clientX, e.clientY); if (!c) return; drag = { minx: c.x, miny: c.y, maxx: c.x, maxy: c.y }; showPrev(); e.preventDefault(); });
+      wrap.addEventListener('pointermove', function (e) { if (!drag) return; var c = cellAt(e.clientX, e.clientY); if (c) { drag.minx = Math.min(drag.minx, c.x); drag.miny = Math.min(drag.miny, c.y); drag.maxx = Math.max(drag.maxx, c.x); drag.maxy = Math.max(drag.maxy, c.y); showPrev(); } e.preventDefault(); });
       window.addEventListener('pointerup', function () {
         if (!drag) return;
-        var x = Math.min(drag.ax, drag.bx), y = Math.min(drag.ay, drag.by), w = Math.abs(drag.ax - drag.bx) + 1, h = Math.abs(drag.ay - drag.by) + 1;
+        var x = drag.minx, y = drag.miny, w = drag.maxx - drag.minx + 1, h = drag.maxy - drag.miny + 1;
         var single = w === 1 && h === 1;
         drag = null; document.getElementById('pt-prev').style.display = 'none';
         if (single) { // case seule : efface le patch dessous, sinon tente un patch 1×1 (carré de 1 case)
@@ -303,7 +306,7 @@
     function showPrev() {
       if (!drag) return;
       var N = NS(), u = 100 / N, prev = document.getElementById('pt-prev');
-      var x = Math.min(drag.ax, drag.bx), y = Math.min(drag.ay, drag.by), w = Math.abs(drag.ax - drag.bx) + 1, h = Math.abs(drag.ay - drag.by) + 1;
+      var x = drag.minx, y = drag.miny, w = drag.maxx - drag.minx + 1, h = drag.maxy - drag.miny + 1;
       prev.style.left = (x * u) + '%'; prev.style.top = (y * u) + '%'; prev.style.width = (w * u) + '%'; prev.style.height = (h * u) + '%'; prev.style.display = 'block';
     }
 

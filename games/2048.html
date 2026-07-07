@@ -169,11 +169,11 @@
       maxPlayers: 6,
       rules: [
         'Glisse les tuiles : deux identiques fusionnent (2+2=4…)',
-        'Objectif : atteindre 2048 avant l\'adversaire / l\'ordi',
-        'Chacun sa grille, en même temps',
-        'Bloqué sans coup = éliminé'
+        'Objectif : atteindre la tuile 2048 (et le plus haut score)',
+        'Bloqué sans coup possible = partie terminée',
+        'Un pur défi solo : bats ton meilleur score'
       ],
-      offline: { solo: true, soloMinBots: 0 },
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, noDiff: true },
       bot: function () {},
       offlineTurn: function () { return null; },
       offlineEnter: function () { if (window.room) render(window.room); },

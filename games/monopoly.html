@@ -429,9 +429,10 @@
       for (var i = 0; i < 40; i++) { if (ENG.canBuildOn(s, i, pid) && (s.cash[pid] || 0) >= B[i].h) return true; }
       return false;
     }
-    // Toutes les RUES (cases couleur) ont un propriétaire — hors gares et services.
+    // Toutes les propriétés ACHETABLES (rues + gares + services) ont un propriétaire.
+    // Tant qu'une carte reste libre (ex. une gare), pas d'échange possible.
     function allStreetsOwned(s) {
-      for (var i = 0; i < 40; i++) { if (B[i].t === 'prop' && (s.owners[i] == null)) return false; }
+      for (var i = 0; i < 40; i++) { var t = B[i].t; if ((t === 'prop' || t === 'rail' || t === 'util') && (s.owners[i] == null)) return false; }
       return true;
     }
     // Existe-t-il un échange sensé que JE pourrais proposer (il me manque 1 rue d'une
