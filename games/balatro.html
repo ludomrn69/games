@@ -160,7 +160,43 @@
     .ba-sort button { color: #cbbcf0; border-color: rgba(255,255,255,0.22); }
     .ba-hands-table { color: #efe8ff; } .ba-hands-table td { border-color: rgba(255,255,255,0.12); }
     .ba-link { color: #b9a9e0; }
-    /* Les jokers restent des tuiles claires bien lisibles sur le fond sombre. */
+
+    /* ═══ RÉPLIQUE fidèle de la colonne de gauche de Balatro ═══
+       Police « blocky » (monospace lourd), panneaux charbon arrondis, accents vifs
+       (jetons bleus, mult rouge, or). Table verte pendant le jeu. ═══ */
+    body.ba-play { background: radial-gradient(1200px 900px at 50% 18%, #2f7a5a, #1e5540 58%, #123a2c) fixed; }
+    .ba-side { font-family: ui-monospace, 'Cascadia Mono', 'Courier New', monospace; display: flex; flex-direction: column; gap: 8px; }
+    @media (min-width: 860px) { .ba-side { flex: 0 0 272px; width: 272px; } }
+    .bl-header { background: linear-gradient(#caa23a, #a97d1e); color: #fff; text-align: center; font-weight: 800; font-size: 1.18rem; letter-spacing: 0.5px; padding: 9px 8px; border-radius: 11px; border: 2px solid rgba(0,0,0,0.28); text-shadow: 0 2px 0 rgba(0,0,0,0.35); box-shadow: inset 0 2px 0 rgba(255,255,255,0.25); }
+    .bl-goal { display: flex; align-items: center; gap: 10px; background: linear-gradient(#4c3f1e, #3a2f14); border: 2px solid rgba(0,0,0,0.3); border-radius: 12px; padding: 12px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.4); }
+    .bl-token { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #f0c04e, #c98a1e); border: 2px solid #8a5f14; display: flex; align-items: center; justify-content: center; text-align: center; color: #5a3d0a; font-weight: 900; font-size: 0.62rem; line-height: 1.05; box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 2px 3px rgba(255,255,255,0.4); }
+    .bl-token.big { background: radial-gradient(circle at 38% 32%, #f0b84e, #c9741e); }
+    .bl-token.boss { background: radial-gradient(circle at 38% 32%, #d16a6a, #a33232); color: #fff; border-color: #6a1e1e; font-size: 1.6rem; }
+    .bl-goal-info { flex: 1; min-width: 0; text-align: center; color: #f3ead0; }
+    .bl-goal-lab { font-size: 0.72rem; font-weight: 700; }
+    .bl-goal-target { font-size: 1.75rem; font-weight: 900; color: #ec5a41; text-shadow: 0 2px 0 rgba(0,0,0,0.35); line-height: 1.15; }
+    .bl-goal-reward { font-size: 0.74rem; font-weight: 700; }
+    .bl-goal-reward span { color: #f0b83a; font-weight: 900; }
+    .bl-round { display: flex; align-items: center; gap: 10px; background: #2b2f38; border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; padding: 8px 13px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.45); }
+    .bl-round-lab { flex: 0 0 auto; color: #fff; font-weight: 800; font-size: 0.92rem; line-height: 1.05; }
+    .bl-round-val { flex: 1; text-align: right; color: #fff; font-weight: 900; font-size: 1.9rem; text-shadow: 0 2px 0 rgba(0,0,0,0.35); font-variant-numeric: tabular-nums; }
+    .bl-hand { background: #23272f !important; border: 2px solid rgba(0,0,0,0.3); border-radius: 12px; padding: 10px !important; min-height: 96px !important; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.45); }
+    .bl-hand .pv-hand { font-family: ui-monospace, 'Courier New', monospace; font-size: 1.35rem; font-weight: 900; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+    .bl-hand .pv-lvl { color: #cfc3ee; font-weight: 800; font-size: 0.8rem; }
+    .bl-hand .pv-empty { color: rgba(255,255,255,0.5); font-size: 0.85rem; text-align: center; }
+    .bl-hand .ba-scorecalc { gap: 6px; }
+    .bl-hand .ba-chipbox, .bl-hand .ba-multbox, .bl-hand .ba-scorebox { min-width: 52px; font-size: 1.55rem; border-radius: 8px; }
+    .bl-hand .ba-times { color: #ec5a41; font-weight: 900; font-size: 1.2rem; }
+    .bl-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; grid-template-areas: "info mains disc" "info money money" "opt mise manche"; gap: 6px; }
+    .bl-btn { border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; font-family: ui-monospace,'Courier New',monospace; font-weight: 800; color: #fff; cursor: pointer; text-shadow: 0 2px 0 rgba(0,0,0,0.3); line-height: 1.1; box-shadow: inset 0 2px 0 rgba(255,255,255,0.18); }
+    .bl-btn.info { grid-area: info; background: linear-gradient(#e8503f, #c23325); font-size: 0.94rem; }
+    .bl-btn.opt { grid-area: opt; background: linear-gradient(#f0a52a, #d0821a); font-size: 0.94rem; }
+    .bl-cell { background: #2b2f38; border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; padding: 6px 4px; text-align: center; box-shadow: inset 0 2px 6px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+    .bl-cell.g-mains { grid-area: mains; } .bl-cell.g-disc { grid-area: disc; }
+    .bl-cell.g-money { grid-area: money; } .bl-cell.g-mise { grid-area: mise; } .bl-cell.g-manche { grid-area: manche; }
+    .bl-cell-lab { color: #fff; font-weight: 700; font-size: 0.72rem; }
+    .bl-cell-val { font-weight: 900; font-size: 1.4rem; text-shadow: 0 2px 0 rgba(0,0,0,0.3); font-variant-numeric: tabular-nums; }
+    .bl-cell-val.blue { color: #4a9fe0; } .bl-cell-val.red { color: #ec5a41; } .bl-cell-val.gold { color: #f0b83a; }
   </style>
 </head>
 <body>
@@ -171,29 +207,36 @@
     <!-- Écran de jeu -->
     <div id="ba-game" style="display:none">
       <div class="ba-layout">
-        <!-- Bande latérale (façon Balatro) : score, blind, jauges de la manche -->
+        <!-- Colonne de gauche : RÉPLIQUE de la sidebar Balatro -->
         <aside class="ba-side">
-          <div class="ba-side-stats">
-            <div class="ba-stat"><div class="lab">Ante</div><div class="val"><span id="ba-ante">1</span>/8</div></div>
-            <div class="ba-stat"><div class="lab">Blind</div><div class="val ba-blindname" id="ba-blind">—</div></div>
-            <div class="ba-stat"><div class="lab">Mains 🖐</div><div class="val" id="ba-hands">4</div></div>
-            <div class="ba-stat"><div class="lab">Défausses ♻</div><div class="val" id="ba-disc">3</div></div>
-            <div class="ba-stat ba-money-stat"><div class="lab">Argent</div><div class="val ba-money">$<span id="ba-money">4</span></div></div>
+          <div class="bl-header" id="ba-blindhdr">Blind</div>
+          <div class="bl-goal" id="ba-goal">
+            <div class="bl-token" id="ba-token"><span>SMALL<br>BLIND</span></div>
+            <div class="bl-goal-info">
+              <div class="bl-goal-lab">Faire un score d'au moins</div>
+              <div class="bl-goal-target">🪙 <span id="ba-target">0</span></div>
+              <div class="bl-goal-reward">Récompense : <span id="ba-reward">$$$</span></div>
+            </div>
+          </div>
+          <div class="bl-round">
+            <div class="bl-round-lab">Manche<br>score</div>
+            <div class="bl-round-val">🪙 <span id="ba-round">0</span></div>
+          </div>
+          <div class="bl-hand ba-preview" id="ba-handinfo"></div>
+          <div class="bl-grid">
+            <button class="bl-btn info" onclick="openModal('ba-modal-hands')">Partie<br>Infos</button>
+            <div class="bl-cell g-mains"><div class="bl-cell-lab">Mains</div><div class="bl-cell-val blue" id="ba-hands">4</div></div>
+            <div class="bl-cell g-disc"><div class="bl-cell-lab">Défausses</div><div class="bl-cell-val red" id="ba-disc">3</div></div>
+            <div class="bl-cell money g-money"><div class="bl-cell-val gold">$<span id="ba-money">4</span></div></div>
+            <button class="bl-btn opt" onclick="openBaOptions()">Options</button>
+            <div class="bl-cell g-mise"><div class="bl-cell-lab">Mise initiale</div><div class="bl-cell-val gold"><span id="ba-ante">1</span>/8</div></div>
+            <div class="bl-cell g-manche"><div class="bl-cell-lab">Manche</div><div class="bl-cell-val gold" id="ba-manche">1</div></div>
           </div>
         </aside>
 
-        <!-- Zone de jeu : plateau sombre (score + jokers + main) -->
+        <!-- Zone de jeu : jokers + main -->
         <div class="ba-main">
           <div class="ba-board">
-            <div class="ba-scoreband">
-              <div class="ba-roundscore">
-                <div class="rs-lab">Score de la manche</div>
-                <div class="rs-val" id="ba-round">0</div>
-                <div class="rs-tgt">Objectif <b id="ba-target">300</b></div>
-                <div class="ba-progress"><div id="ba-bar" style="width:0%"></div></div>
-              </div>
-              <div class="ba-preview" id="ba-handinfo"></div>
-            </div>
             <div class="ba-jokers" id="ba-jokers"></div>
             <div class="ba-hand" id="ba-hand"></div>
           </div>
@@ -644,11 +687,19 @@
     /* ━━ Rendu ━━ */
     function route() {
       ['ba-home', 'ba-game', 'ba-blindscreen', 'ba-shop', 'ba-end'].forEach(function (id) { $(id).style.display = 'none'; });
+      // Table VERTE pendant le jeu (comme l'original), fond spatial ailleurs.
+      document.body.classList.toggle('ba-play', !!(G && G.phase === 'play'));
       if (!G) { $('ba-home').style.display = 'block'; return; }
       if (G.phase === 'blind') { renderBlindScreen(); $('ba-blindscreen').style.display = 'block'; }
       else if (G.phase === 'play') { renderGame(); $('ba-game').style.display = 'block'; }
       else if (G.phase === 'shop') { renderShop(); $('ba-shop').style.display = 'block'; }
       else { renderEnd(); $('ba-end').style.display = 'block'; }
+    }
+    // Menu « Options » (bouton de la colonne) : reprendre, recommencer ou quitter.
+    function openBaOptions() {
+      if (confirm('Options :\n\n• OK = Recommencer une nouvelle partie\n• Annuler = Continuer la partie en cours')) {
+        clearSave(); newGame();
+      }
     }
     function jokerChip(id, sellable) { var j = JOKERS[id]; return '<div class="ba-joker' + (sellable ? ' sellable' : '') + '" data-jid="' + id + '" onclick="showJoker(\'' + id + '\',' + !!sellable + ')"><span class="jn">' + j.name + '</span>' + j.desc + '</div>'; }
     function cardHTML(c) {
@@ -658,7 +709,15 @@
     }
 
     function renderGame() {
-      $('ba-ante').textContent = G.ante; $('ba-blind').textContent = BLIND_NAME[G.blindIdx] + (G.boss ? ' · ' + BOSSES[G.boss].name : '');
+      // Colonne de gauche (réplique Balatro) : en-tête du blind, jeton, objectif…
+      var boss = G.boss ? BOSSES[G.boss] : null;
+      $('ba-blindhdr').textContent = boss ? boss.name : BLIND_NAME[G.blindIdx];
+      var tok = $('ba-token');
+      tok.className = 'bl-token' + (G.blindIdx === 1 ? ' big' : G.blindIdx === 2 ? ' boss' : '');
+      tok.innerHTML = boss ? '💀' : (G.blindIdx === 1 ? '<span>BIG<br>BLIND</span>' : '<span>SMALL<br>BLIND</span>');
+      $('ba-reward').textContent = '$'.repeat(BLIND_REWARD[G.blindIdx]);
+      $('ba-manche').textContent = (G.ante - 1) * 3 + G.blindIdx + 1;
+      $('ba-ante').textContent = G.ante;
       $('ba-target').textContent = G.target.toLocaleString('fr'); $('ba-round').textContent = G.roundScore.toLocaleString('fr');
       $('ba-hands').textContent = G.handsLeft; $('ba-disc').textContent = G.discardsLeft;
       // Argent : compteur animé quand il change (gain de blind, achat…)
@@ -666,7 +725,6 @@
       if (window.Fx && mPrev !== undefined && mPrev !== G.money) Fx.count($('ba-money'), mPrev, G.money, { ms: 450 });
       else $('ba-money').textContent = G.money;
       window._baMoney = G.money;
-      $('ba-bar').style.width = Math.min(100, 100 * G.roundScore / G.target) + '%';
       $('ba-jokers').innerHTML = (G.jokers.length ? G.jokers.map(function (id) { return jokerChip(id, false); }).join('') : '<span class="ba-slots">Pas encore de Joker</span>') + '<span class="ba-slots">' + G.jokers.length + '/5</span>';
       // consommables (tarots) : cliquer pour utiliser sur les cartes sélectionnées
       var cel = $('ba-consum'); if (!cel) { cel = document.createElement('div'); cel.id = 'ba-consum'; cel.className = 'ba-jokers'; var jk = $('ba-jokers'); jk.parentNode.insertBefore(cel, jk.nextSibling); }
@@ -684,7 +742,9 @@
         info = '<div class="pv-hand">' + d.name + '</div>' +
           '<div class="ba-scorecalc"><span class="ba-chipbox">' + d.chips + '</span><span class="ba-times">×</span><span class="ba-multbox">' + d.mult + '</span><span class="ba-times">=</span><span class="ba-scorebox">' + d.score.toLocaleString('fr') + '</span></div>';
       } else {
-        info = '<div class="pv-empty">Sélectionne des cartes<br>pour voir la main et son score</div>';
+        // Aucune carte sélectionnée : panneau « main » neutre 0 × 0 (comme l'original).
+        info = '<div class="pv-hand">—</div>' +
+          '<div class="ba-scorecalc"><span class="ba-chipbox">0</span><span class="ba-times">×</span><span class="ba-multbox">0</span></div>';
       }
       $('ba-handinfo').innerHTML = info;
       $('ba-hand').innerHTML = G.hand.map(cardHTML).join('');
