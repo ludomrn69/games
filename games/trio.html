@@ -42,9 +42,18 @@
     .tr-reveal-empty { font-family: 'Caveat', cursive; color: var(--ink-light); }
 
     .tr-section-label { text-align: center; font-size: 0.78rem; color: var(--ink-light); margin: 8px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .tr-center { display: grid; grid-template-columns: repeat(var(--tr-cols, 3), 1fr); gap: 6px; justify-content: center; justify-items: center; max-width: 280px; margin: 0 auto; padding: 0 10px; }
-    .tr-center .tcard { width: 100%; max-width: 56px; }
+    /* Cartes du centre PLUS GRANDES (elles étaient minuscules). */
+    .tr-center { display: grid; grid-template-columns: repeat(var(--tr-cols, 3), 1fr); gap: 8px; justify-content: center; justify-items: center; max-width: 340px; margin: 0 auto; padding: 0 10px; }
+    .tr-center .tcard { width: 100%; max-width: 80px; height: auto; aspect-ratio: 46 / 64; font-size: 1.9rem; }
 
+    /* Centre & joueurs : empilés sur mobile, côte à côte sur grand écran (comme le Monopoly). */
+    .tr-main { display: flex; flex-direction: column; gap: 4px; }
+    @media (min-width: 760px) {
+      .tr-main { flex-direction: row; align-items: flex-start; justify-content: center; gap: 28px; max-width: 900px; margin: 0 auto; }
+      .tr-main-col { flex: 1 1 0; min-width: 0; }
+      .tr-center { max-width: 380px; }
+      .tr-players { max-width: 100%; }
+    }
     .tr-players { display: flex; flex-direction: column; gap: 7px; padding: 6px 12px 10px; max-width: 460px; margin: 0 auto; }
     .tr-prow { display: flex; align-items: center; gap: 8px; background: var(--white); border-radius: 14px; padding: 6px 10px; box-shadow: var(--shadow); border: 2px solid transparent; }
     .tr-prow.turn { border-color: var(--terracotta); }
@@ -93,16 +102,25 @@
       </div>
       <div class="tr-banner" id="tr-banner"></div>
       <div class="tr-hint" id="tr-hint"></div>
+      <!-- Ma main EN HAUT (pour bien l'avoir sous les yeux). -->
+      <div class="tr-myhand-wrap">
+        <div class="tr-myhand-label">Ta main <span id="tr-my-count"></span></div>
+        <div class="tr-myhand" id="tr-myhand"></div>
+      </div>
       <div class="tr-reveal-wrap felt felt-plum" style="margin:6px auto 4px;width:min(94vw,420px);padding:12px 10px 14px">
         <div class="tr-reveal-label felt-label">Cartes retournées</div>
         <div class="tr-reveal" id="tr-reveal"></div>
       </div>
-      <div class="tr-section-label">Centre (à toucher pour retourner)</div>
-      <div class="tr-center" id="tr-center"></div>
-      <div class="tr-players" id="tr-players"></div>
-      <div class="tr-myhand-wrap">
-        <div class="tr-myhand-label">Ta main <span id="tr-my-count"></span></div>
-        <div class="tr-myhand" id="tr-myhand"></div>
+      <!-- Centre & joueurs : côte à côte sur grand écran, empilés sur mobile. -->
+      <div class="tr-main">
+        <div class="tr-main-col">
+          <div class="tr-section-label">Centre (à toucher pour retourner)</div>
+          <div class="tr-center" id="tr-center"></div>
+        </div>
+        <div class="tr-main-col">
+          <div class="tr-section-label">Les autres joueurs</div>
+          <div class="tr-players" id="tr-players"></div>
+        </div>
       </div>
     </div>
 
@@ -353,7 +371,7 @@
       setHTML('tr-hint', paused
         ? '👀 Mémorise bien les cartes… elles vont se recacher.'
         : (myTurn
-          ? (picks.length ? 'Cherche un autre <b>' + target + '</b> : main ▽/△ d\'un joueur ou carte du centre.' : 'À toi ! Retourne une 1<sup>re</sup> carte (main d\'un joueur ou centre).')
+          ? (picks.length ? 'Cherche un autre <b>' + target + '</b> : ta plus basse ▽/haute △ (en haut), celle d\'un joueur, ou le centre.' : 'À toi ! Retourne une carte : ta plus basse ▽/haute △ (en haut), celle d\'un joueur, ou le centre.')
           : 'Au tour de <b>' + escapeHtml(Room.name(state.turn)) + '</b>.'));
 
       // Cartes retournées cette séquence
@@ -371,9 +389,9 @@
         return '<div class="tcard back' + (canAct ? ' pick' : '') + '"' + (canAct ? ' onclick="revealCenter(' + ci + ')"' : '') + '></div>';
       }).join('') || '<span class="tr-reveal-empty">centre vide</span>');
 
-      // Joueurs (avec leurs extrêmes accessibles)
-      setHTML('tr-players', order.map(function (pid) {
-        var isMe = pid === me, isTurn = pid === state.turn;
+      // Les AUTRES joueurs (on ne se demande pas ses propres cartes — ta main est en haut).
+      setHTML('tr-players', order.filter(function (pid) { return pid !== me; }).map(function (pid) {
+        var isMe = false, isTurn = pid === state.turn;
         var lowIdx = accessibleIdx(state, pid, 'low'), highIdx = accessibleIdx(state, pid, 'high');
         var hand = handOf(state, pid);
         function ext(which, idx) {
@@ -400,11 +418,19 @@
           '<div class="tr-ext">' + extHTML + '</div></div>';
       }).join(''));
 
-      // Ma main (je vois mes valeurs ; mes extrêmes accessibles surlignés)
+      // Ma main, EN HAUT. Sur MON tour, ma plus basse ▽ et ma plus haute △ jouables
+      // sont cliquables directement (on « joue sa carte » au lieu de « se demander »).
       var myHand = handOf(state, me);
       var myLow = accessibleIdx(state, me, 'low'), myHigh = accessibleIdx(state, me, 'high');
-      setText('tr-my-count', '(' + myHand.length + ')');
-      setHTML('tr-myhand', myHand.map(function (v, i) { return cardFace(v, (i === myLow || i === myHigh) ? ' ext' : ''); }).join('') || '—');
+      var myFlipped = flippedHandIdx(reveal, me);
+      setHTML('tr-my-count', '(' + myHand.length + ' cartes) · 🎴 ' + triosOf(state, me) + '/3');
+      setHTML('tr-myhand', myHand.map(function (v, i) {
+        var committed = myFlipped.indexOf(i) >= 0;             // déjà retournée cette séquence
+        var playable = canAct && !committed && (i === myLow || i === myHigh);
+        var which = (i === myLow) ? 'low' : 'high';
+        var cls = (v === 7 ? ' seven' : '') + (committed ? ' flip' : '') + (playable ? ' pick ext' : '');
+        return '<div class="tcard' + cls + '"' + (playable ? ' onclick="revealHand(\'' + me + '\',\'' + which + '\')"' : '') + '>' + v + '</div>';
+      }).join('') || '—');
 
       maybeAbsent(state);
     }
