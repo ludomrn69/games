@@ -397,14 +397,18 @@
     ctx.strokeStyle=dark()?'rgba(255,255,255,.025)':'rgba(0,0,0,.03)';ctx.lineWidth=1;
     for(var c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(OX+c*CELL,OY);ctx.lineTo(OX+c*CELL,OY+ROWS*CELL);ctx.stroke();}
     for(var r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(OX,OY+r*CELL);ctx.lineTo(OX+COLS*CELL,OY+r*CELL);ctx.stroke();}
+    // « parkings » : plot clair arrondi sous chaque usine (les routes y arrivent)
+    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),ps=CELL*1.16;
+      ctx.fillStyle=dark()?'rgba(255,255,255,.045)':'rgba(255,255,255,.6)';
+      rr(x-ps/2,y-ps/2,ps,ps,CELL*0.24);ctx.fill();});
     // routes : contour gris PUIS ruban blanc par-dessus (façon Mini Motorways)
     var th=CELL*0.42;
     ctx.fillStyle=dark()?'#12151a':'#b3b9ac';paintRoadLayer(th+5);
     ctx.fillStyle=dark()?'#39404a':'#f8f5ec';paintRoadLayer(th);
     // ponts : bords BIEN épais (surélevés au-dessus de l'eau)
     overlayLayer('bridge',th,dark()?'#05070a':'#7c8178',dark()?'#39404a':'#f8f5ec');
-    // autoroutes : ruban chaud, bords épais (rapide, passe au-dessus de tout)
-    overlayLayer('motorway',th*0.92,'#233',dark()?'#caa24a':'#f2a83c');
+    // autoroutes : GROS trait jaune épais, bord fin sombre (rapide, passe au-dessus de tout)
+    overlayLayer('motorway',th*1.15,dark()?'#8a6a1a':'#c99a1e',dark()?'#e0b23a':'#f6c92b');
     // ronds-points & feux placés par le joueur
     drawFeatures();
     // voitures (petite auto arrondie avec ombre douce)
@@ -419,21 +423,22 @@
       ctx.fillStyle='rgba(255,255,255,.55)';rr(CELL*0.01,-CELL*0.08,CELL*0.12,CELL*0.16,CELL*0.04);ctx.fill(); // pare-brise
       ctx.restore();
     });
-    // maisons : petit CUBE 3D
-    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.44;
-      drawBox(x,y,s,h.color,s*0.28);
+    // maisons : PETIT cube 3D (sources)
+    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.4;
+      drawBox(x,y,s,h.color,s*0.3);
     });
-    // bâtiments : GROS cube 3D (façade claire) + file de « pins » de demande au-dessus
-    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.62,dep=s*0.26;
+    // usines : GROS cube 3D (nettement plus grand que les maisons) + pins sur le TOIT
+    dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.72,dep=s*0.24;
       if(d.over>0){var f=Math.min(1,d.over/OVER_LIMIT);ctx.strokeStyle='#e8582c';ctx.lineWidth=3;
-        ctx.beginPath();ctx.arc(x,y,s*0.82,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
+        ctx.beginPath();ctx.arc(x,y,s*0.78,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
       drawBox(x,y,s,d.color,dep);
-      ctx.fillStyle='rgba(255,255,255,.9)';rr(x-s*0.18,y-s*0.18,s*0.36,s*0.36,2.5);ctx.fill(); // façade (sur la face du dessus)
-      // pins d'attente (petites barres arrondies façon jauge)
-      for(var p=0;p<Math.min(d.pins,PIN_CAP);p++){
-        var px=x-CELL*0.30+ (p%5)*(CELL*0.15), py=y-s/2-CELL*0.14-((p/5)|0)*CELL*0.15;
-        ctx.fillStyle=d.pins>=PIN_CAP?'#e8582c':d.color;
-        rr(px-CELL*0.045,py-CELL*0.065,CELL*0.09,CELL*0.13,CELL*0.03);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.9)';rr(x-s*0.16,y-s*0.14,s*0.32,s*0.32,2.5);ctx.fill(); // façade sur la face du dessus
+      // pins de demande POSÉS SUR LE TOIT (petites pastilles rondes, en haut du toit)
+      var np=Math.min(d.pins,PIN_CAP);
+      for(var p=0;p<np;p++){
+        var px=x-CELL*0.22+ (p%4)*(CELL*0.145), py=y-s*0.34+((p/4)|0)*CELL*0.13;
+        ctx.fillStyle=d.pins>=PIN_CAP?'#e5484d':'#2b2b2b';
+        ctx.beginPath();ctx.arc(px,py,CELL*0.048,0,7);ctx.fill();
       }
     });
   }
