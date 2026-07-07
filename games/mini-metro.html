@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Mini Métro 🚇</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚇</text></svg>" />
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#2a2a33;overflow:hidden;user-select:none;
+    background:#ece1c4;display:flex;flex-direction:column;align-items:center;touch-action:none}
+  :root[data-theme="dark"] body,body.dark{background:#14161c;color:#e7e7ee}
+  .hud{width:100%;max-width:900px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px;gap:10px;z-index:5}
+  .hud a.back{color:inherit;text-decoration:none;font-size:1.6rem;line-height:1;opacity:.7}
+  .hud a.back:hover{opacity:1}
+  .stat{text-align:center;line-height:1.05}
+  .stat .n{font-size:1.5rem;font-weight:800}
+  .stat .l{font-size:.62rem;text-transform:uppercase;letter-spacing:1px;opacity:.55;font-weight:700}
+  .grow{flex:1}
+  /* Horloge analogique (façon Mini Métro) */
+  .mclock{width:27px;height:27px;border-radius:50%;border:2.5px solid currentColor;position:relative;display:inline-block;opacity:.9;flex-shrink:0}
+  .mclock::after{content:'';position:absolute;width:3px;height:3px;border-radius:50%;background:currentColor;left:50%;top:50%;transform:translate(-50%,-50%)}
+  .mhand{position:absolute;left:50%;top:50%;width:2px;height:9px;background:currentColor;border-radius:2px;transform-origin:bottom center;transform:translate(-50%,-100%) rotate(0deg)}
+  .inv-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.9);border-radius:30px;padding:5px 12px;box-shadow:0 3px 12px rgba(0,0,0,.12);font-weight:800;font-size:.8rem}
+  body.dark .inv-chip{background:rgba(40,42,52,.92);color:#e7e7ee}
+  .icon-btn{border:none;background:rgba(0,0,0,.06);color:inherit;width:40px;height:40px;border-radius:12px;font-size:1.1rem;cursor:pointer}
+  body.dark .icon-btn{background:rgba(255,255,255,.08)}
+  #stage{flex:1;width:100%;max-width:900px;position:relative}
+  canvas{display:block;width:100%;height:100%}
+  .lines{position:absolute;left:0;right:0;bottom:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:0 10px;pointer-events:none}
+  .line-chip{pointer-events:auto;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.9);border-radius:30px;padding:5px 8px 5px 12px;
+    box-shadow:0 3px 12px rgba(0,0,0,.12);font-weight:800;font-size:.8rem}
+  body.dark .line-chip{background:rgba(40,42,52,.92);color:#e7e7ee}
+  .line-chip .dot{width:16px;height:6px;border-radius:4px}
+  .line-chip .rm{border:none;background:none;cursor:pointer;font-size:.85rem;opacity:.5;color:inherit;padding:2px 4px}
+  .line-chip .rm:hover{opacity:1}
+  .palette{position:absolute;top:8px;left:0;right:0;display:flex;gap:9px;justify-content:center;align-items:center;pointer-events:none;z-index:3}
+  .pdot{width:15px;height:15px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.22)}
+  .pdot.empty{background:transparent!important;border:2.5px solid;opacity:.38;box-shadow:none}
+  .hint{position:absolute;top:32px;left:0;right:0;text-align:center;font-size:.82rem;opacity:.55;pointer-events:none;font-weight:600}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;text-align:center;
+    padding:28px;background:rgba(236,225,196,.94);backdrop-filter:blur(6px);z-index:20}
+  body.dark .screen{background:rgba(20,22,28,.94)}
+  .screen.hidden{display:none}
+  .screen h1{font-size:2rem;font-weight:900}
+  .screen p{max-width:320px;line-height:1.5;opacity:.8;font-size:.95rem}
+  .big{font-size:3.4rem;font-weight:900;color:#e8582c}
+  .btn{border:none;border-radius:16px;padding:15px 38px;font-size:1.1rem;font-weight:800;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,#e8582c,#f2a03c);box-shadow:0 8px 24px rgba(232,88,44,.4);font-family:inherit}
+  .btn:active{transform:scale(.96)}
+  .choices{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .choice{border:2px solid rgba(0,0,0,.1);background:rgba(255,255,255,.7);border-radius:18px;padding:18px 16px;min-width:120px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:6px;font-family:inherit;color:inherit;transition:transform .12s,border-color .12s}
+  body.dark .choice{background:rgba(40,42,52,.7);border-color:rgba(255,255,255,.12)}
+  .choice:hover{transform:translateY(-3px);border-color:#e8582c}
+  .choice .ce{font-size:2rem}.choice .ct{font-weight:800}.choice .cs{font-size:.75rem;opacity:.65}
+</style>
+</head>
+<body>
+  <div class="hud">
+    <a class="back" href="../index.html" aria-label="Retour">‹</a>
+    <div class="stat" style="display:flex;align-items:center;gap:8px">
+      <span class="mclock"><span class="mhand" id="clockHand"></span></span>
+      <span style="text-align:left"><span class="n" id="day">LUN</span><span class="l" style="display:block">Jour</span></span>
+    </div>
+    <div class="grow"></div>
+    <div class="stat"><div class="n" id="score">0</div><div class="l">Passagers</div></div>
+    <div class="grow"></div>
+    <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+  </div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="palette" id="palette"></div>
+    <div class="hint" id="hint">Glisse d'une station à une autre pour tracer une ligne</div>
+    <div class="lines" id="lineChips"></div>
+
+    <div class="screen" id="start">
+      <h1>🚇 Mini Métro</h1>
+      <p>Relie les stations par des lignes de métro. Les passagers (○ △ □…) veulent rejoindre une station de leur forme. Une station saturée trop longtemps&nbsp;= fin de partie. Tiens le plus longtemps&nbsp;!</p>
+      <button class="btn" id="startBtn">Jouer</button>
+      <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#2c7be5,#37a86b);box-shadow:0 8px 24px rgba(44,123,229,.4)">🗓️ Défi du jour</button>
+      <div id="dailyInfo" style="font-size:.82rem;opacity:.72;max-width:300px"></div>
+    </div>
+
+    <div class="screen hidden" id="week">
+      <h1 id="weekTitle">Nouvelle semaine</h1>
+      <p>Choisis une amélioration&nbsp;:</p>
+      <div class="choices" id="weekChoices"></div>
+    </div>
+
+    <div class="screen hidden" id="over">
+      <h1>Réseau saturé&nbsp;!</h1>
+      <div class="big" id="finalScore">0</div>
+      <p id="overMsg">passagers transportés</p>
+      <button class="btn" id="replayBtn">Rejouer</button>
+    </div>
+
+    <div class="screen hidden" id="paused">
+      <h1>⏸ Pause</h1>
+      <button class="btn" id="resumeBtn">Reprendre</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),stage=document.getElementById('stage');
+  var W,H,DPR;
+  function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;
+    cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+  addEventListener('resize',resize);
+  // suit le thème du site (mémorisé par nav.js sur les autres pages)
+  try{if(localStorage.getItem('games-theme')==='dark')document.body.classList.add('dark');}catch(e){}
+
+  // ── Constantes de jeu ────────────────────────────────────────────────────
+  var SHAPES=['circle','triangle','square','plus','star','diamond'];
+  var LINE_COLORS=['#e8582c','#2c7be5','#f2b705','#37a86b','#8b5cf6','#e5439b','#14b8c4'];
+  var CAP=6;                 // capacité d'attente d'une station avant saturation
+  var OVER_LIMIT=42;         // secondes de saturation continue avant game over
+  var TRAIN_SPEED=115;       // px/seconde
+  var TRAIN_CAP0=6;          // capacité d'un train
+  var BEST='mini_metro_best',best=+localStorage.getItem(BEST)||0;
+
+  var state,stations,lines,pool,score,gt,week,nextStationT,spawnT,trainCap,shapesN;
+  var effCap,speedMul,spawnMul;            // modulés par le défi du jour
+  var DAILY=false,dayIdx=0,dayTwist=null,rnd=Math.random;
+  var drag=null; // {from:station, x,y}
+
+  // Générateur pseudo-aléatoire seedé : en défi du jour, tout le monde a la MÊME carte.
+  function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;var t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+  // Défis du jour : une règle spéciale qui tourne selon la date.
+  var TWISTS=[
+    {name:'Départ minimal 🚉', desc:'une seule ligne au départ', lines:1},
+    {name:'Heure de pointe 🏃', desc:'les passagers affluent plus vite', spawnMul:0.6},
+    {name:'Trains poussifs 🐌', desc:'trains plus lents', speedMul:0.72},
+    {name:'Quais étroits 📏', desc:'stations vite saturées', cap:4},
+    {name:'Grande ville 🌆', desc:'beaucoup de formes différentes', shapes:5}
+  ];
+  function daySeed(){return (dayIdx*2654435761)>>>0 || 1;}
+
+  function vibrate(m){if(navigator.vibrate)navigator.vibrate(m);}
+  function dist(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy);}
+
+  function reset(){
+    resize();
+    var lines0=3, shapes0=3; effCap=CAP; speedMul=1; spawnMul=1;
+    if(DAILY && dayTwist){
+      if(dayTwist.lines!=null)lines0=dayTwist.lines;
+      if(dayTwist.shapes!=null)shapes0=dayTwist.shapes;
+      if(dayTwist.cap!=null)effCap=dayTwist.cap;
+      if(dayTwist.speedMul!=null)speedMul=dayTwist.speedMul;
+      if(dayTwist.spawnMul!=null)spawnMul=dayTwist.spawnMul;
+    }
+    stations=[];lines=[];pool=lines0;score=0;gt=0;week=1;nextStationT=0;spawnT=3;trainCap=TRAIN_CAP0;shapesN=shapes0;
+    // 3 stations de départ, formes distinctes
+    for(var i=0;i<3;i++) addStation(i);
+    updateChips();updateHud();
+  }
+
+  function freeSpot(){
+    var m=70, top=70, bot=110;
+    for(var tries=0;tries<200;tries++){
+      var x=m+rnd()*(W-2*m), y=top+rnd()*(H-top-bot);
+      var ok=true;
+      for(var i=0;i<stations.length;i++) if(dist({x:x,y:y},stations[i])<78){ok=false;break;}
+      if(ok) return {x:x,y:y};
+    }
+    return {x:m+rnd()*(W-2*m), y:top+rnd()*(H-top-bot)};
+  }
+  function addStation(forceShape){
+    if(W<20) return;
+    var p=freeSpot();
+    var shape;
+    if(forceShape!=null) shape=SHAPES[forceShape%3];
+    else {
+      // formes courantes majoritaires, formes récentes rares (comme le vrai jeu)
+      var r=rnd();
+      shape = r<0.62 ? SHAPES[(rnd()*3)|0] : SHAPES[(rnd()*shapesN)|0];
+    }
+    stations.push({x:p.x,y:p.y,shape:shape,pax:[],over:0,id:stations.length});
+  }
+
+  // ── Lignes & trains ────────────────────────────────────────────────────────
+  function endpointLine(st){ // renvoie la ligne dont st est une extrémité
+    for(var i=0;i<lines.length;i++){var s=lines[i].st;if(s[0]===st||s[s.length-1]===st) return lines[i];}
+    return null;
+  }
+  function stationOnLine(line,st){return line.st.indexOf(st)>=0;}
+  function newTrain(line){return {line:line,i:0,next:line.st.length>1?1:0,t:0,dir:1,pax:[],dwell:0};}
+  function tryBuild(a,b){
+    if(a===b) return;
+    // étendre une ligne existante dont A est une extrémité
+    var line=endpointLine(a);
+    if(line && !stationOnLine(line,b)){
+      if(line.st[0]===a){ line.st.unshift(b);
+        // insertion en tête : décale les indices des trains pour qu'ils restent alignés
+        line.trains.forEach(function(tr){tr.i++;tr.next++;});
+      } else line.st.push(b);
+      vibrate(8);updateChips();return;
+    }
+    // sinon créer une nouvelle ligne (si un slot de ligne est libre)
+    if(pool>0){
+      // couleur : première non utilisée
+      var color=LINE_COLORS[0];
+      var used={};lines.forEach(function(l){used[l.color]=1;});
+      for(var c=0;c<LINE_COLORS.length;c++){if(!used[LINE_COLORS[c]]){color=LINE_COLORS[c];break;}}
+      var nl={color:color,st:[a,b],trains:[]};
+      nl.trains.push(newTrain(nl));
+      lines.push(nl);pool--;
+      vibrate(12);updateChips();
+    }
+  }
+  function removeLine(line){
+    var i=lines.indexOf(line);if(i<0)return;
+    lines.splice(i,1);pool++;updateChips();
+  }
+  function addTrain(){ // ajoute un train sur la plus longue ligne
+    var best=null;lines.forEach(function(l){if(!best||l.st.length>best.st.length)best=l;});
+    if(best) best.trains.push(newTrain(best));
+  }
+
+  // ── Boucle de simulation ────────────────────────────────────────────────────
+  function spawnPassenger(){
+    var shapesPresent={};stations.forEach(function(s){shapesPresent[s.shape]=1;});
+    var present=Object.keys(shapesPresent);
+    if(present.length<2) return;
+    var s=stations[(rnd()*stations.length)|0];
+    var target;var guard=0;
+    do{ target=present[(rnd()*present.length)|0]; guard++; }while(target===s.shape && guard<20);
+    if(target===s.shape) return;
+    s.pax.push(target);
+  }
+
+  function update(dt){
+    gt+=dt;
+    // apparition de stations
+    nextStationT-=dt;
+    if(nextStationT<=0){ addStation(); nextStationT = Math.max(4, 9 - gt*0.05); }
+    // nouvelles formes débloquées avec le temps
+    if(gt>45 && shapesN<4) shapesN=4;
+    if(gt>95 && shapesN<5) shapesN=5;
+    if(gt>160 && shapesN<6) shapesN=6;
+    // apparition de passagers (cadence qui accélère)
+    spawnT-=dt;
+    var rate=Math.max(0.55, 2.6 - gt*0.012)*spawnMul;
+    if(spawnT<=0){ spawnPassenger(); spawnT=rate; }
+    // semaine = récompense toutes les 22 s
+    if(gt >= week*22){ startWeek(); return; }
+
+    // trains
+    for(var li=0;li<lines.length;li++){
+      var line=lines[li],sts=line.st;
+      for(var ti=0;ti<line.trains.length;ti++){
+        var tr=line.trains[ti];
+        if(sts.length<2){tr.i=0;tr.next=0;tr.t=0;continue;}
+        if(tr.dwell>0){tr.dwell-=dt;continue;}
+        var A=sts[tr.i],B=sts[tr.next];
+        var seg=elbowLen(A,B)||1;
+        tr.t += (TRAIN_SPEED*speedMul*dt)/seg;
+        if(tr.t>=1){
+          tr.t=0;tr.i=tr.next;
+          arrive(tr,sts[tr.i]);
+          // avance
+          if(tr.dir>0){ if(tr.next>=sts.length-1) tr.dir=-1; }
+          else { if(tr.next<=0) tr.dir=1; }
+          tr.next = tr.i + tr.dir;
+          if(tr.next<0)tr.next=1;if(tr.next>sts.length-1)tr.next=sts.length-2;
+          tr.dwell=0.28;
+        }
+      }
+    }
+
+    // saturation des stations
+    for(var i=0;i<stations.length;i++){
+      var st=stations[i];
+      if(st.pax.length>effCap){ st.over+=dt; if(st.over>=OVER_LIMIT){ gameOver(); return; } }
+      else st.over=Math.max(0, st.over - dt*2);
+    }
+    updateHud();
+  }
+
+  function lineReaches(line,shape){ for(var i=0;i<line.st.length;i++) if(line.st[i].shape===shape) return true; return false; }
+
+  function arrive(tr,st){
+    // débarque ceux dont la forme cible == forme de la station
+    for(var i=tr.pax.length-1;i>=0;i--){
+      if(tr.pax[i]===st.shape){ tr.pax.splice(i,1); score++; vibrate(5); }
+    }
+    // embarque les passagers en attente que cette ligne peut mener à destination
+    for(var j=0;j<st.pax.length && tr.pax.length<trainCap;){
+      var want=st.pax[j];
+      if(lineReaches(tr.line,want)){ tr.pax.push(want); st.pax.splice(j,1); }
+      else j++;
+    }
+  }
+
+  // ── Rendu ────────────────────────────────────────────────────────────────────
+  function shapePath(x,y,r,shape){
+    ctx.beginPath();
+    if(shape==='circle'){ ctx.arc(x,y,r,0,7); }
+    else if(shape==='square'){ ctx.rect(x-r,y-r,2*r,2*r); }
+    else if(shape==='triangle'){ ctx.moveTo(x,y-r*1.15);ctx.lineTo(x+r,y+r*.8);ctx.lineTo(x-r,y+r*.8);ctx.closePath(); }
+    else if(shape==='plus'){ var t=r*.42;ctx.moveTo(x-t,y-r);ctx.lineTo(x+t,y-r);ctx.lineTo(x+t,y-t);ctx.lineTo(x+r,y-t);ctx.lineTo(x+r,y+t);ctx.lineTo(x+t,y+t);ctx.lineTo(x+t,y+r);ctx.lineTo(x-t,y+r);ctx.lineTo(x-t,y+t);ctx.lineTo(x-r,y+t);ctx.lineTo(x-r,y-t);ctx.lineTo(x-t,y-t);ctx.closePath(); }
+    else if(shape==='diamond'){ ctx.moveTo(x,y-r*1.2);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r*1.2);ctx.lineTo(x-r,y);ctx.closePath(); }
+    else if(shape==='star'){ for(var i=0;i<5;i++){var a=-Math.PI/2+i*2*Math.PI/5;var a2=a+Math.PI/5;ctx[i?'lineTo':'moveTo'](x+Math.cos(a)*r,y+Math.sin(a)*r);ctx.lineTo(x+Math.cos(a2)*r*.45,y+Math.sin(a2)*r*.45);} ctx.closePath(); }
+  }
+  function dark(){return document.body.classList.contains('dark');}
+
+  // ── Tracé octilinéaire (H / V / 45°, coins arrondis) : LA signature de Mini Métro.
+  function elbowOf(A,B){
+    var dx=B.x-A.x, dy=B.y-A.y, adx=Math.abs(dx), ady=Math.abs(dy);
+    var sx=dx<0?-1:1, sy=dy<0?-1:1;
+    if(adx>ady) return {x:B.x - sx*ady, y:A.y};   // droit horizontal, puis diagonale 45°
+    if(ady>adx) return {x:A.x, y:B.y - sy*adx};   // droit vertical, puis diagonale
+    return {x:A.x, y:A.y};                          // pur 45° : pas de coude
+  }
+  function octiPoints(sts){
+    var pts=[sts[0]];
+    for(var i=1;i<sts.length;i++){
+      var P=sts[i-1], Q=sts[i], E=elbowOf(P,Q);
+      if((E.x!==P.x||E.y!==P.y)&&(E.x!==Q.x||E.y!==Q.y)) pts.push(E);
+      pts.push(Q);
+    }
+    return pts;
+  }
+  function elbowLen(A,B){var E=elbowOf(A,B);return dist(A,E)+dist(E,B);}
+  function elbowAt(A,B,t){ // position + angle du train le long du coude, à la fraction t
+    var E=elbowOf(A,B), l1=dist(A,E), l2=dist(E,B), L=(l1+l2)||1, d=t*L;
+    if(d<=l1){var f=l1?d/l1:0;return {x:A.x+(E.x-A.x)*f,y:A.y+(E.y-A.y)*f,ang:Math.atan2((E.y-A.y)||(B.y-A.y),(E.x-A.x)||(B.x-A.x))};}
+    var g=l2?(d-l1)/l2:0;return {x:E.x+(B.x-E.x)*g,y:E.y+(B.y-E.y)*g,ang:Math.atan2((B.y-E.y)||(B.y-A.y),(B.x-E.x)||(B.x-A.x))};
+  }
+  function strokeRounded(pts,r){
+    if(pts.length<2)return;
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(var i=1;i<pts.length-1;i++)ctx.arcTo(pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y,r);
+    ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);ctx.stroke();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    var ink=dark()?'#e7e7ee':'#2b2b33';
+    var white=dark()?'#20232c':'#fbf7ee';   // remplissage des stations (≈ blanc)
+    // rivière décorative (bande bleu-gris qui serpente)
+    ctx.strokeStyle=dark()?'rgba(120,150,190,.16)':'rgba(122,162,200,.30)';
+    ctx.lineWidth=Math.max(26,Math.min(W,H)*0.06);ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(-30,H*0.30);ctx.bezierCurveTo(W*0.35,H*0.44,W*0.55,H*0.18,W+30,H*0.52);ctx.stroke();
+    // lignes octilinéaires à coins arrondis + caps de terminus
+    lines.forEach(function(line){
+      if(line.st.length<2)return;
+      var op=octiPoints(line.st);
+      ctx.strokeStyle=line.color;ctx.lineWidth=7;ctx.lineJoin='round';ctx.lineCap='round';
+      strokeRounded(op,13);
+      // petite barre perpendiculaire à chaque extrémité (terminus)
+      ctx.fillStyle=line.color;
+      [[op[0],op[1]],[op[op.length-1],op[op.length-2]]].forEach(function(pr){
+        var e=pr[0],n=pr[1],ang=Math.atan2(n.y-e.y,n.x-e.x)+Math.PI/2;
+        ctx.save();ctx.translate(e.x,e.y);ctx.rotate(ang);
+        ctx.beginPath();rr(ctx,-9,-3.5,18,7,3.5);ctx.fill();ctx.restore();
+      });
+    });
+    // tracé en cours (pointillé octilinéaire)
+    if(drag){ctx.strokeStyle=dark()?'rgba(255,255,255,.4)':'rgba(0,0,0,.3)';ctx.lineWidth=5;ctx.lineCap='round';ctx.setLineDash([2,10]);
+      strokeRounded(octiPoints([drag.from,{x:drag.x,y:drag.y}]),13);ctx.setLineDash([]);}
+    // trains (suivent le tracé octilinéaire)
+    lines.forEach(function(line){
+      if(line.st.length<2)return;
+      line.trains.forEach(function(tr){
+        var A=line.st[tr.i],B=line.st[tr.next]||A;
+        var p=elbowAt(A,B,tr.t);
+        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.ang);
+        ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=5;ctx.shadowOffsetY=1.5;
+        ctx.fillStyle=line.color;ctx.beginPath();rr(ctx,-11,-6.5,22,13,4.5);ctx.fill();
+        ctx.shadowColor='transparent';
+        ctx.rotate(-p.ang);
+        for(var q=0;q<tr.pax.length;q++){var px=-7+(q%3)*7, py=-4+((q/3)|0)*7;
+          ctx.fillStyle=white;shapePath(px,py,2.1,tr.pax[q]);ctx.fill();}
+        ctx.restore();
+      });
+    });
+    // stations (blanches, contour fin, petite ombre) — plus petites que les lignes
+    stations.forEach(function(st){
+      if(st.over>0){var f=Math.min(1,st.over/OVER_LIMIT);
+        ctx.strokeStyle='#e8582c';ctx.lineWidth=3;ctx.beginPath();
+        ctx.arc(st.x,st.y,18,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.16)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
+      ctx.fillStyle=white;shapePath(st.x,st.y,11,st.shape);ctx.fill();
+      ctx.shadowColor='transparent';ctx.strokeStyle=ink;ctx.lineWidth=2.6;ctx.stroke();
+      ctx.restore();
+      for(var p=0;p<st.pax.length;p++){
+        var a=-Math.PI/2 + p*0.5, rr2=17+ (p>7?7:0);
+        var px=st.x+Math.cos(a)*rr2, py=st.y+Math.sin(a)*rr2;
+        ctx.fillStyle=st.pax.length>effCap?'#e8582c':ink;
+        shapePath(px,py,3,st.pax[p]);ctx.fill();
+      }
+    });
+  }
+  function rr(c,x,y,w,h,r){c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);}
+
+  // ── HUD & chips ─────────────────────────────────────────────────────────────
+  var DAYS=['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
+  function updateHud(){
+    document.getElementById('score').textContent=score;
+    var dayLen=22/7;                                   // 1 semaine (22 s) = 7 jours
+    document.getElementById('day').textContent=DAYS[Math.floor(gt/dayLen)%7];
+    var hand=document.getElementById('clockHand');
+    if(hand){var frac=(gt%22)/22;hand.style.transform='translate(-50%,-100%) rotate('+(frac*360)+'deg)';}
+  }
+  function updateChips(){
+    var box=document.getElementById('lineChips');
+    var trainsN=lines.reduce(function(a,l){return a+l.trains.length;},0);
+    var inv='<span class="inv-chip">🚆 '+trainsN+' · 🚃 '+trainCap+'</span>';
+    box.innerHTML=inv+lines.map(function(l,i){
+      return '<span class="line-chip"><span class="dot" style="background:'+l.color+'"></span>L'+(i+1)+
+        '<button class="rm" data-i="'+i+'" aria-label="Supprimer">✕</button></span>';
+    }).join('') + (pool>0?'<span class="line-chip" style="opacity:.6">+ '+pool+' ligne'+(pool>1?'s':'')+' dispo</span>':'');
+    Array.prototype.forEach.call(box.querySelectorAll('.rm'),function(b){
+      b.onclick=function(e){e.stopPropagation();removeLine(lines[+b.getAttribute('data-i')]);};
+    });
+    // Palette en haut : chaque COULEUR = une LIGNE (pleine = en service, creuse = dispo).
+    var pal=document.getElementById('palette');
+    if(pal){
+      var used={};lines.forEach(function(l){used[l.color]=1;});
+      var avail=[];for(var c=0;c<LINE_COLORS.length && avail.length<pool;c++){if(!used[LINE_COLORS[c]])avail.push(LINE_COLORS[c]);}
+      pal.innerHTML=lines.map(function(l){return '<span class="pdot" style="background:'+l.color+'"></span>';}).join('')
+        + avail.map(function(c){return '<span class="pdot empty" style="border-color:'+c+'"></span>';}).join('');
+    }
+  }
+
+  // ── Entrées (souris + tactile) ──────────────────────────────────────────────
+  function pt(e){var r=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return {x:t.clientX-r.left,y:t.clientY-r.top};}
+  function stationAt(p){var best=null,bd=30;stations.forEach(function(s){var d=dist(p,s);if(d<bd){bd=d;best=s;}});return best;}
+  function down(e){if(state!=='play')return;var p=pt(e);var s=stationAt(p);if(s){drag={from:s,x:p.x,y:p.y};e.preventDefault();}}
+  function move(e){if(!drag)return;var p=pt(e);drag.x=p.x;drag.y=p.y;e.preventDefault();}
+  function up(e){if(!drag)return;var p=pt(e);var s=stationAt(p);if(s&&s!==drag.from)tryBuild(drag.from,s);drag=null;e.preventDefault();}
+  cv.addEventListener('mousedown',down);addEventListener('mousemove',move);addEventListener('mouseup',up);
+  cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',up,{passive:false});
+
+  // ── Semaines (récompenses) ──────────────────────────────────────────────────
+  function startWeek(){
+    week++;state='week';
+    var opts=[
+      {e:'🛤️',t:'+1 Ligne',s:'nouvelle ligne',fn:function(){pool++;}},
+      {e:'🚆',t:'+1 Train',s:'plus de débit',fn:function(){addTrain();}},
+      {e:'🚃',t:'+ Wagon',s:'trains +2 places',fn:function(){trainCap+=2;}}
+    ];
+    document.getElementById('weekTitle').textContent='Semaine '+week+' 🎉';
+    document.getElementById('weekChoices').innerHTML=opts.map(function(o,i){
+      return '<button class="choice" data-i="'+i+'"><span class="ce">'+o.e+'</span><span class="ct">'+o.t+'</span><span class="cs">'+o.s+'</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#weekChoices .choice'),function(b){
+      b.onclick=function(){opts[+b.getAttribute('data-i')].fn();updateChips();updateHud();hide('week');state='play';};
+    });
+    show('week');
+  }
+
+  // ── Écrans ──────────────────────────────────────────────────────────────────
+  function show(id){document.getElementById(id).classList.remove('hidden');}
+  function hide(id){document.getElementById(id).classList.add('hidden');}
+  var hintEl=document.getElementById('hint');
+  function setHint(t){if(hintEl)hintEl.textContent=t;}
+  function begin(){DAILY=false;rnd=Math.random;reset();setHint('Glisse d\'une station à une autre pour tracer une ligne');hide('start');hide('over');state='play';}
+  function dailyKey(){return 'mini_metro_daily_'+dayIdx;}
+  function startDaily(){
+    DAILY=true;dayIdx=Math.floor(Date.now()/86400000);dayTwist=TWISTS[dayIdx%TWISTS.length];
+    rnd=mulberry32(daySeed());
+    reset();setHint('🗓️ Défi du jour — '+dayTwist.name+' : '+dayTwist.desc);hide('start');hide('over');state='play';
+  }
+  function refreshDailyInfo(){
+    var el=document.getElementById('dailyInfo');if(!el)return;
+    var di=Math.floor(Date.now()/86400000), tw=TWISTS[di%TWISTS.length];
+    var db=0;try{db=+localStorage.getItem('mini_metro_daily_'+di)||0;}catch(e){}
+    el.innerHTML='Règle du jour : <b>'+tw.name+'</b> — '+tw.desc+(db?'<br>Ton record du jour : '+db+' passagers':'');
+  }
+  function gameOver(){
+    state='over';document.getElementById('finalScore').textContent=score;
+    var msg;
+    if(DAILY){
+      var dk=dailyKey(),db=0;try{db=+localStorage.getItem(dk)||0;}catch(e){}
+      if(score>db){db=score;try{localStorage.setItem(dk,db);}catch(e){}}
+      msg='🗓️ Défi du jour · record du jour : '+db+' passagers';refreshDailyInfo();
+    } else {
+      msg='passagers transportés';
+      if(score>best){best=score;try{localStorage.setItem(BEST,best);}catch(e){}msg='🏆 Record ! '+score+' passagers';}
+    }
+    document.getElementById('overMsg').textContent=msg;show('over');vibrate([40,60,140]);
+  }
+  document.getElementById('startBtn').onclick=begin;
+  document.getElementById('dailyBtn').onclick=startDaily;
+  document.getElementById('replayBtn').onclick=function(){DAILY?startDaily():begin();};
+  refreshDailyInfo();
+  var pauseBtn=document.getElementById('pauseBtn');
+  pauseBtn.onclick=function(){if(state==='play'){state='pause';show('paused');}};
+  document.getElementById('resumeBtn').onclick=function(){if(state==='pause'){hide('paused');state='play';}};
+
+  // ── Boucle ───────────────────────────────────────────────────────────────────
+  var last=0;
+  function loop(ts){requestAnimationFrame(loop);var dt=Math.min(0.05,(ts-last)/1000)||0;last=ts;
+    if(state==='play') update(dt);
+    draw();
+  }
+  reset();state='start';requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

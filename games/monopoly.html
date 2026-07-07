@@ -33,6 +33,12 @@
     .mo-cell .hh { position: absolute; bottom: 1px; right: 1px; font-size: 7px; }
     .mo-cell.mo-cell-me { box-shadow: inset 0 0 0 3px var(--terracotta); animation: moMePulse 1s ease-in-out infinite alternate; z-index: 2; }
     @keyframes moMePulse { from { box-shadow: inset 0 0 0 2px var(--terracotta); } to { box-shadow: inset 0 0 0 3px var(--gold); } }
+    /* Après le lancer de dés : ma case actuelle RESSORT fort (halo + premier plan +
+       petite pastille « 📍 ») pour repérer où j'ai atterri d'un coup d'œil. */
+    .mo-cell.mo-cell-here { z-index: 6; overflow: visible; box-shadow: inset 0 0 0 3px var(--terracotta), 0 0 0 3px var(--gold), 0 0 16px 5px rgba(216,74,58,.65); animation: moHere .85s ease-in-out infinite alternate; }
+    @keyframes moHere { from { box-shadow: inset 0 0 0 3px var(--terracotta), 0 0 0 2px var(--gold), 0 0 10px 3px rgba(216,74,58,.45); } to { box-shadow: inset 0 0 0 3px var(--gold), 0 0 0 4px var(--terracotta), 0 0 22px 8px rgba(216,74,58,.8); } }
+    .mo-cell.mo-cell-here .mo-here-pin { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); font-size: 13px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); animation: moPinBob .7s ease-in-out infinite alternate; pointer-events: none; z-index: 7; }
+    @keyframes moPinBob { from { transform: translateX(-50%) translateY(0); } to { transform: translateX(-50%) translateY(-3px); } }
     .mo-dice-text { font-weight: 800; font-size: 1.05rem; color: var(--ink); background: var(--cream); border-radius: 10px; padding: 4px 12px; }
     html[data-theme="dark"] .mo-dice-text { background: #2a2433; color: #e8dcc8; }
     .mo-remaining { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); }
@@ -70,7 +76,8 @@
     .mo-btn-row .btn-primary { width: auto; margin: 0; padding: 0.7rem 1.2rem; flex: 1 1 auto; min-width: 120px; }
 
     .mo-players { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 8px; }
-    .mo-pl { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; }
+    .mo-pl { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: transform .12s, border-color .12s; }
+    .mo-pl:hover { transform: translateY(-2px); border-color: var(--gold); }
     .mo-pl.turn { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(198,152,90,.3); }
     .mo-pl.broke { opacity: .5; filter: grayscale(1); }
     .mo-pl-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
@@ -110,6 +117,14 @@
     .mo-ov.active { display: flex; animation: fadeUp .3s ease both; }
     .mo-ov-card { background: var(--white); border-radius: 22px; padding: 30px 26px; text-align: center; max-width: 340px; width: 100%; box-shadow: var(--shadow-hover); }
     @media (min-width: 760px) { .mo-wrap{max-width:820px} .mo-board{width:min(62vw,72vh,600px)} }
+    /* Sur grand écran (PC) : deux colonnes — le plateau tient dans la hauteur de
+       l'écran (plus besoin de scroller pour le voir en entier) et le panneau
+       (joueurs, rues, journal) défile à côté. */
+    @media (min-width: 980px) {
+      .mo-wrap { flex-direction: row; align-items: flex-start; justify-content: center; max-width: 1180px; gap: 20px; }
+      .mo-board { width: min(48vw, calc(100vh - 140px), 660px); position: sticky; top: 100px; align-self: flex-start; }
+      .mo-panel { flex: 1 1 320px; max-width: 460px; }
+    }
   </style>
 </head>
 <body>
@@ -148,6 +163,7 @@
   <div class="modal" id="modal-mortg"><div class="modal-card" id="mortg-card"></div></div>
   <div class="modal" id="modal-trade"><div class="modal-card" id="trade-card"></div></div>
   <div class="modal" id="modal-tradein"><div class="modal-card" id="tradein-card"></div></div>
+  <div class="modal" id="modal-props"><div class="modal-card" id="props-card"></div></div>
 
   <div class="modal" id="modal-restart">
     <div class="modal-card" style="text-align:center">
@@ -256,8 +272,10 @@
       for (var i = 0; i < 40; i++) {
         var sp = B[i], g = gridPos(i);
         var corner = (i % 10 === 0);
-        var cls = 'mo-cell' + (corner ? ' corner' : '') + (s.mortg[i] ? ' mortg' : '') + (highlightMe && i === myPos ? ' mo-cell-me' : '');
-        var inner = '';
+        var iAmHere = highlightMe && i === myPos;
+        var afterRoll = iAmHere && s.phase !== 'roll'; // j'ai lancé → ma case ressort fort
+        var cls = 'mo-cell' + (corner ? ' corner' : '') + (s.mortg[i] ? ' mortg' : '') + (afterRoll ? ' mo-cell-here' : (iAmHere ? ' mo-cell-me' : ''));
+        var inner = afterRoll ? '<div class="mo-here-pin">📍</div>' : '';
         if (sp.t === 'prop') inner += '<div class="bar" style="background:' + GC[sp.g] + '"></div>';
         else if (sp.t === 'rail') inner += '<div class="bar" style="background:#2C2520"></div>';
         else if (sp.t === 'util') inner += '<div class="bar" style="background:#7e9bbf"></div>';
@@ -309,7 +327,7 @@
       var a = ENG.actor(s);
       document.getElementById('mo-players').innerHTML = s.order.map(function (pid) {
         var props = 0; for (var i = 0; i < 40; i++) if (s.owners[i] === pid) props++;
-        return '<div class="mo-pl' + (pid === a ? ' turn' : '') + (s.bankrupt[pid] ? ' broke' : '') + '">' +
+        return '<div class="mo-pl' + (pid === a ? ' turn' : '') + (s.bankrupt[pid] ? ' broke' : '') + '" onclick="showPlayerProps(\'' + pid + '\')" title="Voir ses propriétés">' +
           '<span class="mo-pl-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           '<div class="mo-pl-info"><div class="mo-pl-nm">' + escapeHtml(Room.name(pid)) + (s.jail[pid] > 0 ? ' ⛓' : '') + '</div>' +
           '<div class="mo-pl-cash">' + (s.bankrupt[pid] ? 'ruiné' : '<span id="mo-cash-' + pid + '">' + (s.cash[pid] || 0) + '</span> € · ' + props + ' 🏘') + '</div></div></div>';
@@ -391,7 +409,8 @@
       } else if (s.phase === 'manage') {
         // Bâtir : visible s'il y a au moins une case constructible (monopole complet).
         // Échange : seulement une fois TOUTES les rues vendues (règle voulue) ; ensuite
-        // on peut proposer n'importe quel échange (1+ propriétés ± argent, via l'UI).
+        // on peut proposer n'importe quel échange (1+ propriétés de chacun ± argent),
+        // y compris des couleurs complètes (les maisons sont revendues à la banque).
         var canBuild = canBuildAny(s, me);
         var partners = (s.order || []).filter(function (p) { return p !== me && !s.bankrupt[p]; });
         var canTrade = allStreetsOwned(s) && partners.length > 0;
@@ -472,6 +491,43 @@
       openModal('modal-deed');
     }
 
+    /* ── Propriétés d'un joueur (clic sur sa carte, y compris la mienne) ── */
+    function showPlayerProps(pid) {
+      var s = window.room; if (!s || !s.owners) return;
+      var byKey = {}, order = [], count = 0;
+      for (var i = 0; i < 40; i++) {
+        if (s.owners[i] !== pid) continue;
+        count++;
+        var sp = B[i];
+        var k = sp.t === 'prop' ? sp.g : (sp.t === 'rail' ? '_rail' : (sp.t === 'util' ? '_util' : '_other'));
+        if (!byKey[k]) { byKey[k] = []; order.push(k); }
+        byKey[k].push(i);
+      }
+      var body;
+      if (!count) {
+        body = '<div class="modal-sub">Aucune propriété pour l\'instant.</div>';
+      } else {
+        body = '<div class="mo-rem-groups">' + order.map(function (k) {
+          var col = (k === '_rail' || k === '_util' || k === '_other') ? '#2C2520' : GC[k];
+          var full = GROUPS[k] && GROUPS[k].every(function (x) { return s.owners[x] === pid; });
+          var chips = byKey[k].map(function (i) {
+            var h = s.houses && s.houses[i] || 0;
+            var tag = h ? (h === 5 ? ' 🏨' : ' 🏠' + h) : '';
+            return '<span class="mo-rem-chip" onclick="closeModal(\'modal-props\');openDeed(' + i + ')">' +
+              abbr(B[i].n) + (s.mortg && s.mortg[i] ? ' 🏦' : '') + tag + '</span>';
+          }).join('');
+          return '<div class="mo-rem-group"><span class="mo-rem-bar" style="background:' + col + '"></span>' + chips +
+            (full ? ' <span style="font-size:.64rem;font-weight:800;color:var(--terracotta)">MONOPOLE</span>' : '') + '</div>';
+        }).join('') + '</div>';
+      }
+      document.getElementById('props-card').innerHTML =
+        '<div class="modal-title">' + Room.emoji(pid) + ' ' + escapeHtml(Room.name(pid)) + '</div>' +
+        '<div class="modal-sub">' + (s.bankrupt[pid] ? 'Ruiné · ' : '') + money(s.cash && s.cash[pid] || 0) + ' · ' + count + ' propriété' + (count > 1 ? 's' : '') + '</div>' +
+        body +
+        '<div class="modal-btns"><button class="btn-primary" style="width:auto;padding:.5rem 1.3rem" onclick="closeModal(\'modal-props\')">Fermer</button></div>';
+      openModal('modal-props');
+    }
+
     /* ── Construire / vendre ── */
     function openBuild() {
       var s = window.room, me = window.myPid;
@@ -530,20 +586,73 @@
         '<div class="mo-seg" id="trade-seg">' + seg + '</div><div id="trade-body"></div>';
       openModal('modal-trade');
     }
-    function tradableProps(s, pid) { var a = []; for (var i = 0; i < 40; i++) { if (s.owners[i] !== pid || s.houses[i] > 0) continue; var g = B[i].g; if (g && GROUPS[g].some(function (k) { return s.houses[k] > 0; })) continue; a.push(i); } return a; }
+    // Toutes les propriétés du joueur sont proposables à l'échange, Y COMPRIS les
+    // couleurs complètes (avec maisons) : les maisons sont revendues à la banque au
+    // moment où l'échange est appliqué (cf. moteur applyTrade). On les montre donc
+    // toutes, avec un repère 🏠/🏦 pour l'état.
+    function tradableProps(s, pid) { var a = []; for (var i = 0; i < 40; i++) { if (s.owners[i] === pid) a.push(i); } return a; }
     function setTradeTarget(p) {
       tradeTarget = p;
       document.querySelectorAll('#trade-seg button').forEach(function (b) { b.classList.remove('active'); });
       var el = document.getElementById('tt-' + p); if (el) el.classList.add('active');
       var s = window.room, me = window.myPid;
       var mine = tradableProps(s, me), theirs = tradableProps(s, p);
-      function row(i, side) { var g = B[i].g; return '<label class="mo-chk"><input type="checkbox" data-side="' + side + '" value="' + i + '"><span class="bar2" style="width:5px;height:18px;border-radius:3px;background:' + (g ? GC[g] : '#2C2520') + '"></span>' + escapeHtml(B[i].n) + '</label>'; }
-      document.getElementById('trade-body').innerHTML =
+      function row(i, side) {
+        var g = B[i].g, h = s.houses && s.houses[i] || 0;
+        var tag = (s.mortg && s.mortg[i] ? ' 🏦' : '') + (h ? (h === 5 ? ' 🏨' : ' 🏠' + h) : '');
+        var mono = g && GROUPS[g] && GROUPS[g].every(function (k) { return s.owners[k] === s.owners[i]; }) ? ' <b style="color:var(--terracotta);font-size:.7rem">MONOPOLE</b>' : '';
+        return '<label class="mo-chk"><input type="checkbox" data-side="' + side + '" value="' + i + '"><span class="bar2" style="width:5px;height:18px;border-radius:3px;background:' + (g ? GC[g] : '#2C2520') + '"></span>' + escapeHtml(B[i].n) + tag + mono + '</label>';
+      }
+      var tb = document.getElementById('trade-body');
+      tb.innerHTML =
         '<div style="font-weight:700;margin:6px 0 4px">Tu donnes :</div><div class="mo-list">' + (mine.map(function (i) { return row(i, 'give'); }).join('') || '<span class="modal-sub">—</span>') + '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">+ cash <input class="mo-cash-in" id="trade-give-cash" type="number" min="0" value="0"></div>' +
         '<div style="font-weight:700;margin:6px 0 4px">Tu reçois :</div><div class="mo-list">' + (theirs.map(function (i) { return row(i, 'recv'); }).join('') || '<span class="modal-sub">—</span>') + '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">+ cash <input class="mo-cash-in" id="trade-recv-cash" type="number" min="0" value="0"></div>' +
+        '<div id="trade-verdict" style="margin:8px 0"></div>' +
         '<div class="modal-btns"><button class="btn-link" onclick="closeModal(\'modal-trade\')">Annuler</button><button class="btn-primary" style="width:auto;padding:.6rem 1.3rem" onclick="sendTrade()">Proposer</button></div>';
+      tb.addEventListener('input', updateTradeVerdict);
+      tb.addEventListener('change', updateTradeVerdict);
+      updateTradeVerdict();
+    }
+    // Ce que reflète l'échange en cours (cases cochées + montants saisis).
+    function currentTrade() {
+      var me = window.myPid, give = [], recv = [];
+      document.querySelectorAll('#trade-body input[type=checkbox]').forEach(function (c) { if (c.checked) { (c.dataset.side === 'give' ? give : recv).push(+c.value); } });
+      var gc = Math.max(0, parseInt((document.getElementById('trade-give-cash') || {}).value, 10) || 0);
+      var rc = Math.max(0, parseInt((document.getElementById('trade-recv-cash') || {}).value, 10) || 0);
+      return { from: me, to: tradeTarget, give: { props: give, cash: gc }, recv: { props: recv, cash: rc } };
+    }
+    // Indicateur en direct face à un BOT : combien il réclame pour ce que tu prends,
+    // combien vaut ton offre à ses yeux, et s'il accepterait en l'état.
+    function updateTradeVerdict() {
+      var el = document.getElementById('trade-verdict'); if (!el) return;
+      var s = window.room, t = currentTrade();
+      var empty = !t.give.props.length && !t.recv.props.length && !t.give.cash && !t.recv.cash;
+      if (!tradeTarget || empty) { el.innerHTML = ''; return; }
+      if (!isBotPid(s, tradeTarget)) { el.innerHTML = '<div class="modal-sub" style="text-align:left">👤 C\'est ' + escapeHtml(Room.name(tradeTarget)) + ' qui décidera d\'accepter ou non.</div>'; return; }
+      var ask = Math.ceil(ENG.tradeAsk(s, t.recv));
+      var offer = Math.round(ENG.tradeRecvValue(s, t.give, tradeTarget));
+      var ok = ENG.tradeValid(s, t) && ENG.aiAcceptTrade(s, t);
+      var takes = t.recv.props.length || t.recv.cash;
+      el.innerHTML = '<div style="border:1.5px solid ' + (ok ? 'var(--sage)' : 'var(--terracotta)') + ';border-radius:12px;padding:8px 10px;font-size:.82rem;line-height:1.5">' +
+        '🤖 <b>' + escapeHtml(Room.name(tradeTarget)) + '</b> réclame ≈ <b>' + money(ask) + '</b> pour ce que tu prends.<br>' +
+        'Ton offre vaut <b>' + money(offer) + '</b> à ses yeux.<br>' +
+        (ok ? '🟢 Il accepterait sans doute.' : '🔴 Insuffisant — ajoute du cash ou une rue utile pour lui.') +
+        (!ok && takes ? '<br><button class="mo-mini" style="margin-top:6px" onclick="fillFairCash()">💡 Ajuster mon cash au juste prix</button>' : '') +
+        '</div>';
+    }
+    // Complète le cash donné pour atteindre pile le prix demandé par le bot (si abordable).
+    function fillFairCash() {
+      var s = window.room, t = currentTrade();
+      if (!isBotPid(s, tradeTarget)) return;
+      var ask = Math.ceil(ENG.tradeAsk(s, t.recv));
+      var propsVal = ENG.tradeRecvValue(s, { props: t.give.props, cash: 0 }, tradeTarget);
+      var need = Math.max(0, ask - propsVal), myCash = s.cash[window.myPid] || 0;
+      var gcEl = document.getElementById('trade-give-cash');
+      if (need > myCash) { lbToast('Il faudrait ' + money(need) + ' — tu n\'as que ' + money(myCash)); if (gcEl) gcEl.value = myCash; }
+      else if (gcEl) gcEl.value = need;
+      updateTradeVerdict();
     }
     function sendTrade() {
       if (!tradeTarget) { lbToast('Choisis un joueur'); return; }
@@ -554,7 +663,7 @@
       var rc = Math.max(0, parseInt((document.getElementById('trade-recv-cash') || {}).value, 10) || 0);
       var t = { from: me, to: tradeTarget, give: { props: give, cash: gc }, recv: { props: recv, cash: rc } };
       if (!give.length && !recv.length && !gc && !rc) { lbToast('Propose quelque chose'); return; }
-      if (!ENG.tradeValid(window.room, t)) { lbToast('Échange invalide (maisons ? cash ?)'); return; }
+      if (!ENG.tradeValid(window.room, t)) { lbToast('Échange invalide (pas assez de cash ?)'); return; }
       closeModal('modal-trade');
       if (isBotPid(window.room, tradeTarget)) {
         if (ENG.aiAcceptTrade(window.room, t)) {
@@ -563,7 +672,7 @@
         } else {
           var counter = ENG.aiCounterTrade(window.room, t);
           if (counter) { tx(function (cur) { cur.trade = counter; }); lbToast('🔄 ' + Room.name(tradeTarget) + ' fait une contre-offre'); }
-          else { tx(function (cur) { cur.trade = null; }); lbToast('❌ ' + Room.name(tradeTarget) + ' refuse (il ne lâche pas un monopole)'); }
+          else { tx(function (cur) { cur.trade = null; }); lbToast('❌ ' + Room.name(tradeTarget) + ' refuse l\'échange'); }
         }
       } else {
         tx(function (cur) { cur.trade = t; });
@@ -599,6 +708,7 @@
       var gcEl = document.getElementById('trade-give-cash'); if (gcEl) gcEl.value = (t.recv && t.recv.cash) || 0;
       var rcEl = document.getElementById('trade-recv-cash'); if (rcEl) rcEl.value = (t.give && t.give.cash) || 0;
       var titleEl = document.querySelector('#trade-card .modal-title'); if (titleEl) titleEl.textContent = '🔄 Contre-offre à ' + Room.name(t.from);
+      updateTradeVerdict();
     }
 
     /* ━━━━━━━━━━ Fin de partie ━━━━━━━━━━ */

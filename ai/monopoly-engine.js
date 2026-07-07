@@ -398,8 +398,12 @@
   function tradeValid(s, t) { norm(s);
     if (!t) return false;
     if (s.bankrupt[t.from] || s.bankrupt[t.to]) return false;
-    var okProps = (t.give.props || []).every(function (i) { return s.owners[i] === t.from && !(s.houses[i] > 0) && groupHouses(s, B[i].g) === 0; });
-    var okProps2 = (t.recv.props || []).every(function (i) { return s.owners[i] === t.to && !(s.houses[i] > 0) && groupHouses(s, B[i].g) === 0; });
+    // On peut échanger n'importe quelle propriété qu'on possède, y compris une
+    // COULEUR COMPLÈTE (avec maisons) : les maisons éventuelles sont revendues à la
+    // banque au moment d'appliquer l'échange (cf. applyTrade). Seule contrainte réelle :
+    // bien être propriétaire de ce qu'on propose.
+    var okProps = (t.give.props || []).every(function (i) { return s.owners[i] === t.from; });
+    var okProps2 = (t.recv.props || []).every(function (i) { return s.owners[i] === t.to; });
     if (!okProps || !okProps2) return false;
     if ((t.give.cash || 0) > (s.cash[t.from] || 0)) return false;
     if ((t.recv.cash || 0) > (s.cash[t.to] || 0)) return false;
@@ -407,11 +411,21 @@
   }
   function applyTrade(s, t) { norm(s);
     if (!tradeValid(s, t)) return false;
+    // Échanger une propriété dont le groupe a des maisons : on ne peut pas garder de
+    // maisons sans posséder toute la couleur → on les revend d'abord à la banque
+    // (moitié prix, remboursées au propriétaire actuel), puis on transfère la rue nue.
+    var sold = false;
+    function sellGroup(prop, owner) {
+      var g = B[prop].g; if (!g) return;
+      GROUPS[g].forEach(function (i) { var h = s.houses[i] || 0; if (h > 0) { s.cash[owner] += h * Math.floor(B[i].h / 2); s.houses[i] = 0; sold = true; } });
+    }
+    (t.give.props || []).forEach(function (i) { sellGroup(i, t.from); });
+    (t.recv.props || []).forEach(function (i) { sellGroup(i, t.to); });
     (t.give.props || []).forEach(function (i) { s.owners[i] = t.to; });
     (t.recv.props || []).forEach(function (i) { s.owners[i] = t.from; });
     s.cash[t.from] -= (t.give.cash || 0); s.cash[t.to] += (t.give.cash || 0);
     s.cash[t.to] -= (t.recv.cash || 0); s.cash[t.from] += (t.recv.cash || 0);
-    log(s, '🤝 Échange entre ' + nameish(t.from) + ' et ' + nameish(t.to));
+    log(s, '🤝 Échange entre ' + nameish(t.from) + ' et ' + nameish(t.to) + (sold ? ' (maisons revendues à la banque)' : ''));
     return true;
   }
 
@@ -420,43 +434,87 @@
     for (var i = 0; i < B.length; i++) { if (B[i].t === 'prop' && s.owners[i] == null) return false; }
     return true;
   }
-  // ── IA d'échange : compléter un monopole en achetant la dernière case ──────
+  // ── IA d'échange : le bot cherche à compléter un monopole ──────────────────
   // Comme pour les humains : pas d'échange tant que toutes les rues ne sont pas vendues.
-  function aiProposeTrade(s, pid) { norm(s);
-    if (!allStreetsOwned(s)) return null;
+  // Groupes où `who` est à UNE case du monopole (case manquante détenue par un autre).
+  function oneAwayGroups(s, who) {
+    var res = [];
     for (var g in GROUPS) {
       var idxs = GROUPS[g];
-      if (idxs.filter(function (i) { return s.owners[i] === pid; }).length !== idxs.length - 1) continue;
       if (groupHouses(s, g) > 0) continue;
-      var need = idxs.filter(function (i) { return s.owners[i] !== pid; })[0];
-      var o = s.owners[need]; if (o == null || s.bankrupt[o] || o === pid) continue;
-      var offer = Math.round(B[need].p * 1.3);
-      if ((s.cash[pid] || 0) < offer + 150) continue; // garder de quoi bâtir
-      var t = { from: pid, to: o, give: { props: [], cash: offer }, recv: { props: [need], cash: 0 } };
-      if (tradeValid(s, t)) return t;
+      if (idxs.filter(function (i) { return s.owners[i] === who; }).length !== idxs.length - 1) continue;
+      var need = idxs.filter(function (i) { return s.owners[i] !== who; })[0];
+      res.push({ g: g, need: need, owner: s.owners[need] });
+    }
+    return res;
+  }
+  function aiProposeTrade(s, pid) { norm(s);
+    if (!allStreetsOwned(s)) return null;
+    var mineNeeds = oneAwayGroups(s, pid).filter(function (n) { return n.owner != null && !s.bankrupt[n.owner] && n.owner !== pid; });
+    if (!mineNeeds.length) return null;
+    // 1) ÉCHANGE GAGNANT-GAGNANT : je donne à l'adversaire la case qui LUI complète une
+    //    couleur, contre celle qui me complète la mienne (+ cash d'appoint si besoin).
+    for (var a = 0; a < mineNeeds.length; a++) {
+      var mn = mineNeeds[a], o = mn.owner;
+      var theirNeeds = oneAwayGroups(s, o);
+      for (var b = 0; b < theirNeeds.length; b++) {
+        var tn = theirNeeds[b];
+        if (tn.g === mn.g || s.owners[tn.need] !== pid) continue; // c'est MOI qui détiens la case qui complète O
+        var giveCash = Math.max(0, B[mn.need].p - B[tn.need].p);  // je compense si je donne moins cher
+        if ((s.cash[pid] || 0) < giveCash + 100) continue;
+        var t = { from: pid, to: o, give: { props: [tn.need], cash: giveCash }, recv: { props: [mn.need], cash: 0 } };
+        if (tradeValid(s, t)) return t;
+      }
+    }
+    // 2) sinon, ACHAT CASH (offre généreuse) de la case qui me manque.
+    for (var c = 0; c < mineNeeds.length; c++) {
+      var m = mineNeeds[c], offer = Math.round(B[m.need].p * 1.4);
+      if ((s.cash[pid] || 0) < offer + 120) continue; // garder un coussin pour bâtir
+      var t2 = { from: pid, to: m.owner, give: { props: [], cash: offer }, recv: { props: [m.need], cash: 0 } };
+      if (tradeValid(s, t2)) return t2;
     }
     return null;
   }
-  // Le destinataire `t.to` évalue : accepte si la valeur reçue dépasse de 15% ce qu'il cède
-  // ET s'il ne se prive pas d'un monopole à lui.
+  // Prix minimum que le bot (t.to) réclame pour céder ce qu'on lui demande (t.recv) :
+  //  • couleur COMPLÈTE : ≈ 1,8× la valeur NUE des rues + la moitié de l'investissement
+  //    en maisons (l'autre moitié lui est remboursée par la banque lors de l'échange) ;
+  //  • simple rue : sa valeur (rue + maisons éventuelles) + 15 %.
+  // Barème calibré par simulation (des centaines de parties rejouées) : à ce prix,
+  // l'échange d'un monopole est équitable — le vendeur n'y perd pas et l'acheteur y
+  // gagne un peu — alors qu'une prime de +60 % faisait payer l'acheteur trop cher.
+  function tradeAsk(s, recv) {
+    var bare = (recv.cash || 0), houseInv = 0, mono = false;
+    (recv.props || []).forEach(function (i) { bare += B[i].p; houseInv += (s.houses[i] || 0) * (B[i].h || 0); });
+    (recv.props || []).forEach(function (i) { if (hasMonopoly(s, B[i].g, s.owners[i])) mono = true; });
+    return mono ? (1.8 * bare + 0.5 * houseInv) : ((bare + houseInv) * 1.15);
+  }
+  // Valeur, pour `pid`, de ce qu'il REÇOIT dans un échange (cash + rues) :
+  //  • prix nu de la rue en temps normal ;
+  //  • MOITIÉ prix si la rue est hypothéquée (elle ne rapporte rien et coûte à lever) ;
+  //  • BONUS (≈ ×2) si la rue lui COMPLÈTE une couleur — un monopole vaut bien plus que
+  //    la rue seule, donc le bot accepte plus volontiers une rue vraiment utile pour lui.
+  function tradeRecvValue(s, give, pid) {
+    var v = (give.cash || 0);
+    (give.props || []).forEach(function (i) {
+      var base = s.mortg[i] ? Math.floor(B[i].p / 2) : B[i].p;
+      var g = B[i].g;
+      if (g && GROUPS[g].every(function (k) { return k === i || s.owners[k] === pid; })) base += B[i].p;
+      v += base;
+    });
+    return v;
+  }
+  // Le destinataire `t.to` évalue : accepte si la valeur reçue dépasse son prix demandé.
   function aiAcceptTrade(s, t) { norm(s);
-    var recvV = (t.give.cash || 0); (t.give.props || []).forEach(function (i) { recvV += B[i].p; });
-    var giveV = (t.recv.cash || 0); (t.recv.props || []).forEach(function (i) { giveV += B[i].p; });
-    var keepsMonopoly = (t.recv.props || []).some(function (i) { return hasMonopoly(s, B[i].g, t.to); });
-    if (keepsMonopoly) return false;
-    return recvV >= giveV * 1.15;
+    return tradeRecvValue(s, t.give, t.to) >= tradeAsk(s, t.recv);
   }
   // Si le bot (t.to) refuse, il peut faire une CONTRE-OFFRE : mêmes propriétés mais
-  // il réclame le cash qui rendrait l'échange équitable (sauf s'il devrait céder un
-  // monopole → pas de contre-offre). Renvoie un trade RETOURNÉ (du bot vers l'humain),
-  // prêt à être affiché à l'humain, ou null.
+  // il réclame le cash qui atteindrait son prix demandé (prime renforcée pour un
+  // monopole). Renvoie un trade RETOURNÉ (du bot vers l'humain), ou null.
   function aiCounterTrade(s, t) { norm(s);
     if (!t || s.bankrupt[t.from] || s.bankrupt[t.to]) return null;
     var bot = t.to;
-    if ((t.recv.props || []).some(function (i) { return hasMonopoly(s, B[i].g, bot); })) return null;
-    var recvV = (t.give.cash || 0); (t.give.props || []).forEach(function (i) { recvV += B[i].p; }); // ce que le bot reçoit
-    var giveV = (t.recv.cash || 0); (t.recv.props || []).forEach(function (i) { giveV += B[i].p; }); // ce que le bot cède
-    var target = Math.ceil(giveV * 1.15);
+    var recvV = tradeRecvValue(s, t.give, bot);             // ce que le bot reçoit (rues utiles valorisées)
+    var target = Math.ceil(tradeAsk(s, t.recv));            // prix demandé par le bot pour ce qu'il cède
     if (recvV >= target) return null;                       // il accepterait déjà
     var extra = target - recvV;                             // cash en plus demandé à l'humain
     if ((t.give.cash || 0) + extra > (s.cash[t.from] || 0)) return null; // l'humain ne peut pas payer
@@ -550,6 +608,7 @@
     buildHouse: buildHouse, sellHouse: sellHouse, mortgage: mortgage, unmortgage: unmortgage,
     canBuildOn: canBuildOn, canSellOn: canSellOn, endTurn: endTurn,
     tradeValid: tradeValid, applyTrade: applyTrade, aiProposeTrade: aiProposeTrade, aiAcceptTrade: aiAcceptTrade, aiCounterTrade: aiCounterTrade,
+    tradeAsk: tradeAsk, tradeRecvValue: tradeRecvValue,
     useGetout: useGetout, payJail: payJail,
     actor: actor, alive: alive, rentOf: rentOf, netWorth: netWorth, hasMonopoly: hasMonopoly,
     ownedInGroup: ownedInGroup, countRails: countRails, countUtils: countUtils,
