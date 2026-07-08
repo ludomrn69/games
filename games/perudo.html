@@ -45,6 +45,13 @@
     /* Dé « touché » par l'enchère en cours : cerclé terracotta, points rouges. */
     .pipdie.hit { box-shadow: 0 0 0 2.5px var(--terracotta), 0 2px 5px rgba(0,0,0,0.28); }
     .pipdie.hit i.on { background: #c0392b; }
+    /* Le Paco 🦜 compte aussi comme joker : on l'entoure comme un dé touché au reveal. */
+    .pd-paco.hit { border-radius: 8px; box-shadow: 0 0 0 2.5px var(--terracotta), 0 2px 5px rgba(0,0,0,0.28); background: rgba(196,116,90,0.14); }
+    /* Ligne de révélation : indicateur « a cliqué Suivant ? » */
+    .pd-reveal-ack { margin-left: auto; font-size: 0.9rem; flex: 0 0 auto; }
+    .pd-reveal-ack.waiting { opacity: 0.5; }
+    .pd-bid-recap { text-align: center; font-size: 0.86rem; font-weight: 700; color: var(--ink-light); padding: 2px 12px 6px; }
+    .pd-bid-recap b { color: var(--terracotta); }
     .pd-picker { background: var(--white); border-radius: 18px; padding: 12px; box-shadow: var(--shadow); margin-bottom: 10px; }
     .pd-qty { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px; }
     .pd-qty button { width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid var(--gold-light); background: var(--cream); font-size: 1.4rem; font-weight: 800; cursor: pointer; color: var(--ink); }
@@ -400,10 +407,20 @@
       var rev = document.getElementById('pd-reveal');
       if (state.phase === 'reveal' && state.reveal) {
         var R = state.reveal;
-        rev.innerHTML = '<div class="pd-reveal">' + activePids0(state).map(function (pid) {
+        // Rappel de l'enchère contestée + résultat du comptage (on la perdait de vue au reveal).
+        var recap = '<div class="pd-bid-recap">' +
+          (R.kind === 'calza' ? '☝️ Calza de ' : '🗣️ Dudo de ') + escapeHtml(Room.name(R.challenger)) +
+          ' sur l\'enchère de ' + escapeHtml(Room.name(R.bidder)) + ' : <b>' + R.qty + ' × ' + faceHTML(R.face) + '</b>' +
+          ' → compté <b>' + R.count + '</b> (Paco 🦜 inclus)</div>';
+        var acks = (R.ack || {});
+        rev.innerHTML = recap + '<div class="pd-reveal">' + activePids0(state).map(function (pid) {
           var d = (R.dice || {})[pid] || [];
+          var isBot = (state.players[pid] || {}).isBot;
+          // Indicateur « a validé Suivant ? » — les ordis sont toujours prêts (✓).
+          var ready = isBot || acks[pid];
+          var ackIc = '<span class="pd-reveal-ack' + (ready ? '' : ' waiting') + '" title="' + (ready ? 'Prêt' : 'Doit encore appuyer sur Suivant') + '">' + (ready ? '✅' : '⏳') + '</span>';
           return '<div class="pd-reveal-row"><span class="pd-reveal-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-            '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face, state.palifico) + '</span></div>';
+            '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face, state.palifico) + '</span>' + ackIc + '</div>';
         }).join('') + '</div>';
       } else rev.innerHTML = '';
 
