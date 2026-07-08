@@ -7,8 +7,9 @@
   hors-ligne. Les modes EN LIGNE (Firebase) nécessitent toujours une connexion.
 
   Stratégie :
-   • Pages HTML / navigations : réseau d'abord, repli sur le cache (contenu frais
-     quand on est en ligne, fonctionne quand même hors-ligne).
+   • Pages HTML / navigations : cache d'abord puis rafraîchissement réseau en
+     arrière-plan (« stale-while-revalidate ») → ouverture instantanée, contenu
+     mis à jour au prochain chargement, et fonctionne hors-ligne.
    • Scripts / styles same-origin : cache d'abord (rapide + hors-ligne), mis à jour
      en arrière-plan.
    • Polices : auto-hébergées (fonts.css + fonts/*.woff2, même origine) → en cache
@@ -18,7 +19,7 @@
 */
 // La version est estampillée automatiquement (empreinte du contenu mis en cache)
 // par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
-var CACHE = 'jeux-d6ca4fa394';
+var CACHE = 'jeux-c10c6579cc';
 var ASSETS = [
   './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
   'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/pixelifysans-latin-ext.woff2', 'fonts/pixelifysans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',

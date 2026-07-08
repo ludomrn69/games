@@ -202,6 +202,7 @@
 
     /* ━━ Rendu ━━ */
     var _frKey = null; // clé de l'iframe en cours (slug#idx) pour ne pas la recharger
+    var _roundFxIdx = -1; // évite de rejouer le son de résultat à chaque re-rendu
     function onState(snap) {
       var state = snap.val() || {};
       if (state.status !== 'playing') return;
@@ -273,6 +274,12 @@
 
       // 3) Résultat de la manche.
       if (state.phase === 'round' && state.lastRound) {
+        // Petit retour (son + vibration) à l'arrivée du résultat, une fois par manche.
+        if (_roundFxIdx !== idx) {
+          _roundFxIdx = idx;
+          var iWon = state.lastRound.winner === window.myPid;
+          if (window.Fx) { Fx.sfx(iWon ? 'coin' : 'place'); Fx.vib(iWon ? [20, 40, 20] : 15); }
+        }
         var MED = ['🥇', '🥈', '🥉'];
         var detail = (state.lastRound.podium || []).map(function (e, i) { return (MED[i] || '') + ' <b>' + escapeHtml(Room.name(e.p)) + '</b> (' + e.sc + ') +' + e.pts; }).join(' · ');
         var last = idx >= total - 1;
