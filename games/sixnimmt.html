@@ -29,6 +29,7 @@
     /* Cartes révélées de la manche (qui a joué quoi) — visibles pendant la résolution. */
     .sn-plays { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 2px 10px 6px; max-width: 480px; margin: 0 auto; }
     .sn-plays:empty { display: none; }
+    .sn-plays-label { flex-basis: 100%; text-align: center; font-family: 'Caveat', cursive; font-size: 0.92rem; color: var(--ink-light); margin-bottom: -2px; }
     .sn-play { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     .sn-play-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; }
     .sn-play .ncard { width: 34px; height: 46px; font-size: 0.95rem; cursor: default; }
@@ -199,7 +200,7 @@
       var deck = []; for (var i = 1; i <= 104; i++) deck.push(i); shuffle(deck);
       order.forEach(function (p, i) { cur.players[p].hand = deck.slice(i * 10, i * 10 + 10).sort(function (a, b) { return a - b; }); cur.players[p].heads = 0; });
       var rows = []; for (var r = 0; r < 4; r++) rows.push([deck[order.length * 10 + r]]);
-      cur.rows = rows; cur.picks = {}; cur.phase = 'select'; cur.resolveQueue = null; cur.pendingLow = null;
+      cur.rows = rows; cur.picks = {}; cur.phase = 'select'; cur.resolveQueue = null; cur.pendingLow = null; cur.lastPlays = null;
       cur.banner = 'Choisissez une carte (face cachée)';
     }
 
@@ -276,7 +277,7 @@
       finishRound(cur);
     }
     function finishRound(cur) {
-      cur.picks = {}; cur.phase = 'select'; cur.pendingLow = null; cur.lastPlays = null;
+      cur.picks = {}; cur.phase = 'select'; cur.pendingLow = null; // lastPlays gardé : visible au tour suivant
       var anyLeft = (cur.order || []).some(function (p) { return handOf(cur, p).length > 0; });
       if (!anyLeft) endDeal(cur); else cur.banner = 'Choisissez une carte (face cachée)';
     }
@@ -352,7 +353,7 @@
           '<span class="sn-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           (isMe ? 'Toi' : escapeHtml(Room.name(pid))) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
           (rh > 0 ? ' <span class="sn-row-heads">+' + rh + '🐮</span>' : '') +
-          (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✓</span>' : ' …') : '') + '</div>';
+          (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✅</span>' : ' <span title="Doit encore choisir sa carte">⏳</span>') : '') + '</div>';
       }
       setHTML('sn-opps', chip(me, true) + order.filter(function (p) { return p !== me; }).map(function (pid) { return chip(pid, false); }).join(''));
       setText('sn-banner', state.banner || '');
@@ -363,10 +364,18 @@
       var plays = state.lastPlays || [], queue = state.resolveQueue || [];
       var pendingVal = queue.length ? queue[0].val : null, remainingVals = {};
       queue.forEach(function (x) { remainingVals[x.val] = true; });
-      setHTML('sn-plays', (state.phase === 'resolve' || state.phase === 'chooseRow') ? plays.map(function (pl) {
-        return '<div class="sn-play' + (!remainingVals[pl.val] ? ' done' : '') + (pl.val === pendingVal ? ' now' : '') + '">' +
-          '<span class="sn-play-av" style="background:' + Room.color(pl.pid) + '">' + Room.emoji(pl.pid) + '</span>' + ncard(pl.val) + '</div>';
-      }).join('') : '');
+      var resolving = (state.phase === 'resolve' || state.phase === 'chooseRow');
+      // On garde les cartes du tour visibles PENDANT la résolution ET après (au début
+      // de la sélection suivante) → on voit ce que tout le monde a joué, pas juste un
+      // flash. Un intitulé rappelle si c'est le tour en cours ou le précédent.
+      var showPlays = resolving || (state.phase === 'select' && plays.length);
+      setHTML('sn-plays', showPlays
+        ? '<div class="sn-plays-label">' + (resolving ? 'Cartes révélées' : 'Tour précédent') + '</div>' +
+          plays.map(function (pl) {
+            return '<div class="sn-play' + (resolving && !remainingVals[pl.val] ? ' done' : '') + (pl.val === pendingVal ? ' now' : '') + (!resolving ? ' done' : '') + '">' +
+              '<span class="sn-play-av" style="background:' + Room.color(pl.pid) + '">' + Room.emoji(pl.pid) + '</span>' + ncard(pl.val) + '</div>';
+          }).join('')
+        : '');
 
       // 4 rangées — un petit son quand elles bougent (résolution des cartes posées)
       var rowsSig = JSON.stringify(state.rows || []);
