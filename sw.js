@@ -92,15 +92,21 @@ self.addEventListener('fetch', function (e) {
 
   var isPage = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname === '/';
   if (isPage) {
-    // réseau d'abord, repli cache. ignoreSearch : le précache contient
-    // « games/uno.html » SANS query, mais on y navigue avec « ?mode=solo » ou
-    // « ?room=CODE » — sans ce drapeau, le repli hors-ligne raterait le cache
-    // et servirait l'accueil à la place du jeu (mode avion cassé).
+    // « stale-while-revalidate » : on sert la page DEPUIS LE CACHE tout de suite
+    // (ouverture quasi instantanée, même en ligne), et on va la rechercher sur le
+    // réseau EN ARRIÈRE-PLAN pour rafraîchir le cache → nouvelle version au
+    // prochain chargement (le toast « nouvelle version » gère les maj du site).
+    // ignoreSearch : le précache contient « games/uno.html » SANS query alors
+    // qu'on y navigue avec « ?mode=solo » / « ?room=CODE » (sinon repli raté).
     e.respondWith(
-      fetch(req).then(function (res) {
-        var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
-        return res;
-      }).catch(function () { return caches.match(req, { ignoreSearch: true }).then(function (m) { return m || caches.match('/index.html'); }); })
+      caches.match(req, { ignoreSearch: true }).then(function (cached) {
+        var net = fetch(req).then(function (res) {
+          var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
+          return res;
+        }).catch(function () { return cached || caches.match('/index.html'); });
+        if (cached) { e.waitUntil(net.catch(function () {})); return cached; } // cache d'abord
+        return net;                                                            // 1re visite : réseau
+      })
     );
   } else {
     // cache d'abord, repli réseau (et mise en cache)
