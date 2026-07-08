@@ -407,12 +407,15 @@
       setHTML('pa-info', 'Donne ' + (state.deal || 1) + ' · seuil ' + (state.target || 250) +
         ' · <span class="pa-pap">Papayoo : ' + SUIT_EMOJI[state.papSuit] + ' 7 ' + SUIT_NAME[state.papSuit] + ' = 40</span>');
 
-      // Adversaires (tous sauf moi)
+      // Adversaires (tous sauf moi). Pendant la passe (simultanée), un ✅/⏳ montre
+      // qui a déjà donné ses cartes et qui on attend encore.
+      var isPassing = (state.phase === 'passing');
       var opps = order.filter(function (p) { return p !== me; }).map(function (pid) {
         var on = (state.turn === pid) ? ' turn' : '';
+        var wait = isPassing ? (' <span title="' + ((state.passSel && state.passSel[pid]) ? 'A passé ses cartes' : 'Doit encore passer') + '">' + ((state.passSel && state.passSel[pid]) ? '✅' : '⏳') + '</span>') : '';
         return '<div class="pa-opp' + on + '">' +
           '<span class="pa-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + ' <span class="cnt">' + handOf(state, pid).length + '</span> <span class="sc">' + totalOf(state, pid) + '</span></div>';
+          escapeHtml(Room.name(pid)) + ' <span class="cnt">' + handOf(state, pid).length + '</span> <span class="sc">' + totalOf(state, pid) + '</span>' + wait + '</div>';
       }).join('');
       setHTML('pa-opps', opps);
       setText('pa-banner', state.banner || '');

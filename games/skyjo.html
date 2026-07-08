@@ -334,10 +334,13 @@
       });
       window._skTot = tPrev;
 
-      // Adversaires
+      // Adversaires. Pendant la révélation initiale (flip2, simultanée), un ✅/⏳
+      // montre qui a déjà retourné ses 2 cartes et qui on attend.
+      var flipping = (state.phase === 'flip2');
       document.getElementById('sk-opps').innerHTML = ord.filter(function (p) { return p !== window.myPid; }).map(function (pid) {
         var p = state.players[pid] || {};
-        return '<div class="sk-opp' + (state.turn === pid ? ' turn' : '') + '"><div class="sk-opp-name"><span class="sk-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' · ' + sumVisible(p) + '</div><div class="sk-mini-grid">' + miniGrid(p) + '</div></div>';
+        var wait = flipping ? (' <span title="' + (flippedCount(p) >= 2 ? 'Cartes révélées' : 'Doit retourner 2 cartes') + '">' + (flippedCount(p) >= 2 ? '✅' : '⏳') + '</span>') : '';
+        return '<div class="sk-opp' + (state.turn === pid ? ' turn' : '') + '"><div class="sk-opp-name"><span class="sk-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' · ' + sumVisible(p) + wait + '</div><div class="sk-mini-grid">' + miniGrid(p) + '</div></div>';
       }).join('');
 
       // Piles
