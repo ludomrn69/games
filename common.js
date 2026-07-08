@@ -2300,6 +2300,10 @@
   function startGame(savedKeep) {
     endFx = false; // ré-arme le son/confetti de fin pour cette nouvelle partie
     statsRecorded = false;
+    // Nettoie un éventuel encart « Défi du jour réussi » resté d'une partie précédente
+    // (position:fixed → il flottait sinon par-dessus la nouvelle grille = faux « gagné »).
+    dailyRecorded = false;
+    var _od = document.getElementById('off-daily'); if (_od) _od.remove();
     var id0 = readIdentity();
     var pmap = {}, ids = [];
     players = [];
