@@ -428,7 +428,11 @@
   }
 
   // ── Entrées (souris + tactile) ──────────────────────────────────────────────
-  function pt(e){var r=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return {x:t.clientX-r.left,y:t.clientY-r.top};}
+  function pt(e){var r=cv.getBoundingClientRect();
+    // À `touchend`, e.touches est VIDE (le doigt est levé) → il faut lire
+    // changedTouches, sinon le tracé de ligne échouait tout le temps sur mobile.
+    var t=(e.touches&&e.touches.length)?e.touches[0]:((e.changedTouches&&e.changedTouches.length)?e.changedTouches[0]:e);
+    return {x:t.clientX-r.left,y:t.clientY-r.top};}
   function stationAt(p){var best=null,bd=30;stations.forEach(function(s){var d=dist(p,s);if(d<bd){bd=d;best=s;}});return best;}
   function down(e){if(state!=='play')return;var p=pt(e);var s=stationAt(p);if(s){drag={from:s,x:p.x,y:p.y};e.preventDefault();}}
   function move(e){if(!drag)return;var p=pt(e);drag.x=p.x;drag.y=p.y;e.preventDefault();}
