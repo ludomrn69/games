@@ -161,7 +161,15 @@
       if (!legal.length) { passMove(); return; }
       var idx;
       if (window.Bots && window.Bots.shouldBlunder(state)) {
-        idx = legal[Math.floor(Math.random() * legal.length)];
+        // Erreur PLAUSIBLE : le coup qui retourne LE PLUS de pions — la stratégie
+        // typique du débutant (gourmande, ignore coins et mobilité), bien plus
+        // crédible qu'un coup au hasard. Égalités départagées au hasard.
+        var bestN = -1, cand = [];
+        legal.forEach(function (ix) {
+          var n = window.ReversiAI.wouldFlip(b, ix, me).length;
+          if (n > bestN) { bestN = n; cand = [ix]; } else if (n === bestN) cand.push(ix);
+        });
+        idx = cand[Math.floor(Math.random() * cand.length)];
       } else {
         var depth = (window.Bots ? window.Bots.pick(state, { easy: 1, normal: 4, hard: 8 }) : 4);
         idx = window.ReversiAI.bestMove(b, me, opp, depth);

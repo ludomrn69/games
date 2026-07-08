@@ -170,9 +170,11 @@
     function morpionBot(state, pid) {
       var order = state.order, b = state.board || emptyBoard();
       var meN = order.indexOf(pid), me = String(meN), opp = String(1 - meN);
-      // Facile : joue parfois un coup légal au hasard → battable.
+      // Facile : erreur PLAUSIBLE — il voit sa victoire immédiate (comme tout
+      // débutant), sinon coup légal au hasard. Battable, mais plus crédible.
       if (window.Bots && window.Bots.shouldBlunder(state)) {
-        var rnd = randomMove(b, me); if (rnd) { if (rnd.f != null) doMove(rnd.f, rnd.t); else doPlace(rnd.i); } return;
+        var rnd = winningMove(b, me) || randomMove(b, me);
+        if (rnd) { if (rnd.f != null) doMove(rnd.f, rnd.t); else doPlace(rnd.i); } return;
       }
       var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 10 }) : 6);
       var best = window.MorpionAI.bestMove(b, me, opp, depth);
@@ -186,6 +188,25 @@
       var own = []; for (i = 0; i < 9; i++) if (b[i] === mk) own.push(i);
       if (!own.length || !emp.length) return null;
       return { f: own[Math.floor(Math.random() * own.length)], t: emp[Math.floor(Math.random() * emp.length)] };
+    }
+    // Premier coup légal qui GAGNE tout de suite (l'erreur « plausible » ne rate
+    // pas une victoire sous ses yeux), sinon null.
+    function winningMove(b, mk) {
+      var emp = [], own = [], i, j;
+      for (i = 0; i < 9; i++) { if (b[i] === '.') emp.push(i); else if (b[i] === mk) own.push(i); }
+      function wins(mv) {
+        var a = b.split('');
+        if (mv.f != null) { a[mv.f] = '.'; a[mv.t] = mk; } else a[mv.i] = mk;
+        return !!window.MorpionAI.winLineFor(a.join(''), mk);
+      }
+      if (countMark(b, mk) < 3) {
+        for (i = 0; i < emp.length; i++) if (wins({ i: emp[i] })) return { i: emp[i] };
+        return null;
+      }
+      for (i = 0; i < own.length; i++) for (j = 0; j < emp.length; j++) {
+        if (wins({ f: own[i], t: emp[j] })) return { f: own[i], t: emp[j] };
+      }
+      return null;
     }
 
     function onStart(players) {

@@ -159,12 +159,26 @@
       if (!legal.length) return; // bloqué → l'autre a déjà gagné (géré au coup précédent)
       var move;
       if (window.Bots && window.Bots.shouldBlunder(state)) {
-        move = legal[Math.floor(Math.random() * legal.length)];
+        move = plausibleWeak(b, me, legal);
       } else {
         var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 9 }) : 6);
         move = window.DamesAI.bestMove(b, me, opp, depth) || legal[0];
       }
       commitMove(move);
+    }
+    // Erreur PLAUSIBLE (niveau facile) : un débutant ne DONNE pas une pièce sous
+    // les yeux (prise immédiate en face) s'il a une alternative — mais il reste
+    // aveugle aux combinaisons à deux coups. Prises obligatoires : au hasard.
+    function plausibleWeak(b, me, legal) {
+      var isCapture = function (mvs) { return mvs.length > 0 && Math.abs(((mvs[0][1] / 8) | 0) - ((mvs[0][0] / 8) | 0)) === 2; };
+      if (isCapture(legal)) return legal[Math.floor(Math.random() * legal.length)];
+      var opp = window.DamesAI.other(me);
+      var safe = legal.filter(function (mv) {
+        var reply = window.DamesAI.legalMoves(window.DamesAI.applyMove(b, mv, me), opp);
+        return !isCapture(reply);
+      });
+      var pool = safe.length ? safe : legal;
+      return pool[Math.floor(Math.random() * pool.length)];
     }
 
     function onStart(players) {

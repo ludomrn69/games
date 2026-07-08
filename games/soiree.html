@@ -105,7 +105,7 @@
       rules: [
         'Le salon tire une série de jeux au hasard (3 ou 5 manches)',
         'Chaque manche se joue normalement, puis tout le monde revient ici',
-        '+3 points au vainqueur de chaque manche · classement cumulé',
+        'Podium à chaque manche : +3 / +2 / +1 points · classement cumulé',
         'Podium final à la dernière manche 🏆'
       ],
       lobbyExtraHTML: lobbyExtraHTML,
@@ -140,10 +140,41 @@
 
     /* ━━ Récolte du résultat de la manche ━━
        Le sous-salon a pour code CODE + n° de manche. Chaque client revenu ici lit
-       son résultat ; une transaction idempotente (done[idx]) crédite le vainqueur
-       une seule fois, quel que soit le client qui la déclenche. */
+       son résultat ; une transaction idempotente (done[idx]) crédite le PODIUM de
+       la manche une seule fois, quel que soit le client qui la déclenche.
+       Barème : +3 / +2 / +1 aux trois premiers (à 3 joueurs : +3 / +1 ; à 2 :
+       +3 au vainqueur) — chaque manche compte pour tout le monde, pas seulement
+       pour celui qui gagne. */
     var _fetchAt = 0;
     function subCode(state) { return window.roomCode + (state.idx + 1); }
+    // Classement final d'un sous-salon terminé, du 1er au dernier. Chaque jeu du
+    // POOL range ses joueurs différemment (score cumulé, têtes, dés restants…) :
+    // on lit le bon champ dans le bon sens. Repli : le vainqueur seul.
+    function rankOfSub(s) {
+      var players = s.players || {};
+      var order = (s.order || Object.keys(players)).slice();
+      var num = function (v) { return (typeof v === 'number' && isFinite(v)) ? v : 0; };
+      var by = null, asc = false; // by(pid) → valeur de classement ; asc = plus petit d'abord
+      switch (s.game) {
+        case 'president':   return (s.finishOrder || []).slice();
+        case 'uno':         by = function (p) { return num((s.scores || {})[p]); }; break;
+        case 'skyjo':       by = function (p) { return num((players[p] || {}).total); }; asc = true; break;
+        case 'sixnimmt':    by = function (p) { return num((players[p] || {}).heads); }; asc = true; break;
+        case 'perudo':      by = function (p) { return num((s.diceCount || {})[p]); }; break;
+        case 'diamants':    by = function (p) { return num((s.banked || {})[p]); }; break;
+        case 'nothanks':    by = function (p) { return num((players[p] || {}).score); }; asc = true; break;
+        case 'trio':        by = function (p) { return num((players[p] || {}).trios); }; break;
+        case 'papayoo':     by = function (p) { return num((s.totals || {})[p]); }; asc = true; break;
+        case 'millebornes': by = function (p) { return num(((players[p] || {}).mb || {}).dist); }; break;
+        case 'ludo':        by = function (p) { return ((s.tokens || {})[p] || []).reduce(function (a, x) { return a + num(x); }, 0); }; break;
+        default:            return s.winner ? [s.winner] : [];
+      }
+      order.sort(function (a, b) { return asc ? (by(a) - by(b)) : (by(b) - by(a)); });
+      // Le vainqueur officiel passe devant quoi qu'il arrive (égalités, champ manquant).
+      var w = s.winner || null;
+      if (w && order.indexOf(w) > 0) { order.splice(order.indexOf(w), 1); order.unshift(w); }
+      return order;
+    }
     function maybeCollect(state) {
       if (!state.seq || state.idx == null || state.idx >= state.seq.length) return;
       if (state.done && state.done[state.idx]) return;
@@ -156,19 +187,29 @@
         if (!s) return;
         var ended = !!(s.winner || s.status === 'ended' || s.status === 'finished');
         if (!ended) return;
-        var w = s.winner || ((s.finishOrder || [])[0]) || null;
-        var wname = (w && s.players && s.players[w] && s.players[w].name) || null;
+        var ranked = rankOfSub(s);
+        var w = ranked[0] || null;
+        var nameOf = function (p) { return (p && s.players && s.players[p] && s.players[p].name) || null; };
         rref().transaction(function (cur) {
           if (!cur || cur.status !== 'playing' || !cur.seq) return cur;
           cur.done = cur.done || {};
           if (cur.done[cur.idx]) return cur; // déjà comptée
           var gk = cur.seq[cur.idx];
           cur.done[cur.idx] = true;
-          if (w && cur.scores && cur.scores[w] != null) {
-            cur.scores[w] += 3;
-            cur.lastWin = { g: gk, n: wname || '?', p: w };
+          // Podium : uniquement les joueurs DU tournoi (les ordis du sous-salon
+          // ou un joueur de passage ne marquent pas). Barème selon la taille.
+          var inTournament = ranked.filter(function (p) { return cur.scores && cur.scores[p] != null; });
+          var n = Object.keys(cur.scores || {}).length;
+          var bareme = n >= 4 ? [3, 2, 1] : (n === 3 ? [3, 1] : [3]);
+          var podium = [];
+          inTournament.slice(0, bareme.length).forEach(function (p, i) {
+            cur.scores[p] += bareme[i];
+            podium.push({ p: p, n: nameOf(p) || '?', pts: bareme[i] });
+          });
+          if (podium.length) {
+            cur.lastWin = { g: gk, n: podium[0].n, p: podium[0].p, podium: podium };
           } else {
-            cur.lastWin = { g: gk, n: wname, p: null }; // vainqueur hors soirée (ordi…) → 0 pt
+            cur.lastWin = { g: gk, n: nameOf(w), p: null }; // vainqueur hors soirée (ordi…) → 0 pt
           }
           cur.idx += 1;
           return cur;
@@ -205,8 +246,18 @@
       var lw = '';
       if (state.lastWin) {
         var lm = META[state.lastWin.g] || { n: state.lastWin.g };
-        lw = '<div class="so-lastwin">Manche ' + escapeHtml(lm.n) + ' : ' +
-          (state.lastWin.p ? '<b>' + escapeHtml(state.lastWin.n) + '</b> +3 pts 🎉' : (state.lastWin.n ? escapeHtml(state.lastWin.n) + ' (hors tournoi) — 0 pt' : 'manche sans vainqueur')) + '</div>';
+        var detail;
+        if (state.lastWin.podium && state.lastWin.podium.length) {
+          var MEDALS = ['🥇', '🥈', '🥉'];
+          detail = state.lastWin.podium.map(function (e, i) {
+            return (MEDALS[i] || '') + ' <b>' + escapeHtml(e.n) + '</b> +' + e.pts;
+          }).join(' · ') + ' pts';
+        } else if (state.lastWin.p) {
+          detail = '<b>' + escapeHtml(state.lastWin.n) + '</b> +3 pts 🎉';
+        } else {
+          detail = state.lastWin.n ? escapeHtml(state.lastWin.n) + ' (hors tournoi) — 0 pt' : 'manche sans vainqueur';
+        }
+        lw = '<div class="so-lastwin">Manche ' + escapeHtml(lm.n) + ' : ' + detail + '</div>';
       }
 
       var rows = ranking(state).map(function (pid, i) {

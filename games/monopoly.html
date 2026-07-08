@@ -216,13 +216,48 @@
       rules: ['Achète des rues, encaisse des loyers, ruine les autres',
         'Réunis une couleur = monopole → bâtis et fais exploser les loyers',
         'Échange, hypothèque, enchères : tout est permis',
-        'Le dernier joueur non ruiné gagne'],
+        'Le dernier joueur non ruiné gagne',
+        'Partie courte (option) : après N tours, le plus gros patrimoine gagne'],
       offline: { solo: true },
       bot: monoBot,
       offlineTurn: function (room) { return ENG.actor(room); },
+      lobbyExtraHTML: durationLobbyHTML,
+      offlineExtraSetup: durationOfflineHTML,
       onState: onState,
       onStart: function (players) { return ENG.initGame(players.map(function (p) { return p.pid; })); }
     });
+
+    /* ━━━━━━━━━━ Durée de partie (complète / courte) ━━━━━━━━━━ */
+    // room.turnLimit = nombre de TOURS DE TABLE avant la fin (le plus gros
+    // patrimoine gagne) ; absent = partie complète (jusqu'à la ruine).
+    var DURATIONS = [
+      { v: null, label: 'Complète' },
+      { v: 20, label: 'Courte · 20 tours' },
+      { v: 10, label: 'Éclair · 10 tours' }
+    ];
+    function durationLobbyHTML(room) {
+      var isHost = room && room.host === window.myPid;
+      var cur = (room && room.turnLimit) || null;
+      var btns = DURATIONS.map(function (d) {
+        return '<button type="button" class="lb-set-btn' + (d.v === cur ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setTurnLimit(' + (d.v === null ? 'null' : d.v) + ')"' : ' disabled') + '>' + d.label + '</button>';
+      }).join('');
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">⏱ Durée de la partie</div>' +
+        '<div class="lb-set-row">' + btns + '</div></div>' +
+        '<div class="lb-set-hint">Courte : au bout des tours, le plus gros patrimoine gagne</div></div>';
+    }
+    function setTurnLimit(v) {
+      if (!window.roomRef) return;
+      if (v == null) window.roomRef.child('turnLimit').remove();
+      else window.roomRef.child('turnLimit').set(+v);
+    }
+    function durationOfflineHTML() {
+      var btns = DURATIONS.map(function (d, i) {
+        return '<button type="button" class="off-opt' + (i === 0 ? ' active' : '') + '" data-val="' + (d.v == null ? '' : d.v) + '">' + d.label + '</button>';
+      }).join('');
+      return '<div class="off-set"><div class="off-set-label">⏱ Durée de la partie</div>' +
+        '<div class="off-set-row" data-opt="turnLimit">' + btns + '</div></div>';
+    }
 
     /* ━━━━━━━━━━ IA (réacteur : une action par appel) ━━━━━━━━━━ */
     // IA : un pas de bot dans monopoly-engine.js (ENG.botStep), partagé avec le banc.
@@ -318,6 +353,8 @@
       var txt = s.winner ? '🏆 ' + escapeHtml(Room.name(s.winner)) + ' gagne !'
         : (s.phase === 'auction' ? 'Enchère — à <b>' + escapeHtml(Room.name(a)) + '</b>'
           : 'Au tour de <b>' + escapeHtml(Room.name(a)) + '</b>' + (a === window.myPid ? ' (toi)' : ''));
+      // Partie courte : où en est-on dans les tours de table.
+      if (s.turnLimit && !s.winner) txt += ' <span style="color:var(--ink-light);font-weight:600">· tour ' + Math.min(s.round || 1, s.turnLimit) + '/' + s.turnLimit + '</span>';
       document.getElementById('mo-turn').innerHTML = txt;
       var d = s.dice || [0, 0];
       document.getElementById('mo-dice').innerHTML = (d[0] ? (window.Fx ? Fx.die(d[0], 22) + Fx.die(d[1], 22) : '<span class="mo-die">' + d[0] + '</span><span class="mo-die">' + d[1] + '</span>') : '');
@@ -716,10 +753,26 @@
     function maybeOverlay(s) {
       var ov = document.getElementById('mo-ov');
       if (s.winner) {
+        var short = !!s.turnLimit;
+        // Partie courte : petit classement au patrimoine pour départager tout le monde.
+        var rankHtml = '';
+        if (short) {
+          var ranked = (s.order || []).filter(function (p) { return !s.bankrupt[p]; })
+            .map(function (p) { return { p: p, w: ENG.netWorth(s, p) }; })
+            .sort(function (a, b) { return b.w - a.w; });
+          rankHtml = '<div style="display:flex;flex-direction:column;gap:4px;margin:10px 0;text-align:left">' +
+            ranked.map(function (e, i) {
+              return '<div style="display:flex;gap:8px;align-items:center;font-size:.88rem">' +
+                '<b style="width:20px">' + (i + 1) + '</b>' +
+                '<span style="flex:1">' + Room.emoji(e.p) + ' ' + escapeHtml(Room.name(e.p)) + '</span>' +
+                '<b style="color:var(--terracotta)">' + money(e.w) + '</b></div>';
+            }).join('') + '</div>';
+        }
         document.getElementById('mo-ov-card').innerHTML =
           '<div style="font-size:3rem">🏆</div><div class="modal-title">' +
           (s.winner === window.myPid ? 'Tu as gagné !' : escapeHtml(Room.name(s.winner)) + ' gagne !') + '</div>' +
-          '<div class="modal-sub">Dernier joueur non ruiné.</div>' +
+          '<div class="modal-sub">' + (short ? s.turnLimit + ' tours joués — le plus gros patrimoine gagne.' : 'Dernier joueur non ruiné.') + '</div>' +
+          rankHtml +
           '<button class="btn-primary" onclick="handleReplay()">Rejouer</button>' +
           '<button class="btn-link mt-4" onclick="document.getElementById(\'mo-ov\').classList.remove(\'active\');Lobby.peekBoard(function(){document.getElementById(\'mo-ov\').classList.add(\'active\');})">🔍 Revoir le plateau</button>' +
           '<button class="btn-link mt-4" onclick="window.location.href=\'/index.html\'">Accueil</button>';

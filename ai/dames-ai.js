@@ -158,14 +158,34 @@
         }
         if (ch !== '.' && col > 1 && col < 6) { var own = isOwn(ch, me); sc += own ? 1 : -1; }
       }
-      // Quand l'adversaire n'a presque plus de pièces et qu'on mène, on le POUSSE
-      // vers les bords/coins (où il a moins de fuite). Terme bon marché (O(64)),
-      // sans recherche profonde ni legalMoves — pour rester rapide.
-      if (myMat > opMat && (opMen + opK) <= 2) {
+      // ── Conversion d'avantage (anti-nul) ────────────────────────────────
+      // Sans ces termes, « difficile » pouvait mener au matériel puis tourner
+      // en rond sans jamais conclure (parties stériles). Trois idées classiques :
+      // 1) QUAND ON MÈNE, ÉCHANGER : le même écart matériel vaut plus quand il
+      //    reste peu de pièces (+X% par pièce disparue) → l'IA simplifie au lieu
+      //    d'éviter les échanges égaux.
+      if (myMat > opMat) sc += Math.round((myMat - opMat) * (24 - total)) >> 4;
+      else if (opMat > myMat) sc -= Math.round((opMat - myMat) * (24 - total)) >> 4;
+      // 2) EN FINALE, TRAQUER : on pousse l'adversaire vers bords/coins (moins de
+      //    fuites) et on RAPPROCHE nos dames de ses pièces (une dame qui chasse à
+      //    distance ne mate jamais). Bon marché (O(64) + O(k²) sur peu de pièces).
+      if (myMat > opMat && (opMen + opK) <= 4) {
+        var foes = [], myKings = [];
         for (var f = 0; f < 64; f++) {
-          if (!isFoe(b[f], me)) continue;
-          var fr = Math.floor(f / N), fc = f % N;
+          if (isFoe(b[f], me)) foes.push(f);
+          else if (b[f] === (me === 'w' ? 'W' : 'B')) myKings.push(f);
+        }
+        for (var fi = 0; fi < foes.length; fi++) {
+          var fr = Math.floor(foes[fi] / N), fc = foes[fi] % N;
           sc += (Math.abs(3.5 - fr) + Math.abs(3.5 - fc)) * 3;
+          // distance de Tchebychev de la dame la plus proche → plus près = mieux
+          var bestDist = 99;
+          for (var ki = 0; ki < myKings.length; ki++) {
+            var kr = Math.floor(myKings[ki] / N), kc = myKings[ki] % N;
+            var dch = Math.max(Math.abs(kr - fr), Math.abs(kc - fc));
+            if (dch < bestDist) bestDist = dch;
+          }
+          if (bestDist < 99) sc += (7 - bestDist) * 4;
         }
       }
       // (Pas de terme de mobilité ici : appeler legalMoves à chaque feuille coûte

@@ -166,11 +166,24 @@
       var b = state.board || emptyBoard();
       var vc = []; for (var c = 0; c < 7; c++) if (b[c] === '.') vc.push(c);
       if (!vc.length) return;
-      // Facile : joue parfois au hasard → réellement battable.
-      if (window.Bots && window.Bots.shouldBlunder(state)) return dropInColumn(vc[Math.floor(Math.random() * vc.length)]);
+      // Facile : erreur PLAUSIBLE (pas un coup absurde) — il prend sa victoire
+      // immédiate s'il la voit, sinon colonne au hasard pondérée vers le CENTRE
+      // (comme un débutant). Il reste aveugle aux menaces adverses.
+      if (window.Bots && window.Bots.shouldBlunder(state)) return dropInColumn(plausibleCol(b, me, vc));
       var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 12 }) : 8);
       var col = window.P4AI.bestColumn(b, me, opp, depth);
       dropInColumn(col >= 0 ? col : vc[0]);
+    }
+    function plausibleCol(b, me, vc) {
+      for (var i = 0; i < vc.length; i++) {
+        var d = window.P4AI.drop(b, vc[i], me);
+        if (d && window.P4AI.winAt(d.b, d.idx, me)) return vc[i];
+      }
+      var W = [1, 2, 3, 4, 3, 2, 1], tot = 0;
+      vc.forEach(function (c) { tot += W[c]; });
+      var r = Math.random() * tot;
+      for (var j = 0; j < vc.length; j++) { r -= W[vc[j]]; if (r <= 0) return vc[j]; }
+      return vc[vc.length - 1];
     }
 
     /* ━━ État initial d'une manche (fourni au lancement) ━━ */
