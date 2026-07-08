@@ -312,7 +312,7 @@
       grid.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
       grid.innerHTML = html;
       var pad = ''; for (var k = 1; k <= n; k++) pad += '<button class="su-key" onclick="tapKey(' + k + ')">' + k + '</button>';
-      pad += '<button class="su-key erase" onclick="tapKey(0)">⌫</button>';
+      pad += '<button class="su-key erase" onclick="tapKey(0)" aria-label="Effacer la case">⌫</button>';
       var padEl = document.getElementById('su-pad');
       padEl.style.gridTemplateColumns = 'repeat(' + (n === 6 ? 4 : 5) + ', 1fr)';
       padEl.innerHTML = pad;

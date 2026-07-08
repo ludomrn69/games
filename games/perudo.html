@@ -458,7 +458,7 @@
       host.innerHTML = handHTML +
         (pal ? '<div class="pd-wait" style="color:#7e57c2;font-weight:700">🟣 Palifico : ⚀ non jokers, valeur figée</div>' : '') +
         '<div class="pd-picker">' +
-          '<div class="pd-qty"><button onclick="bumpQty(-1)">−</button><span class="pd-qty-val">' + pick.qty + '</span><button onclick="bumpQty(1)">+</button>' +
+          '<div class="pd-qty"><button onclick="bumpQty(-1)" aria-label="Diminuer la quantité">−</button><span class="pd-qty-val">' + pick.qty + '</span><button onclick="bumpQty(1)" aria-label="Augmenter la quantité">+</button>' +
             '<span style="font-size:1.4rem;margin:0 4px">×</span><span class="pd-qty-val">' + faceHTML(pick.face) + '</span></div>' +
           '<div class="pd-faces">' + faces + '</div>' +
         '</div>' +

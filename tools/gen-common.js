@@ -21,7 +21,7 @@ var OUT = path.join(ROOT, 'common.js');
 
 // Ordre HISTORIQUE (identique à celui de l'ancien boot.js) : les dépendances
 // (lobby, offline) arrivent après les briques de base.
-var SOURCES = ['nav.js', 'daily.js', 'stats.js', 'sfx.js', 'fx.js', 'presence.js', 'avatars.js', 'lobby.js', 'offline.js'];
+var SOURCES = ['nav.js', 'daily.js', 'stats.js', 'sfx.js', 'fx.js', 'a11y.js', 'presence.js', 'avatars.js', 'lobby.js', 'offline.js'];
 
 function build() {
   var banner =

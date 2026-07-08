@@ -66,6 +66,7 @@ la synchro temps réel.
 | 🐮 6 qui prend ! | 2–10 | ✈️ | cartes simultanées |
 | 🎯 Mastermind | 1–8 | ✈️ | déduction (IA solveur) |
 | 🧠 The Mind | 2–6 | ✈️ | coopératif / timing |
+| 🔢 2048 | 1–6 | ✈️ | solo + course |
 | 9️⃣ Sudoku | 1–6 | ✈️ | solo + course (chrono) |
 | 👑 Queens | 1–6 | ✈️ | solo + course (chrono) |
 | 🌙 Tango | 1–6 | ✈️ | solo + course (chrono) |

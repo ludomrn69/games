@@ -218,7 +218,7 @@
         html += '<div class="st-kbrow">';
         if (ri === 2) html += '<button class="st-key wide" onclick="press(\'↵\')">Entrée</button>';
         for (var i = 0; i < row.length; i++) { var ch = row[i]; html += '<button class="st-key ' + (status[ch] || '') + '" onclick="press(\'' + ch + '\')">' + ch + '</button>'; }
-        if (ri === 2) html += '<button class="st-key wide" onclick="press(\'⌫\')">⌫</button>';
+        if (ri === 2) html += '<button class="st-key wide" onclick="press(\'⌫\')" aria-label="Effacer la dernière lettre">⌫</button>';
         html += '</div>';
       });
       setHTML('st-kb', html);

@@ -362,7 +362,7 @@
     function buildToolbar() {
       var tools = document.getElementById('td-tools');
       var sw = COLORS_PALETTE.map(function (c, i) {
-        return '<button type="button" class="color-swatch' + (i === 0 ? ' active' : '') + '" style="background:' + c + '" data-color="' + c + '"></button>';
+        return '<button type="button" class="color-swatch' + (i === 0 ? ' active' : '') + '" style="background:' + c + '" data-color="' + c + '" aria-label="Couleur ' + c + '"></button>';
       }).join('');
       var sz = SIZES.map(function (s, i) {
         return '<button type="button" class="size-btn' + (i === 1 ? ' active' : '') + '" data-w="' + s.w + '">' + s.label + '</button>';
