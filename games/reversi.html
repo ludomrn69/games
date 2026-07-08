@@ -13,7 +13,7 @@
     #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
     .ot-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
     html[data-theme="dark"] .ot-header { background: rgba(20,16,28,0.97); }
-    .ot-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .ot-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
     .ot-turn-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
     .ot-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; display: flex; align-items: center; gap: 10px; }
     .ot-score-chip { display: inline-flex; align-items: center; gap: 5px; }
@@ -161,7 +161,15 @@
       if (!legal.length) { passMove(); return; }
       var idx;
       if (window.Bots && window.Bots.shouldBlunder(state)) {
-        idx = legal[Math.floor(Math.random() * legal.length)];
+        // Erreur PLAUSIBLE : le coup qui retourne LE PLUS de pions — la stratégie
+        // typique du débutant (gourmande, ignore coins et mobilité), bien plus
+        // crédible qu'un coup au hasard. Égalités départagées au hasard.
+        var bestN = -1, cand = [];
+        legal.forEach(function (ix) {
+          var n = window.ReversiAI.wouldFlip(b, ix, me).length;
+          if (n > bestN) { bestN = n; cand = [ix]; } else if (n === bestN) cand.push(ix);
+        });
+        idx = cand[Math.floor(Math.random() * cand.length)];
       } else {
         var depth = (window.Bots ? window.Bots.pick(state, { easy: 1, normal: 4, hard: 8 }) : 4);
         idx = window.ReversiAI.bestMove(b, me, opp, depth);

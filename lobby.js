@@ -226,8 +226,10 @@
     },
     // Choisit une valeur selon le niveau : pick(state, {easy:.., normal:.., hard:..}).
     pick: function (state, m) { var l = window.Bots.level(state); return (m[l] !== undefined) ? m[l] : m.normal; },
-    // Probabilité, par niveau, de jouer un coup volontairement sous-optimal (au
-    // hasard parmi les coups légaux). Espacement net : DIFFICILE ne se trompe JAMAIS
+    // Probabilité, par niveau, de jouer un coup volontairement sous-optimal.
+    // Chaque jeu définit SON erreur « plausible » (débutant crédible : prend sa
+    // victoire immédiate, ne donne pas une pièce gratuite, joue central…) plutôt
+    // qu'un coup absurde au hasard. Espacement net : DIFFICILE ne se trompe JAMAIS
     // (force maximale), MOYEN se trompe parfois (1 coup sur 5), FACILE souvent (plus
     // d'1 coup sur 2) → trois niveaux franchement différents.
     blunderP: function (state) { return window.Bots.pick(state, { easy: 0.55, normal: 0.2, hard: 0 }); },
@@ -539,11 +541,32 @@
     });
   }
 
+  // ── Anti-rafale « heartbeat » ──────────────────────────────────────────────
+  // presence.js rafraîchit players/*/ts toutes les 5 s PAR JOUEUR : chaque
+  // écriture redéclenchait un re-render COMPLET du jeu chez tous les clients
+  // (à 8 joueurs ≈ 1,6 re-render/s en continu). On calcule une signature de
+  // l'état SANS les champs de présence (ts) : si seule la présence a bougé,
+  // le jeu n'est re-rendu qu'au plus une fois toutes les 10 s — assez pour la
+  // détection d'absence (seuil 20 s), sans jank ni bande passante inutile.
+  var _stateSig = null, _lastGameRender = 0, TS_RENDER_MS = 10000;
+  function shouldSkipGameRender(room) {
+    var sig;
+    try { sig = JSON.stringify(room, function (k, v) { return k === 'ts' ? undefined : v; }); }
+    catch (e) { sig = null; }
+    var now = Date.now();
+    var tsOnly = sig !== null && sig === _stateSig;
+    _stateSig = sig;
+    if (tsOnly && (now - _lastGameRender) < TS_RENDER_MS) return true;
+    _lastGameRender = now;
+    return false;
+  }
+
   // ── Handler central : route les écrans + relaie au jeu ────────────────────
   function masterOnState(snap) {
     var room = snap.val() || {};
     window.room = room;
     var status = room.status || 'waiting';
+    var skipRender = shouldSkipGameRender(room);
 
     // Mode SPECTATEUR : on regarde une partie en cours sans y participer. Dès
     // que le salon repasse en attente (rejouer), on devient un vrai joueur.
@@ -554,7 +577,7 @@
         ensureIdentityThenEnter();
         return;
       }
-      if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
+      if (!skipRender && cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
       try { refreshReactUI(room); } catch (e) {}
       try { updateTurnClock(room); } catch (e) {}
       return; // ni pilotage d'ordis, ni stats, ni bip de tour
@@ -562,18 +585,26 @@
 
     maybeMigrateHost(room);
 
+    // Je reviens alors qu'on m'a « remplacé par un ordi » (bandeau d'absence) :
+    // je reprends la main — mon client retire le drapeau. Les vrais ordis
+    // (bot_*) n'ont pas de client, ils ne passent jamais ici.
+    if (room.players && room.players[window.myPid] && room.players[window.myPid].isBot) {
+      try { window.roomRef.child('players/' + window.myPid + '/isBot').remove(); } catch (e) {}
+    }
+
     if (status === 'waiting') {
       // En attente : la salle d'attente est gérée ici. On y revient si on était
       // sur l'écran de jeu (fin de partie) ou encore sur l'accueil (auto-join).
       armGhostGuard(); // retour au lobby (rejouer) → la garde anti-fantôme reprend
       if (isActive('s-playing') || isActive('s-home')) window.showScreen('s-lobby');
-      if (isActive('s-lobby')) renderLobby(room);
+      if (isActive('s-lobby') && !skipRender) renderLobby(room);
       maybeAutoStart(room);
     } else {
       disarmGhostGuard(); // partie lancée : le nœud joueur ne doit plus s'effacer
     }
-    // Dans tous les cas on laisse le jeu réagir (il gère son écran 's-playing').
-    if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
+    // Dans tous les cas on laisse le jeu réagir (il gère son écran 's-playing') —
+    // sauf si SEULE la présence (ts) a bougé depuis le dernier rendu (anti-rafale).
+    if (!skipRender && cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
     try { refreshBotSpeedUI(); } catch (e) {}
@@ -1101,7 +1132,9 @@
       cur.order = null;
       var ps = cur.players || {};
       Object.keys(ps).forEach(function (k) {
-        var isBot = !!ps[k].isBot;
+        // Le remplacement « humain absent → ordi » ne vaut que pour la manche :
+        // au retour au salon, seuls les VRAIS ordis (bot_*) gardent le drapeau.
+        var isBot = !!ps[k].isBot && /^bot_/.test(k);
         // on ne garde de l'ancien que name/emoji/color/seat/online/ts + les clés demandées.
         // Les ordis restent « prêts » (l'hôte les pilote) pour ne pas bloquer le redémarrage.
         var base = { name: ps[k].name, emoji: ps[k].emoji, color: ps[k].color, seat: ps[k].seat,
@@ -1206,15 +1239,31 @@
   }
   function absentBanner(holder, onSkip) {
     var el = document.getElementById('lb-absent');
-    if (!holder) { if (el) el.classList.remove('show'); return; }
+    // Un joueur déjà remplacé par un ordi n'est plus « absent » : l'hôte joue
+    // pour lui (driveBots) — le bandeau n'a plus lieu d'être.
+    var hp = holder && window.room && window.room.players && window.room.players[holder];
+    if (!holder || (hp && hp.isBot)) { if (el) el.classList.remove('show'); return; }
     if (!el) {
       el = document.createElement('div'); el.id = 'lb-absent'; el.className = 'lb-absent';
-      el.innerHTML = '<span class="lb-absent-txt"></span><button class="lb-absent-btn" type="button">Passer son tour</button>';
+      el.innerHTML = '<span class="lb-absent-txt"></span>' +
+        '<button class="lb-absent-btn" type="button">Passer son tour</button>' +
+        '<button class="lb-absent-btn lb-absent-bot" type="button" title="Un ordi joue à sa place jusqu\'à son retour">🤖 Remplacer</button>';
       document.body.appendChild(el);
     }
     var name = (window.Room && Room.name) ? Room.name(holder) : holder;
     el.querySelector('.lb-absent-txt').textContent = '⏳ ' + name + ' semble absent·e';
     el.querySelector('.lb-absent-btn').onclick = function () { el.classList.remove('show'); try { onSkip && onSkip(); } catch (e) {} };
+    // « Remplacer par un ordi » : seulement si le jeu a une IA (cfg.bot). L'ordi
+    // joue TOUS ses tours suivants ; s'il revient, son client retire le drapeau
+    // (voir masterOnState) et il reprend la main.
+    var botBtn = el.querySelector('.lb-absent-bot');
+    if (botBtn) {
+      botBtn.style.display = cfg().bot ? '' : 'none';
+      botBtn.onclick = function () {
+        el.classList.remove('show');
+        if (window.roomRef) window.roomRef.child('players/' + holder + '/isBot').set(true);
+      };
+    }
     el.classList.add('show');
   }
 

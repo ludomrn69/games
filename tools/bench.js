@@ -183,7 +183,9 @@ otMatch('difficile (A) vs facile (B)', hardO, easyO, Math.max(16, NO / 2 | 0), {
 // l'aléatoire, ni contre « facile »). Mater un roi seul qui fuit n'est pas l'objet
 // du banc : on mesure la domination (cf. daDominance / arrêt anticipé sur écart).
 daMatch('difficile (A) vs aléatoire (B)', hardD, rndD, ND, { minA: 0.55, maxBLoss: 0.0 });
-daMatch('difficile (A) vs facile (B)', hardD, easyD, FULL ? 20 : 5, { maxBLoss: 0.0 });
+// minA : les deux IA sont déterministes → la partie est unique ; exiger la victoire
+// verrouille l'heuristique de CONVERSION d'avantage (avant, elle finissait nulle).
+daMatch('difficile (A) vs facile (B)', hardD, easyD, FULL ? 20 : 5, { minA: 0.9, maxBLoss: 0.0 });
 
 console.log('');
 if (failures.length) {

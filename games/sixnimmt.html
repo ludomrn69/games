@@ -25,6 +25,14 @@
 
     .sn-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
 
+    /* Cartes révélées de la manche (qui a joué quoi) — visibles pendant la résolution. */
+    .sn-plays { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 2px 10px 6px; max-width: 480px; margin: 0 auto; }
+    .sn-plays:empty { display: none; }
+    .sn-play { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .sn-play-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; }
+    .sn-play .ncard { width: 34px; height: 46px; font-size: 0.95rem; cursor: default; }
+    .sn-play.done { opacity: 0.4; }
+    .sn-play.now .ncard { outline: 3px solid var(--terracotta); }
     .sn-rows { display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 10px; max-width: 460px; margin: 0 auto; }
     .sn-row { display: flex; align-items: center; gap: 4px; background: var(--white); border-radius: 12px; padding: 5px 8px; box-shadow: var(--shadow); border: 2px solid transparent; }
     .sn-row.pickable { cursor: pointer; border-color: var(--terracotta); }
@@ -85,6 +93,7 @@
       <div class="sn-info" id="sn-info"></div>
       <div class="sn-opps" id="sn-opps"></div>
       <div class="sn-banner" id="sn-banner"></div>
+      <div class="sn-plays" id="sn-plays"></div>
       <div class="sn-rows" id="sn-rows"></div>
       <div class="sn-my-label">Tes cartes <span id="sn-my-count"></span></div>
       <div class="sn-hand" id="sn-hand"></div>
@@ -233,6 +242,9 @@
       if (!order.every(function (p) { return cur.picks && (p in cur.picks); })) return;
       var q = order.map(function (p) { return { pid: p, val: cur.picks[p] }; }).sort(function (a, b) { return a.val - b.val; });
       order.forEach(function (p) { var h = handOf(cur, p).slice(); var i = h.indexOf(cur.picks[p]); if (i >= 0) h.splice(i, 1); cur.players[p].hand = h; });
+      // Cartes de tout le monde, révélées : sert à voir qui a joué quoi pendant la
+      // résolution (utile quand on doit choisir une rangée à ramasser).
+      cur.lastPlays = q.map(function (x) { return { pid: x.pid, val: x.val }; });
       cur.picks = {}; cur.resolveQueue = q; cur.phase = 'resolve';
       processResolve(cur);
     }
@@ -263,7 +275,7 @@
       finishRound(cur);
     }
     function finishRound(cur) {
-      cur.picks = {}; cur.phase = 'select'; cur.pendingLow = null;
+      cur.picks = {}; cur.phase = 'select'; cur.pendingLow = null; cur.lastPlays = null;
       var anyLeft = (cur.order || []).some(function (p) { return handOf(cur, p).length > 0; });
       if (!anyLeft) endDeal(cur); else cur.banner = 'Choisissez une carte (face cachée)';
     }
@@ -341,6 +353,17 @@
           (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✓</span>' : ' …') : '') + '</div>';
       }).join(''));
       setText('sn-banner', state.banner || '');
+
+      // Cartes révélées de la manche : on montre ce que CHACUN a joué pendant la
+      // résolution, pour choisir sa rangée en connaissance de cause. Déjà posées =
+      // estompées, carte en cours = cerclée.
+      var plays = state.lastPlays || [], queue = state.resolveQueue || [];
+      var pendingVal = queue.length ? queue[0].val : null, remainingVals = {};
+      queue.forEach(function (x) { remainingVals[x.val] = true; });
+      setHTML('sn-plays', (state.phase === 'resolve' || state.phase === 'chooseRow') ? plays.map(function (pl) {
+        return '<div class="sn-play' + (!remainingVals[pl.val] ? ' done' : '') + (pl.val === pendingVal ? ' now' : '') + '">' +
+          '<span class="sn-play-av" style="background:' + Room.color(pl.pid) + '">' + Room.emoji(pl.pid) + '</span>' + ncard(pl.val) + '</div>';
+      }).join('') : '');
 
       // 4 rangées — un petit son quand elles bougent (résolution des cartes posées)
       var rowsSig = JSON.stringify(state.rows || []);

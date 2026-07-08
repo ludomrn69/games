@@ -14,7 +14,7 @@
     #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
     .p4-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
     html[data-theme="dark"] .p4-header { background: rgba(20,16,28,0.97); }
-    .p4-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .p4-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .p4-turn-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
     .p4-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; }
     .p4-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
@@ -166,11 +166,24 @@
       var b = state.board || emptyBoard();
       var vc = []; for (var c = 0; c < 7; c++) if (b[c] === '.') vc.push(c);
       if (!vc.length) return;
-      // Facile : joue parfois au hasard → réellement battable.
-      if (window.Bots && window.Bots.shouldBlunder(state)) return dropInColumn(vc[Math.floor(Math.random() * vc.length)]);
+      // Facile : erreur PLAUSIBLE (pas un coup absurde) — il prend sa victoire
+      // immédiate s'il la voit, sinon colonne au hasard pondérée vers le CENTRE
+      // (comme un débutant). Il reste aveugle aux menaces adverses.
+      if (window.Bots && window.Bots.shouldBlunder(state)) return dropInColumn(plausibleCol(b, me, vc));
       var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 12 }) : 8);
       var col = window.P4AI.bestColumn(b, me, opp, depth);
       dropInColumn(col >= 0 ? col : vc[0]);
+    }
+    function plausibleCol(b, me, vc) {
+      for (var i = 0; i < vc.length; i++) {
+        var d = window.P4AI.drop(b, vc[i], me);
+        if (d && window.P4AI.winAt(d.b, d.idx, me)) return vc[i];
+      }
+      var W = [1, 2, 3, 4, 3, 2, 1], tot = 0;
+      vc.forEach(function (c) { tot += W[c]; });
+      var r = Math.random() * tot;
+      for (var j = 0; j < vc.length; j++) { r -= W[vc[j]]; if (r <= 0) return vc[j]; }
+      return vc[vc.length - 1];
     }
 
     /* ━━ État initial d'une manche (fourni au lancement) ━━ */

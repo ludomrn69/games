@@ -51,7 +51,8 @@ function pct(x, n) { return (100 * x / n).toFixed(0) + '%'; }
     var ships = AI.placeFleet(AI.FLEET), occ = {}; ships.forEach(function (s) { s.cells.forEach(function (c) { occ[c] = true; }); });
     var free = []; for (var i = 0; i < 100; i++) free.push(i);
     for (var a = free.length - 1; a > 0; a--) { var b = (Math.random() * (a + 1)) | 0; var t = free[a]; free[a] = free[b]; free[b] = t; }
-    var hitsNeeded = 17, n = 0; for (var k = 0; k < free.length; k++) { n++; if (occ[free[k]]) { if (--hitsNeeded === 0) break; } }
+    var hitsNeeded = 0; ships.forEach(function (s) { hitsNeeded += s.cells.length; });
+    var n = 0; for (var k = 0; k < free.length; k++) { n++; if (occ[free[k]]) { if (--hitsNeeded === 0) break; } }
     return n;
   }
   for (var i = 0; i < N; i++) {

@@ -123,7 +123,8 @@
       <div class="modal-body">
         <p>Chacun a 5 dés cachés sous son gobelet. À ton tour, tu <b>surenchéris</b> sur le nombre de dés d'une valeur présents sur la table (chez TOUT le monde) — ex. « quatre ⚄ ».</p>
         <p style="margin-top:8px">• Surenchérir = plus de dés, ou autant de dés d'une valeur plus haute.</p>
-        <p style="margin-top:6px">• Les <b>⚀ (1) sont jokers</b> : ils comptent pour n'importe quelle valeur. Miser sur les ⚀ : la quantité requise est ~divisée par deux.</p>
+        <p style="margin-top:6px">• Le <b>1 est le Paco 🦜</b> (perroquet) : c'est un <b>joker</b>, il compte pour n'importe quelle valeur. Miser sur les 🦜 : la quantité requise est ~divisée par deux.</p>
+        <p style="margin-top:6px">• Après un <b>Dudo</b> ou un <b>Calza</b>, on révèle les dés : chaque joueur clique <b>Suivant ▶</b> pour lancer la manche d'après (le temps de bien voir).</p>
         <p style="margin-top:6px">• <b>Dudo !</b> : tu doutes de l'enchère précédente → on révèle tout et on compte. Si l'enchère tenait, TU perds un dé ; sinon c'est l'enchérisseur.</p>
         <p style="margin-top:6px">• <b>Calza !</b> : tu paries que l'enchère est <b>exactement</b> juste → exact : tu regagnes un dé (max 5) ; sinon tu en perds un.</p>
         <p style="margin-top:6px">• <b>Palifico</b> : quand un joueur passe à 1 dé, il ouvre une manche spéciale — les ⚀ ne sont plus jokers et la valeur annoncée est figée.</p>
@@ -144,8 +145,14 @@
     /* ━━ Constantes ━━ */
     var START_DICE = 5;
     var DIE = { 1: '⚀', 2: '⚁', 3: '⚂', 4: '⚃', 5: '⚄', 6: '⚅' };
+    // Le « 1 » du Perudo est le PACO (perroquet) : joker qui compte pour toutes les
+    // valeurs. On l'affiche donc avec un perroquet 🦜 pour le distinguer d'un coup d'œil.
+    function faceTxt(f) { return f === 1 ? '🦜' : DIE[f]; }
     // Dé à POINTS (pipdie de game.css) — les glyphes ⚀⚁ rendaient petit et inégal selon l'appareil.
-    function dieHTML(f, px, extra) { return window.Fx ? Fx.die(f, px || 26, extra) : DIE[f]; }
+    function dieHTML(f, px, extra) {
+      if (f === 1) { var s = px || 26; return '<span class="pd-paco ' + (extra || '') + '" style="display:inline-flex;align-items:center;justify-content:center;width:' + s + 'px;height:' + s + 'px;font-size:' + Math.round(s * 0.72) + 'px;line-height:1">🦜</span>'; }
+      return window.Fx ? Fx.die(f, px || 26, extra) : DIE[f];
+    }
     function faceHTML(f) { return '<span class="die" style="vertical-align:-6px;display:inline-block">' + dieHTML(f, 26) + '</span>'; }
 
     var prevStatus = null, pick = null; // pick : enchère en cours de composition (locale)
@@ -155,7 +162,7 @@
       minPlayers: 2, maxPlayers: 6,
       rules: [
         'Chacun 5 dés cachés · tu surenchéris sur le nombre d\'une valeur sur la table',
-        'Les ⚀ sont jokers (comptent pour tout)',
+        'Le 1 est le Paco 🦜 (perroquet) : joker, il compte pour tout',
         '« Dudo ! » : le perdant perd un dé · « Calza » : exact = tu regagnes un dé',
         'Palifico à 1 dé : ⚀ non jokers, valeur figée · dernier avec des dés gagne'
       ],
@@ -246,7 +253,7 @@
         if (!isHigher({ qty: qty, face: face }, cur.bid, cur.palifico)) return cur;
         if (qty > totalDice(cur)) return cur;
         cur.bid = { qty: qty, face: face, by: window.myPid };
-        cur.banner = Room.name(window.myPid) + ' mise ' + qty + ' × ' + DIE[face];
+        cur.banner = Room.name(window.myPid) + ' mise ' + qty + ' × ' + faceTxt(face);
         cur.turn = nextActive(cur, window.myPid);
         return cur;
       });
@@ -263,7 +270,7 @@
         cur.diceCount[loser] = Math.max(0, (cur.diceCount[loser] || 0) - 1);
         cur.reveal = { kind: 'dudo', face: face, qty: qty, count: count, loser: loser, bidder: bidder, challenger: challenger, dice: dice };
         cur.phase = 'reveal';
-        cur.banner = '🎲 Dudo ! ' + count + ' × ' + DIE[face] + ' sur la table — ' +
+        cur.banner = '🎲 Dudo ! ' + count + ' × ' + faceTxt(face) + ' sur la table — ' +
           (loser === challenger ? 'l\'enchère tenait, ' : 'enchère trop haute, ') + Room.name(loser) + ' perd un dé';
         // Prochain lanceur = le perdant (s'il lui reste des dés), sinon le suivant actif.
         cur.turn = ((cur.diceCount[loser] || 0) > 0) ? loser : nextActive(cur, loser);
@@ -284,18 +291,37 @@
         else cur.diceCount[caller] = Math.max(0, (cur.diceCount[caller] || 0) - 1);
         cur.reveal = { kind: 'calza', face: face, qty: qty, count: count, loser: exact ? null : caller, winner: exact ? caller : null, bidder: cur.bid.by, challenger: caller, dice: dice };
         cur.phase = 'reveal';
-        cur.banner = '🎯 Calza ! ' + count + ' × ' + DIE[face] + ' sur la table — ' +
+        cur.banner = '🎯 Calza ! ' + count + ' × ' + faceTxt(face) + ' sur la table — ' +
           (exact ? Room.name(caller) + ' avait juste et regagne un dé !' : 'raté, ' + Room.name(caller) + ' perd un dé');
         cur.turn = ((cur.diceCount[caller] || 0) > 0) ? caller : nextActive(cur, caller);
         if (activeCount(cur) <= 1) { cur.status = 'ended'; cur.winner = activePids(cur)[0] || caller; }
         return cur;
       });
     }
+    // Joueurs humains encore en lice (dés > 0). La manche ne repart que lorsqu'ils ont
+    // TOUS cliqué « Suivant » → on a le temps de voir les dés, même face aux ordis.
+    function activeHumans(cur) { return activePids(cur).filter(function (p) { return !((cur.players[p] || {}).isBot); }); }
+    function revealAllAcked(cur) { var ack = (cur.reveal && cur.reveal.ack) || {}; return activeHumans(cur).every(function (p) { return ack[p]; }); }
+    function advanceRound(cur) { cur.round = (cur.round || 1) + 1; startRound(cur, cur.turn); }
+    // « Suivant » : je confirme avoir vu la révélation. Quand tout le monde a confirmé,
+    // on enchaîne la manche suivante.
+    function ackReveal() {
+      if (window.Fx) Fx.sfx('click');
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal') return cur;
+        var ack = (cur.reveal && cur.reveal.ack) || {}; ack[window.myPid] = true;
+        if (cur.reveal) cur.reveal.ack = ack;
+        if (revealAllAcked(cur)) advanceRound(cur);
+        return cur;
+      });
+    }
+    // Repli automatique quand plus aucun humain n'est en lice (partie 100 % ordi) :
+    // le résultat n'a personne à attendre, on enchaîne.
     function continueRound() {
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal' || cur.turn !== window.myPid) return cur;
-        cur.round = (cur.round || 1) + 1;
-        startRound(cur, cur.turn);
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal') return cur;
+        if (activeHumans(cur).length) return cur; // on attend les « Suivant » des humains
+        advanceRound(cur);
         return cur;
       });
     }
@@ -303,7 +329,9 @@
     /* ━━ IA : estimation probabiliste ━━ */
     function perudoBot(state, pid) {
       if (state.status !== 'playing') return;
-      if (state.phase === 'reveal') { if (state.turn === pid) continueRound(); return; }
+      // En révélation, les ordis ne pressent PAS le pas : ils n'enchaînent que s'il ne
+      // reste aucun humain en lice (sinon on attend que les humains cliquent « Suivant »).
+      if (state.phase === 'reveal') { if (!activeHumans(state).length) continueRound(); return; }
       if (state.phase !== 'bid' || state.turn !== pid) return;
       var my = (state.players[pid] || {}).dice || [];
       var tot = totalDice(state), unknown = tot - my.length, pal = !!state.palifico;
@@ -393,9 +421,16 @@
       var myDice = (state.players[me] || {}).dice || [];
 
       if (state.phase === 'reveal') {
-        var isStarter = state.turn === me;
-        host.innerHTML = '<button class="btn-primary" ' + (isStarter ? '' : 'disabled') + ' onclick="continueRound()">' +
-          (isStarter ? 'Manche suivante →' : 'En attente de ' + escapeHtml(Room.name(state.turn)) + '…') + '</button>';
+        var meActive = (state.diceCount || {})[me] > 0;
+        var acked = !!(state.reveal && state.reveal.ack && state.reveal.ack[me]);
+        var waiting = activeHumans(state).filter(function (p) { return !(state.reveal && state.reveal.ack && state.reveal.ack[p]); });
+        if (!meActive) { host.innerHTML = '<div class="pd-wait">Manche terminée — la partie continue…</div>'; return; }
+        if (acked) {
+          var names = waiting.map(function (p) { return Room.name(p); }).join(', ');
+          host.innerHTML = '<button class="btn-primary" disabled>En attente' + (names ? ' de ' + escapeHtml(names) : '') + '…</button>';
+        } else {
+          host.innerHTML = '<button class="btn-primary" onclick="ackReveal()">Suivant ▶</button>';
+        }
         return;
       }
       // Phase enchères
@@ -423,7 +458,7 @@
       host.innerHTML = handHTML +
         (pal ? '<div class="pd-wait" style="color:#7e57c2;font-weight:700">🟣 Palifico : ⚀ non jokers, valeur figée</div>' : '') +
         '<div class="pd-picker">' +
-          '<div class="pd-qty"><button onclick="bumpQty(-1)">−</button><span class="pd-qty-val">' + pick.qty + '</span><button onclick="bumpQty(1)">+</button>' +
+          '<div class="pd-qty"><button onclick="bumpQty(-1)" aria-label="Diminuer la quantité">−</button><span class="pd-qty-val">' + pick.qty + '</span><button onclick="bumpQty(1)" aria-label="Augmenter la quantité">+</button>' +
             '<span style="font-size:1.4rem;margin:0 4px">×</span><span class="pd-qty-val">' + faceHTML(pick.face) + '</span></div>' +
           '<div class="pd-faces">' + faces + '</div>' +
         '</div>' +

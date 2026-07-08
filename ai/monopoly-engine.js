@@ -106,7 +106,7 @@
       dice: [0, 0], doubles: 0, pending: null, auction: null, trade: null,
       chanceDeck: shuffle(CHANCE.length, rnd), chancePtr: 0,
       chestDeck: shuffle(CHEST.length, rnd), chestPtr: 0,
-      log: [], winner: null, turnCount: 0
+      log: [], winner: null, turnCount: 0, round: 1
     };
     order.forEach(function (p) { s.cash[p] = START_CASH; s.pos[p] = 0; s.jail[p] = 0; s.getout[p] = 0; });
     return s;
@@ -126,7 +126,9 @@
 
   // ── Valeur / possessions ──────────────────────────────────────────────────
   function ownedInGroup(s, g, pid) { return GROUPS[g].filter(function (i) { return s.owners[i] === pid; }).length; }
-  function hasMonopoly(s, g, pid) { return GROUPS[g].every(function (i) { return s.owners[i] === pid; }); }
+  // g peut être indéfini (gares/services n'ont pas de couleur) : dans ce cas, pas de
+  // « monopole de couleur ». On garde-fou pour ne pas planter sur GROUPS[undefined].
+  function hasMonopoly(s, g, pid) { return !!(g && GROUPS[g]) && GROUPS[g].every(function (i) { return s.owners[i] === pid; }); }
   function countRails(s, pid) { return RAILS.filter(function (i) { return s.owners[i] === pid; }).length; }
   function countUtils(s, pid) { return UTILS.filter(function (i) { return s.owners[i] === pid; }).length; }
   function groupHouses(s, g) { return (GROUPS[g] || []).reduce(function (a, i) { return a + (s.houses[i] || 0); }, 0); }
@@ -429,9 +431,11 @@
     return true;
   }
 
-  // Toutes les rues (cases couleur, hors gares/services) ont-elles un propriétaire ?
+  // Toutes les propriétés ACHETABLES (rues couleur + gares + services) ont-elles un
+  // propriétaire ? Tant qu'une carte reste à vendre (ex. Gare Saint-Lazare), aucun
+  // échange n'est autorisé — règle voulue : on n'échange qu'une fois le plateau vendu.
   function allStreetsOwned(s) {
-    for (var i = 0; i < B.length; i++) { if (B[i].t === 'prop' && s.owners[i] == null) return false; }
+    for (var i = 0; i < B.length; i++) { var t = B[i].t; if ((t === 'prop' || t === 'rail' || t === 'util') && s.owners[i] == null) return false; }
     return true;
   }
   // ── IA d'échange : le bot cherche à compléter un monopole ──────────────────
@@ -547,8 +551,27 @@
     if (allowDouble && s.doubles > 0 && s.jail[pid] === 0 && !s.bankrupt[pid]) { s.phase = 'roll'; return; } // rejoue
     s.doubles = 0;
     var ord = s.order, idx = ord.indexOf(pid);
-    for (var k = 1; k <= ord.length; k++) { var cand = ord[(idx + k) % ord.length]; if (!s.bankrupt[cand]) { s.turn = cand; s.phase = 'roll'; return; } }
+    for (var k = 1; k <= ord.length; k++) {
+      var cand = ord[(idx + k) % ord.length];
+      if (s.bankrupt[cand]) continue;
+      if ((idx + k) >= ord.length) { // on a bouclé la table → nouveau tour de plateau
+        s.round = (s.round || 1) + 1;
+        // Partie COURTE (s.turnLimit = nombre de tours de table, réglé au salon) :
+        // au bout du dernier tour, le plus gros patrimoine gagne.
+        if (s.turnLimit && s.round > s.turnLimit) { finishByNetWorth(s); return; }
+      }
+      s.turn = cand; s.phase = 'roll'; return;
+    }
     s.phase = 'over';
+  }
+
+  // Fin de la partie courte : classement au PATRIMOINE (argent + propriétés +
+  // maisons). Départage d'égalité : l'ordre du tour (le premier servi gagne).
+  function finishByNetWorth(s) {
+    var best = null, bw = -1;
+    alive(s).forEach(function (p) { var w = netWorth(s, p); if (w > bw) { bw = w; best = p; } });
+    s.winner = best; s.phase = 'over';
+    log(s, '⏱ ' + s.turnLimit + ' tours joués — ' + nameish(best) + ' gagne avec le plus gros patrimoine (' + bw + ')');
   }
 
   // ── IA (un pas de bot) ───────────────────────────────────────────────────────

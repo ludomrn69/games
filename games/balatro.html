@@ -42,7 +42,7 @@
 
     /* Jokers */
     .ba-jokers { display: flex; gap: 6px; flex-wrap: wrap; min-height: 20px; margin-bottom: 8px; align-items: stretch; }
-    .ba-joker { background: var(--white); border: 1.5px solid var(--gold); border-radius: 10px; padding: 6px 8px; width: 88px; box-shadow: var(--shadow); font-size: 0.64rem; position: relative; cursor: help; }
+    .ba-joker { background: var(--white); border: 1.5px solid var(--gold); border-radius: 10px; padding: 6px 8px; width: 88px; box-shadow: var(--shadow); font-size: 0.7rem; position: relative; cursor: help; }
     .ba-joker .jn { font-weight: 800; font-size: 0.72rem; color: var(--terracotta); display: block; margin-bottom: 2px; }
     .ba-joker.sellable::after { content: '💰'; position: absolute; top: 2px; right: 3px; font-size: 0.7rem; }
     .ba-slots { font-size: 0.7rem; color: var(--ink-light); align-self: center; }
@@ -65,7 +65,7 @@
     .ba-card .rk { font-size: clamp(0.9rem, 3.6vw, 1.15rem); line-height: 1; }
     .ba-card .su { font-size: clamp(1.1rem, 4.4vw, 1.5rem); text-align: right; line-height: 1; }
     .ba-card.enh { box-shadow: 0 0 0 2px #7c5cdb, 0 2px 5px rgba(0,0,0,0.18); }
-    .ba-enh { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); font-size: 0.56rem; font-weight: 800; color: #fff; border-radius: 8px; padding: 1px 5px; }
+    .ba-enh { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); font-size: 0.62rem; font-weight: 800; color: #fff; border-radius: 8px; padding: 1px 5px; }
     .ba-enh.chips { background: #3b6fd8; } .ba-enh.mult { background: #d8453b; }
     .ba-card { position: relative; }
 
@@ -139,6 +139,85 @@
     .ba-board .ba-card .rk { font-size: clamp(1rem, 4vw, 1.35rem); }
     .ba-board .ba-card .su { font-size: clamp(1.2rem, 5vw, 1.7rem); }
     .ba-board .ba-card.sel { transform: translateY(-16px); box-shadow: 0 8px 18px rgba(242,193,78,0.5); border-color: #f2c14e; }
+
+    /* ── Ambiance « table de Balatro » : tout le jeu sur un fond spatial sombre,
+       pour que la boutique, la sélection de blind et la bande latérale soient
+       cohérentes avec le plateau (au lieu du thème clair du site). ── */
+    body { background: radial-gradient(1200px 820px at 50% -6%, #33244f 0%, #1a1030 58%, #100a20 100%) fixed; }
+    .ba-wrap { color: #efe8ff; }
+    .ba-stat { background: rgba(255,255,255,0.055); border-color: rgba(255,255,255,0.12); box-shadow: inset 0 1px 6px rgba(0,0,0,0.35); }
+    .ba-stat .lab { color: #b9a9e0; }
+    .ba-stat .val { color: #fff; }
+    .ba-money-stat .val { color: #ffcf4d; }
+    .ba-blindname { color: #f2a24e; }
+    .ba-panel h2 { color: #fff; }
+    .ba-panel, .ba-panel p { color: #cbbcf0; }
+    .ba-blind { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); color: #efe8ff; box-shadow: inset 0 1px 8px rgba(0,0,0,0.4); }
+    .ba-blind .bt { color: #fff; } .ba-blind .bg { color: #b9a9e0; }
+    .ba-shop-item { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.16); color: #efe8ff; box-shadow: inset 0 1px 8px rgba(0,0,0,0.4); }
+    .ba-shop-item .si-desc { color: #b9a9e0; }
+    .ba-btn.disc, .ba-btn.ghost { background: rgba(255,255,255,0.09); color: #efe8ff; border-color: rgba(255,255,255,0.22); }
+    .ba-sort button { color: #cbbcf0; border-color: rgba(255,255,255,0.22); }
+    .ba-hands-table { color: #efe8ff; } .ba-hands-table td { border-color: rgba(255,255,255,0.12); }
+    .ba-link { color: #b9a9e0; }
+
+    /* ═══ RÉPLIQUE fidèle de Balatro ═══
+       Police PIXEL auto-hébergée (Pixelify Sans, OFL) → marche sans connexion.
+       Panneaux charbon arrondis, accents vifs (jetons bleus, mult rouge, or),
+       table verte pendant le jeu. ═══ */
+    @font-face { font-family: 'Pixelify Sans'; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/pixelifysans-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2212, U+2215; }
+    @font-face { font-family: 'Pixelify Sans'; font-style: normal; font-weight: 400 700; font-display: swap; src: url(/fonts/pixelifysans-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+2C60-2C7F, U+A720-A7FF; }
+    /* Toute l'UI Balatro passe en police pixel (on garde une pile de repli sûre). */
+    .ba-wrap, .ba-btn, .ba-sort button, .modal .ba-btn { font-family: 'Pixelify Sans', ui-monospace, 'Courier New', monospace; }
+    body.ba-play { background: radial-gradient(1200px 900px at 50% 18%, #2f7a5a, #1e5540 58%, #123a2c) fixed; }
+    .ba-side { font-family: 'Pixelify Sans', ui-monospace, 'Courier New', monospace; display: flex; flex-direction: column; gap: 8px; }
+    @media (min-width: 860px) { .ba-side { flex: 0 0 272px; width: 272px; } }
+    .bl-header { background: linear-gradient(#caa23a, #a97d1e); color: #fff; text-align: center; font-weight: 800; font-size: 1.18rem; letter-spacing: 0.5px; padding: 9px 8px; border-radius: 11px; border: 2px solid rgba(0,0,0,0.28); text-shadow: 0 2px 0 rgba(0,0,0,0.35); box-shadow: inset 0 2px 0 rgba(255,255,255,0.25); }
+    .bl-goal { display: flex; align-items: center; gap: 10px; background: linear-gradient(#4c3f1e, #3a2f14); border: 2px solid rgba(0,0,0,0.3); border-radius: 12px; padding: 12px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.4); }
+    .bl-token { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 38% 32%, #f0c04e, #c98a1e); border: 2px solid #8a5f14; display: flex; align-items: center; justify-content: center; text-align: center; color: #5a3d0a; font-weight: 900; font-size: 0.62rem; line-height: 1.05; box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 2px 3px rgba(255,255,255,0.4); }
+    .bl-token.big { background: radial-gradient(circle at 38% 32%, #f0b84e, #c9741e); }
+    .bl-token.boss { background: radial-gradient(circle at 38% 32%, #d16a6a, #a33232); color: #fff; border-color: #6a1e1e; font-size: 1.6rem; }
+    .bl-goal-info { flex: 1; min-width: 0; text-align: center; color: #f3ead0; }
+    .bl-goal-lab { font-size: 0.72rem; font-weight: 700; }
+    .bl-goal-target { font-size: 1.75rem; font-weight: 900; color: #ec5a41; text-shadow: 0 2px 0 rgba(0,0,0,0.35); line-height: 1.15; }
+    .bl-goal-reward { font-size: 0.74rem; font-weight: 700; }
+    .bl-goal-reward span { color: #f0b83a; font-weight: 900; }
+    .bl-round { display: flex; align-items: center; gap: 10px; background: #2b2f38; border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; padding: 8px 13px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.45); }
+    .bl-round-lab { flex: 0 0 auto; color: #fff; font-weight: 800; font-size: 0.92rem; line-height: 1.05; }
+    .bl-round-val { flex: 1; text-align: right; color: #fff; font-weight: 900; font-size: 1.9rem; text-shadow: 0 2px 0 rgba(0,0,0,0.35); font-variant-numeric: tabular-nums; }
+    .bl-hand { background: #23272f !important; border: 2px solid rgba(0,0,0,0.3); border-radius: 12px; padding: 10px !important; min-height: 96px !important; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 8px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.45); }
+    .bl-hand .pv-hand { font-family: 'Pixelify Sans', ui-monospace, monospace; font-size: 1.35rem; font-weight: 900; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+    .bl-hand .pv-lvl { color: #cfc3ee; font-weight: 800; font-size: 0.8rem; }
+    .bl-hand .pv-empty { color: rgba(255,255,255,0.5); font-size: 0.85rem; text-align: center; }
+    .bl-hand .ba-scorecalc { gap: 6px; }
+    .bl-hand .ba-chipbox, .bl-hand .ba-multbox, .bl-hand .ba-scorebox { min-width: 52px; font-size: 1.55rem; border-radius: 8px; }
+    .bl-hand .ba-times { color: #ec5a41; font-weight: 900; font-size: 1.2rem; }
+    .bl-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; grid-template-areas: "info mains disc" "info money money" "opt mise manche"; gap: 6px; }
+    .bl-btn { border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; font-family: 'Pixelify Sans', ui-monospace, monospace; font-weight: 800; color: #fff; cursor: pointer; text-shadow: 0 2px 0 rgba(0,0,0,0.3); line-height: 1.1; box-shadow: inset 0 2px 0 rgba(255,255,255,0.18); }
+    .bl-btn.info { grid-area: info; background: linear-gradient(#e8503f, #c23325); font-size: 0.94rem; }
+    .bl-btn.opt { grid-area: opt; background: linear-gradient(#f0a52a, #d0821a); font-size: 0.94rem; }
+    .bl-cell { background: #2b2f38; border: 2px solid rgba(0,0,0,0.3); border-radius: 11px; padding: 6px 4px; text-align: center; box-shadow: inset 0 2px 6px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+    .bl-cell.g-mains { grid-area: mains; } .bl-cell.g-disc { grid-area: disc; }
+    .bl-cell.g-money { grid-area: money; } .bl-cell.g-mise { grid-area: mise; } .bl-cell.g-manche { grid-area: manche; }
+    .bl-cell-lab { color: #fff; font-weight: 700; font-size: 0.72rem; }
+    .bl-cell-val { font-weight: 900; font-size: 1.4rem; text-shadow: 0 2px 0 rgba(0,0,0,0.3); font-variant-numeric: tabular-nums; }
+    .bl-cell-val.blue { color: #4a9fe0; } .bl-cell-val.red { color: #ec5a41; } .bl-cell-val.gold { color: #f0b83a; }
+
+    /* ── Paquet Céleste (booster de planètes) ── */
+    .pack-card-modal { max-width: 560px; background: linear-gradient(160deg, #1b1436, #241a44) !important; color: #efe8ff; border: 2px solid #4a3a6e; }
+    .pack-card-modal .modal-title { color: #fff; font-family: 'Pixelify Sans', ui-monospace, monospace; }
+    .pack-cards { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .pack-planet-card { width: 118px; background: linear-gradient(#2a3a58, #1e2b44); border: 2px solid #6d84b4; border-radius: 12px; padding: 10px 8px; cursor: pointer; text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,0.4); transition: transform .12s, box-shadow .12s; font-family: 'Pixelify Sans', ui-monospace, monospace; }
+    .pack-planet-card:hover { transform: translateY(-6px); box-shadow: 0 8px 18px rgba(120,160,255,0.4); border-color: #a9c0f0; }
+    .pack-planet-card.starred { border-color: #f0c04e; box-shadow: 0 0 0 2px rgba(240,192,78,0.5), 0 3px 10px rgba(0,0,0,0.4); }
+    .pack-planet { width: 56px; height: 56px; border-radius: 50%; margin: 2px auto 8px; box-shadow: inset -6px -6px 10px rgba(0,0,0,0.35), 0 2px 5px rgba(0,0,0,0.4); }
+    .pack-name { font-weight: 800; color: #dfe8ff; font-size: 0.95rem; }
+    .pack-hand { color: #f0c04e; font-weight: 800; font-size: 0.82rem; margin-top: 2px; }
+    .pack-eff { color: #b9c8ea; font-size: 0.72rem; margin-top: 4px; line-height: 1.3; }
+    .pack-eff .up { color: #4a9fe0; font-weight: 800; } .pack-eff .um { color: #ec5a41; font-weight: 800; }
+    .pack-star { color: #f0c04e; font-size: 0.66rem; font-weight: 800; margin-top: 3px; }
+    .ba-shop-item.celest { border-color: #7b8fe0; }
+    .ba-shop-item.celest .si-name { color: #9fb0f0; }
   </style>
 </head>
 <body>
@@ -149,29 +228,36 @@
     <!-- Écran de jeu -->
     <div id="ba-game" style="display:none">
       <div class="ba-layout">
-        <!-- Bande latérale (façon Balatro) : score, blind, jauges de la manche -->
+        <!-- Colonne de gauche : RÉPLIQUE de la sidebar Balatro -->
         <aside class="ba-side">
-          <div class="ba-side-stats">
-            <div class="ba-stat"><div class="lab">Ante</div><div class="val"><span id="ba-ante">1</span>/8</div></div>
-            <div class="ba-stat"><div class="lab">Blind</div><div class="val ba-blindname" id="ba-blind">—</div></div>
-            <div class="ba-stat"><div class="lab">Mains 🖐</div><div class="val" id="ba-hands">4</div></div>
-            <div class="ba-stat"><div class="lab">Défausses ♻</div><div class="val" id="ba-disc">3</div></div>
-            <div class="ba-stat ba-money-stat"><div class="lab">Argent</div><div class="val ba-money">$<span id="ba-money">4</span></div></div>
+          <div class="bl-header" id="ba-blindhdr">Blind</div>
+          <div class="bl-goal" id="ba-goal">
+            <div class="bl-token" id="ba-token"><span>SMALL<br>BLIND</span></div>
+            <div class="bl-goal-info">
+              <div class="bl-goal-lab">Faire un score d'au moins</div>
+              <div class="bl-goal-target">🪙 <span id="ba-target">0</span></div>
+              <div class="bl-goal-reward">Récompense : <span id="ba-reward">$$$</span></div>
+            </div>
+          </div>
+          <div class="bl-round">
+            <div class="bl-round-lab">Manche<br>score</div>
+            <div class="bl-round-val">🪙 <span id="ba-round">0</span></div>
+          </div>
+          <div class="bl-hand ba-preview" id="ba-handinfo"></div>
+          <div class="bl-grid">
+            <button class="bl-btn info" onclick="openModal('ba-modal-hands')">Partie<br>Infos</button>
+            <div class="bl-cell g-mains"><div class="bl-cell-lab">Mains</div><div class="bl-cell-val blue" id="ba-hands">4</div></div>
+            <div class="bl-cell g-disc"><div class="bl-cell-lab">Défausses</div><div class="bl-cell-val red" id="ba-disc">3</div></div>
+            <div class="bl-cell money g-money"><div class="bl-cell-val gold">$<span id="ba-money">4</span></div></div>
+            <button class="bl-btn opt" onclick="openBaOptions()">Options</button>
+            <div class="bl-cell g-mise"><div class="bl-cell-lab">Mise initiale</div><div class="bl-cell-val gold"><span id="ba-ante">1</span>/8</div></div>
+            <div class="bl-cell g-manche"><div class="bl-cell-lab">Manche</div><div class="bl-cell-val gold" id="ba-manche">1</div></div>
           </div>
         </aside>
 
-        <!-- Zone de jeu : plateau sombre (score + jokers + main) -->
+        <!-- Zone de jeu : jokers + main -->
         <div class="ba-main">
           <div class="ba-board">
-            <div class="ba-scoreband">
-              <div class="ba-roundscore">
-                <div class="rs-lab">Score de la manche</div>
-                <div class="rs-val" id="ba-round">0</div>
-                <div class="rs-tgt">Objectif <b id="ba-target">300</b></div>
-                <div class="ba-progress"><div id="ba-bar" style="width:0%"></div></div>
-              </div>
-              <div class="ba-preview" id="ba-handinfo"></div>
-            </div>
             <div class="ba-jokers" id="ba-jokers"></div>
             <div class="ba-hand" id="ba-hand"></div>
           </div>
@@ -210,8 +296,8 @@
     <div id="ba-end" class="ba-panel" style="display:none">
       <div style="font-size:3.4rem" id="end-emoji">🃏</div>
       <h2 id="end-title">—</h2>
-      <p id="end-sub" style="color:var(--ink-light);margin:6px 0 4px"></p>
-      <p id="end-stats" style="color:var(--ink-light);font-size:0.86rem"></p>
+      <p id="end-sub" style="margin:6px 0 4px"></p>
+      <p id="end-stats" style="font-size:0.86rem"></p>
       <button class="ba-btn play" style="margin-top:16px" onclick="newGame()">Nouvelle partie</button>
       <br><a class="ba-link" href="/index.html">← Retour à l'accueil</a>
     </div>
@@ -220,11 +306,12 @@
     <div id="ba-home" class="ba-panel">
       <div style="font-size:3.4rem">🃏</div>
       <h2>Balatro</h2>
-      <p style="color:var(--ink-light);max-width:460px;margin:8px auto 0;font-size:0.9rem">
+      <p style="max-width:460px;margin:8px auto 0;font-size:0.9rem">
         Un <b>roguelike de poker</b>. Joue des mains de poker pour atteindre l'objectif de chaque blind.
         Chaque main vaut <span class="ba-chips">Jetons</span> × <span class="ba-mult">Mult</span>.
-        Entre les manches, achète des <b>Jokers</b> qui transforment ton score, et des <b>planètes</b>
-        qui améliorent tes mains. Survis jusqu'à l'<b>Ante 8</b> !</p>
+        Entre les manches, achète des <b>Jokers</b> qui transforment ton score, et ouvre des
+        <b>Paquets Célestes</b> pour faire monter tes mains de niveau (elles deviennent de plus
+        en plus puissantes). Survis jusqu'à l'<b>Ante 8</b> !</p>
       <div style="margin-top:18px"><button class="ba-btn play" onclick="newGame()">Commencer</button></div>
       <button class="ba-link" id="ba-resume" style="display:none" onclick="resumeGame()">↩ Reprendre la partie en cours</button>
     </div>
@@ -241,6 +328,15 @@
   <div class="modal" id="ba-modal-joker">
     <div class="modal-card"><div class="modal-title" id="jk-title">Joker</div><p id="jk-desc" style="text-align:center;color:var(--ink-light)"></p>
       <div style="text-align:center;margin-top:14px" id="jk-actions"></div></div>
+  </div>
+  <!-- Paquet Céleste : choisis 1 planète pour faire monter une main de niveau -->
+  <div class="modal" id="ba-modal-pack">
+    <div class="modal-card pack-card-modal">
+      <div class="modal-title">🌌 Paquet Céleste</div>
+      <div style="text-align:center;color:#cbbcf0;font-size:0.86rem;margin-bottom:12px" id="pack-sub">Choisis 1 planète</div>
+      <div class="pack-cards" id="pack-cards"></div>
+      <div style="text-align:center;margin-top:14px"><button class="ba-btn ghost" onclick="closePack()">Passer</button></div>
+    </div>
   </div>
 
   <script>
@@ -365,7 +461,9 @@
       green:     { name: 'Joker Vert',   cost: 4, desc: '+1 Mult à chaque main jouée', apply: function (r, c, n) { r.mult += n; }, tick: function (n) { return n + 1; } },
       runner:    { name: 'Coureur',      cost: 5, desc: '+15 Jetons cumulés à chaque Suite', apply: function (r, c, n) { r.chips += n; }, tick: function (n, r) { return (r.key === 'STR' || r.key === 'SF') ? n + 15 : n; } },
       squarej:   { name: 'Joker Carré',  cost: 4, desc: '+4 Jetons cumulés par main de 4 cartes', apply: function (r, c, n) { r.chips += n; }, tick: function (n, r, c) { return c.played === 4 ? n + 4 : n; } },
-      supernova: { name: 'Supernova',    cost: 5, desc: '+Mult = nombre de fois cette main jouée', apply: function (r, c) { r.mult += c.plays; } }
+      supernova: { name: 'Supernova',    cost: 5, desc: '+Mult = nombre de fois cette main jouée', apply: function (r, c) { r.mult += c.plays; } },
+      // Utilitaire (aucun effet de score) : garantit ta main la plus jouée dans un Paquet Céleste.
+      astronomer:{ name: 'Astronome',    cost: 6, desc: 'Un Paquet Céleste contient TOUJOURS la planète de ta main la plus jouée', apply: function () {} }
     };
     var JOKER_POOL = Object.keys(JOKERS);
 
@@ -585,9 +683,10 @@
       var pool = JOKER_POOL.filter(function (id) { return G.jokers.indexOf(id) < 0; });
       shuffle(pool);
       var js = pool.slice(0, 2);
-      var planetKeys = shuffle(HAND_ORDER.slice()).slice(0, 2);
+      var planetKeys = shuffle(HAND_ORDER.slice()).slice(0, 2);   // planètes à l'unité (comme le vrai jeu)
       var tarots = [shuffle(TAROT_POOL.slice())[0]];
-      G.shop = { jokers: js, planets: planetKeys, tarots: tarots, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
+      // Boutique fidèle : 2 Jokers + 2 planètes + 1 tarot en cartes, plus un PAQUET CÉLESTE.
+      G.shop = { jokers: js, planets: planetKeys, tarots: tarots, celestial: true, rerollCost: (G.shop && G.phase === 'shop' ? G.shop.rerollCost : 5), bought: {} };
     }
     function reroll() {
       if (G.money < G.shop.rerollCost) { toast('Pas assez d\'argent'); return; }
@@ -603,6 +702,41 @@
       if (G.money < 3) { toast('Pas assez d\'argent'); return; }
       G.money -= 3; G.levels[key] = (G.levels[key] || 1) + 1; G.shop.bought['p_' + key] = true; if (window.Sfx) Sfx.play('coin'); toast(PLANETS[key] + ' : ' + HANDS[key].name + ' niv. ' + G.levels[key]); route(); save();
     }
+    /* ━━ Paquet Céleste (booster de planètes) ━━ */
+    var PLANET_BG = { HIGH: '#b8a898', PAIR: '#c08a4a', TWO: '#7fd0e0', THREE: '#e8c07a', STR: '#e0c060', FLUSH: '#d8a060', FULL: '#4a90d0', FOUR: '#d0533a', SF: '#3f60d0' };
+    function planetBg(key) { return 'radial-gradient(circle at 34% 30%, ' + (PLANET_BG[key] || '#8899bb') + ', #0f1730)'; }
+    // Main la plus jouée (par nombre de fois) ; à égalité, la plus forte ; sinon Carte haute.
+    function mostPlayedHand() { var best = null, bestN = 0; HAND_ORDER.forEach(function (k) { var n = (G.handPlays[k] || 0); if (n > bestN) { bestN = n; best = k; } }); return best || 'HIGH'; }
+    function openCelestialPack(cost) {
+      if (!G.shop || G.shop.bought['pack']) return;
+      if (G.money < cost) { toast('Pas assez d\'argent'); return; }
+      G.money -= cost; G.shop.bought['pack'] = true; if (window.Sfx) Sfx.play('coin');
+      // 4 planètes distinctes au hasard. L'Astronome GARANTIT la main la plus jouée.
+      var picks = shuffle(HAND_ORDER.slice()).slice(0, 4), star = null;
+      if (G.jokers.indexOf('astronomer') >= 0) { star = mostPlayedHand(); if (picks.indexOf(star) < 0) picks[picks.length - 1] = star; }
+      G._packOpts = picks; G._packStar = star;
+      route(); save();                                        // maj boutique (paquet ouvert, argent)
+      renderPack(); openModal('ba-modal-pack');
+    }
+    function renderPack() {
+      $('pack-sub').textContent = G._packStar ? 'Choisis 1 planète — ⭐ = ta main la plus jouée (Astronome)' : 'Choisis 1 planète pour faire monter une main de niveau';
+      $('pack-cards').innerHTML = (G._packOpts || []).map(function (key) {
+        var lvl = G.levels[key] || 1, h = HANDS[key], star = (key === G._packStar);
+        return '<div class="pack-planet-card' + (star ? ' starred' : '') + '" onclick="pickPlanet(\'' + key + '\')">' +
+          '<div class="pack-planet" style="background:' + planetBg(key) + '"></div>' +
+          '<div class="pack-name">' + PLANETS[key] + '</div><div class="pack-hand">' + h.name + '</div>' +
+          '<div class="pack-eff">niv.' + lvl + ' → ' + (lvl + 1) + '<br><span class="um">+' + h.lm + ' Mult</span> · <span class="up">+' + h.lc + ' Jetons</span></div>' +
+          (star ? '<div class="pack-star">⭐ la + jouée</div>' : '') + '</div>';
+      }).join('');
+    }
+    function pickPlanet(key) {
+      G.levels[key] = (G.levels[key] || 1) + 1;
+      if (window.Sfx) Sfx.play('coin');
+      toast('🪐 ' + PLANETS[key] + ' — ' + HANDS[key].name + ' niveau ' + G.levels[key]);
+      closePack();
+    }
+    function closePack() { closeModal('ba-modal-pack'); G._packOpts = null; G._packStar = null; route(); save(); }
+
     function buyTarot(id) {
       if (G.consumables.length >= 2) { toast('2 consommables maximum'); return; }
       if (G.money < TAROTS[id].cost) { toast('Pas assez d\'argent'); return; }
@@ -622,11 +756,19 @@
     /* ━━ Rendu ━━ */
     function route() {
       ['ba-home', 'ba-game', 'ba-blindscreen', 'ba-shop', 'ba-end'].forEach(function (id) { $(id).style.display = 'none'; });
+      // Table VERTE pendant le jeu (comme l'original), fond spatial ailleurs.
+      document.body.classList.toggle('ba-play', !!(G && G.phase === 'play'));
       if (!G) { $('ba-home').style.display = 'block'; return; }
       if (G.phase === 'blind') { renderBlindScreen(); $('ba-blindscreen').style.display = 'block'; }
       else if (G.phase === 'play') { renderGame(); $('ba-game').style.display = 'block'; }
       else if (G.phase === 'shop') { renderShop(); $('ba-shop').style.display = 'block'; }
       else { renderEnd(); $('ba-end').style.display = 'block'; }
+    }
+    // Menu « Options » (bouton de la colonne) : reprendre, recommencer ou quitter.
+    function openBaOptions() {
+      if (confirm('Options :\n\n• OK = Recommencer une nouvelle partie\n• Annuler = Continuer la partie en cours')) {
+        clearSave(); newGame();
+      }
     }
     function jokerChip(id, sellable) { var j = JOKERS[id]; return '<div class="ba-joker' + (sellable ? ' sellable' : '') + '" data-jid="' + id + '" onclick="showJoker(\'' + id + '\',' + !!sellable + ')"><span class="jn">' + j.name + '</span>' + j.desc + '</div>'; }
     function cardHTML(c) {
@@ -636,7 +778,15 @@
     }
 
     function renderGame() {
-      $('ba-ante').textContent = G.ante; $('ba-blind').textContent = BLIND_NAME[G.blindIdx] + (G.boss ? ' · ' + BOSSES[G.boss].name : '');
+      // Colonne de gauche (réplique Balatro) : en-tête du blind, jeton, objectif…
+      var boss = G.boss ? BOSSES[G.boss] : null;
+      $('ba-blindhdr').textContent = boss ? boss.name : BLIND_NAME[G.blindIdx];
+      var tok = $('ba-token');
+      tok.className = 'bl-token' + (G.blindIdx === 1 ? ' big' : G.blindIdx === 2 ? ' boss' : '');
+      tok.innerHTML = boss ? '💀' : (G.blindIdx === 1 ? '<span>BIG<br>BLIND</span>' : '<span>SMALL<br>BLIND</span>');
+      $('ba-reward').textContent = '$'.repeat(BLIND_REWARD[G.blindIdx]);
+      $('ba-manche').textContent = (G.ante - 1) * 3 + G.blindIdx + 1;
+      $('ba-ante').textContent = G.ante;
       $('ba-target').textContent = G.target.toLocaleString('fr'); $('ba-round').textContent = G.roundScore.toLocaleString('fr');
       $('ba-hands').textContent = G.handsLeft; $('ba-disc').textContent = G.discardsLeft;
       // Argent : compteur animé quand il change (gain de blind, achat…)
@@ -644,7 +794,6 @@
       if (window.Fx && mPrev !== undefined && mPrev !== G.money) Fx.count($('ba-money'), mPrev, G.money, { ms: 450 });
       else $('ba-money').textContent = G.money;
       window._baMoney = G.money;
-      $('ba-bar').style.width = Math.min(100, 100 * G.roundScore / G.target) + '%';
       $('ba-jokers').innerHTML = (G.jokers.length ? G.jokers.map(function (id) { return jokerChip(id, false); }).join('') : '<span class="ba-slots">Pas encore de Joker</span>') + '<span class="ba-slots">' + G.jokers.length + '/5</span>';
       // consommables (tarots) : cliquer pour utiliser sur les cartes sélectionnées
       var cel = $('ba-consum'); if (!cel) { cel = document.createElement('div'); cel.id = 'ba-consum'; cel.className = 'ba-jokers'; var jk = $('ba-jokers'); jk.parentNode.insertBefore(cel, jk.nextSibling); }
@@ -662,7 +811,9 @@
         info = '<div class="pv-hand">' + d.name + '</div>' +
           '<div class="ba-scorecalc"><span class="ba-chipbox">' + d.chips + '</span><span class="ba-times">×</span><span class="ba-multbox">' + d.mult + '</span><span class="ba-times">=</span><span class="ba-scorebox">' + d.score.toLocaleString('fr') + '</span></div>';
       } else {
-        info = '<div class="pv-empty">Sélectionne des cartes<br>pour voir la main et son score</div>';
+        // Aucune carte sélectionnée : panneau « main » neutre 0 × 0 (comme l'original).
+        info = '<div class="pv-hand">—</div>' +
+          '<div class="ba-scorecalc"><span class="ba-chipbox">0</span><span class="ba-times">×</span><span class="ba-multbox">0</span></div>';
       }
       $('ba-handinfo').innerHTML = info;
       $('ba-hand').innerHTML = G.hand.map(cardHTML).join('');
@@ -692,9 +843,17 @@
         html += '<div class="ba-shop-item"><div class="si-name">🃏 ' + j.name + '</div><div class="si-desc">' + j.desc + '</div>' +
           '<button class="si-buy" ' + (bought || owned ? 'disabled' : '') + ' onclick="buyJoker(\'' + id + '\')">' + (bought ? 'Acheté ✓' : '$' + j.cost) + '</button></div>';
       });
-      G.shop.planets.forEach(function (key) {
-        var bought = G.shop.bought['p_' + key];
-        html += '<div class="ba-shop-item planet"><div class="si-name">🪐 ' + PLANETS[key] + '</div><div class="si-desc">' + HANDS[key].name + ' niveau +1 (actuel ' + (G.levels[key] || 1) + ')</div>' +
+      // Paquet Céleste : ouvre 4 planètes, choisis-en 1 (le levelling des mains).
+      if (G.shop.celestial) {
+        var pb = G.shop.bought['pack'];
+        html += '<div class="ba-shop-item celest"><div class="si-name">🌌 Paquet Céleste</div><div class="si-desc">Ouvre 4 planètes, choisis-en 1 pour faire monter une main de niveau (plus tu montes, plus tes mains sont puissantes).</div>' +
+          '<button class="si-buy" ' + (pb ? 'disabled' : '') + ' onclick="openCelestialPack(4)">' + (pb ? 'Ouvert ✓' : '$4') + '</button></div>';
+      }
+      // Planètes à l'unité (achetables directement, comme dans le vrai jeu).
+      (G.shop.planets || []).forEach(function (key) {
+        var bought = G.shop.bought['p_' + key], h = HANDS[key], lvl = (G.levels[key] || 1);
+        html += '<div class="ba-shop-item planet"><div class="si-name">🪐 ' + PLANETS[key] + '</div>' +
+          '<div class="si-desc"><b>' + h.name + '</b> · niv.' + lvl + ' → ' + (lvl + 1) + '<br>+' + h.lm + ' Mult, +' + h.lc + ' Jetons</div>' +
           '<button class="si-buy" ' + (bought ? 'disabled' : '') + ' onclick="buyPlanet(\'' + key + '\')">' + (bought ? 'Acheté ✓' : '$3') + '</button></div>';
       });
       (G.shop.tarots || []).forEach(function (id) {

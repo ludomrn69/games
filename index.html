@@ -7,6 +7,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
+  <script src="/playus-extra.js"></script><!-- médailles Playus (seuils partagés) -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
@@ -90,10 +91,10 @@
     .card.playus .name { color: #fff; }
     .card.playus .players { color: #c9b8ef; }
     .card.playus .off-badge { filter: grayscale(0.2); }
-    .duel-btn { margin-top: 4px; border: 1px solid rgba(245,199,126,0.4); background: rgba(255,255,255,0.06); color: #f5c77e;
-      border-radius: 20px; padding: 3px 10px; font-size: 0.68rem; font-weight: 800; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    .duel-btn { display: inline-block; margin-top: 4px; border: 1px solid rgba(245,199,126,0.4); background: rgba(255,255,255,0.06); color: #f5c77e;
+      border-radius: 20px; padding: 3px 10px; font-size: 0.72rem; font-weight: 800; cursor: pointer; font-family: 'DM Sans', sans-serif;
       transition: background .15s; }
-    .duel-btn:hover { background: rgba(245,199,126,0.18); }
+    .duel-btn:hover, .duel-btn:focus-visible { background: rgba(245,199,126,0.18); }
   </style>
 </head>
 <body>
@@ -174,7 +175,7 @@
       { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true, type: 'cartes simultanées' },
       { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true, type: 'déduction (IA solveur)' },
       { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true, type: 'coopératif / timing' },
-      { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true, type: 'puzzle / course (IA)' },
+      { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true, type: 'solo + course' },
       { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
       { key: 'queens',          name: 'Queens',          emoji: '👑', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
       { key: 'tango',           name: 'Tango',           emoji: '🌙', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
@@ -193,13 +194,12 @@
       { key: 'mini-metro',      name: 'Mini Métro',      emoji: '🚇', players: '1',    on: true, offline: true, type: 'gestion / réseau (solo)' },
       { key: 'mini-motorways',  name: 'Mini Motorways',  emoji: '🚗', players: '1',    on: true, offline: true, type: 'gestion / routes (solo)' },
       { key: 'nothanks',        name: 'No Thanks!',       emoji: '🙅', players: '2–7',  on: true, offline: true, type: 'stop-ou-encore' },
-      { key: 'qwixx',           name: 'Qwixx',           emoji: '🎲', players: '1–5',  on: true, offline: true, type: 'dés / roll-and-write' },
       { key: 'yams',            name: "Yam's",           emoji: '🎲', players: '1–6',  on: true, offline: true, type: 'dés / combinaisons' }
     ];
     // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
     // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
     var CATS = [
-      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'reversi', 'dames', 'morpion', 'mastermind', 'sudoku', 'queens', 'tango', 'zip', 'patches', '2048', 'qwixx', 'yams'] },
+      { title: 'Réflexion & logique', emoji: '🧠', keys: ['puissance4', 'reversi', 'dames', 'morpion', 'mastermind', 'sudoku', 'queens', 'tango', 'zip', 'patches', '2048', 'yams'] },
       { title: 'Cartes',              emoji: '🃏', keys: ['solitaire', 'balatro', 'blackjack', 'uno', 'skyjo', 'president', 'papayoo', 'trio', 'sixnimmt', 'millebornes', 'lapaye', 'nothanks'] },
       { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale', 'diamants', 'perudo'] },
       { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'sutom', 'crack-list', 'pictionary', 'telephone-dessine'] },
@@ -310,47 +310,40 @@
       { s: 'piano',        name: 'Piano',        emoji: '🎹', tag: 'Rythme' },
       { s: 'rhythm',       name: 'Rhythm',       emoji: '🥁', tag: 'Rythme' }
     ];
-    // ── Médailles Playus : seuils bronze/argent/or par jeu, comparés au record
-    // local (playus_<slug>_best). Boucle de progression sans aucun serveur.
-    var PLAYUS_MEDALS = {
-      'center-hit': [5, 15, 30], 'knife-throw': [8, 18, 32], 'color-reflex': [10, 25, 45], 'on-time': [5, 12, 24],
-      'perfect-shape': [5, 12, 22], 'target-speed': [10, 25, 45], 'times-up': [10, 25, 45], 'flap': [5, 15, 35],
-      'keep-up': [8, 20, 40], 'descend': [10, 30, 60], 'bloopy': [8, 20, 40], 'bouncy': [10, 30, 60],
-      'trampbox': [8, 20, 40], 'balldrop': [10, 25, 50], 'ballracer': [10, 30, 60], 'grid': [10, 25, 45],
-      'speed-tap': [15, 35, 60], 'swipe-fast': [10, 25, 45], 'react': [8, 18, 32], 'count': [5, 12, 22],
-      'call-me': [4, 9, 15], 'slicer': [15, 40, 80], 'balloon-pop': [15, 40, 80], 'drift': [8, 20, 40],
-      'zig': [10, 30, 60], 'kenneys-race': [10, 25, 50], 'tilted': [8, 20, 40], 'sword-balance': [8, 20, 40],
-      'tower-stack': [10, 25, 45], 'ninja-chop': [15, 35, 65], 'dangerwall': [10, 25, 50], 'astro-glide': [10, 30, 60],
-      'jumpy': [10, 25, 50], 'speedgolf': [3, 7, 14], 'color-memory': [5, 10, 18], 'memorizer': [5, 10, 18],
-      'memory': [4, 8, 14], 'balls-cups': [5, 10, 18], 'boxguesser': [5, 10, 18], 'snake': [10, 25, 50],
-      'piano': [15, 40, 80], 'rhythm': [10, 25, 50]
-    };
+    // ── Médailles Playus : seuils bronze/argent/or PARTAGÉS (playus-extra.js,
+    // source unique avec l'écran de fin des mini-jeux), comparés au record local.
     function playusMedal(slug) {
-      var th = PLAYUS_MEDALS[slug];
-      if (!th) return '';
-      var best = 0;
-      try { best = +localStorage.getItem('playus_' + slug.replace(/-/g, '') + '_best') || 0; } catch (e) {}
-      if (!best) return '';
-      var m = best >= th[2] ? '🥇' : best >= th[1] ? '🥈' : best >= th[0] ? '🥉' : '';
+      if (!window.PlayusMedals) return '';
+      var best = PlayusMedals.bestOf(slug);
+      var m = PlayusMedals.medalOf(slug, best);
       return m ? '<span style="position:absolute;top:6px;right:8px;font-size:1rem" title="Record : ' + best + '">' + m + '</span>' : '';
     }
     var pg = document.getElementById('playus-grid');
     if (pg) {
       pg.innerHTML = PLAYUS.map(function (g) {
+        // Le « bouton » Duel vit DANS le lien de la carte : un <button> dans un
+        // <a> est du HTML invalide (focus clavier imprévisible) → span role=button.
         return '<a class="card playus" href="games/playus/' + g.s + '.html">' +
           '<span class="off-badge" title="Jouable hors-ligne">✈️</span>' +
           playusMedal(g.s) +
-          '<div class="emoji">' + g.emoji + '</div>' +
+          '<div class="emoji" aria-hidden="true">' + g.emoji + '</div>' +
           '<div class="name">' + g.name + '</div>' +
           '<div class="players">' + g.tag + '</div>' +
-          '<button class="duel-btn" data-duel="' + g.s + '" title="Duel : 2 joueurs, un essai chacun">⚔️ Duel</button></a>';
+          '<span class="duel-btn" role="button" tabindex="0" data-duel="' + g.s + '" title="Duel : 2 joueurs, un essai chacun" aria-label="Duel à deux joueurs — ' + g.name + '">⚔️ Duel</span></a>';
       }).join('');
       // Bouton Duel : ouvre le jeu en mode 2 joueurs SANS suivre le lien de la carte.
+      function goDuel(b) { location.href = 'games/playus/' + b.getAttribute('data-duel') + '.html?duel=1'; }
       pg.addEventListener('click', function (e) {
         var b = e.target.closest('.duel-btn');
         if (!b) return;
         e.preventDefault(); e.stopPropagation();
-        location.href = 'games/playus/' + b.getAttribute('data-duel') + '.html?duel=1';
+        goDuel(b);
+      });
+      pg.addEventListener('keydown', function (e) {
+        var b = e.target.closest('.duel-btn');
+        if (!b || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault(); e.stopPropagation();
+        goDuel(b);
       });
     }
 

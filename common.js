@@ -5,7 +5,7 @@
   Chargé par chaque page via une balise bloquante classique (plus de document.write) :
       <script src="/common.js"></script>
   Pour modifier : édite le fichier source concerné puis relance `node tools/gen-common.js`.
-  Sources : nav.js, daily.js, stats.js, sfx.js, fx.js, presence.js, avatars.js, lobby.js, offline.js
+  Sources : nav.js, daily.js, stats.js, sfx.js, fx.js, a11y.js, presence.js, avatars.js, lobby.js, offline.js
 */
 
 // ════════════════════ nav.js ════════════════════
@@ -392,6 +392,7 @@
     opts = opts || {};
     var el = doc.createElement('div');
     el.className = 'fx-float';
+    el.setAttribute('aria-hidden', 'true'); // purement décoratif
     var x = (opts.x != null) ? opts.x : (0.14 + Math.random() * 0.72);
     el.style.left = Math.round(x * 100) + 'vw';
     el.style.bottom = '12vh';
@@ -429,6 +430,109 @@
     die: die
   };
 })(typeof window !== 'undefined' ? window : this);
+;
+
+// ════════════════════ a11y.js ════════════════════
+/*
+  a11y.js — Accessibilité TRANSVERSE, appliquée automatiquement à toutes les
+  pages de jeu (chargé via common.js). Aucun jeu n'a besoin d'être modifié :
+  un décorateur passe sur le DOM (initial + re-rendus, via MutationObserver) et
+  pose les attributs ARIA manquants.
+
+   • Modales : role="dialog" + aria-modal + aria-labelledby (sur .modal-title).
+   • Régions vivantes : toast (#lb-toast) et bandeau de tour (.turnbar) annoncés
+     aux lecteurs d'écran (aria-live) — l'info « à qui de jouer » n'est plus
+     purement visuelle.
+   • Boutons icône : tout bouton SANS texte lisible (émoji/symbole seul) reçoit
+     un aria-label — copié depuis son `title`, sinon depuis la table des
+     composants connus (règles « ? », rejouer « ↻ », historique « 📜 »…).
+
+  Débit : le décorateur est déclenché par MutationObserver mais REGROUPÉ (au
+  plus une passe toutes les 400 ms) — négligeable même sur les jeux qui
+  re-rendent tout leur écran à chaque état.
+*/
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+
+  // Libellés de secours pour les boutons icône connus qui n'auraient pas de title.
+  var CLASS_LABELS = [
+    ['game-rules-btn', 'Règles du jeu'],
+    ['game-restart-btn', 'Nouvelle partie'],
+    ['game-stats-btn', 'Statistiques de la partie'],
+    ['lb-react-fab', 'Réagir avec un émoji'],
+    ['lb-absent-bot', 'Remplacer le joueur absent par un ordi']
+  ];
+
+  // Un « texte lisible » = au moins une lettre ou un chiffre. Un bouton dont le
+  // contenu est un émoji/symbole seul (« ? », « ↻ », « 📜 », « ✕ ») n'en a pas.
+  function hasReadableText(el) {
+    return /[\p{L}\p{N}]/u.test(el.textContent || '');
+  }
+
+  function labelButtons(rootEl) {
+    var btns = rootEl.querySelectorAll('button:not([aria-label]):not([aria-labelledby])');
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      if (hasReadableText(b)) continue;
+      var label = b.getAttribute('title');
+      if (!label) {
+        for (var c = 0; c < CLASS_LABELS.length; c++) {
+          if (b.classList.contains(CLASS_LABELS[c][0])) { label = CLASS_LABELS[c][1]; break; }
+        }
+      }
+      if (label) b.setAttribute('aria-label', label);
+    }
+  }
+
+  var _dlgSeq = 0;
+  function decorateModals(rootEl) {
+    var modals = rootEl.querySelectorAll('.modal:not([role]), .uno-overlay:not([role])');
+    for (var i = 0; i < modals.length; i++) {
+      var m = modals[i];
+      m.setAttribute('role', 'dialog');
+      m.setAttribute('aria-modal', 'true');
+      var title = m.querySelector('.modal-title, .uno-overlay-title');
+      if (title) {
+        if (!title.id) title.id = 'a11y-dlg-' + (++_dlgSeq);
+        m.setAttribute('aria-labelledby', title.id);
+      }
+    }
+  }
+
+  function decorateLive() {
+    var toast = document.getElementById('lb-toast');
+    if (toast && !toast.getAttribute('role')) { toast.setAttribute('role', 'status'); toast.setAttribute('aria-live', 'polite'); }
+    var absent = document.getElementById('lb-absent');
+    if (absent && !absent.getAttribute('role')) absent.setAttribute('role', 'status');
+    var bars = document.querySelectorAll('.turnbar:not([aria-live]), .uno-turn-banner:not([aria-live])');
+    for (var i = 0; i < bars.length; i++) bars[i].setAttribute('aria-live', 'polite');
+  }
+
+  function pass() {
+    try {
+      labelButtons(document);
+      decorateModals(document);
+      decorateLive();
+    } catch (e) {}
+  }
+
+  // Passe initiale + regroupée sur mutation (les jeux re-rendent par innerHTML).
+  var scheduled = false;
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    setTimeout(function () { scheduled = false; pass(); }, 400);
+  }
+  function start() {
+    pass();
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
+})();
 ;
 
 // ════════════════════ presence.js ════════════════════
@@ -849,8 +953,10 @@
     },
     // Choisit une valeur selon le niveau : pick(state, {easy:.., normal:.., hard:..}).
     pick: function (state, m) { var l = window.Bots.level(state); return (m[l] !== undefined) ? m[l] : m.normal; },
-    // Probabilité, par niveau, de jouer un coup volontairement sous-optimal (au
-    // hasard parmi les coups légaux). Espacement net : DIFFICILE ne se trompe JAMAIS
+    // Probabilité, par niveau, de jouer un coup volontairement sous-optimal.
+    // Chaque jeu définit SON erreur « plausible » (débutant crédible : prend sa
+    // victoire immédiate, ne donne pas une pièce gratuite, joue central…) plutôt
+    // qu'un coup absurde au hasard. Espacement net : DIFFICILE ne se trompe JAMAIS
     // (force maximale), MOYEN se trompe parfois (1 coup sur 5), FACILE souvent (plus
     // d'1 coup sur 2) → trois niveaux franchement différents.
     blunderP: function (state) { return window.Bots.pick(state, { easy: 0.55, normal: 0.2, hard: 0 }); },
@@ -1162,11 +1268,32 @@
     });
   }
 
+  // ── Anti-rafale « heartbeat » ──────────────────────────────────────────────
+  // presence.js rafraîchit players/*/ts toutes les 5 s PAR JOUEUR : chaque
+  // écriture redéclenchait un re-render COMPLET du jeu chez tous les clients
+  // (à 8 joueurs ≈ 1,6 re-render/s en continu). On calcule une signature de
+  // l'état SANS les champs de présence (ts) : si seule la présence a bougé,
+  // le jeu n'est re-rendu qu'au plus une fois toutes les 10 s — assez pour la
+  // détection d'absence (seuil 20 s), sans jank ni bande passante inutile.
+  var _stateSig = null, _lastGameRender = 0, TS_RENDER_MS = 10000;
+  function shouldSkipGameRender(room) {
+    var sig;
+    try { sig = JSON.stringify(room, function (k, v) { return k === 'ts' ? undefined : v; }); }
+    catch (e) { sig = null; }
+    var now = Date.now();
+    var tsOnly = sig !== null && sig === _stateSig;
+    _stateSig = sig;
+    if (tsOnly && (now - _lastGameRender) < TS_RENDER_MS) return true;
+    _lastGameRender = now;
+    return false;
+  }
+
   // ── Handler central : route les écrans + relaie au jeu ────────────────────
   function masterOnState(snap) {
     var room = snap.val() || {};
     window.room = room;
     var status = room.status || 'waiting';
+    var skipRender = shouldSkipGameRender(room);
 
     // Mode SPECTATEUR : on regarde une partie en cours sans y participer. Dès
     // que le salon repasse en attente (rejouer), on devient un vrai joueur.
@@ -1177,7 +1304,7 @@
         ensureIdentityThenEnter();
         return;
       }
-      if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
+      if (!skipRender && cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
       try { refreshReactUI(room); } catch (e) {}
       try { updateTurnClock(room); } catch (e) {}
       return; // ni pilotage d'ordis, ni stats, ni bip de tour
@@ -1185,18 +1312,26 @@
 
     maybeMigrateHost(room);
 
+    // Je reviens alors qu'on m'a « remplacé par un ordi » (bandeau d'absence) :
+    // je reprends la main — mon client retire le drapeau. Les vrais ordis
+    // (bot_*) n'ont pas de client, ils ne passent jamais ici.
+    if (room.players && room.players[window.myPid] && room.players[window.myPid].isBot) {
+      try { window.roomRef.child('players/' + window.myPid + '/isBot').remove(); } catch (e) {}
+    }
+
     if (status === 'waiting') {
       // En attente : la salle d'attente est gérée ici. On y revient si on était
       // sur l'écran de jeu (fin de partie) ou encore sur l'accueil (auto-join).
       armGhostGuard(); // retour au lobby (rejouer) → la garde anti-fantôme reprend
       if (isActive('s-playing') || isActive('s-home')) window.showScreen('s-lobby');
-      if (isActive('s-lobby')) renderLobby(room);
+      if (isActive('s-lobby') && !skipRender) renderLobby(room);
       maybeAutoStart(room);
     } else {
       disarmGhostGuard(); // partie lancée : le nœud joueur ne doit plus s'effacer
     }
-    // Dans tous les cas on laisse le jeu réagir (il gère son écran 's-playing').
-    if (cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
+    // Dans tous les cas on laisse le jeu réagir (il gère son écran 's-playing') —
+    // sauf si SEULE la présence (ts) a bougé depuis le dernier rendu (anti-rafale).
+    if (!skipRender && cfg().onState) try { cfg().onState(snap); } catch (e) { console.error(e); }
     // Puis l'hôte fait jouer les ordis dont c'est le tour (no-op s'il n'y en a pas).
     try { driveBots(room); } catch (e) { console.error(e); }
     try { refreshBotSpeedUI(); } catch (e) {}
@@ -1724,7 +1859,9 @@
       cur.order = null;
       var ps = cur.players || {};
       Object.keys(ps).forEach(function (k) {
-        var isBot = !!ps[k].isBot;
+        // Le remplacement « humain absent → ordi » ne vaut que pour la manche :
+        // au retour au salon, seuls les VRAIS ordis (bot_*) gardent le drapeau.
+        var isBot = !!ps[k].isBot && /^bot_/.test(k);
         // on ne garde de l'ancien que name/emoji/color/seat/online/ts + les clés demandées.
         // Les ordis restent « prêts » (l'hôte les pilote) pour ne pas bloquer le redémarrage.
         var base = { name: ps[k].name, emoji: ps[k].emoji, color: ps[k].color, seat: ps[k].seat,
@@ -1829,15 +1966,31 @@
   }
   function absentBanner(holder, onSkip) {
     var el = document.getElementById('lb-absent');
-    if (!holder) { if (el) el.classList.remove('show'); return; }
+    // Un joueur déjà remplacé par un ordi n'est plus « absent » : l'hôte joue
+    // pour lui (driveBots) — le bandeau n'a plus lieu d'être.
+    var hp = holder && window.room && window.room.players && window.room.players[holder];
+    if (!holder || (hp && hp.isBot)) { if (el) el.classList.remove('show'); return; }
     if (!el) {
       el = document.createElement('div'); el.id = 'lb-absent'; el.className = 'lb-absent';
-      el.innerHTML = '<span class="lb-absent-txt"></span><button class="lb-absent-btn" type="button">Passer son tour</button>';
+      el.innerHTML = '<span class="lb-absent-txt"></span>' +
+        '<button class="lb-absent-btn" type="button">Passer son tour</button>' +
+        '<button class="lb-absent-btn lb-absent-bot" type="button" title="Un ordi joue à sa place jusqu\'à son retour">🤖 Remplacer</button>';
       document.body.appendChild(el);
     }
     var name = (window.Room && Room.name) ? Room.name(holder) : holder;
     el.querySelector('.lb-absent-txt').textContent = '⏳ ' + name + ' semble absent·e';
     el.querySelector('.lb-absent-btn').onclick = function () { el.classList.remove('show'); try { onSkip && onSkip(); } catch (e) {} };
+    // « Remplacer par un ordi » : seulement si le jeu a une IA (cfg.bot). L'ordi
+    // joue TOUS ses tours suivants ; s'il revient, son client retire le drapeau
+    // (voir masterOnState) et il reprend la main.
+    var botBtn = el.querySelector('.lb-absent-bot');
+    if (botBtn) {
+      botBtn.style.display = cfg().bot ? '' : 'none';
+      botBtn.onclick = function () {
+        el.classList.remove('show');
+        if (window.roomRef) window.roomRef.child('players/' + holder + '/isBot').set(true);
+      };
+    }
     el.classList.add('show');
   }
 
@@ -1910,6 +2063,7 @@
   var cfg = null, room = null, players = [], totalPlayers = 2;
   var humanPids = [], humanPid = null, lastTurnShown = null;
   var offlineDifficulty = 'normal';
+  var offlineExtraOpts = {}; // réglages propres au jeu choisis à l'écran de réglages (ex. { size: 6 })
   var statsRecorded = false; // stats par jeu : un seul enregistrement par partie
   var BOT_DELAY = 650;
 
@@ -2039,12 +2193,16 @@
     var controls = '';
     if (mode === 'solo') {
       if (max > 2 && !noBots) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
-      // Difficulté (des ordis, ou de la grille pour un solo pur).
-      if (max - 1 >= 1) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
+      // Difficulté (des ordis, ou de la grille pour un solo pur). Un jeu sans niveau
+      // de difficulté (ex. 2048) peut la masquer via offline:{ noDiff:true }.
+      if (max - 1 >= 1 && !(noBots && off.noDiff)) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
       if (!noBots && cfg.bot) controls += speedRow();   // vitesse des ordis (pas pour un solo-chrono pur)
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
     }
+    // Réglages propres au jeu (ex. taille de grille du Sudoku). Chaque rangée porte
+    // data-opt="<clé>" ; le bouton actif (.off-opt) donne data-val, reporté sur le salon.
+    if (cfg.offlineExtraSetup) controls += cfg.offlineExtraSetup(cfg);
     var sub = mode === 'solo'
       ? (noBots ? 'Toi contre le chrono ⏱' : (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi'))
       : 'Chacun son tour, on se passe l\'appareil';
@@ -2077,8 +2235,8 @@
     // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
     host.querySelectorAll('.off-set-row').forEach(function (row) {
       row.addEventListener('click', function (e) {
-        var b = e.target.closest('.off-num, .off-diff, .off-speed'); if (!b) return;
-        row.querySelectorAll('.off-num, .off-diff, .off-speed').forEach(function (x) { x.classList.remove('active'); });
+        var b = e.target.closest('.off-num, .off-diff, .off-speed, .off-opt'); if (!b) return;
+        row.querySelectorAll('.off-num, .off-diff, .off-speed, .off-opt').forEach(function (x) { x.classList.remove('active'); });
         b.classList.add('active');
         // Vitesse des ordis : mémorisée immédiatement (préférence appareil).
         if (b.classList.contains('off-speed') && window.Bots) window.Bots.setSpeedPref(b.dataset.speed);
@@ -2126,6 +2284,12 @@
     totalPlayers = Math.max(soloPure ? 1 : min, Math.min(max, totalPlayers));
     var d = document.querySelector('.off-diff.active');
     offlineDifficulty = (d && d.dataset.diff) || 'normal';
+    // Réglages propres au jeu : chaque .off-set-row[data-opt] → salon[clé] = valeur.
+    offlineExtraOpts = {};
+    document.querySelectorAll('.off-set-row[data-opt]').forEach(function (row) {
+      var b = row.querySelector('.off-opt.active'); if (!b) return;
+      var v = b.dataset.val; offlineExtraOpts[row.dataset.opt] = (v !== '' && !isNaN(+v)) ? +v : v;
+    });
     startGame(null);
   }
 
@@ -2156,6 +2320,9 @@
     humanPid = humanPids[0];
 
     room = { game: cfg.gameKey, status: 'playing', host: ids[0], players: pmap, order: ids, difficulty: offlineDifficulty };
+    // Réglages propres au jeu (ex. { size: 6 }) posés sur le salon AVANT onStart, qui
+    // les lit (ex. le Sudoku lit room.size pour générer une grille 6×6 ou 9×9).
+    for (var ek in offlineExtraOpts) if (offlineExtraOpts.hasOwnProperty(ek)) room[ek] = offlineExtraOpts[ek];
     window.room = room; window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
 
     var onList = players.map(function (p) { return { pid: p.pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat }; });
@@ -2198,12 +2365,18 @@
     } catch (e) {}
   }
   function clearResume() { try { localStorage.removeItem(resumeKey()); } catch (e) {} }
+  // Au-delà de ce délai, une partie interrompue n'est plus proposée (on l'efface) :
+  // reprendre un truc vieux de plusieurs jours n'a plus de sens.
+  var RESUME_MAX_AGE = 48 * 3600 * 1000; // 48 h
   function resumeAgeLabel(ts) {
     var m = Math.max(0, Math.round((Date.now() - (ts || 0)) / 60000));
     if (m < 1) return 'sauvegardée à l\'instant';
     if (m < 60) return 'interrompue il y a ' + m + ' min';
     var h = Math.round(m / 60);
-    return 'interrompue il y a ' + h + ' h';
+    if (h < 24) return 'interrompue il y a ' + h + ' h';
+    // Au-delà de 24 h, on parle en JOURS (plus lisible que « il y a 114 h »).
+    var j = Math.round(h / 24);
+    return 'interrompue il y a ' + j + ' jour' + (j > 1 ? 's' : '');
   }
   function loadResume() {
     if (!canResume()) return null;
@@ -2211,6 +2384,8 @@
       var raw = localStorage.getItem(resumeKey()); if (!raw) return null;
       var d = JSON.parse(raw);
       if (!d || !d.room || d.room.game !== cfg.gameKey || d.room.status !== 'playing') return null;
+      // Trop vieux (> 48 h) : on efface et on ne propose pas la reprise.
+      if (d.ts && (Date.now() - d.ts) > RESUME_MAX_AGE) { clearResume(); return null; }
       return d;
     } catch (e) { return null; }
   }
@@ -2319,8 +2494,8 @@
       '.off-set{margin:6px 0 10px;}' +
       '.off-set-label{font-size:.8rem;color:var(--ink-light);margin-bottom:6px;}' +
       '.off-set-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;}' +
-      '.off-num,.off-diff,.off-speed{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
-      '.off-num.active,.off-diff.active,.off-speed.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
+      '.off-num,.off-diff,.off-speed,.off-opt{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
+      '.off-num.active,.off-diff.active,.off-speed.active,.off-opt.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
       '#off-pass{position:fixed;inset:0;z-index:9000;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,16,28,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}' +
       '#off-pass.show{display:flex;}' +
       '.off-pass-card{background:var(--white);border-radius:22px;padding:32px 26px;text-align:center;max-width:340px;width:100%;box-shadow:var(--shadow-hover);}' +

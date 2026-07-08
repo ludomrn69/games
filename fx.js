@@ -72,6 +72,7 @@
     opts = opts || {};
     var el = doc.createElement('div');
     el.className = 'fx-float';
+    el.setAttribute('aria-hidden', 'true'); // purement décoratif
     var x = (opts.x != null) ? opts.x : (0.14 + Math.random() * 0.72);
     el.style.left = Math.round(x * 100) + 'vw';
     el.style.bottom = '12vh';

@@ -155,8 +155,20 @@
 
   function squaresOf(pieces) { var s = 0; (pieces || []).forEach(function (p) { s += (PIECES[p] || []).length; }); return s; }
 
+  // Coup « débutant plausible » (niveau facile) : privilégie les GROSSES pièces
+  // — comme un humain qui sait qu'il faut les caser tôt — mais les place au
+  // hasard, sans optimiser coins ni mobilité. Bien plus crédible que randomMove
+  // (qui pose volontiers le mono-carré au 2e tour), tout en restant très battable.
+  function weakMove(board, color, pieces, first) {
+    if (!pieces || !pieces.length) return null;
+    var maxSz = 0;
+    pieces.forEach(function (p) { var sz = (PIECES[p] || []).length; if (sz > maxSz) maxSz = sz; });
+    var bigs = pieces.filter(function (p) { return (PIECES[p] || []).length >= maxSz - 1; });
+    return randomMove(board, color, bigs, first) || randomMove(board, color, pieces, first);
+  }
+
   root.BlokusAI = {
-    chooseMove: chooseMove, randomMove: randomMove, isValidPlacement: isValidPlacement,
+    chooseMove: chooseMove, randomMove: randomMove, weakMove: weakMove, isValidPlacement: isValidPlacement,
     blokusAnchors: blokusAnchors, applyMove: applyMove, squaresOf: squaresOf,
     PIECES: PIECES, ORIENT: ORIENT, ALL_PIECE_IDS: ALL_PIECE_IDS, COLOR_CORNER: COLOR_CORNER, SIZE: SIZE
   };

@@ -210,11 +210,12 @@
     // Coins disponibles (ancres) : centralisé dans blokus-ai.js.
     var blokusAnchors = window.BlokusAI.blokusAnchors;
     // IA : voir blokus-ai.js (plus grosse pièce, maximise coins + centre ; partagé
-    // avec le banc). Facile = un placement valide au hasard.
+    // avec le banc). Facile = erreur PLAUSIBLE : grosse pièce posée au hasard
+    // (weakMove), au lieu d'un placement n'importe où avec n'importe quoi.
     function blokusChooseMove(state, color) {
       var board = state.board || emptyBoard(), first = colorIsFirst(state, color);
       var pieces = (state.pieces && state.pieces[color]) || [];
-      if (window.Bots && window.Bots.shouldBlunder(state)) return window.BlokusAI.randomMove(board, color, pieces, first);
+      if (window.Bots && window.Bots.shouldBlunder(state)) return window.BlokusAI.weakMove(board, color, pieces, first);
       return window.BlokusAI.chooseMove(board, color, pieces, first);
     }
     function blokusBot(state, pid) {

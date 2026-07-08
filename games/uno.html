@@ -24,7 +24,7 @@
     .uno-round-label { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--gold); white-space: nowrap; }
     .uno-header-actions { display: flex; gap: 6px; }
     .uno-hist-btn { position: relative; border: 1.5px solid var(--gold-light); background: var(--cream); border-radius: 30px; padding: 4px 9px; font-size: 0.78rem; cursor: pointer; }
-    .uno-hist-btn .badge { position: absolute; top: -6px; right: -6px; background: var(--terracotta); color: #fff; border-radius: 20px; font-size: 0.62rem; padding: 1px 5px; }
+    .uno-hist-btn .badge { position: absolute; top: -6px; right: -6px; background: var(--terracotta); color: #fff; border-radius: 20px; font-size: 0.7rem; padding: 1px 5px; }
 
     .uno-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 12px 12px 6px; }
     .uno-opp-chip { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.82rem; font-weight: 600; border: 2px solid transparent; }
@@ -59,7 +59,9 @@
     .uno-draw-pile:hover { transform: translateY(-3px); }
     .uno-draw-pile.pending { box-shadow: 0 0 0 3px var(--terracotta); animation: unoPulse 0.9s infinite; }
     @keyframes unoPulse { 50% { box-shadow: 0 0 0 6px var(--terracotta); } }
-    .uno-current-color { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--gold-light); }
+    /* Pastille de couleur active : un <span>, il lui FAUT display:inline-block sinon
+       width/height sont ignorés → elle s'affichait en fin trait blanc vertical. */
+    .uno-current-color { display: inline-block; vertical-align: middle; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--gold-light); }
     .uno-current-color.R { background: var(--uno-r); } .uno-current-color.Y { background: var(--uno-y); }
     .uno-current-color.G { background: var(--uno-g); } .uno-current-color.B { background: var(--uno-b); }
     /* Bandeau de tour : l'info critique en GRAS lisible (pulse quand c'est à toi). */
@@ -146,7 +148,7 @@
           <div class="uno-card lg uno-draw-pile" id="uno-draw-pile" onclick="drawCard()">UNO</div>
         </div>
         <div class="uno-pile-col">
-          <div class="uno-pile-label">Dessus <span class="uno-current-color" id="uno-current-color"></span></div>
+          <div class="uno-pile-label">Défausse <span class="uno-current-color" id="uno-current-color"></span></div>
           <div id="uno-discard"></div>
         </div>
       </div>
@@ -188,10 +190,10 @@
     <div class="modal-card">
       <div class="modal-title">Choisis une couleur</div>
       <div class="color-pick-row">
-        <button class="color-pick R" onclick="pickColor('R')"></button>
-        <button class="color-pick Y" onclick="pickColor('Y')"></button>
-        <button class="color-pick G" onclick="pickColor('G')"></button>
-        <button class="color-pick B" onclick="pickColor('B')"></button>
+        <button class="color-pick R" onclick="pickColor('R')" aria-label="Rouge"></button>
+        <button class="color-pick Y" onclick="pickColor('Y')" aria-label="Jaune"></button>
+        <button class="color-pick G" onclick="pickColor('G')" aria-label="Vert"></button>
+        <button class="color-pick B" onclick="pickColor('B')" aria-label="Bleu"></button>
       </div>
     </div>
   </div>

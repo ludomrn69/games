@@ -234,8 +234,10 @@ html[data-theme="dark"] .game-restart-btn {
 .lb-set-btn:disabled { opacity: 0.55; cursor: default; }
 .lb-set-hint { font-size: 0.78rem; color: var(--ink-light); text-align: center; }
 
-/* Chrono de tour flottant (jeux au tour par tour, en ligne) */
-.lb-turnclock { position: fixed; top: 60px; right: 12px; z-index: 400; display: none; background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); border-radius: 30px; padding: 4px 12px; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.82rem; box-shadow: var(--shadow); }
+/* Chrono de tour flottant (jeux au tour par tour, en ligne). top : sous la nav
+   (52px) ET sous les en-têtes sticky des jeux (~44px) — il ne chevauche plus
+   les boutons Règles/Rejouer des pages qui en ont un. */
+.lb-turnclock { position: fixed; top: 98px; right: 12px; z-index: 400; display: none; background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); border-radius: 30px; padding: 4px 12px; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.82rem; box-shadow: var(--shadow); }
 .lb-turnclock.mine { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
 .lb-turnclock.urgent { animation: lbclockpulse 0.7s ease-in-out infinite alternate; }
 @keyframes lbclockpulse { from { transform: scale(1); } to { transform: scale(1.08); } }
@@ -307,4 +309,18 @@ html[data-theme="dark"] .game-restart-btn {
   background: var(--ink); color: var(--cream); padding: 7px 16px; border-radius: 30px;
   font-family: 'DM Sans', sans-serif; font-size: 0.82rem; box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Animations réduites (réglage système d'accessibilité) ──────────────────
+   Le site est plein d'animations INFINIES (pulsations de tour, halos, cartes
+   qui scintillent…). Quand l'utilisateur a demandé « réduire les animations »,
+   on coupe tout : les animations finissent instantanément (l'état final reste
+   correct, les événements animationend/transitionend se déclenchent toujours). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -66,7 +66,7 @@ la synchro temps réel.
 | 🐮 6 qui prend ! | 2–10 | ✈️ | cartes simultanées |
 | 🎯 Mastermind | 1–8 | ✈️ | déduction (IA solveur) |
 | 🧠 The Mind | 2–6 | ✈️ | coopératif / timing |
-| 🔢 2048 | 1–6 | ✈️ | puzzle / course (IA) |
+| 🔢 2048 | 1–6 | ✈️ | solo + course |
 | 9️⃣ Sudoku | 1–6 | ✈️ | solo + course (chrono) |
 | 👑 Queens | 1–6 | ✈️ | solo + course (chrono) |
 | 🌙 Tango | 1–6 | ✈️ | solo + course (chrono) |
@@ -85,7 +85,6 @@ la synchro temps réel.
 | 🚇 Mini Métro | 1 | ✈️ | gestion / réseau (solo) |
 | 🚗 Mini Motorways | 1 | ✈️ | gestion / routes (solo) |
 | 🙅 No Thanks! | 2–7 | ✈️ | stop-ou-encore |
-| 🎲 Qwixx | 1–5 | ✈️ | dés / roll-and-write |
 | 🎲 Yam's | 1–6 | ✈️ | dés / combinaisons |
 
 <!-- GAMES:END -->

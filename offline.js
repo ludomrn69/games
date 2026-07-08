@@ -33,6 +33,7 @@
   var cfg = null, room = null, players = [], totalPlayers = 2;
   var humanPids = [], humanPid = null, lastTurnShown = null;
   var offlineDifficulty = 'normal';
+  var offlineExtraOpts = {}; // réglages propres au jeu choisis à l'écran de réglages (ex. { size: 6 })
   var statsRecorded = false; // stats par jeu : un seul enregistrement par partie
   var BOT_DELAY = 650;
 
@@ -162,12 +163,16 @@
     var controls = '';
     if (mode === 'solo') {
       if (max > 2 && !noBots) controls = counterRow('Adversaires (ordi)', loBots, max - 1, loBots);
-      // Difficulté (des ordis, ou de la grille pour un solo pur).
-      if (max - 1 >= 1) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
+      // Difficulté (des ordis, ou de la grille pour un solo pur). Un jeu sans niveau
+      // de difficulté (ex. 2048) peut la masquer via offline:{ noDiff:true }.
+      if (max - 1 >= 1 && !(noBots && off.noDiff)) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
       if (!noBots && cfg.bot) controls += speedRow();   // vitesse des ordis (pas pour un solo-chrono pur)
     } else {
       controls = counterRow('Nombre de joueurs', min, max, min);
     }
+    // Réglages propres au jeu (ex. taille de grille du Sudoku). Chaque rangée porte
+    // data-opt="<clé>" ; le bouton actif (.off-opt) donne data-val, reporté sur le salon.
+    if (cfg.offlineExtraSetup) controls += cfg.offlineExtraSetup(cfg);
     var sub = mode === 'solo'
       ? (noBots ? 'Toi contre le chrono ⏱' : (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi'))
       : 'Chacun son tour, on se passe l\'appareil';
@@ -200,8 +205,8 @@
     // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
     host.querySelectorAll('.off-set-row').forEach(function (row) {
       row.addEventListener('click', function (e) {
-        var b = e.target.closest('.off-num, .off-diff, .off-speed'); if (!b) return;
-        row.querySelectorAll('.off-num, .off-diff, .off-speed').forEach(function (x) { x.classList.remove('active'); });
+        var b = e.target.closest('.off-num, .off-diff, .off-speed, .off-opt'); if (!b) return;
+        row.querySelectorAll('.off-num, .off-diff, .off-speed, .off-opt').forEach(function (x) { x.classList.remove('active'); });
         b.classList.add('active');
         // Vitesse des ordis : mémorisée immédiatement (préférence appareil).
         if (b.classList.contains('off-speed') && window.Bots) window.Bots.setSpeedPref(b.dataset.speed);
@@ -249,6 +254,12 @@
     totalPlayers = Math.max(soloPure ? 1 : min, Math.min(max, totalPlayers));
     var d = document.querySelector('.off-diff.active');
     offlineDifficulty = (d && d.dataset.diff) || 'normal';
+    // Réglages propres au jeu : chaque .off-set-row[data-opt] → salon[clé] = valeur.
+    offlineExtraOpts = {};
+    document.querySelectorAll('.off-set-row[data-opt]').forEach(function (row) {
+      var b = row.querySelector('.off-opt.active'); if (!b) return;
+      var v = b.dataset.val; offlineExtraOpts[row.dataset.opt] = (v !== '' && !isNaN(+v)) ? +v : v;
+    });
     startGame(null);
   }
 
@@ -279,6 +290,9 @@
     humanPid = humanPids[0];
 
     room = { game: cfg.gameKey, status: 'playing', host: ids[0], players: pmap, order: ids, difficulty: offlineDifficulty };
+    // Réglages propres au jeu (ex. { size: 6 }) posés sur le salon AVANT onStart, qui
+    // les lit (ex. le Sudoku lit room.size pour générer une grille 6×6 ou 9×9).
+    for (var ek in offlineExtraOpts) if (offlineExtraOpts.hasOwnProperty(ek)) room[ek] = offlineExtraOpts[ek];
     window.room = room; window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
 
     var onList = players.map(function (p) { return { pid: p.pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat }; });
@@ -321,12 +335,18 @@
     } catch (e) {}
   }
   function clearResume() { try { localStorage.removeItem(resumeKey()); } catch (e) {} }
+  // Au-delà de ce délai, une partie interrompue n'est plus proposée (on l'efface) :
+  // reprendre un truc vieux de plusieurs jours n'a plus de sens.
+  var RESUME_MAX_AGE = 48 * 3600 * 1000; // 48 h
   function resumeAgeLabel(ts) {
     var m = Math.max(0, Math.round((Date.now() - (ts || 0)) / 60000));
     if (m < 1) return 'sauvegardée à l\'instant';
     if (m < 60) return 'interrompue il y a ' + m + ' min';
     var h = Math.round(m / 60);
-    return 'interrompue il y a ' + h + ' h';
+    if (h < 24) return 'interrompue il y a ' + h + ' h';
+    // Au-delà de 24 h, on parle en JOURS (plus lisible que « il y a 114 h »).
+    var j = Math.round(h / 24);
+    return 'interrompue il y a ' + j + ' jour' + (j > 1 ? 's' : '');
   }
   function loadResume() {
     if (!canResume()) return null;
@@ -334,6 +354,8 @@
       var raw = localStorage.getItem(resumeKey()); if (!raw) return null;
       var d = JSON.parse(raw);
       if (!d || !d.room || d.room.game !== cfg.gameKey || d.room.status !== 'playing') return null;
+      // Trop vieux (> 48 h) : on efface et on ne propose pas la reprise.
+      if (d.ts && (Date.now() - d.ts) > RESUME_MAX_AGE) { clearResume(); return null; }
       return d;
     } catch (e) { return null; }
   }
@@ -442,8 +464,8 @@
       '.off-set{margin:6px 0 10px;}' +
       '.off-set-label{font-size:.8rem;color:var(--ink-light);margin-bottom:6px;}' +
       '.off-set-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;}' +
-      '.off-num,.off-diff,.off-speed{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
-      '.off-num.active,.off-diff.active,.off-speed.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
+      '.off-num,.off-diff,.off-speed,.off-opt{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
+      '.off-num.active,.off-diff.active,.off-speed.active,.off-opt.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
       '#off-pass{position:fixed;inset:0;z-index:9000;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,16,28,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}' +
       '#off-pass.show{display:flex;}' +
       '.off-pass-card{background:var(--white);border-radius:22px;padding:32px 26px;text-align:center;max-width:340px;width:100%;box-shadow:var(--shadow-hover);}' +

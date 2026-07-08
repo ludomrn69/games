@@ -67,10 +67,10 @@
         <div class="tw-grid" id="tw-grid"></div>
         <div class="tw-banner" id="tw-banner"></div>
         <div class="tw-arrows">
-          <button class="tw-arrow tw-ar-up" onclick="human(0)">⬆️</button>
-          <button class="tw-arrow tw-ar-left" onclick="human(3)">⬅️</button>
-          <button class="tw-arrow tw-ar-down" onclick="human(2)">⬇️</button>
-          <button class="tw-arrow tw-ar-right" onclick="human(1)">➡️</button>
+          <button class="tw-arrow tw-ar-up" onclick="human(0)" aria-label="Vers le haut">⬆️</button>
+          <button class="tw-arrow tw-ar-left" onclick="human(3)" aria-label="Vers la gauche">⬅️</button>
+          <button class="tw-arrow tw-ar-down" onclick="human(2)" aria-label="Vers le bas">⬇️</button>
+          <button class="tw-arrow tw-ar-right" onclick="human(1)" aria-label="Vers la droite">➡️</button>
         </div>
         <div class="tw-hint">Flèches du clavier, glissé tactile, ou boutons</div>
       </div>
@@ -169,11 +169,11 @@
       maxPlayers: 6,
       rules: [
         'Glisse les tuiles : deux identiques fusionnent (2+2=4…)',
-        'Objectif : atteindre 2048 avant l\'adversaire / l\'ordi',
-        'Chacun sa grille, en même temps',
-        'Bloqué sans coup = éliminé'
+        'Objectif : atteindre la tuile 2048 (et le plus haut score)',
+        'Bloqué sans coup possible = partie terminée',
+        'Un pur défi solo : bats ton meilleur score'
       ],
-      offline: { solo: true, soloMinBots: 0 },
+      offline: { solo: true, soloMinBots: 0, soloNoBots: true, noDiff: true },
       bot: function () {},
       offlineTurn: function () { return null; },
       offlineEnter: function () { if (window.room) render(window.room); },

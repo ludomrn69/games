@@ -31,9 +31,14 @@
     .su-cell.given { font-weight: 900; color: #2C2520; cursor: default; }
     html[data-theme="dark"] .su-cell.given { color: #fff; }
     .su-cell.mine { color: #2a6fd6; }
-    .su-cell.sel { background: rgba(198,152,90,0.4); }
-    .su-cell.peer { background: rgba(198,152,90,0.16); }
+    /* Case sélectionnée : un contour net, SANS teinter les autres cases. */
+    .su-cell.sel { background: rgba(198,152,90,0.28); box-shadow: inset 0 0 0 3px var(--terracotta); position: relative; z-index: 1; }
     .su-cell.bad { color: #e05a4e; background: rgba(224,90,78,0.18); }
+    /* Petites notes (candidats) : mini-grille de chiffres dans la case. */
+    .su-notes { display: grid; width: 100%; height: 100%; }
+    .su-notes span { display: flex; align-items: center; justify-content: center; font-size: clamp(0.42rem, 2.1vw, 0.66rem); font-weight: 700; color: rgba(44,37,32,0.5); line-height: 1; }
+    html[data-theme="dark"] .su-notes span { color: rgba(232,220,200,0.55); }
+    #su-notes-btn.active { background: linear-gradient(135deg,var(--terracotta),var(--gold)); color: #fff; border-color: transparent; }
     .su-cell.br { border-right: 2.5px solid #2C2520; } .su-cell.bb { border-bottom: 2.5px solid #2C2520; }
 
     .su-pad { display: grid; gap: 7px; width: min(94vw, 430px); }
@@ -65,6 +70,7 @@
         <span class="su-title-mini">Sudoku</span>
         <span class="su-timer" id="su-timer">⏱ 0:00</span>
         <div class="su-head-actions" id="su-actions">
+          <button class="game-restart-btn" id="su-notes-btn" onclick="toggleNotes()" title="Notes : écris de petits chiffres candidats">✏️</button>
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
         </div>
@@ -101,7 +107,8 @@
       <div class="modal-title">9️⃣ Sudoku</div>
       <div class="modal-body">
         <p>• Remplis la grille : chaque <b>ligne</b>, chaque <b>colonne</b> et chaque <b>bloc</b> contient tous les chiffres une seule fois.</p>
-        <p style="margin-top:6px">• Choisis la <b>taille</b> (6×6 ou 9×9) et la <b>difficulté</b> (nombre d'indices) dans le salon.</p>
+        <p style="margin-top:6px">• Choisis la <b>taille</b> (6×6 ou 9×9) et la <b>difficulté</b> avant de lancer la partie.</p>
+        <p style="margin-top:6px">• Bouton <b>✏️</b> : mode <b>notes</b> — inscris de petits chiffres candidats dans une case (« ici c'est un 3 ou un 6 »). Reclique pour repasser en saisie normale.</p>
         <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : tout le monde a la <b>même grille</b>, le <b>plus rapide</b> gagne !</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
@@ -152,7 +159,7 @@
     }
 
     /* ━━ Enregistrement ━━ */
-    var prevStatus = null, sel = -1, timerInt = null;
+    var prevStatus = null, sel = -1, timerInt = null, noteMode = false;
     GameRoom({
       gameKey: 'sudoku', name: 'Sudoku', emoji: '9️⃣', tagline: 'Course à la grille remplie',
       minPlayers: 1, maxPlayers: 6,
@@ -165,6 +172,12 @@
       offline: { solo: true, soloMinBots: 0, soloNoBots: true, daily: true },
       bot: function () {}, offlineTurn: function () { return null; },
       offlineEnter: function () { if (window.room) render(window.room); },
+      // Choix de la taille (6×6 / 9×9) AUSSI en solo hors-ligne, pas seulement en salon.
+      offlineExtraSetup: function () {
+        return '<div class="off-set"><div class="off-set-label">Taille de la grille</div><div class="off-set-row" data-opt="size">' +
+          [6, 9].map(function (n) { return '<button type="button" class="off-opt' + (n === 9 ? ' active' : '') + '" data-val="' + n + '">' + n + '×' + n + '</button>'; }).join('') +
+          '</div></div>';
+      },
       lobbyExtraHTML: lobbyExtraHTML, onState: onState, onStart: onStart
     });
 
@@ -186,7 +199,7 @@
     function onState(snap) {
       var state = snap.val() || {};
       var status = state.status || 'waiting';
-      if (status === 'playing') { if (prevStatus !== 'playing') { sel = -1; showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
+      if (status === 'playing') { if (prevStatus !== 'playing') { sel = -1; noteMode = false; var nb = document.getElementById('su-notes-btn'); if (nb) nb.classList.remove('active'); showScreen('s-playing'); if (typeof assist !== 'undefined' && assist) assist.reset(); } render(state); startTimer(state); }
       else { stopTimer(); if (status === 'ended') showResults(state); }
       prevStatus = status;
     }
@@ -208,7 +221,36 @@
         if ((cur.puzzle || [])[idx] !== 0) return cur;             // case-indice : verrouillée
         if (doneOf(cur, pid)) return cur;
         var g = gridOf(cur, pid).slice(); g[idx] = val; cur.players[pid].grid = g;
+        // Poser un chiffre efface les notes de la case.
+        var notes = cur.players[pid].notes || {};
+        if (notes[idx]) { delete notes[idx]; cur.players[pid].notes = notes; }
         if (isComplete(g, cur.solution)) { Puzzle.finish(cur, pid); cur.banner = Room.name(pid) + ' finit en ' + Puzzle.fmtTime(cur.players[pid].finishedAt) + ' !'; }
+        return cur;
+      });
+    }
+    function notesOf(s, pid) { return (s.players[pid] && s.players[pid].notes) || {}; }
+    // Bascule le mode « notes » (petits candidats) au lieu de poser un vrai chiffre.
+    function toggleNotes() {
+      noteMode = !noteMode;
+      var b = document.getElementById('su-notes-btn'); if (b) b.classList.toggle('active', noteMode);
+    }
+    // Ajoute/enlève un petit chiffre candidat `val` dans la case `idx` (personnel).
+    function toggleNote(pid, idx, val) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        if ((cur.puzzle || [])[idx] !== 0) return cur;             // case-indice : verrouillée
+        if (gridOf(cur, pid)[idx]) return cur;                     // case déjà remplie : pas de note
+        var notes = cur.players[pid].notes || {}, bit = 1 << (val - 1), m = notes[idx] || 0;
+        m = (m & bit) ? (m & ~bit) : (m | bit);
+        if (m) notes[idx] = m; else delete notes[idx];
+        cur.players[pid].notes = notes;
+        return cur;
+      });
+    }
+    function clearNotes(pid, idx) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
+        var notes = cur.players[pid].notes || {}; if (notes[idx]) { delete notes[idx]; cur.players[pid].notes = notes; }
         return cur;
       });
     }
@@ -236,11 +278,16 @@
     }
     var assist = Puzzle.assist({ mount: 'su-actions', canEdit: assistCanEdit, snapshot: assistSnap, restore: assistRestore, hint: hintMove });
     function tapCell(idx) { if ((window.room.puzzle || [])[idx] !== 0) { sel = -1; render(window.room); return; } sel = (sel === idx ? -1 : idx); render(window.room); }
-    function tapKey(val) { if (sel < 0) { lbToast('Choisis une case'); return; } setCell(window.myPid, sel, val); }
+    function tapKey(val) {
+      if (sel < 0) { lbToast('Choisis une case'); return; }
+      if (val === 0) { clearNotes(window.myPid, sel); setCell(window.myPid, sel, 0); return; } // ⌫ efface valeur ET notes
+      if (noteMode) { toggleNote(window.myPid, sel, val); return; }
+      setCell(window.myPid, sel, val);
+    }
 
     /* ━━ Rendu ━━ */
     function render(state) {
-      var me = window.myPid, order = state.order || [], puzzle = state.puzzle || [], g = gridOf(state, me);
+      var me = window.myPid, order = state.order || [], puzzle = state.puzzle || [], g = gridOf(state, me), notes = notesOf(state, me);
       var n = state.size || 9, d = boxDims(n), bh = d.bh, bw = d.bw, cells = n * n;
       setHTML('su-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
         return '<div class="su-opp' + (doneOf(state, pid) ? ' done' : '') + '"><span class="su-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
@@ -248,29 +295,34 @@
       }).join(''));
       setText('su-banner', state.banner || '');
 
-      var selR = sel >= 0 ? (sel / n | 0) : -1, selC = sel >= 0 ? sel % n : -1;
       var html = '';
       for (var i = 0; i < cells; i++) {
         var r = i / n | 0, c = i % n, v = g[i], given = puzzle[i] !== 0;
         var cls = 'su-cell';
         if (given) cls += ' given'; else if (v) cls += ' mine';
-        if (i === sel) cls += ' sel';
-        else if (sel >= 0 && (r === selR || c === selC || ((r / bh | 0) === (selR / bh | 0) && (c / bw | 0) === (selC / bw | 0)))) cls += ' peer';
+        if (i === sel) cls += ' sel';                              // seule la case choisie est mise en avant
         if (v && !given && !validDisplay(g, i, v, n, bh, bw)) cls += ' bad';
         if (c % bw === bw - 1 && c !== n - 1) cls += ' br';
         if (r % bh === bh - 1 && r !== n - 1) cls += ' bb';
-        html += '<div class="' + cls + '" onclick="tapCell(' + i + ')">' + (v ? v : '') + '</div>';
+        var inner = v ? v : ((!given && notes[i]) ? notesHTML(notes[i], n) : '');
+        html += '<div class="' + cls + '" onclick="tapCell(' + i + ')">' + inner + '</div>';
       }
       var grid = document.getElementById('su-grid');
       grid.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
       grid.style.gridTemplateRows = 'repeat(' + n + ', 1fr)';
       grid.innerHTML = html;
       var pad = ''; for (var k = 1; k <= n; k++) pad += '<button class="su-key" onclick="tapKey(' + k + ')">' + k + '</button>';
-      pad += '<button class="su-key erase" onclick="tapKey(0)">⌫</button>';
+      pad += '<button class="su-key erase" onclick="tapKey(0)" aria-label="Effacer la case">⌫</button>';
       var padEl = document.getElementById('su-pad');
       padEl.style.gridTemplateColumns = 'repeat(' + (n === 6 ? 4 : 5) + ', 1fr)';
       padEl.innerHTML = pad;
       if (typeof assist !== 'undefined' && assist) assist.refresh();
+    }
+    // Mini-grille des chiffres candidats (notes) : chaque chiffre à sa place fixe.
+    function notesHTML(mask, n) {
+      var cells = '';
+      for (var k = 1; k <= n; k++) cells += '<span>' + ((mask & (1 << (k - 1))) ? k : '') + '</span>';
+      return '<div class="su-notes" style="grid-template-columns:repeat(3,1fr)">' + cells + '</div>';
     }
     // Validité d'une valeur posée (surlignage rouge) : on ignore la case elle-même.
     function validDisplay(g, idx, val, N, bh, bw) {
