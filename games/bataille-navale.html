@@ -139,7 +139,7 @@
     <div class="modal-card">
       <div class="modal-title">Bataille navale</div>
       <div class="modal-body">
-        <p>Chacun place ses <b>5 bateaux</b> en secret : Porte-avions (2×4, un gros rectangle), Croiseur (4), Contre-torpilleur (3), Sous-marin (3), Torpilleur (2). Le bouton <b>Sens</b> fait pivoter le porte-avions.</p>
+        <p>Chacun place ses <b>7 bateaux</b> en secret : Porte-avions (2×4, un gros rectangle), Croiseur (4), Contre-torpilleur (3), 2× Sous-marin (3), Torpilleur (2) et Vedette (2). Le bouton <b>Sens</b> fait pivoter le bateau.</p>
         <p style="margin-top:10px">Puis chacun son tour, tu tires sur une case adverse. <b>Touché</b> : tu rejoues. <b>Manqué</b> : à l'autre.</p>
         <p style="margin-top:10px">Le premier à <b>couler toute la flotte</b> ennemie gagne.</p>
       </div>
@@ -154,7 +154,8 @@
     // lignes. `shape` = longueur (ligne) ou { w, l } (rectangle) ; `size` = nb de cases.
     var FLEET = [
       { name: 'Porte-avions', size: 8, shape: { w: 2, l: 4 } }, { name: 'Croiseur', size: 4, shape: 4 },
-      { name: 'Contre-torpilleur', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 }, { name: 'Torpilleur', size: 2, shape: 2 }
+      { name: 'Contre-torpilleur', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 },
+      { name: 'Torpilleur', size: 2, shape: 2 }, { name: 'Vedette', size: 2, shape: 2 }
     ];
     var localFleet = [], selectedIdx = 0, orientation = 'h', placedDone = false, prevStatus = null;
     function rref() { return window.roomRef; }
