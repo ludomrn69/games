@@ -45,6 +45,9 @@
     .ar-set-btn { min-width: 84px; padding: 0.55rem 0.9rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
     .ar-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
     .ar-set-hint { text-align: center; font-size: 0.78rem; color: var(--ink-light); margin-top: 8px; }
+    .ar-select { width: 100%; max-width: 320px; margin: 0 auto; display: block; padding: 0.6rem 0.8rem; border: 1.5px solid var(--gold-light);
+      border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.92rem; cursor: pointer; }
+    .ar-select:disabled { opacity: 0.6; cursor: default; }
   </style>
 </head>
 <body>
@@ -130,23 +133,34 @@
       var modeBtns = [['quick', '⚡ Partie rapide'], ['tourney', '🏆 Tournoi']].map(function (m) {
         return '<button class="ar-set-btn' + (mode === m[0] ? ' active' : '') + '"' + (isHost ? ' onclick="setMode(\'' + m[0] + '\')"' : ' disabled') + '>' + m[1] + '</button>';
       }).join('');
-      var roundsRow = mode === 'tourney'
+      var pick = (room && room.pick) || 'random';
+      var extraRow = mode === 'tourney'
         ? '<div class="lb-set" style="margin-top:12px"><div class="lb-set-label">🎯 Nombre de mini-jeux</div><div class="ar-set-row">' +
           [3, 5, 7].map(function (n) { return '<button class="ar-set-btn' + (rounds === n ? ' active' : '') + '"' + (isHost ? ' onclick="setRounds(' + n + ')"' : ' disabled') + '>' + n + '</button>'; }).join('') + '</div></div>'
-        : '';
+        : '<div class="lb-set" style="margin-top:12px"><div class="lb-set-label">🎮 Mini-jeu</div>' +
+          '<select class="ar-select"' + (isHost ? ' onchange="setPick(this.value)"' : ' disabled') + '>' +
+          '<option value="random"' + (pick === 'random' ? ' selected' : '') + '>🎲 Surprise (aléatoire)</option>' +
+          GAMES.map(function (g) { return '<option value="' + g.s + '"' + (pick === g.s ? ' selected' : '') + '>' + g.e + '  ' + escapeHtml(g.n) + '</option>'; }).join('') +
+          '</select></div>';
+      var hint = mode === 'tourney' ? 'Les mini-jeux du tournoi sont tirés au hasard.' : (pick === 'random' ? 'Un mini-jeu sera tiré au hasard.' : 'Tout le monde jouera à ' + escapeHtml((META[pick] || {}).n || pick) + '.');
       return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">Type de partie</div><div class="ar-set-row">' + modeBtns + '</div></div>' +
-        roundsRow + '<div class="ar-set-hint">Les mini-jeux sont tirés au hasard (surprise).</div></div>';
+        extraRow + '<div class="ar-set-hint">' + hint + '</div></div>';
     }
     function setMode(m) { if (window.roomRef) window.roomRef.child('mode').set(m); }
     function setRounds(n) { if (window.roomRef) window.roomRef.child('rounds').set(n); }
+    function setPick(s) { if (window.roomRef) window.roomRef.child('pick').set(s); }
 
     function onStart(players, cur) {
       var mode = (cur && cur.mode) || 'quick';
+      var pick = (cur && cur.pick) || 'random';
       var count = mode === 'tourney' ? Math.min((cur && cur.rounds) || 3, GAMES.length) : 1;
       var pool = GAMES.slice();
       for (var i = pool.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+      var seq;
+      if (mode === 'quick' && pick !== 'random' && META[pick]) seq = [pick];          // mini-jeu choisi par l'hôte
+      else seq = pool.slice(0, count).map(function (g) { return g.s; });               // surprise (aléatoire)
       var scores = {}; players.forEach(function (p) { scores[p.pid] = 0; });
-      return { mode: mode, seq: pool.slice(0, count).map(function (g) { return g.s; }), idx: 0, scores: scores, sub: {}, awarded: {}, phase: 'play', lastRound: null };
+      return { mode: mode, seq: seq, idx: 0, scores: scores, sub: {}, awarded: {}, phase: 'play', lastRound: null };
     }
 
     /* ━━ Score du mini-jeu embarqué : remonté par postMessage depuis playus-extra.js ━━ */
