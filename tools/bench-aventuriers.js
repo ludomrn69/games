@@ -35,12 +35,12 @@ console.log('🚂 Aventuriers du Rail (moteur)');
 // 3) Paiement / réclamation d'une route.
 (function () {
   var st = E.setup(['A', 'B'], 42); st.order = ['A', 'B']; st.turn = 'A';
-  st.players.A.hand = E.emptyHand(); st.players.A.hand.R = 1; // route r2 (grise, longueur 1)
-  var opts = E.paymentOptions(st, 'A', 'r2');
+  st.players.A.hand = E.emptyHand(); st.players.A.hand.R = 1; // route r22 (grise, longueur 1 : Amsterdam–Bruxelles)
+  var opts = E.paymentOptions(st, 'A', 'r22');
   if (opts.length && opts[0].colorCards === 1) ok('paiement d\'une route grise (1 carte)'); else bad('paiement grise KO');
   var trains = st.players.A.trains;
-  E.claim(st, 'A', 'r2', opts[0]);
-  if (st.claimed.r2 === 'A' && st.players.A.trains === trains - 1 && st.players.A.scoreRoutes === 1 && st.turn === 'B') ok('réclamation : débit wagons + score + fin de tour'); else bad('réclamation KO');
+  E.claim(st, 'A', 'r22', opts[0]);
+  if (st.claimed.r22 === 'A' && st.players.A.trains === trains - 1 && st.players.A.scoreRoutes === 1 && st.turn === 'B') ok('réclamation : débit wagons + score + fin de tour'); else bad('réclamation KO');
 })();
 
 // 4) Parties complètes (bots) : terminent, vainqueur au score max, billets scorés.

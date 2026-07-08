@@ -12,61 +12,88 @@
   'use strict';
 
   // ── Carte (coords en 0..100 pour le SVG) ────────────────────────────────────
-  // Carte EUROPE (villes réelles = repères géographiques ; le réseau de routes et
-  // les billets ci-dessous sont une création propre à ce jeu, pas une reproduction
-  // d'un plateau existant). Coordonnées x (ouest→est) / y (nord→sud) en 0..100.
+  // Carte EUROPE — design ORIGINAL (villes réelles = repères géographiques ; le
+  // réseau de routes, couleurs, longueurs et billets ci-dessous sont une création
+  // propre à ce jeu, PAS une reproduction d'un plateau du commerce). Réseau élargi
+  // et plus réaliste. Coordonnées x (ouest→est) / y (nord→sud) en 0..100.
   var CITIES = [
-    { id: 'lisboa', n: 'Lisbonne', x: 6, y: 76 }, { id: 'madrid', n: 'Madrid', x: 15, y: 72 },
-    { id: 'barcelona', n: 'Barcelone', x: 25, y: 66 }, { id: 'marseille', n: 'Marseille', x: 33, y: 60 },
-    { id: 'paris', n: 'Paris', x: 29, y: 42 }, { id: 'london', n: 'Londres', x: 23, y: 31 },
-    { id: 'amsterdam', n: 'Amsterdam', x: 34, y: 33 }, { id: 'bruxelles', n: 'Bruxelles', x: 31, y: 37 },
-    { id: 'frankfurt', n: 'Francfort', x: 39, y: 38 }, { id: 'zurich', n: 'Zurich', x: 36, y: 50 },
-    { id: 'milano', n: 'Milan', x: 40, y: 57 }, { id: 'roma', n: 'Rome', x: 48, y: 69 },
-    { id: 'venezia', n: 'Venise', x: 46, y: 55 }, { id: 'munchen', n: 'Munich', x: 47, y: 44 },
-    { id: 'berlin', n: 'Berlin', x: 51, y: 33 }, { id: 'hamburg', n: 'Hambourg', x: 45, y: 26 },
-    { id: 'kobenhavn', n: 'Copenhague', x: 49, y: 21 }, { id: 'stockholm', n: 'Stockholm', x: 58, y: 11 },
-    { id: 'praha', n: 'Prague', x: 52, y: 40 }, { id: 'wien', n: 'Vienne', x: 57, y: 45 },
-    { id: 'budapest', n: 'Budapest', x: 62, y: 50 }, { id: 'zagreb', n: 'Zagreb', x: 55, y: 58 },
-    { id: 'warszawa', n: 'Varsovie', x: 61, y: 33 }, { id: 'beograd', n: 'Belgrade', x: 63, y: 58 },
-    { id: 'sofia', n: 'Sofia', x: 67, y: 63 }, { id: 'bucuresti', n: 'Bucarest', x: 72, y: 54 },
-    { id: 'athina', n: 'Athènes', x: 65, y: 79 }, { id: 'istanbul', n: 'Istanbul', x: 78, y: 67 },
-    { id: 'kyiv', n: 'Kiev', x: 77, y: 40 }, { id: 'riga', n: 'Riga', x: 65, y: 21 },
-    { id: 'moskva', n: 'Moscou', x: 88, y: 26 }, { id: 'minsk', n: 'Minsk', x: 73, y: 33 }
+    { id: 'lisboa', n: 'Lisbonne', x: 6, y: 77 }, { id: 'porto', n: 'Porto', x: 5, y: 68 },
+    { id: 'madrid', n: 'Madrid', x: 15, y: 71 }, { id: 'bilbao', n: 'Bilbao', x: 17, y: 61 },
+    { id: 'barcelona', n: 'Barcelone', x: 26, y: 64 }, { id: 'bordeaux', n: 'Bordeaux', x: 22, y: 55 },
+    { id: 'marseille', n: 'Marseille', x: 33, y: 59 }, { id: 'lyon', n: 'Lyon', x: 31, y: 52 },
+    { id: 'paris', n: 'Paris', x: 27, y: 43 }, { id: 'london', n: 'Londres', x: 22, y: 31 },
+    { id: 'edinburgh', n: 'Édimbourg', x: 19, y: 19 }, { id: 'dublin', n: 'Dublin', x: 12, y: 25 },
+    { id: 'bruxelles', n: 'Bruxelles', x: 31, y: 37 }, { id: 'amsterdam', n: 'Amsterdam', x: 34, y: 32 },
+    { id: 'koln', n: 'Cologne', x: 37, y: 35 }, { id: 'frankfurt', n: 'Francfort', x: 40, y: 40 },
+    { id: 'hamburg', n: 'Hambourg', x: 44, y: 27 }, { id: 'berlin', n: 'Berlin', x: 50, y: 32 },
+    { id: 'munchen', n: 'Munich', x: 46, y: 45 }, { id: 'zurich', n: 'Zurich', x: 37, y: 49 },
+    { id: 'milano', n: 'Milan', x: 41, y: 56 }, { id: 'venezia', n: 'Venise', x: 46, y: 54 },
+    { id: 'roma', n: 'Rome', x: 48, y: 68 }, { id: 'napoli', n: 'Naples', x: 52, y: 73 },
+    { id: 'kobenhavn', n: 'Copenhague', x: 48, y: 22 }, { id: 'oslo', n: 'Oslo', x: 45, y: 11 },
+    { id: 'stockholm', n: 'Stockholm', x: 57, y: 12 }, { id: 'helsinki', n: 'Helsinki', x: 66, y: 8 },
+    { id: 'praha', n: 'Prague', x: 52, y: 40 }, { id: 'wien', n: 'Vienne', x: 56, y: 46 },
+    { id: 'krakow', n: 'Cracovie', x: 60, y: 39 }, { id: 'warszawa', n: 'Varsovie', x: 61, y: 32 },
+    { id: 'budapest', n: 'Budapest', x: 62, y: 51 }, { id: 'zagreb', n: 'Zagreb', x: 54, y: 56 },
+    { id: 'beograd', n: 'Belgrade', x: 63, y: 57 }, { id: 'sofia', n: 'Sofia', x: 67, y: 63 },
+    { id: 'bucuresti', n: 'Bucarest', x: 73, y: 54 }, { id: 'athina', n: 'Athènes', x: 66, y: 80 },
+    { id: 'istanbul', n: 'Istanbul', x: 79, y: 66 }, { id: 'riga', n: 'Riga', x: 65, y: 19 },
+    { id: 'vilnius', n: 'Vilnius', x: 69, y: 27 }, { id: 'minsk', n: 'Minsk', x: 73, y: 31 },
+    { id: 'kyiv', n: 'Kiev', x: 79, y: 39 }, { id: 'moskva', n: 'Moscou', x: 89, y: 24 }
   ];
 
   // Couleurs wagon : R O Y G B P K W ; X = grise (n'importe quelle couleur). L = locomotive (joker).
   var COLORS = ['R', 'O', 'Y', 'G', 'B', 'P', 'K', 'W'];
   function R(id, a, b, color, len) { return { id: id, a: a, b: b, color: color, len: len }; }
   var ROUTES = [
-    R('r1', 'lisboa', 'madrid', 'P', 3), R('r2', 'amsterdam', 'bruxelles', 'X', 1), R('r3', 'madrid', 'barcelona', 'Y', 2),
-    R('r4', 'barcelona', 'marseille', 'G', 3), R('r5', 'marseille', 'paris', 'B', 4), R('r6', 'barcelona', 'paris', 'X', 4),
-    R('r7', 'paris', 'london', 'W', 2), R('r8', 'paris', 'bruxelles', 'R', 2), R('r9', 'marseille', 'zurich', 'O', 3),
-    R('r10', 'marseille', 'milano', 'K', 4), R('r11', 'amsterdam', 'hamburg', 'Y', 2), R('r12', 'bruxelles', 'frankfurt', 'P', 2),
-    R('r13', 'frankfurt', 'zurich', 'W', 2), R('r14', 'zurich', 'milano', 'G', 2), R('r15', 'zurich', 'munchen', 'X', 2),
-    R('r16', 'frankfurt', 'munchen', 'R', 2), R('r17', 'frankfurt', 'berlin', 'K', 3), R('r18', 'munchen', 'venezia', 'B', 3),
-    R('r19', 'milano', 'venezia', 'X', 1), R('r20', 'venezia', 'zagreb', 'Y', 2), R('r21', 'hamburg', 'berlin', 'O', 2),
-    R('r22', 'hamburg', 'kobenhavn', 'R', 2), R('r23', 'kobenhavn', 'stockholm', 'B', 3), R('r24', 'london', 'amsterdam', 'K', 2),
-    R('r25', 'berlin', 'warszawa', 'P', 3), R('r26', 'berlin', 'praha', 'G', 2), R('r27', 'praha', 'wien', 'X', 2),
-    R('r28', 'praha', 'munchen', 'Y', 2), R('r29', 'wien', 'munchen', 'O', 2), R('r30', 'wien', 'budapest', 'R', 1),
-    R('r31', 'wien', 'zagreb', 'P', 2), R('r32', 'budapest', 'zagreb', 'K', 2), R('r33', 'budapest', 'beograd', 'G', 2),
-    R('r34', 'zagreb', 'beograd', 'X', 1), R('r35', 'beograd', 'sofia', 'B', 2), R('r36', 'beograd', 'bucuresti', 'Y', 3),
-    R('r37', 'sofia', 'bucuresti', 'O', 2), R('r38', 'sofia', 'istanbul', 'P', 3), R('r39', 'sofia', 'athina', 'R', 3),
-    R('r40', 'roma', 'milano', 'W', 3), R('r41', 'roma', 'venezia', 'G', 3), R('r42', 'roma', 'athina', 'K', 5),
-    R('r43', 'istanbul', 'bucuresti', 'X', 3), R('r44', 'istanbul', 'athina', 'Y', 4), R('r45', 'warszawa', 'minsk', 'X', 2),
-    R('r46', 'minsk', 'kyiv', 'G', 2), R('r47', 'minsk', 'riga', 'O', 2), R('r48', 'riga', 'stockholm', 'B', 4),
-    R('r49', 'warszawa', 'riga', 'P', 3), R('r50', 'kyiv', 'bucuresti', 'R', 3), R('r51', 'kyiv', 'moskva', 'W', 3),
-    R('r52', 'minsk', 'moskva', 'Y', 4), R('r53', 'riga', 'moskva', 'K', 4), R('r54', 'warszawa', 'praha', 'X', 3),
-    R('r55', 'roma', 'zagreb', 'B', 4), R('r56', 'barcelona', 'madrid', 'W', 2)
+    // Péninsule ibérique + sud France
+    R('r1', 'lisboa', 'porto', 'W', 1), R('r2', 'lisboa', 'madrid', 'O', 3), R('r3', 'porto', 'madrid', 'X', 3),
+    R('r4', 'madrid', 'bilbao', 'G', 2), R('r5', 'madrid', 'barcelona', 'Y', 2), R('r6', 'bilbao', 'bordeaux', 'R', 2),
+    R('r7', 'barcelona', 'bordeaux', 'P', 3), R('r8', 'barcelona', 'marseille', 'B', 3),
+    // France
+    R('r9', 'bordeaux', 'paris', 'K', 3), R('r10', 'bordeaux', 'lyon', 'X', 3), R('r11', 'marseille', 'lyon', 'O', 2),
+    R('r12', 'lyon', 'paris', 'G', 3), R('r13', 'lyon', 'zurich', 'W', 3), R('r14', 'marseille', 'milano', 'K', 3),
+    R('r15', 'paris', 'bruxelles', 'Y', 2), R('r16', 'paris', 'london', 'W', 2), R('r17', 'paris', 'frankfurt', 'R', 3),
+    // Îles britanniques
+    R('r18', 'london', 'edinburgh', 'K', 3), R('r19', 'london', 'dublin', 'B', 2), R('r20', 'edinburgh', 'dublin', 'X', 2),
+    R('r21', 'london', 'amsterdam', 'O', 2),
+    // Benelux + Allemagne
+    R('r22', 'amsterdam', 'bruxelles', 'X', 1), R('r23', 'amsterdam', 'koln', 'R', 2), R('r24', 'bruxelles', 'koln', 'P', 2),
+    R('r25', 'koln', 'frankfurt', 'G', 1), R('r26', 'frankfurt', 'munchen', 'P', 2), R('r27', 'frankfurt', 'hamburg', 'B', 3),
+    R('r28', 'koln', 'hamburg', 'Y', 3), R('r29', 'hamburg', 'berlin', 'O', 2), R('r30', 'hamburg', 'kobenhavn', 'R', 2),
+    R('r31', 'berlin', 'praha', 'K', 2), R('r32', 'berlin', 'warszawa', 'P', 3), R('r33', 'frankfurt', 'zurich', 'W', 2),
+    // Alpes + Italie
+    R('r34', 'zurich', 'munchen', 'X', 2), R('r35', 'zurich', 'milano', 'G', 2), R('r36', 'munchen', 'venezia', 'B', 3),
+    R('r37', 'milano', 'venezia', 'X', 1), R('r38', 'milano', 'roma', 'O', 4), R('r39', 'venezia', 'roma', 'G', 3),
+    R('r40', 'roma', 'napoli', 'R', 1), R('r41', 'roma', 'athina', 'K', 5), R('r42', 'napoli', 'athina', 'P', 4),
+    // Scandinavie
+    R('r43', 'kobenhavn', 'oslo', 'B', 3), R('r44', 'kobenhavn', 'stockholm', 'Y', 3), R('r45', 'oslo', 'stockholm', 'R', 2),
+    R('r46', 'stockholm', 'helsinki', 'X', 3), R('r47', 'helsinki', 'riga', 'W', 3), R('r48', 'riga', 'stockholm', 'B', 4),
+    // Europe centrale
+    R('r49', 'praha', 'wien', 'Y', 1), R('r50', 'praha', 'krakow', 'X', 2), R('r51', 'praha', 'munchen', 'R', 2),
+    R('r52', 'wien', 'munchen', 'G', 2), R('r53', 'wien', 'budapest', 'O', 1), R('r54', 'wien', 'zagreb', 'P', 2),
+    R('r55', 'krakow', 'warszawa', 'K', 1), R('r56', 'krakow', 'budapest', 'B', 2), R('r57', 'zagreb', 'venezia', 'R', 2),
+    // Balkans
+    R('r58', 'budapest', 'zagreb', 'Y', 2), R('r59', 'budapest', 'beograd', 'K', 2), R('r60', 'zagreb', 'beograd', 'X', 1),
+    R('r61', 'beograd', 'sofia', 'B', 2), R('r62', 'beograd', 'bucuresti', 'Y', 3), R('r63', 'sofia', 'bucuresti', 'O', 2),
+    R('r64', 'sofia', 'istanbul', 'P', 3), R('r65', 'sofia', 'athina', 'R', 4), R('r66', 'bucuresti', 'istanbul', 'X', 3),
+    R('r67', 'istanbul', 'athina', 'Y', 4),
+    // Baltique + est
+    R('r68', 'warszawa', 'vilnius', 'G', 3), R('r69', 'riga', 'vilnius', 'O', 2), R('r70', 'vilnius', 'minsk', 'R', 2),
+    R('r71', 'minsk', 'warszawa', 'Y', 3), R('r72', 'minsk', 'kyiv', 'G', 3), R('r73', 'bucuresti', 'kyiv', 'R', 4),
+    R('r74', 'minsk', 'moskva', 'X', 4), R('r75', 'kyiv', 'moskva', 'W', 4)
   ];
   // Billets de destination : relier a↔b rapporte pts (ou les perd si non relié en fin de partie).
   var TICKETS = [
-    { a: 'lisboa', b: 'moskva', pts: 25 }, { a: 'lisboa', b: 'wien', pts: 20 }, { a: 'madrid', b: 'berlin', pts: 18 },
-    { a: 'london', b: 'istanbul', pts: 21 }, { a: 'paris', b: 'warszawa', pts: 15 }, { a: 'paris', b: 'athina', pts: 21 },
-    { a: 'barcelona', b: 'kyiv', pts: 20 }, { a: 'amsterdam', b: 'roma', pts: 13 }, { a: 'stockholm', b: 'roma', pts: 21 },
-    { a: 'stockholm', b: 'athina', pts: 25 }, { a: 'berlin', b: 'bucuresti', pts: 12 }, { a: 'frankfurt', b: 'riga', pts: 13 },
+    { a: 'lisboa', b: 'moskva', pts: 26 }, { a: 'lisboa', b: 'wien', pts: 20 }, { a: 'madrid', b: 'berlin', pts: 18 },
+    { a: 'madrid', b: 'stockholm', pts: 23 }, { a: 'london', b: 'istanbul', pts: 21 }, { a: 'london', b: 'napoli', pts: 20 },
+    { a: 'paris', b: 'warszawa', pts: 15 }, { a: 'paris', b: 'athina', pts: 22 }, { a: 'edinburgh', b: 'athina', pts: 25 },
+    { a: 'dublin', b: 'roma', pts: 21 }, { a: 'barcelona', b: 'kyiv', pts: 20 }, { a: 'amsterdam', b: 'roma', pts: 13 },
+    { a: 'amsterdam', b: 'bucuresti', pts: 17 }, { a: 'stockholm', b: 'roma', pts: 21 }, { a: 'oslo', b: 'athina', pts: 26 },
+    { a: 'helsinki', b: 'marseille', pts: 24 }, { a: 'berlin', b: 'bucuresti', pts: 12 }, { a: 'frankfurt', b: 'riga', pts: 13 },
     { a: 'munchen', b: 'sofia', pts: 12 }, { a: 'zurich', b: 'budapest', pts: 10 }, { a: 'roma', b: 'istanbul', pts: 15 },
     { a: 'paris', b: 'moskva', pts: 22 }, { a: 'london', b: 'roma', pts: 17 }, { a: 'kobenhavn', b: 'beograd', pts: 14 },
-    { a: 'warszawa', b: 'athina', pts: 18 }, { a: 'milano', b: 'kyiv', pts: 16 }, { a: 'madrid', b: 'marseille', pts: 8 }
+    { a: 'warszawa', b: 'athina', pts: 18 }, { a: 'milano', b: 'kyiv', pts: 16 }, { a: 'porto', b: 'vilnius', pts: 24 },
+    { a: 'napoli', b: 'hamburg', pts: 17 }, { a: 'madrid', b: 'marseille', pts: 8 }, { a: 'bilbao', b: 'budapest', pts: 15 }
   ];
   var SCORE_BY_LEN = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 10, 6: 15 };
   var START_TRAINS = 30, START_TICKETS = 2, HAND_START = 4, MARKET_SIZE = 5;
