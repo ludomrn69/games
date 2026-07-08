@@ -70,7 +70,7 @@
 
     <div class="screen" id="start">
       <h1>🚗 Mini Motorways</h1>
-      <p>Trace des routes pour relier chaque maison à un bâtiment de <b>même couleur</b>. Les voitures font la navette toutes seules. Chaque semaine tu débloques des <b>ponts</b> 🌉 (traverser l'eau), des <b>autoroutes</b> 🛤️ (rapides), des <b>ronds-points</b> 🔄 et des <b>feux</b> 🚦 (fluidifier les carrefours). Si un bâtiment attend trop longtemps, c'est fini&nbsp;!</p>
+      <p>Relie chaque <b>maison 🏠</b> (toit pointu) à un <b>bâtiment</b> de la <b>même couleur</b> en traçant des routes. Une route posée à côté d'un bâtiment y crée une <b>entrée</b> (le petit bitume) : c'est par là que les voitures entrent et sortent. Un bâtiment cerclé de <b style="color:#e8582c">rouge clignotant</b> n'est relié à <b>aucune</b> route — branche-le vite&nbsp;! Chaque semaine tu débloques <b>ponts</b> 🌉, <b>autoroutes</b> 🛤️, <b>ronds-points</b> 🔄 et <b>feux</b> 🚦. Si un bâtiment sature trop longtemps, c'est fini&nbsp;!</p>
       <button class="btn" id="startBtn">Jouer</button>
       <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#2c7be5,#8b5cf6);box-shadow:0 8px 24px rgba(44,123,229,.4)">🗓️ Défi du jour</button>
       <div id="dailyInfo" style="font-size:.82rem;opacity:.72;max-width:300px"></div>
@@ -409,6 +409,26 @@
     ctx.fillStyle='rgba(255,255,255,.15)';rr(x-s/2,y-s/2,s,s*0.42,r);ctx.fill();// reflet doux
     ctx.restore();
   }
+  // « Par où on rentre » : on branche visuellement chaque bâtiment aux routes
+  // voisines par une petite ENTRÉE (bitume), et on fait pulser un halo rouge sur
+  // ceux qui n'ont AUCUNE route adjacente (= à relier). Renvoie true si branché.
+  function drawDriveways(b){
+    var x=cx(b.c),y=cy(b.r),w=CELL*0.20,connected=false;
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){
+      if(!isRoad(grid[key(b.r+d[0],b.c+d[1])]))return;
+      connected=true;
+      var ex=x+d[1]*CELL*0.5,ey=y+d[0]*CELL*0.5;
+      ctx.lineCap='butt';
+      ctx.strokeStyle=dark()?'#12151a':'#b3b9ac';ctx.lineWidth=w+5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.strokeStyle=dark()?'#39404a':'#f8f5ec';ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ex,ey);ctx.stroke();
+    });
+    if(!connected){
+      var pulse=(0.55+0.45*Math.sin(Date.now()/280)).toFixed(2);
+      ctx.strokeStyle='rgba(232,88,44,'+pulse+')';ctx.lineWidth=2.6;ctx.setLineDash([CELL*0.13,CELL*0.09]);
+      ctx.beginPath();ctx.arc(x,y,CELL*0.52,0,7);ctx.stroke();ctx.setLineDash([]);
+    }
+    return connected;
+  }
   function draw(){
     ctx.clearRect(0,0,W,H);
     // terrain : zones d'herbe plus foncée puis plans d'EAU avec plage (côtes organiques)
@@ -433,10 +453,18 @@
     overlayLayer('bridge',th,dark()?'#05070a':'#7c8178',dark()?'#39404a':'#f8f5ec');
     // ronds-points & feux placés par le joueur
     drawFeatures();
-    // maisons : petit bâtiment coloré arrondi (sources)
-    houses.forEach(function(h){drawBox(cx(h.c),cy(h.r),CELL*0.42,h.color,CELL*0.1);});
-    // usines : bâtiment coloré nettement plus GRAND + file de « voitures » en attente
+    // maisons (sources) : petite maison colorée avec un TOIT en pointe (repère
+    // visuel « départ ») + entrées vers les routes voisines.
+    houses.forEach(function(h){var x=cx(h.c),y=cy(h.r),s=CELL*0.42;
+      drawDriveways(h);
+      drawBox(x,y,s,h.color,CELL*0.1);
+      ctx.fillStyle=shade(h.color,0.6);ctx.beginPath();
+      ctx.moveTo(x-s*0.6,y-s*0.44);ctx.lineTo(x,y-s*0.9);ctx.lineTo(x+s*0.6,y-s*0.44);ctx.closePath();ctx.fill();
+    });
+    // destinations (arrivées) : bâtiment coloré nettement plus GRAND + file de
+    // « voitures » en attente + entrées vers les routes voisines.
     dests.forEach(function(d){var x=cx(d.c),y=cy(d.r),s=CELL*0.72;
+      drawDriveways(d);
       if(d.over>0){var f=Math.min(1,d.over/OVER_LIMIT);ctx.strokeStyle='#e8582c';ctx.lineWidth=3;
         ctx.beginPath();ctx.arc(x,y,s*0.85,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
       drawBox(x,y,s,d.color,CELL*0.13);
