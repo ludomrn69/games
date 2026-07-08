@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script src="/head.js" data-title="Playus Arena ⚔️" data-emoji="⚔️"></script>
+  <link rel="stylesheet" href="/theme.css" />
+  <link rel="stylesheet" href="/game.css" />
+  <style>
+    #s-playing { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    .ar-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    html[data-theme="dark"] .ar-head { background: rgba(20,16,28,0.97); }
+    .ar-head .t { font-weight: 800; font-size: 0.98rem; } .ar-head .s { font-size: 0.82rem; color: var(--ink-light); font-weight: 700; }
+    .ar-wrap { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 12px; max-width: 560px; margin: 0 auto; width: 100%; }
+    /* Zone du mini-jeu embarqué (iframe) */
+    .ar-frame-box { position: relative; width: 100%; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-hover);
+      background: #241a3c; aspect-ratio: 0.62; max-height: 66vh; }
+    .ar-frame-box iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .ar-play-hint { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); }
+    /* Carte « prochaine manche » */
+    .ar-now { background: radial-gradient(130% 120% at 50% 0, #5a3f8a, #2c1f47); color: #fff; border-radius: 20px; padding: 18px; text-align: center;
+      border: 1px solid rgba(245,199,126,0.3); box-shadow: 0 12px 30px rgba(50,34,78,0.4); }
+    .ar-now .mn { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #d8c9f5; }
+    .ar-now .ge { font-size: 3rem; line-height: 1; margin: 6px 0 2px; } .ar-now .gn { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.3rem; }
+    .ar-now .go { display: inline-block; margin-top: 12px; background: linear-gradient(135deg, #ffb020, #ff7a3d); color: #fff; font-weight: 800;
+      border: none; border-radius: 30px; padding: 12px 30px; font-size: 1.02rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .ar-now .wait { margin-top: 10px; font-size: 0.8rem; color: #d8c9f5; }
+    /* Bandeau étapes (tournoi) */
+    .ar-seq { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .ar-step { font-size: 0.74rem; font-weight: 700; background: var(--white); color: var(--ink-light); border-radius: 30px; padding: 4px 10px; box-shadow: var(--shadow); }
+    .ar-step.done { opacity: 0.55; } .ar-step.now { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; }
+    /* Classement */
+    .ar-board { display: flex; flex-direction: column; gap: 6px; }
+    .ar-row { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); }
+    .ar-row.first { border: 1.5px solid var(--gold); box-shadow: 0 0 0 3px rgba(198,152,90,0.18), var(--shadow); }
+    .ar-row.me { outline: 2px solid var(--terracotta); }
+    .ar-pos { font-weight: 800; width: 22px; } .ar-av { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+    .ar-nm { flex: 1; font-weight: 700; } .ar-sc { font-weight: 800; color: var(--terracotta); font-variant-numeric: tabular-nums; }
+    .ar-sc .pending { color: var(--ink-light); font-weight: 700; }
+    .ar-lastwin { text-align: center; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--terracotta); }
+    .ar-next { display: block; width: 100%; max-width: 320px; margin: 4px auto 0; }
+    .lb-set-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-light); margin-bottom: 8px; text-align: center; }
+    .ar-set-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .ar-set-btn { min-width: 84px; padding: 0.55rem 0.9rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .ar-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .ar-set-hint { text-align: center; font-size: 0.78rem; color: var(--ink-light); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <script src="/common.js"></script>
+
+  <div class="app">
+    <div id="s-home" class="screen active"></div>
+    <div id="s-identity" class="screen"></div>
+    <div id="s-lobby" class="screen"></div>
+
+    <div id="s-playing" class="screen">
+      <div class="ar-head"><span class="t" id="ar-title">⚔️ Playus Arena</span><span class="s" id="ar-sub"></span></div>
+      <div class="ar-wrap" id="ar-wrap"></div>
+    </div>
+
+    <div id="s-results" class="screen">
+      <div class="res-emoji" id="res-emoji">🏆</div>
+      <h2 class="res-title" id="res-title">—</h2>
+      <div class="res-rank" id="res-rank"></div>
+      <button class="btn-primary" id="ar-replay" onclick="handleReplay()">↺ Rejouer</button>
+      <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="lb-toast" id="lb-toast"></div>
+
+  <script>
+    var escapeHtml = window.esc;
+    function rref() { return window.roomRef; }
+    function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
+
+    // Catalogue des mini-jeux tirables (slug → nom + emoji). Doit rester aligné
+    // avec la grille Playus de l'accueil.
+    var GAMES = [
+      { s: 'center-hit', n: 'Center Hit', e: '🎯' }, { s: 'knife-throw', n: 'Knife Throw', e: '🔪' },
+      { s: 'color-reflex', n: 'Color Reflex', e: '🟩' }, { s: 'on-time', n: 'On Time!', e: '⏱️' },
+      { s: 'perfect-shape', n: 'Perfect Shape', e: '🔵' }, { s: 'target-speed', n: 'Target Speed', e: '◎' },
+      { s: 'times-up', n: "Time's up!", e: '⏳' }, { s: 'flap', n: 'Flap', e: '🐤' },
+      { s: 'keep-up', n: 'Keep up!', e: '⚪' }, { s: 'descend', n: 'Descend', e: '🔵' },
+      { s: 'bloopy', n: 'Bloopy', e: '🟪' }, { s: 'bouncy', n: 'Bouncy', e: '🔴' },
+      { s: 'trampbox', n: 'Trampbox', e: '📦' }, { s: 'balldrop', n: 'Balldrop', e: '🌀' },
+      { s: 'ballracer', n: 'Ballracer', e: '🟡' }, { s: 'grid', n: 'Grid', e: '🟦' },
+      { s: 'speed-tap', n: 'Speed Tap', e: '👆' }, { s: 'swipe-fast', n: 'Swipe Fast!', e: '➡️' },
+      { s: 'react', n: 'React!', e: '⚡' }, { s: 'count', n: 'Count!', e: '🔢' },
+      { s: 'call-me', n: 'Call me', e: '🔗' }, { s: 'slicer', n: 'Slicer', e: '🔪' },
+      { s: 'balloon-pop', n: 'Balloon Pop', e: '🎈' }, { s: 'drift', n: 'Drift!', e: '🏎️' },
+      { s: 'zig', n: 'Zig', e: '⚡' }, { s: 'kenneys-race', n: 'Kenneys Race', e: '🏁' },
+      { s: 'tilted', n: 'Tilted', e: '⚖️' }, { s: 'sword-balance', n: 'Sword Balance', e: '⚔️' },
+      { s: 'tower-stack', n: 'Tower Stack', e: '🗼' }, { s: 'ninja-chop', n: 'Ninja Chop', e: '🥷' },
+      { s: 'dangerwall', n: 'Dangerwall', e: '🧊' }, { s: 'astro-glide', n: 'Astro Glide', e: '🚀' },
+      { s: 'jumpy', n: 'Jumpy', e: '🐸' }, { s: 'speedgolf', n: 'Speedgolf', e: '⛳' },
+      { s: 'color-memory', n: 'Color Memory', e: '🎨' }, { s: 'memorizer', n: 'Memorizer', e: '✖️' },
+      { s: 'memory', n: 'Memory', e: '🧠' }, { s: 'balls-cups', n: 'Balls & Cups', e: '🥤' },
+      { s: 'boxguesser', n: 'Boxguesser', e: '📦' }, { s: 'snake', n: 'Snake', e: '🐍' },
+      { s: 'piano', n: 'Piano', e: '🎹' }, { s: 'rhythm', n: 'Rhythm', e: '🥁' }
+    ];
+    var META = {}; GAMES.forEach(function (g) { META[g.s] = g; });
+
+    GameRoom({
+      gameKey: 'arena',
+      name: 'Playus Arena',
+      emoji: '⚔️',
+      tagline: 'Compétition de mini-jeux entre copains',
+      minPlayers: 1,
+      maxPlayers: 8,
+      rules: [
+        'Partie rapide : UN mini-jeu, meilleur score gagne',
+        'Tournoi : une série de mini-jeux, podium à chaque manche (+3 / +2 / +1)',
+        'Chacun joue sa manche sur son téléphone, les scores se synchronisent',
+        'Classement en direct, podium final 🏆'
+      ],
+      lobbyExtraHTML: lobbyExtraHTML,
+      onState: onState,
+      onStart: onStart
+    });
+
+    /* ━━ Réglages du salon (hôte) : mode + nombre de manches ━━ */
+    function lobbyExtraHTML(room) {
+      var isHost = room && room.host === window.myPid;
+      var mode = (room && room.mode) || 'quick';
+      var rounds = (room && room.rounds) || 3;
+      var modeBtns = [['quick', '⚡ Partie rapide'], ['tourney', '🏆 Tournoi']].map(function (m) {
+        return '<button class="ar-set-btn' + (mode === m[0] ? ' active' : '') + '"' + (isHost ? ' onclick="setMode(\'' + m[0] + '\')"' : ' disabled') + '>' + m[1] + '</button>';
+      }).join('');
+      var roundsRow = mode === 'tourney'
+        ? '<div class="lb-set" style="margin-top:12px"><div class="lb-set-label">🎯 Nombre de mini-jeux</div><div class="ar-set-row">' +
+          [3, 5, 7].map(function (n) { return '<button class="ar-set-btn' + (rounds === n ? ' active' : '') + '"' + (isHost ? ' onclick="setRounds(' + n + ')"' : ' disabled') + '>' + n + '</button>'; }).join('') + '</div></div>'
+        : '';
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">Type de partie</div><div class="ar-set-row">' + modeBtns + '</div></div>' +
+        roundsRow + '<div class="ar-set-hint">Les mini-jeux sont tirés au hasard (surprise).</div></div>';
+    }
+    function setMode(m) { if (window.roomRef) window.roomRef.child('mode').set(m); }
+    function setRounds(n) { if (window.roomRef) window.roomRef.child('rounds').set(n); }
+
+    function onStart(players, cur) {
+      var mode = (cur && cur.mode) || 'quick';
+      var count = mode === 'tourney' ? Math.min((cur && cur.rounds) || 3, GAMES.length) : 1;
+      var pool = GAMES.slice();
+      for (var i = pool.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+      var scores = {}; players.forEach(function (p) { scores[p.pid] = 0; });
+      return { mode: mode, seq: pool.slice(0, count).map(function (g) { return g.s; }), idx: 0, scores: scores, sub: {}, awarded: {}, phase: 'play', lastRound: null };
+    }
+
+    /* ━━ Score du mini-jeu embarqué : remonté par postMessage depuis playus-extra.js ━━ */
+    window.addEventListener('message', function (e) {
+      var d = e && e.data; if (!d || d.type !== 'playus-score') return;
+      var st = window.room; if (!st || st.status !== 'playing' || st.phase !== 'play') return;
+      var idx = st.idx || 0, slug = (st.seq || [])[idx];
+      if (d.slug !== slug) return;
+      submitScore(Math.max(0, d.score | 0));
+    });
+
+    function bareme(n) { return n >= 4 ? [3, 2, 1] : (n === 3 ? [3, 1] : [3]); }
+    function submitScore(score) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'play') return cur;
+        var idx = cur.idx || 0, order = cur.order || [];
+        cur.sub = cur.sub || {}; cur.sub[idx] = cur.sub[idx] || {};
+        if (cur.sub[idx][window.myPid] != null) return cur; // déjà soumis
+        cur.sub[idx][window.myPid] = score;
+        // Tout le monde a joué cette manche ? → on crédite le podium.
+        if (order.every(function (p) { return cur.sub[idx][p] != null; }) && !(cur.awarded || {})[idx]) {
+          var ranked = order.slice().sort(function (a, b) { return cur.sub[idx][b] - cur.sub[idx][a]; });
+          var pts = bareme(order.length), podium = [];
+          ranked.slice(0, pts.length).forEach(function (p, i) { cur.scores[p] = (cur.scores[p] || 0) + pts[i]; podium.push({ p: p, sc: cur.sub[idx][p], pts: pts[i] }); });
+          cur.awarded = cur.awarded || {}; cur.awarded[idx] = true;
+          cur.lastRound = { slug: cur.seq[idx], podium: podium, winner: ranked[0] };
+          cur.phase = 'round';
+        }
+        return cur;
+      });
+    }
+    function nextRound() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'round') return cur;
+        cur.idx = (cur.idx || 0) + 1; cur.phase = 'play'; cur.lastRound = null;
+        return cur;
+      });
+    }
+
+    /* ━━ Rendu ━━ */
+    var _frKey = null; // clé de l'iframe en cours (slug#idx) pour ne pas la recharger
+    function onState(snap) {
+      var state = snap.val() || {};
+      if (state.status !== 'playing') return;
+      if (state.seq && (state.idx || 0) >= state.seq.length) { showPodium(state); return; }
+      showScreen('s-playing');
+      render(state);
+    }
+
+    function ranking(state) {
+      var sc = state.scores || {};
+      return (state.order || []).slice().sort(function (a, b) { return (sc[b] || 0) - (sc[a] || 0); });
+    }
+    function boardHTML(state, showRoundScore) {
+      var idx = state.idx || 0, sub = (state.sub || {})[idx] || {};
+      return '<div class="ar-board">' + ranking(state).map(function (pid, i) {
+        var mine = pid === window.myPid;
+        var rs = showRoundScore ? (sub[pid] != null ? sub[pid] : null) : null;
+        var right = showRoundScore
+          ? (sub[pid] != null ? ('manche ' + sub[pid]) : '<span class="pending">⏳ en jeu…</span>')
+          : ((state.scores[pid] || 0) + ' pts');
+        return '<div class="ar-row' + (i === 0 && (state.scores[pid] || 0) > 0 ? ' first' : '') + (mine ? ' me' : '') + '">' +
+          '<span class="ar-pos">' + (i + 1) + '</span>' +
+          '<span class="ar-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="ar-nm">' + escapeHtml(Room.name(pid)) + (mine ? ' (toi)' : '') + '</span>' +
+          '<span class="ar-sc">' + right + '</span></div>';
+      }).join('') + '</div>';
+    }
+    function seqHTML(state) {
+      if ((state.seq || []).length < 2) return '';
+      var idx = state.idx || 0;
+      return '<div class="ar-seq">' + state.seq.map(function (s, i) {
+        var m = META[s] || { e: '🎲', n: s };
+        return '<span class="ar-step' + (i < idx ? ' done' : i === idx ? ' now' : '') + '">' + m.e + '</span>';
+      }).join('') + '</div>';
+    }
+
+    function render(state) {
+      var wrap = document.getElementById('ar-wrap');
+      var idx = state.idx || 0, seq = state.seq || [], slug = seq[idx], g = META[slug] || { e: '🎲', n: slug };
+      var total = seq.length, isTourney = state.mode === 'tourney';
+      setText('ar-sub', isTourney ? ('Manche ' + (idx + 1) + ' / ' + total) : 'Partie rapide');
+      var mySub = ((state.sub || {})[idx] || {})[window.myPid];
+
+      // 1) Phase JEU et je n'ai pas encore joué ma manche → mini-jeu embarqué.
+      if (state.phase === 'play' && mySub == null) {
+        var key = slug + '#' + idx;
+        if (_frKey !== key) {
+          _frKey = key;
+          wrap.innerHTML =
+            '<div class="ar-play-hint">' + g.e + ' ' + escapeHtml(g.n) + ' — joue ta manche !</div>' +
+            '<div class="ar-frame-box"><iframe id="ar-frame" src="/games/playus/' + slug + '.html?embed=1" title="' + escapeHtml(g.n) + '" allow="autoplay"></iframe></div>' +
+            seqHTML(state) +
+            '<div id="ar-livewrap"></div>';
+        }
+        // Le classement « en direct » se met à jour sans recharger l'iframe.
+        var live = document.getElementById('ar-livewrap');
+        if (live) live.innerHTML = boardHTML(state, true);
+        return;
+      }
+      _frKey = null; // on quitte l'iframe
+
+      // 2) J'ai joué mais on attend les autres.
+      if (state.phase === 'play') {
+        wrap.innerHTML = '<div class="ar-now"><div class="mn">Ta manche est jouée</div><div class="ge">' + g.e + '</div><div class="gn">' + escapeHtml(g.n) + '</div>' +
+          '<div class="wait">Score : <b>' + mySub + '</b> — on attend les autres joueurs…</div></div>' +
+          seqHTML(state) + boardHTML(state, true);
+        return;
+      }
+
+      // 3) Résultat de la manche.
+      if (state.phase === 'round' && state.lastRound) {
+        var MED = ['🥇', '🥈', '🥉'];
+        var detail = (state.lastRound.podium || []).map(function (e, i) { return (MED[i] || '') + ' <b>' + escapeHtml(Room.name(e.p)) + '</b> (' + e.sc + ') +' + e.pts; }).join(' · ');
+        var last = idx >= total - 1;
+        wrap.innerHTML =
+          '<div class="ar-lastwin">' + g.e + ' ' + escapeHtml(g.n) + ' — ' + detail + '</div>' +
+          seqHTML(state) + boardHTML(state, false) +
+          '<button class="btn-primary ar-next" onclick="nextRound()">' + (last ? '🏁 Voir le podium' : 'Manche suivante ▶') + '</button>';
+        return;
+      }
+    }
+
+    var _podiumFx = false;
+    function showPodium(state) {
+      showScreen('s-results');
+      var rank = ranking(state), w = rank[0];
+      setText('res-emoji', w === window.myPid ? '🏆' : '🎉');
+      setText('res-title', w === window.myPid ? 'Tu gagnes la partie ! 🏆' : (rank.length > 1 ? Room.name(w) + ' gagne !' : 'Terminé'));
+      setHTML('res-rank', rank.map(function (pid, i) {
+        return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
+          '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-sc">' + (state.scores[pid] || 0) + ' pts</span></div>';
+      }).join(''));
+      var rb = document.getElementById('ar-replay'); if (rb) rb.style.display = (state.host === window.myPid || rank.length <= 1) ? '' : 'none';
+      if (!_podiumFx) { _podiumFx = true; if (window.Sfx) Sfx.play(w === window.myPid ? 'big' : 'win'); }
+    }
+    function handleReplay() { _podiumFx = false; _frKey = null; Lobby.resetToLobby([]); }
+  </script>
+</body>
+</html>
