@@ -56,6 +56,17 @@
     .lp-dice { font-size: 2.4rem; min-height: 44px; }
     .lp-event { background: var(--white); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); max-width: 360px; margin: 8px auto; }
     .lp-event-title { font-weight: 800; font-size: 1.05rem; margin-bottom: 4px; } .lp-event-sub { font-size: 0.85rem; color: var(--ink-light); }
+    /* Carte d'affaire « posée sur la table » : elle s'affiche quand on tombe sur 🤝. */
+    .lp-deal-card { background: linear-gradient(160deg, #fffaf0, #fdeecf); border: 2px solid var(--gold); border-radius: 18px;
+      padding: 14px 16px 16px; box-shadow: 0 10px 26px rgba(44,37,32,0.22); max-width: 300px; margin: 10px auto; text-align: center;
+      animation: fxPopIn 0.3s cubic-bezier(0.34,1.4,0.64,1) both; }
+    html[data-theme="dark"] .lp-deal-card { background: linear-gradient(160deg, #2a2331, #37223a); border-color: var(--gold); color: #f3e9d8; }
+    .lp-deal-tag { display: inline-block; font-size: 0.68rem; font-weight: 900; letter-spacing: 1px; color: #fff; background: linear-gradient(135deg, var(--terracotta), var(--gold)); border-radius: 20px; padding: 3px 12px; }
+    .lp-deal-emoji { font-size: 3.4rem; line-height: 1; margin: 8px 0 4px; }
+    .lp-deal-name { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.15rem; margin-bottom: 6px; }
+    .lp-deal-price { font-size: 0.95rem; } .lp-deal-price b { color: var(--terracotta); }
+    .lp-deal-sub { font-size: 0.82rem; color: var(--ink-light); margin-top: 3px; }
+    html[data-theme="dark"] .lp-deal-sub { color: #b8ab98; }
     .lp-btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
     .lp-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.6rem 1.4rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
     .lp-btn.go { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border: none; }
@@ -157,6 +168,18 @@
       return d;
     })();
     var EV_LABEL = { start: 'Début du mois', rien: 'Journée tranquille', mail: 'Courrier 📬', deal: 'Une affaire à saisir', lottery: 'Loterie 🎲', sweet: 'Coup de chance', rough: 'Coup dur', pay: 'Jour de Paye 💰' };
+    // Objets d'occasion (création propre) : une AFFAIRE = un objet chiné qu'on
+    // rachète pour le revendre plus cher au Jour de Paye. La carte s'affiche à
+    // l'écran (comme sur une vraie table de jeu).
+    var DEAL_ITEMS = [
+      { n: 'Vieux vélo de course', e: '🚲' }, { n: 'Collection de vinyles', e: '💿' },
+      { n: 'Montre ancienne', e: '⌚' }, { n: 'Commode chinée', e: '🗄️' },
+      { n: 'Tableau de brocante', e: '🖼️' }, { n: 'Console rétro', e: '🕹️' },
+      { n: 'Appareil photo argentique', e: '📷' }, { n: 'Tapis fait main', e: '🧶' },
+      { n: 'Trottinette électrique', e: '🛴' }, { n: 'Guitare vintage', e: '🎸' },
+      { n: 'Service en porcelaine', e: '🍽️' }, { n: 'Lot de BD rares', e: '📚' },
+      { n: 'Ampli hi-fi', e: '🔊' }, { n: 'Ancienne mobylette', e: '🛵' }
+    ];
 
     /* ━━ Enregistrement ━━ */
     var prevStatus = null;
@@ -223,7 +246,7 @@
     function payday(cur, pid) {
       var P = L(cur, pid);
       // Revente des affaires : prix au DÉ (de ~1,05× à ~2,3× le coût d'achat).
-      var dealRev = 0; (P.deals || []).forEach(function (cost) { dealRev += Math.round(cost * (0.8 + rnd(1, 6) * 0.25)); }); P.deals = [];
+      var dealRev = 0; (P.deals || []).forEach(function (dd) { var cost = (typeof dd === 'number') ? dd : dd.cost; dealRev += Math.round(cost * (0.8 + rnd(1, 6) * 0.25)); }); P.deals = [];
       var bills = (P.bills || []).reduce(function (a, b) { return a + b; }, 0); P.bills = []; // TOUTES les factures du mois
       var loanInt = Math.round(P.debt * 0.1);             // 10 % d'intérêts sur la dette
       var saveInt = Math.round((P.savings || 0) * 0.05);   // l'épargne rapporte 5 %
@@ -253,7 +276,7 @@
         else { var g = rnd(100, 400); P.cash += g; cur.banner = '📬 ' + Room.name(pid) + ' reçoit un chèque de ' + g + ' €'; }
         nextTurn(cur, pid);
       }
-      else if (ev.t === 'deal') { var cost = rnd(300, 800); cur.pendingDeal = { cost: cost }; cur.phase = 'deal'; cur.banner = '🤝 ' + Room.name(pid) + ' : affaire à ' + cost + ' € — revendable au Jour de Paye'; }
+      else if (ev.t === 'deal') { var item = DEAL_ITEMS[Math.floor(Math.random() * DEAL_ITEMS.length)]; var cost = rnd(300, 800); cur.pendingDeal = { name: item.n, emoji: item.e, cost: cost }; cur.phase = 'deal'; cur.banner = '🤝 ' + Room.name(pid) + ' tombe sur une affaire : ' + item.e + ' ' + item.n; }
       else if (ev.t === 'lottery') { if (P.cash >= 200) { pay(P, 200); if (rnd(1, 6) === 6) { P.cash += 1000; cur.banner = '🎲 ' + Room.name(pid) + ' GAGNE 1000 € à la loterie !'; } else cur.banner = '🎲 ' + Room.name(pid) + ' joue 200 €… perdu'; } else cur.banner = Room.name(pid) + ' ne peut pas jouer à la loterie'; nextTurn(cur, pid); }
       else if (ev.t === 'sweet') { var s = rnd(150, 500); P.cash += s; cur.banner = '😊 ' + Room.name(pid) + ' : coup de chance +' + s + ' €'; nextTurn(cur, pid); }
       else if (ev.t === 'rough') { var rb = rnd(200, 400); P.bills = (P.bills || []).concat([rb]); cur.banner = '😟 ' + Room.name(pid) + ' : coup dur — facture de ' + rb + ' €'; nextTurn(cur, pid); }
@@ -263,7 +286,7 @@
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'deal' || cur.turn !== pid) return cur;
         var P = L(cur, pid), d = cur.pendingDeal || { cost: 0 };
-        if (buy) { pay(P, d.cost); P.deals = (P.deals || []).concat([d.cost]); cur.banner = '🤝 ' + Room.name(pid) + ' achète l\'affaire (' + d.cost + ' €) — à revendre à la paye'; }
+        if (buy) { pay(P, d.cost); P.deals = (P.deals || []).concat([{ name: d.name, emoji: d.emoji, cost: d.cost }]); cur.banner = '🤝 ' + Room.name(pid) + ' achète ' + (d.emoji || '') + ' ' + (d.name || 'l\'affaire') + ' (' + d.cost + ' €) — à revendre à la paye'; }
         else cur.banner = Room.name(pid) + ' passe l\'affaire';
         cur.pendingDeal = null; cur.phase = 'roll';
         nextTurn(cur, pid);
@@ -348,7 +371,13 @@
       if (!myTurn) { stage.innerHTML = '<div class="lp-wait">⏳ Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>'; return; }
       if (state.phase === 'deal') {
         var d = state.pendingDeal || {};
-        stage.innerHTML = '<div class="lp-event"><div class="lp-event-title">🤝 Affaire</div><div class="lp-event-sub">Coût : <b>' + d.cost + ' €</b> · tu la revends au <b>Jour de Paye</b> (gain au dé, ~1 à 2×).</div>' +
+        var loRev = Math.round((d.cost || 0) * 1.05), hiRev = Math.round((d.cost || 0) * 2.3);
+        stage.innerHTML = '<div class="lp-deal-card">' +
+          '<div class="lp-deal-tag">🤝 AFFAIRE</div>' +
+          '<div class="lp-deal-emoji">' + (d.emoji || '🤝') + '</div>' +
+          '<div class="lp-deal-name">' + escapeHtml(d.name || 'Affaire') + '</div>' +
+          '<div class="lp-deal-price">Prix d\'achat : <b>' + d.cost + ' €</b></div>' +
+          '<div class="lp-deal-sub">Revente au Jour de Paye 💰 : <b>' + loRev + '–' + hiRev + ' €</b> (au dé)</div>' +
           '<div class="lp-btn-row"><button class="lp-btn go" onclick="decideDeal(\'' + me + '\',true)">Acheter</button><button class="lp-btn" onclick="decideDeal(\'' + me + '\',false)">Passer</button></div></div>';
       } else {
         var P = L(state, me);
