@@ -21,7 +21,7 @@
     .so-opp.done { box-shadow: 0 0 0 2px var(--sage), var(--shadow); }
     .so-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--terracotta); min-height: 22px; padding: 2px 12px; }
 
-    .so-board { flex: 1; padding: 6px 8px 20px; max-width: 620px; margin: 0 auto; width: 100%; }
+    .so-board { flex: 0 0 auto; padding: 6px 8px 20px; max-width: 620px; margin: 0 auto; width: 100%; }
     .so-top { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 12px; }
     .so-tab { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; align-items: start; }
     .so-col { position: relative; min-height: 70px; }
@@ -311,7 +311,7 @@
       if (!g) return;
       // haut : pioche, défausse, 4 familles
       var top = '';
-      top += g.stock.length ? '<div class="so-card down" onclick="drawStock()"><span class="rk">🂠</span></div>' : '<div class="so-slot" onclick="drawStock()">↺</div>';
+      top += g.stock.length ? '<div class="so-card down" onclick="drawStock()"></div>' : '<div class="so-slot" onclick="drawStock()">↺</div>';
       var wsel = sel && sel.from === 'waste' ? ' sel' : '';
       top += g.waste.length ? cardHTML(g.waste[g.waste.length - 1], wsel, 'tapWaste()') : '<div class="so-slot"></div>';
       top += '<div class="so-slot"></div>'; // espace

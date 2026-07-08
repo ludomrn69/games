@@ -184,3 +184,19 @@ body {
   12% { transform: translateY(-4vh) scale(1.15) rotate(-6deg); opacity: 1; }
   100% { transform: translateY(-46vh) scale(1) rotate(7deg); opacity: 0; }
 }
+
+/* ══ EN-TÊTES DE JEU COLLANTS SUR MOBILE ══════════════════════════════════════
+   Beaucoup de pages posent un bandeau collant `.<xx>-header` en grille
+   `minmax(0,1fr) auto minmax(0,1fr)` (tour · scores · actions). Sur écran
+   étroit le texte se chevauchait. Le sélecteur `div[class$="-header"]` (0,1,1)
+   passe DEVANT le `.xx-header` inline de la page (0,1,0) sans !important, et
+   réduit typo/gaps pour que tour, scores et boutons tiennent sur une ligne. */
+@media (max-width: 600px) {
+  div[class$="-header"] { gap: 6px; padding: 7px 10px; }
+  div[class$="-header"] > span[class$="-turn"] { font-size: 0.85rem; }
+  div[class$="-header"] > span[class$="-scores"] { font-size: 0.8rem; min-width: 0; overflow: hidden; }
+}
+@media (max-width: 380px) {
+  div[class$="-header"] > span[class$="-turn"] { font-size: 0.78rem; }
+  div[class$="-header"] > span[class$="-scores"] { font-size: 0.72rem; }
+}

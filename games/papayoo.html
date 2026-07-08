@@ -35,6 +35,7 @@
     /* Sur le tapis (feutre), les étiquettes passent en clair. */
     .pa-trick-wrap.felt .pa-trick-empty, .pa-trick-wrap.felt .pa-trick-who { color: rgba(255,255,255,0.78); }
     .pa-trick-card { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .pa-trick-past { opacity: 0.72; }
     .pa-trick-who { font-size: 0.66rem; color: var(--ink-light); max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .card { width: 50px; height: 72px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0; position: relative; }
@@ -432,11 +433,23 @@
         var winNow = trick.length ? trickWinner(trick, state.ledSuit) : null;
         var grew = window._paTrickLen !== undefined && trick.length > window._paTrickLen;
         window._paTrickLen = trick.length;
-        setHTML('pa-trick', trick.length ? trick.map(function (t, i) {
-          var fresh = grew && i === trick.length - 1; // dernière carte posée sur le pli
-          return '<div class="pa-trick-card' + (fresh ? ' card-in' : '') + '">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
-            '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
-        }).join('') : '<span class="pa-trick-empty">— en attente —</span>');
+        if (trick.length) {
+          setHTML('pa-trick', trick.map(function (t, i) {
+            var fresh = grew && i === trick.length - 1; // dernière carte posée sur le pli
+            return '<div class="pa-trick-card' + (fresh ? ' card-in' : '') + '">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
+              '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
+          }).join(''));
+        } else if (state.lastTrick && state.lastTrick.length) {
+          // Entre deux plis : on GARDE le pli qui vient d'être ramassé bien visible
+          // (façon vrai jeu de cartes) — chiffres lisibles + qui a ramassé.
+          var lastWin = trickWinner(state.lastTrick, suitOf(state.lastTrick[0].card));
+          setHTML('pa-trick', state.lastTrick.map(function (t) {
+            return '<div class="pa-trick-card pa-trick-past">' + cardHTML(t.card, state.papSuit, (t.by === lastWin) ? ' win' : '') +
+              '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + (t.by === lastWin ? ' ✋' : '') + '</span></div>';
+          }).join(''));
+        } else {
+          setHTML('pa-trick', '<span class="pa-trick-empty">— en attente —</span>');
+        }
       }
 
       // Ma main

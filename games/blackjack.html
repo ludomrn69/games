@@ -11,7 +11,7 @@
     html { scroll-behavior: smooth; }
 
     #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: stretch; }
-    .bj-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    .bj-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
     html[data-theme="dark"] .bj-header { background: rgba(20,16,28,0.97); }
     .bj-phase { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; }
     .bj-title { justify-self: center; font-family: 'Playfair Display', serif; font-weight: 800; }

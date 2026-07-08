@@ -19,6 +19,7 @@
     .sn-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 6px 12px 4px; }
     .sn-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 600; border: 2px solid transparent; }
     .sn-opp.picked { border-color: var(--sage); }
+    .sn-opp-me { box-shadow: 0 0 0 2px var(--gold), var(--shadow); }
     .sn-opp-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
     .sn-opp .pen { color: var(--terracotta); font-weight: 800; }
     .sn-opp .ok { color: var(--sage); font-weight: 800; }
@@ -340,18 +341,20 @@
       var order = state.order || [], me = window.myPid;
       setHTML('sn-info', 'Donne ' + (state.deal || 1) + ' · seuil ' + (state.target || 66) + ' têtes · manche : tête de bœuf = pénalité');
 
-      // Adversaires
-      setHTML('sn-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+      // Moi + adversaires : on affiche AUSSI mon propre total de têtes (avant, on ne
+      // voyait que celui des autres) — chip « Toi » mis en avant en tête de liste.
+      function chip(pid, isMe) {
         var hasPicked = state.picks && (pid in state.picks);
         // Têtes ramassées PENDANT la manche en cours (remis à 0 à chaque manche) :
         // affichées en direct à côté du total, pour suivre qui prend cher ce tour-ci.
         var rh = headsOf(state, pid);
-        return '<div class="sn-opp' + (hasPicked ? ' picked' : '') + '">' +
+        return '<div class="sn-opp' + (isMe ? ' sn-opp-me' : '') + (hasPicked ? ' picked' : '') + '">' +
           '<span class="sn-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
+          (isMe ? 'Toi' : escapeHtml(Room.name(pid))) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
           (rh > 0 ? ' <span class="sn-row-heads">+' + rh + '🐮</span>' : '') +
           (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✓</span>' : ' …') : '') + '</div>';
-      }).join(''));
+      }
+      setHTML('sn-opps', chip(me, true) + order.filter(function (p) { return p !== me; }).map(function (pid) { return chip(pid, false); }).join(''));
       setText('sn-banner', state.banner || '');
 
       // Cartes révélées de la manche : on montre ce que CHACUN a joué pendant la
