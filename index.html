@@ -141,19 +141,6 @@
       </div>
       <button class="pc-btn" id="pc-btn" hidden onclick="preparePlane()">Préparer</button>
     </div>
-
-    <!-- Encart « installer l'appli » : bouton natif (Android/Chrome via
-         beforeinstallprompt) ou astuce iOS (Partager → Sur l'écran d'accueil).
-         Masqué si déjà installé ou si l'utilisateur l'a fermé. -->
-    <div class="plane-check" id="install-check" hidden>
-      <span class="pc-icon">📲</span>
-      <div class="pc-text">
-        <div class="pc-title">Installer l'appli</div>
-        <div class="pc-sub" id="install-sub">Sur ton écran d'accueil : plein écran, lancement direct, hors-ligne.</div>
-      </div>
-      <button class="pc-btn" id="install-btn" hidden>Installer</button>
-      <button class="s-clear" id="install-close" type="button" aria-label="Ne plus proposer" style="display:block;position:static;transform:none">✕</button>
-    </div>
   </div>
 
   <div class="lb-toast" id="lb-toast"></div>
@@ -498,43 +485,6 @@
       };
 
       ask('CACHE_STATUS').then(render);
-    })();
-
-    // ── Encart « installer l'appli » (PWA) ────────────────────────────────────
-    // Android/Chrome : on capte beforeinstallprompt et on propose un vrai bouton.
-    // iOS Safari : pas d'API → petite astuce « Partager → Sur l'écran d'accueil ».
-    // Jamais montré si déjà installé (standalone) ou si l'utilisateur a fermé.
-    (function installPrompt() {
-      var box = document.getElementById('install-check');
-      var btn = document.getElementById('install-btn');
-      var sub = document.getElementById('install-sub');
-      var close = document.getElementById('install-close');
-      if (!box) return;
-      var DISMISS_KEY = 'games.installDismissed';
-      function dismissed() { try { return localStorage.getItem(DISMISS_KEY) === '1'; } catch (e) { return false; } }
-      var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-      if (standalone || dismissed()) return;
-      if (close) close.onclick = function () { box.hidden = true; try { localStorage.setItem(DISMISS_KEY, '1'); } catch (e) {} };
-
-      var deferred = null;
-      window.addEventListener('beforeinstallprompt', function (e) {
-        e.preventDefault();
-        deferred = e;
-        box.hidden = false; btn.hidden = false;
-        btn.onclick = function () {
-          btn.disabled = true;
-          deferred.prompt();
-          deferred.userChoice.then(function () { box.hidden = true; deferred = null; });
-        };
-      });
-
-      // iOS (Safari) : pas de beforeinstallprompt — on affiche l'astuce.
-      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      if (isIOS) {
-        box.hidden = false; btn.hidden = true;
-        sub.innerHTML = 'Dans Safari : <b>Partager</b> <span aria-hidden="true">⎋</span> puis <b>« Sur l\'écran d\'accueil »</b> — plein écran et hors-ligne.';
-      }
     })();
   </script>
 </body>
