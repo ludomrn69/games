@@ -35,3 +35,5 @@ jobs:
         run: node tools/bench-playus.js
       - name: "Aventuriers du Rail (moteur : plus long chemin, scoring, parties complètes)"
         run: node tools/bench-aventuriers.js
+      - name: "OpenFront (IA : terminaison, « difficile » écrase « facile », robustesse)"
+        run: node tools/bench-openfront.js

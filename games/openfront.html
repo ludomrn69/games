@@ -698,10 +698,14 @@ function aiThink(p,dt){
   p.aiCd-=dt;if(p.aiCd>0)return;
   p.aiCd=1.1+rng()*1.4;
   if(!p.alive)return;
-  // arbitrage troupes/or : bascule sur les troupes quand on est attaqué (défense)
+  // niveau : 0 (facile) .. 1 (difficile) — pilote l'EFFICACITÉ, pas l'agressivité
+  var skill=DIFF==='hard'?1:DIFF==='easy'?0:0.6;
   var underAtk=false;for(var ua=0;ua<attacks.length;ua++){if(!attacks[ua].dead&&attacks[ua].tgt===p.id){underAtk=true;break;}}
+  var losing=p.prevTiles>0 && p.tiles<p.prevTiles*0.9; p.prevTiles=p.tiles;
   p.ratio=underAtk?0.82:(p.perso==='defensive'?0.5:p.perso==='aggressive'?0.72:0.6);
-  var diffMul=DIFF==='hard'?1.35:DIFF==='easy'?0.6:1;
+  // les IA faibles agissent moins souvent → grossissent plus lentement
+  if(rng()>0.45+0.55*skill)return;
+  var diffMul=0.6+0.75*skill;
   var persoAgg={aggressive:1.4,defensive:0.5,expansionist:0.7,opportunist:1.0,balanced:0.9}[p.perso]*diffMul;
 
   // voisins (via matrice touch)
@@ -709,7 +713,7 @@ function aiThink(p,dt){
     if(touch[p.id]&&touch[p.id][q])neigh.push(players[q]);}
 
   // --- Dépenses (or) ---
-  aiSpend(p,neigh,persoAgg);
+  aiSpend(p,neigh,persoAgg,skill);
 
   // --- Diplomatie : demander alliance à un voisin fort si menacé ---
   var strongest=null;for(var s=0;s<neigh.length;s++)if(!strongest||neigh[s].tiles>strongest.tiles)strongest=neigh[s];
@@ -727,41 +731,36 @@ function aiThink(p,dt){
   }
 
   // --- Repli tactique : si on saigne, on consolide et on tente la paix ---
-  var losing=p.prevTiles>0 && p.tiles<p.prevTiles*0.9;
-  p.prevTiles=p.tiles;
   var aggressor=0;for(var ax=0;ax<attacks.length;ax++){var AA=attacks[ax];if(!AA.dead&&AA.tgt===p.id){aggressor=AA.atk;break;}}
   if(underAtk&&losing){
     if(aggressor&&p.perso!=='aggressive'&&!p.allies[aggressor]&&rng()<0.6)requestAlliance(p.id,aggressor);
     return; // on ne lance aucune offensive ce tour-ci (défense/consolidation)
   }
 
-  // --- Expansion / guerre ---
-  var wantWar=rng()<0.15*persoAgg;
+  // --- Expansion / guerre : le NEUTRE (peu cher) d'abord, la guerre avec l'avantage ---
   var neutral=neutralAdjacent(p.id);
-  var send=p.troops*(0.25+0.35*rng());
-  if(p.perso==='expansionist'&&neutral){send*=1.2;}
-  if(neutral&&(!wantWar||p.perso==='defensive'||p.perso==='expansionist')){
-    if(p.troops>armyCap(p)*0.25)launchAttack(p.id,0,send);
-  } else if(neigh.length){
-    // cible : voisin non-allié le plus faible (densité de troupes)
+  var reserve=armyCap(p)*(0.32-0.18*skill);           // « difficile » engage plus tôt
+  var send=p.troops*(0.28+0.32*rng())*(0.7+0.5*skill);
+  if(p.perso==='expansionist')send*=1.15;
+  var forceWar=p.perso==='aggressive'&&rng()<0.4*(0.5+skill);
+  var didAttack=false;
+  if(neutral&&p.troops>reserve&&!forceWar){launchAttack(p.id,0,send);didAttack=true;}
+  if(!didAttack&&neigh.length){
     var target=null,tb=1e9;
     for(var n=0;n<neigh.length;n++){var e=neigh[n];if(p.allies[e.id])continue;
       var dens=e.troops/Math.max(1,e.tiles)+e.tiles*0.4;if(dens<tb){tb=dens;target=e;}}
     // coalition : viser le leader en priorité s'il est voisin, non-allié et bien plus gros
-    if(leaderId&&leaderId!==p.id&&touch[p.id]&&touch[p.id][leaderId]&&!p.allies[leaderId]&&players[leaderId].tiles>p.tiles*1.25&&rng()<0.6){
-      target=players[leaderId];
-    }
+    if(leaderId&&leaderId!==p.id&&touch[p.id]&&touch[p.id][leaderId]&&!p.allies[leaderId]&&players[leaderId].tiles>p.tiles*1.25&&rng()<0.6)target=players[leaderId];
     // focus-fire : on s'acharne sur la même cible tant qu'elle vit et reste voisine
-    if(p.focus&&players[p.focus]&&players[p.focus].alive&&touch[p.id]&&touch[p.id][p.focus]&&!p.allies[p.focus]&&rng()<0.7){
-      target=players[p.focus];
-    }
+    if(p.focus&&players[p.focus]&&players[p.focus].alive&&touch[p.id]&&touch[p.id][p.focus]&&!p.allies[p.focus]&&rng()<0.7)target=players[p.focus];
     if(target)p.focus=target.id;
-    if(target&&p.troops>target.troops*0.6*(2-persoAgg)&&p.troops>armyCap(p)*0.3){
+    var warNeed=(1.25-0.55*skill)-Math.max(0,persoAgg-0.9)*0.22;
+    if(target&&p.troops>target.troops*warNeed&&p.troops>reserve){
       p.war[target.id]=1;target.war[p.id]=1;
       if(p.allies[target.id]){breakAlliance(p.id,target.id,true);}
       launchAttack(p.id,target.id,p.troops*(0.4+0.3*rng()),{x:centroid[target.id]?centroid[target.id].x:target.seed%MW,y:centroid[target.id]?centroid[target.id].y:(target.seed/MW|0)});
       if(target.id===ME)warnInvasion(p);
-    } else if(neutral){launchAttack(p.id,0,send);}
+    } else if(neutral&&p.troops>reserve){launchAttack(p.id,0,send);}
   }
 
   // --- Bateaux : coloniser une île / attaquer outre-mer ---
@@ -770,12 +769,13 @@ function aiThink(p,dt){
     if(from>=0){var tgt=findOverseasTarget(p.id,from);if(tgt>=0)launchBoat(p.id,from,tgt,p.troops*0.3);}
   }
 }
-function aiSpend(p,neigh,agg){
+function aiSpend(p,neigh,agg,skill){
+  skill=skill==null?0.6:skill;
   var underAttack=false;for(var a=0;a<attacks.length;a++){if(!attacks[a].dead&&attacks[a].tgt===p.id){underAttack=true;break;}}
   var coast=hasCoast(p.id);
-  // priorités : défense si attaqué, ville si riche, port si côtier sans port, silo/nuke si grand
+  // priorités : défense si attaqué, ville si riche (les fortes IA investissent plus), port, silo/nuke si grand
   if(underAttack&&p.gold>=2000&&rng()<0.7){placeAIStruct(p,'defense');}
-  else if(p.gold>=5000&&p.tiles>40&&rng()<0.6){placeAIStruct(p,'city');}
+  else if(p.gold>=5000&&p.tiles>35&&rng()<0.3+0.5*skill){placeAIStruct(p,'city');}
   if(coast&&p.ports===0&&p.gold>=4000){placeAIStruct(p,'port');}
   if(p.tiles>90&&p.silos===0&&p.gold>=9000&&rng()<0.5){placeAIStruct(p,'silo');}
   if(p.sams===0&&p.tiles>110&&p.gold>=7000&&rng()<0.4){placeAIStruct(p,'sam');}
