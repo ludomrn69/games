@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>OpenFront 🗺️</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>" />
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#eaeaf0;overflow:hidden;user-select:none;
+    background:#0c1018;display:flex;flex-direction:column;align-items:center;touch-action:none}
+  :root[data-theme="light"] body,body.light{color:#20242c}
+  #stage{position:fixed;inset:0;width:100%;height:100%}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+
+  /* ── HUD haut ─────────────────────────────────────────────── */
+  .top{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;padding:8px 10px;
+    z-index:6;pointer-events:none;background:linear-gradient(rgba(6,9,15,.72),rgba(6,9,15,0))}
+  .top>*{pointer-events:auto}
+  .back{color:#eaeaf0;text-decoration:none;font-size:1.7rem;line-height:1;opacity:.85;padding:2px 6px}
+  .stat{background:rgba(18,22,32,.82);border:1px solid rgba(255,255,255,.08);border-radius:12px;
+    padding:5px 10px;display:flex;flex-direction:column;line-height:1.05;min-width:64px}
+  .stat .n{font-size:1.05rem;font-weight:800;white-space:nowrap}
+  .stat .l{font-size:.56rem;text-transform:uppercase;letter-spacing:.7px;opacity:.6;font-weight:700}
+  .grow{flex:1}
+  .iconbtn{border:none;background:rgba(18,22,32,.82);border:1px solid rgba(255,255,255,.08);color:#eaeaf0;
+    width:42px;height:42px;border-radius:12px;font-size:1.15rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .iconbtn:active{transform:scale(.94)}
+  .iconbtn.on{background:#2c7be5;border-color:#2c7be5}
+
+  /* ── Barre du bas (construire / actions) ──────────────────── */
+  .bottom{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;flex-direction:column;gap:8px;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));pointer-events:none}
+  .bottom>*{pointer-events:auto}
+  .sliders{display:flex;gap:10px;align-items:center;background:rgba(18,22,32,.82);border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;padding:8px 12px}
+  .sl{flex:1;display:flex;flex-direction:column;gap:2px}
+  .sl label{font-size:.6rem;text-transform:uppercase;letter-spacing:.6px;opacity:.7;font-weight:700;display:flex;justify-content:space-between}
+  .sl input[type=range]{width:100%;accent-color:#2c7be5;height:20px}
+  .dock{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .dock::-webkit-scrollbar{display:none}
+  .build{flex:0 0 auto;min-width:62px;border:1px solid rgba(255,255,255,.1);background:rgba(18,22,32,.85);color:#eaeaf0;
+    border-radius:13px;padding:7px 8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .build:active{transform:scale(.95)}
+  .build.sel{border-color:#f2b705;background:rgba(60,50,15,.9)}
+  .build.lock{opacity:.4}
+  .build .e{font-size:1.3rem;line-height:1}
+  .build .t{font-size:.6rem;font-weight:700;white-space:nowrap}
+  .build .c{font-size:.58rem;opacity:.8;font-weight:700;color:#f2c94c;white-space:nowrap}
+
+  /* ── Panneaux (leaderboard / diplo) ───────────────────────── */
+  .panel{position:fixed;top:58px;right:10px;width:min(300px,86vw);max-height:70vh;overflow-y:auto;z-index:8;
+    background:rgba(16,20,29,.96);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:12px 12px 14px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55)}
+  .panel.hidden{display:none}
+  .panel h3{font-size:.95rem;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+  .panel h3 button{background:none;border:none;color:#eaeaf0;font-size:1.1rem;cursor:pointer;opacity:.6}
+  .lbrow{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:9px;font-size:.85rem}
+  .lbrow .sw{width:14px;height:14px;border-radius:4px;flex-shrink:0}
+  .lbrow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .lbrow .pc{font-variant-numeric:tabular-nums;opacity:.85;font-weight:700}
+  .lbrow.me{background:rgba(44,123,229,.18)}
+  .tag{font-size:.58rem;padding:1px 5px;border-radius:20px;font-weight:700}
+  .tag.ally{background:#1f7a4d;color:#eaffee}
+  .tag.war{background:#a3352f;color:#ffecec}
+  .tag.dead{background:#333;color:#aaa}
+  .diprow{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.06);font-size:.85rem}
+  .diprow .nm{flex:1;font-weight:600}
+  .dbtn{border:none;border-radius:9px;padding:5px 9px;font-size:.72rem;font-weight:700;cursor:pointer;color:#fff}
+  .dbtn.ally{background:#1f7a4d}.dbtn.break{background:#a3352f}.dbtn.dis{opacity:.4}
+
+  /* ── Toasts (demandes d'alliance, events) ─────────────────── */
+  .toasts{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9;display:flex;flex-direction:column;
+    gap:8px;width:min(360px,92vw);pointer-events:none}
+  .toast{pointer-events:auto;background:rgba(16,20,29,.97);border:1px solid rgba(255,255,255,.12);border-radius:14px;
+    padding:10px 12px;box-shadow:0 12px 34px rgba(0,0,0,.5);font-size:.85rem;animation:pop .25s}
+  @keyframes pop{from{transform:translateY(-8px);opacity:0}}
+  .toast .row{display:flex;gap:8px;margin-top:8px}
+  .toast button{flex:1;border:none;border-radius:9px;padding:7px;font-weight:700;font-size:.8rem;cursor:pointer;color:#fff}
+  .toast .yes{background:#1f7a4d}.toast .no{background:#555}
+  .toast.info{font-size:.8rem;opacity:.96}
+
+  .hint{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:5;font-size:.78rem;font-weight:600;
+    background:rgba(16,20,29,.85);padding:5px 12px;border-radius:20px;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+  .hint.show{opacity:.95}
+
+  /* ── Écrans (start / fin) ─────────────────────────────────── */
+  .screen{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:center;align-items:center;
+    gap:16px;text-align:center;padding:26px;background:radial-gradient(circle at 50% 35%,#182236,#080b12);overflow-y:auto}
+  .screen.hidden{display:none}
+  .screen h1{font-size:2.3rem;font-weight:900;letter-spacing:-1px}
+  .screen h1 .em{font-size:2.6rem}
+  .screen p{max-width:360px;line-height:1.5;opacity:.82;font-size:.92rem}
+  .opt{width:min(360px,92vw);text-align:left}
+  .opt .lab{font-size:.7rem;text-transform:uppercase;letter-spacing:.8px;opacity:.6;font-weight:700;margin:12px 0 6px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:2px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#eaeaf0;border-radius:12px;
+    padding:9px 14px;font-weight:700;font-size:.85rem;cursor:pointer;flex:1;min-width:80px;text-align:center}
+  .chip.sel{border-color:#2c7be5;background:rgba(44,123,229,.22)}
+  .colorpick{display:flex;gap:8px;flex-wrap:wrap}
+  .col{width:38px;height:38px;border-radius:11px;cursor:pointer;border:3px solid transparent}
+  .col.sel{border-color:#fff;box-shadow:0 0 0 2px #2c7be5}
+  .btn{border:none;border-radius:16px;padding:15px 42px;font-size:1.1rem;font-weight:800;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,#2c7be5,#5b9df0);box-shadow:0 10px 30px rgba(44,123,229,.45);font-family:inherit;margin-top:8px}
+  .btn:active{transform:scale(.96)}
+  .big{font-size:3rem;font-weight:900}
+  .win{color:#4fd18b}.lose{color:#f0655a}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+
+<div class="top">
+  <a class="back" href="../index.html" aria-label="Retour">‹</a>
+  <div class="stat"><span class="n" id="sTroops">0</span><span class="l">Troupes</span></div>
+  <div class="stat"><span class="n" id="sGold">0</span><span class="l">Or</span></div>
+  <div class="stat"><span class="n" id="sLand">0%</span><span class="l">Territoire</span></div>
+  <div class="grow"></div>
+  <button class="iconbtn" id="btnDiplo" title="Diplomatie">🤝</button>
+  <button class="iconbtn" id="btnBoard" title="Classement">📊</button>
+  <button class="iconbtn" id="btnPause" title="Pause">⏸</button>
+</div>
+
+<div class="hint" id="hint"></div>
+
+<div class="bottom">
+  <div class="dock" id="dock"></div>
+  <div class="sliders">
+    <div class="sl"><label>Attaque <span id="atkVal">30%</span></label><input type="range" id="atkR" min="5" max="100" value="30"></div>
+    <div class="sl"><label><span id="ratLab">Troupes ⇄ Or</span></label><input type="range" id="ratR" min="10" max="95" value="55"></div>
+  </div>
+</div>
+
+<div class="panel hidden" id="board"><h3>Classement <button id="closeBoard">✕</button></h3><div id="boardList"></div></div>
+<div class="panel hidden" id="diplo"><h3>Diplomatie <button id="closeDiplo">✕</button></h3><div id="diploList"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<div class="screen" id="start">
+  <h1><span class="em">🗺️</span> OpenFront</h1>
+  <p>Conquiers la carte. Peins ton territoire sur le neutre, écrase tes voisins, construis villes, ports, silos et bombes. Le dernier debout gagne.</p>
+  <div class="opt">
+    <div class="lab">Ta couleur</div><div class="colorpick" id="colorPick"></div>
+    <div class="lab">Nombre de nations</div>
+    <div class="chips" id="nationsPick">
+      <div class="chip" data-n="4">4</div><div class="chip sel" data-n="6">6</div><div class="chip" data-n="8">8</div>
+    </div>
+    <div class="lab">Difficulté des IA</div>
+    <div class="chips" id="diffPick">
+      <div class="chip" data-d="easy">Facile</div><div class="chip sel" data-d="normal">Normal</div><div class="chip" data-d="hard">Difficile</div>
+    </div>
+    <div class="lab">Carte</div>
+    <div class="chips" id="mapPick">
+      <div class="chip" data-m="0">Continents</div><div class="chip sel" data-m="1">Archipel</div><div class="chip" data-m="2">Pangée</div>
+    </div>
+  </div>
+  <button class="btn" id="playBtn">Jouer ▶</button>
+</div>
+
+<div class="screen hidden" id="over">
+  <div class="big" id="overTitle"></div>
+  <p id="overMsg"></p>
+  <button class="btn" id="replayBtn">Rejouer</button>
+</div>
+
+<div class="screen hidden" id="paused">
+  <h1>⏸ Pause</h1>
+  <button class="btn" id="resumeBtn">Reprendre</button>
+  <button class="btn" id="quitBtn" style="background:linear-gradient(135deg,#a3352f,#d05a4f)">Abandonner</button>
+</div>
+
+<script>
+(function(){
+"use strict";
+try{if(localStorage.getItem('games-theme')==='light')document.body.classList.add('light');}catch(e){}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CONSTANTES
+// ═══════════════════════════════════════════════════════════════════════════
+var MW=200, MH=125, N=MW*MH;             // grille interne (tuiles)
+var OCEAN=0, LAND=1;                       // terrain
+var TICK=0.1;                             // pas de simulation (s)
+
+// Nations disponibles (couleur + drapeau). Le joueur en choisit une.
+var PALETTE=[
+  {name:'Rougie',   flag:'🔴', rgb:[222,64,64]},
+  {name:'Azuria',   flag:'🔵', rgb:[58,124,224]},
+  {name:'Verdanie', flag:'🟢', rgb:[72,182,96]},
+  {name:'Solenne',  flag:'🟡', rgb:[232,196,58]},
+  {name:'Pourprie', flag:'🟣', rgb:[164,96,214]},
+  {name:'Orangie',  flag:'🟠', rgb:[236,142,52]},
+  {name:'Turquia',  flag:'🩵', rgb:[42,196,196]},
+  {name:'Rosalie',  flag:'🩷', rgb:[232,104,182]}
+];
+var PERSOS=['aggressive','defensive','expansionist','opportunist','balanced'];
+var PERSO_FR={aggressive:'Belliqueuse',defensive:'Défensive',expansionist:'Colonisatrice',opportunist:'Opportuniste',balanced:'Équilibrée'};
+
+// Constructions : coût en OR + emoji + libellé + condition
+var BUILDS=[
+  {k:'city',   e:'🏙️', t:'Ville',    c:5000,  need:'land'},
+  {k:'port',   e:'⚓', t:'Port',     c:4000,  need:'coast'},
+  {k:'defense',e:'🛡️', t:'Défense',  c:2000,  need:'land'},
+  {k:'silo',   e:'🚀', t:'Silo',     c:9000,  need:'land'},
+  {k:'sam',    e:'🛰️', t:'SAM',      c:7000,  need:'land'},
+  {k:'warship',e:'🚢', t:'Navire',   c:4500,  need:'portUnit'},
+  {k:'atom',   e:'💥', t:'A-bombe',  c:12000, need:'nuke', r:6},
+  {k:'hydro',  e:'☢️', t:'H-bombe',  c:26000, need:'nuke', r:12},
+  {k:'mirv',   e:'🌐', t:'MIRV',     c:45000, need:'nuke', r:7, warheads:3}
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ÉTAT GLOBAL
+// ═══════════════════════════════════════════════════════════════════════════
+var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+var stage=document.getElementById('stage');
+var VW,VH,DPR;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);VW=stage.clientWidth;VH=stage.clientHeight;
+  cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);}
+addEventListener('resize',resize);resize();
+
+var terr=new Uint8Array(N);       // OCEAN / LAND
+var elev=new Uint8Array(N);       // 0..255 (relief → défense + rendu)
+var owner=new Int16Array(N);      // 0 = personne, sinon id de joueur (1..)
+var defMap=new Uint8Array(N);     // couverture des postes de défense (rayon)
+var structAt={};                  // idx -> {k, owner}
+var players=[];                   // index 0 inutilisé ; joueurs 1..P
+var ME=1;                         // id du joueur humain
+var attacks=[];                   // fronts d'expansion actifs
+var attackKey={};                 // "atk>tgt" -> attaque (fusion)
+var units=[];                     // bateaux, navires, missiles
+var touch=[];                     // adjacence des territoires (matrice)
+var terrBmp, terrImg, terrBuf;    // bitmap du territoire
+var running=false, paused=false, dirty=true;
+var elapsed=0, aiClock=0, touchClock=0, tradeClock=0;
+var rng=Math.random;
+var settings={color:1, nations:6, diff:'normal', map:1};
+
+// caméra
+var cam={x:0,y:0,zoom:4};
+
+// mode d'interaction : null / build:'city' / nuke:'atom'
+var mode=null;
+
+function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;var t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+function fmt(n){n=Math.round(n);if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e4)return(n/1e3).toFixed(0)+'k';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return''+n;}
+var nb4=function(i){var x=i%MW,y=(i/MW)|0,r=[];if(x>0)r.push(i-1);if(x<MW-1)r.push(i+1);if(y>0)r.push(i-MW);if(y<MH-1)r.push(i+MW);return r;};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  GÉNÉRATION DE CARTE (bruit de valeur fractal + seuil mer)
+// ═══════════════════════════════════════════════════════════════════════════
+function valueNoise(seed){
+  var pr=mulberry32(seed), gw=24, gh=16, g=new Float32Array(gw*gh);
+  for(var i=0;i<g.length;i++)g[i]=pr();
+  return function(x,y){ // x,y en [0,1)
+    var fx=x*(gw-1), fy=y*(gh-1), x0=fx|0, y0=fy|0, tx=fx-x0, ty=fy-y0;
+    var a=g[y0*gw+x0], b=g[y0*gw+x0+1], c=g[(y0+1)*gw+x0], d=g[(y0+1)*gw+x0+1];
+    tx=tx*tx*(3-2*tx); ty=ty*ty*(3-2*ty);
+    return (a*(1-tx)+b*tx)*(1-ty)+(c*(1-tx)+d*tx)*ty;
+  };
+}
+function genMap(seed, mapType){
+  var oct=[valueNoise(seed),valueNoise(seed*7+3),valueNoise(seed*13+9),valueNoise(seed*29+1)];
+  var amp=[1,0.5,0.26,0.13], sc=[1,2.1,4.3,8.7];
+  // paramètres selon le type de carte
+  var sea = mapType===2?0.30 : mapType===0?0.42 : 0.50;   // niveau de la mer
+  var edge= mapType===2?0.55 : mapType===0?0.9  : 1.15;   // atténuation des bords
+  for(var y=0;y<MH;y++)for(var x=0;x<MW;x++){
+    var i=y*MW+x, nx=x/MW, ny=y/MH, e=0, tot=0;
+    for(var o=0;o<4;o++){e+=oct[o](nx*sc[o]%1,ny*sc[o]%1)*amp[o];tot+=amp[o];}
+    e/=tot;
+    // atténuation radiale → continents centrés / bords océan
+    var dx=(nx-0.5)*2, dy=(ny-0.5)*2, d=Math.sqrt(dx*dx+dy*dy);
+    e-=Math.max(0,(d-0.35))*edge;
+    if(mapType===1){ // archipel : creuse des détroits
+      e-=Math.abs(oct[1](nx*3%1,ny*3%1)-0.5)*0.35;
+    }
+    if(e>sea){terr[i]=LAND;elev[i]=clamp(Math.round((e-sea)/(1-sea)*255),0,255);}
+    else{terr[i]=OCEAN;elev[i]=clamp(Math.round(e/sea*255),0,255);}
+  }
+  // lisse les tuiles isolées (une case océan entourée de terre → terre)
+  for(var p=0;p<2;p++){
+    var snap=terr.slice();
+    for(i=0;i<N;i++){var nn=nb4(i),ld=0;for(var k=0;k<nn.length;k++)if(snap[nn[k]]===LAND)ld++;
+      if(snap[i]===OCEAN&&ld>=nn.length)terr[i]=LAND;
+      if(snap[i]===LAND&&ld===0)terr[i]=OCEAN;}
+  }
+}
+function terrainMult(i){var e=elev[i];return e>200?2.6:e>150?1.7:e>90?1.15:1;} // relief = plus cher à prendre
+function isCoast(i){if(terr[i]!==LAND)return false;var nn=nb4(i);for(var k=0;k<nn.length;k++)if(terr[nn[k]]===OCEAN)return true;return false;}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  JOUEURS & DÉMARRAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function makePlayer(id,pal,human,perso){
+  return {id:id,name:human?'Toi':pal.name,flag:pal.flag,rgb:pal.rgb,
+    packed:packRGB(pal.rgb[0],pal.rgb[1],pal.rgb[2]),
+    border:packRGB(pal.rgb[0]*0.45,pal.rgb[1]*0.45,pal.rgb[2]*0.45),
+    human:human,perso:perso,alive:true,
+    gold:1000,troops:6000,pop:6000,tiles:0,
+    cities:0,ports:0,silos:0,sams:0,defenses:0,
+    allies:{},war:{},traitor:false,seed:0,
+    aiCd:Math.random()*1.5,lastAtkT:0};
+}
+function packRGB(r,g,b){return (255<<24)|((b&255)<<16)|((g&255)<<8)|(r&255);}
+
+function spawnBlob(id,center,radius){
+  // flood arrondi autour d'un centre → territoire de départ
+  var cx=center%MW, cy=(center/MW)|0, q=[center], seen={}; seen[center]=1;
+  var got=0, cap=radius*radius*3;
+  while(q.length&&got<cap){
+    var i=q.shift(), x=i%MW, y=(i/MW)|0;
+    if(terr[i]!==LAND||owner[i]!==0)continue;
+    var dd=Math.hypot(x-cx,y-cy); if(dd>radius)continue;
+    owner[i]=id; got++;
+    var nn=nb4(i);for(var k=0;k<nn.length;k++)if(!seen[nn[k]]){seen[nn[k]]=1;q.push(nn[k]);}
+  }
+  return got;
+}
+function pickSpawns(count){
+  // cases terre candidates, on choisit les plus éloignées entre elles
+  var land=[];for(var i=0;i<N;i++)if(terr[i]===LAND)land.push(i);
+  if(!land.length)return[];
+  var pts=[land[(rng()*land.length)|0]];
+  while(pts.length<count){
+    var best=-1,bestD=-1;
+    for(var t=0;t<400;t++){
+      var c=land[(rng()*land.length)|0], x=c%MW,y=(c/MW)|0, md=1e9;
+      for(var p=0;p<pts.length;p++){var px=pts[p]%MW,py=(pts[p]/MW)|0,d=Math.hypot(x-px,y-py);if(d<md)md=d;}
+      if(md>bestD){bestD=md;best=c;}
+    }
+    pts.push(best);
+  }
+  return pts;
+}
+
+function startGame(){
+  // reset
+  owner.fill(0);defMap.fill(0);structAt={};players=[null];attacks=[];attackKey={};units=[];touch=[];
+  elapsed=0;aiClock=0;touchClock=0;tradeClock=0;paused=false;mode=null;setMode(null);
+  var seed=(Math.random()*1e9)|0; rng=mulberry32(seed);
+  genMap(seed,settings.map);
+
+  // ordre des nations : le joueur d'abord avec sa couleur, puis les autres
+  var pool=PALETTE.slice(); var mine=pool.splice(settings.color-1,1)[0];
+  for(var s=pool.length-1;s>0;s--){var j=(rng()*(s+1))|0;var tmp=pool[s];pool[s]=pool[j];pool[j]=tmp;}
+  var order=[mine].concat(pool).slice(0,settings.nations);
+  var spawns=pickSpawns(settings.nations);
+  for(var p=0;p<settings.nations;p++){
+    var human=(p===0);
+    var perso=human?null:PERSOS[p%PERSOS.length];
+    var pl=makePlayer(p+1,order[p],human,perso);
+    pl.seed=spawns[p];
+    players.push(pl);
+    spawnBlob(p+1,spawns[p],5.5);
+  }
+  recountTiles();
+  // caméra centrée sur le joueur
+  centerOn(players[ME].seed, 5.5);
+  buildDock();
+  dirty=true;running=true;
+  show('none');
+  toast('info','🗺️ '+settings.nations+' nations. Touche le neutre pour t\'étendre, un ennemi pour l\'attaquer.',4200);
+}
+
+function recountTiles(){
+  for(var p=1;p<players.length;p++)players[p].tiles=0;
+  for(var i=0;i<N;i++){var o=owner[i];if(o>0)players[o].tiles++;}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ÉCONOMIE
+// ═══════════════════════════════════════════════════════════════════════════
+function armyCap(p){return 5000+p.tiles*120+p.cities*25000;}
+function economy(p,dt){
+  if(!p.alive)return;
+  var rat=p.ratio!==undefined?p.ratio:0.55;      // part visée en troupes
+  var cap=armyCap(p);
+  var grow=(cap-p.troops)*0.16*(0.35+rat)*dt + p.tiles*2.2*dt;
+  p.troops=clamp(p.troops+grow,0,cap);
+  var inc=(p.tiles*0.34+p.ports*11+p.cities*5+8)*(1.35-rat*0.85);
+  p.gold+=inc*dt;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  EXPANSION / GUERRE  (fronts d'attaque)
+// ═══════════════════════════════════════════════════════════════════════════
+function launchAttack(atkId,tgtId,troops){
+  var atk=players[atkId];
+  if(!atk||!atk.alive||troops<50)return;
+  if(tgtId>0&&(atk.allies[tgtId]||atk.id===tgtId))return;
+  troops=Math.min(troops,atk.troops);
+  atk.troops-=troops;
+  var key=atkId+'>'+tgtId, a=attackKey[key];
+  if(a){a.troops+=troops; if(a.dead){a.dead=false;} seedFrontier(a);}
+  else{a={atk:atkId,tgt:tgtId,troops:troops,front:[],head:0,seen:new Uint8Array(N),carry:0,dead:false};
+    attackKey[key]=a;attacks.push(a);seedFrontier(a);}
+}
+function seedFrontier(a){
+  // (ré)amorce le front : cases de l'attaquant adjacentes à une cible capturable
+  var atkId=a.atk, tgt=a.tgt;
+  for(var i=0;i<N;i++){
+    if(owner[i]!==atkId)continue;
+    var nn=nb4(i);
+    for(var k=0;k<nn.length;k++){if(capturable(nn[k],atkId,tgt)){if(!a.seen[i]){a.seen[i]=1;a.front.push(i);}break;}}
+  }
+}
+function capturable(i,atkId,tgt){
+  if(terr[i]!==LAND)return false;
+  if(owner[i]!==tgt)return false;
+  if(owner[i]===atkId)return false;
+  if(tgt>0&&players[atkId].allies[tgt])return false;
+  return true;
+}
+function tileCost(i,atkId,tgt){
+  var tm=terrainMult(i), base;
+  if(tgt===0){base=6;}
+  else{var d=players[tgt]; var dens=d.troops/Math.max(1,d.tiles); base=4+Math.sqrt(dens)*3;}
+  if(defMap[i]>0&&tgt>0)base*=1.9;   // postes de défense adverses
+  return base*tm;
+}
+function processAttack(a,dt){
+  if(a.dead)return;
+  var atk=players[a.atk];
+  if(!atk||!atk.alive){a.dead=true;return;}
+  var speed=clamp(9+a.troops/240,9,140);
+  var budget=speed*dt + a.carry;
+  var steps=Math.floor(budget); a.carry=budget-steps;
+  var did=0;
+  while(steps-->0){
+    // avance la tête en sautant les cases invalides
+    while(a.head<a.front.length && owner[a.front[a.head]]!==a.atk) a.head++;
+    if(a.head>=a.front.length){a.dead=true;break;}
+    var t=a.front[a.head];
+    // meilleure cible voisine (coût mini)
+    var nn=nb4(t), best=-1, bc=1e9;
+    for(var k=0;k<nn.length;k++){var n=nn[k];if(capturable(n,a.atk,a.tgt)){var c=tileCost(n,a.atk,a.tgt);if(c<bc){bc=c;best=n;}}}
+    if(best<0){a.head++;continue;}                 // plus rien à prendre ici
+    if(a.troops<bc){a.dead=true;atk.troops+=a.troops*0.5;a.troops=0;break;} // à court de troupes
+    // capture !
+    var prev=owner[best];
+    if(prev>0){var dp=players[prev];dp.tiles--;dp.troops=Math.max(0,dp.troops-bc*0.8);
+      if(dp.tiles<=0)eliminate(prev,a.atk);}
+    owner[best]=a.atk; atk.tiles++; a.troops-=bc;
+    if(!a.seen[best]){a.seen[best]=1;a.front.push(best);}
+    did++; dirty=true;
+    if(a.head>20000){a.front=a.front.slice(a.head);a.head=0;}
+  }
+  if(a.troops<=1&&!did)a.dead=true;
+}
+function eliminate(id,by){
+  var p=players[id];if(!p.alive)return;
+  p.alive=false;
+  // libère structures & fronts
+  for(var idx in structAt){if(structAt[idx].owner===id){removeStruct(+idx);}}
+  for(var i=0;i<N;i++)if(owner[i]===id)owner[i]=0;
+  p.tiles=0;
+  if(id===ME){endGame(false);}
+  else toast('info',p.flag+' '+p.name+' a été éliminée.',2600);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STRUCTURES
+// ═══════════════════════════════════════════════════════════════════════════
+function stampDef(i,delta){
+  var x=i%MW,y=(i/MW)|0,R=4;
+  for(var dy=-R;dy<=R;dy++)for(var dx=-R;dx<=R;dx++){
+    if(dx*dx+dy*dy>R*R)continue;var xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=MW||yy>=MH)continue;
+    var j=yy*MW+xx;defMap[j]=clamp(defMap[j]+delta,0,255);
+  }
+}
+function buildStruct(i,k,ownerId){
+  var pl=players[ownerId];
+  structAt[i]={k:k,owner:ownerId};
+  if(k==='city')pl.cities++;
+  else if(k==='port')pl.ports++;
+  else if(k==='silo')pl.silos++;
+  else if(k==='sam')pl.sams++;
+  else if(k==='defense'){pl.defenses++;stampDef(i,1);}
+  dirty=true;
+}
+function removeStruct(i){
+  var s=structAt[i];if(!s)return;var pl=players[s.owner];
+  if(pl){if(s.k==='city')pl.cities--;else if(s.k==='port')pl.ports--;else if(s.k==='silo')pl.silos--;
+    else if(s.k==='sam')pl.sams--;else if(s.k==='defense'){pl.defenses--;stampDef(i,-1);}}
+  delete structAt[i];dirty=true;
+}
+function nearestStruct(ownerId,k,tx,ty){
+  var best=-1,bd=1e9;
+  for(var idx in structAt){var s=structAt[idx];if(s.owner!==ownerId||s.k!==k)continue;
+    var i=+idx,x=i%MW,y=(i/MW)|0,d=(x-tx)*(x-tx)+(y-ty)*(y-ty);if(d<bd){bd=d;best=i;}}
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UNITÉS : bateaux (transport), commerce, navires, missiles
+// ═══════════════════════════════════════════════════════════════════════════
+function spawnUnit(u){units.push(u);}
+function launchBoat(ownerId,fromTile,toTile,troops){
+  var pl=players[ownerId];
+  spawnUnit({type:'boat',owner:ownerId,x:fromTile%MW+0.5,y:(fromTile/MW|0)+0.5,
+    tx:toTile%MW+0.5,ty:(toTile/MW|0)+0.5,tgtTile:toTile,troops:troops,spd:11});
+}
+function launchTrade(fromTile,toTile,ownerId,destOwner){
+  spawnUnit({type:'trade',owner:ownerId,dest:destOwner,x:fromTile%MW+0.5,y:(fromTile/MW|0)+0.5,
+    tx:toTile%MW+0.5,ty:(toTile/MW|0)+0.5,tgtTile:toTile,gold:900+rng()*700,spd:8});
+}
+function launchWarship(ownerId,atTile){
+  spawnUnit({type:'warship',owner:ownerId,x:atTile%MW+0.5,y:(atTile/MW|0)+0.5,
+    tx:atTile%MW+0.5,ty:(atTile/MW|0)+0.5,home:atTile,spd:9,cd:0});
+}
+function launchMissile(ownerId,fromTile,toTile,kind){
+  var b=BUILDS.filter(function(x){return x.k===kind;})[0];
+  spawnUnit({type:'missile',owner:ownerId,x:fromTile%MW+0.5,y:(fromTile/MW|0)+0.5,
+    tx:toTile%MW+0.5,ty:(toTile/MW|0)+0.5,tgtTile:toTile,r:b.r,warheads:b.warheads||1,spd:26,kind:kind});
+}
+function detonate(i0,radius,byId){
+  var x0=i0%MW,y0=(i0/MW)|0;
+  for(var dy=-radius;dy<=radius;dy++)for(var dx=-radius;dx<=radius;dx++){
+    if(dx*dx+dy*dy>radius*radius)continue;var xx=x0+dx,yy=y0+dy;if(xx<0||yy<0||xx>=MW||yy>=MH)continue;
+    var i=yy*MW+xx;
+    if(structAt[i])removeStruct(i);
+    if(owner[i]>0){var p=players[owner[i]];p.tiles--;p.troops=Math.max(0,p.troops-40);owner[i]=0;if(p.tiles<=0)eliminate(p.id,byId);}
+  }
+  dirty=true;
+  spawnUnit({type:'blast',x:x0+0.5,y:y0+0.5,r:radius,t:0,life:0.7});
+}
+function updateUnits(dt){
+  for(var u=units.length-1;u>=0;u--){
+    var it=units[u];
+    if(it.type==='blast'){it.t+=dt;if(it.t>=it.life)units.splice(u,1);continue;}
+    var dx=it.tx-it.x, dy=it.ty-it.y, d=Math.hypot(dx,dy);
+    // missiles interceptables par SAM
+    if(it.type==='missile'){
+      for(var idx in structAt){var s=structAt[idx];if(s.k!=='sam')continue;if(s.owner===it.owner||players[s.owner].allies[it.owner])continue;
+        var si=+idx,sx=si%MW,sy=(si/MW)|0;if(Math.hypot(sx-it.x,sy-it.y)<9&&rng()<0.65*dt*8){
+          spawnUnit({type:'blast',x:it.x,y:it.y,r:2,t:0,life:0.5});units.splice(u,1);it=null;break;}}
+      if(!it)continue;
+    }
+    if(d<0.6){arrive(it);units.splice(u,1);continue;}
+    var mv=it.spd*dt;it.x+=dx/d*Math.min(mv,d);it.y+=dy/d*Math.min(mv,d);
+    if(it.type==='warship'){ // patrouille : détruit les bateaux ennemis proches
+      it.cd=(it.cd||0)-dt;
+      for(var v=units.length-1;v>=0;v--){var e=units[v];if(v===u)continue;
+        if((e.type==='boat'||e.type==='trade')&&e.owner!==it.owner&&!players[it.owner].allies[e.owner]){
+          if(Math.hypot(e.x-it.x,e.y-it.y)<6){it.tx=e.x;it.ty=e.y;if(it.cd<=0&&Math.hypot(e.x-it.x,e.y-it.y)<2.5){
+            spawnUnit({type:'blast',x:e.x,y:e.y,r:1.5,t:0,life:0.4});units.splice(v,1);it.cd=1.2;if(v<u)u--;}break;}}}
+      // rentre au port si rien à faire
+      if(it.tx===it.x&&it.ty===it.y){it.tx=it.home%MW+0.5;it.ty=(it.home/MW|0)+0.5;}
+    }
+  }
+}
+function arrive(it){
+  if(it.type==='boat'){
+    var i=it.tgtTile;
+    if(terr[i]===LAND){
+      var prev=owner[i];
+      if(prev===it.owner||players[it.owner].allies[prev]){return;}
+      if(prev>0){players[prev].tiles--;if(players[prev].tiles<=0)eliminate(prev,it.owner);}
+      owner[i]=it.owner;players[it.owner].tiles++;dirty=true;
+      // débarque : lance un front local
+      var a={atk:it.owner,tgt:prev,troops:it.troops,front:[i],head:0,seen:new Uint8Array(N),carry:0,dead:false};
+      a.seen[i]=1;attacks.push(a);
+    }
+  } else if(it.type==='trade'){
+    if(players[it.owner]&&players[it.owner].alive)players[it.owner].gold+=it.gold*0.6;
+    if(players[it.dest]&&players[it.dest].alive)players[it.dest].gold+=it.gold*0.4;
+  } else if(it.type==='missile'){
+    if(it.warheads>1){ // MIRV : éclate en plusieurs têtes
+      for(var w=0;w<it.warheads;w++){var jx=it.tgtTile%MW+((rng()-0.5)*14|0),jy=(it.tgtTile/MW|0)+((rng()-0.5)*14|0);
+        jx=clamp(jx,0,MW-1);jy=clamp(jy,0,MH-1);detonate(jy*MW+jx,it.r,it.owner);}
+    } else detonate(it.tgtTile,it.r,it.owner);
+  }
+}
+function nearestCoast(ownerId,tx,ty){ // case côtière de ownerId la plus proche de (tx,ty)
+  var best=-1,bd=1e9;
+  for(var i=0;i<N;i++){if(owner[i]!==ownerId)continue;if(!isCoast(i))continue;
+    var x=i%MW,y=(i/MW)|0,d=(x-tx)*(x-tx)+(y-ty)*(y-ty);if(d<bd){bd=d;best=i;}}
+  return best;
+}
+function coastNear(tile){ // case côtière/terre proche de tile (pour débarquer)
+  if(terr[tile]===LAND)return tile;
+  var best=-1,bd=1e9,x0=tile%MW,y0=(tile/MW)|0;
+  for(var i=0;i<N;i++){if(!isCoast(i))continue;var x=i%MW,y=(i/MW)|0,d=(x-x0)*(x-x0)+(y-y0)*(y-y0);if(d<bd){bd=d;best=i;}}
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ADJACENCE DES TERRITOIRES (pour l'IA & la diplomatie)
+// ═══════════════════════════════════════════════════════════════════════════
+function computeTouch(){
+  var P=players.length;touch=[];for(var a=0;a<P;a++)touch.push(new Uint8Array(P));
+  for(var i=0;i<N;i++){var o=owner[i];if(o<=0)continue;var nn=nb4(i);
+    for(var k=0;k<nn.length;k++){var no=owner[nn[k]];if(no>0&&no!==o){touch[o][no]=1;}}}
+}
+function neutralAdjacent(id){ // le joueur id touche-t-il du neutre ?
+  for(var i=0;i<N;i++){if(owner[i]!==id)continue;var nn=nb4(i);
+    for(var k=0;k<nn.length;k++)if(terr[nn[k]]===LAND&&owner[nn[k]]===0)return true;}
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  INTELLIGENCE ARTIFICIELLE
+// ═══════════════════════════════════════════════════════════════════════════
+function aiThink(p,dt){
+  p.aiCd-=dt;if(p.aiCd>0)return;
+  p.aiCd=1.1+rng()*1.4;
+  if(!p.alive)return;
+  var diffMul=settings.diff==='hard'?1.35:settings.diff==='easy'?0.6:1;
+  var persoAgg={aggressive:1.4,defensive:0.5,expansionist:0.7,opportunist:1.0,balanced:0.9}[p.perso]*diffMul;
+
+  // voisins (via matrice touch)
+  var neigh=[];for(var q=1;q<players.length;q++){if(q===p.id||!players[q].alive)continue;
+    if(touch[p.id]&&touch[p.id][q])neigh.push(players[q]);}
+
+  // --- Dépenses (or) ---
+  aiSpend(p,neigh,persoAgg);
+
+  // --- Diplomatie : demander alliance à un voisin fort si menacé ---
+  var strongest=null;for(var s=0;s<neigh.length;s++)if(!strongest||neigh[s].tiles>strongest.tiles)strongest=neigh[s];
+  var myThreat=strongest&&strongest.tiles>p.tiles*1.5;
+  if(myThreat&&p.perso!=='aggressive'&&rng()<0.5){
+    // propose alliance au plus fort (souvent le joueur si c'est lui)
+    if(!p.allies[strongest.id]&&!p.war[strongest.id]){requestAlliance(p.id,strongest.id);}
+  }
+  // opportuniste : trahison si l'allié est faible et qu'on peut le croquer
+  if(p.perso==='opportunist'){
+    for(var al in p.allies){var A=players[al];if(A&&A.alive&&A.tiles<p.tiles*0.5&&rng()<0.25){breakAlliance(p.id,+al,true);}}
+  }
+
+  // --- Expansion / guerre ---
+  var wantWar=rng()<0.15*persoAgg;
+  var neutral=neutralAdjacent(p.id);
+  var send=p.troops*(0.25+0.35*rng());
+  if(p.perso==='expansionist'&&neutral){send*=1.2;}
+  if(neutral&&(!wantWar||p.perso==='defensive'||p.perso==='expansionist')){
+    if(p.troops>armyCap(p)*0.25)launchAttack(p.id,0,send);
+  } else if(neigh.length){
+    // cible : voisin non-allié le plus faible (densité de troupes)
+    var target=null,tb=1e9;
+    for(var n=0;n<neigh.length;n++){var e=neigh[n];if(p.allies[e.id])continue;
+      var dens=e.troops/Math.max(1,e.tiles)+e.tiles*0.4;if(dens<tb){tb=dens;target=e;}}
+    if(target&&p.troops>target.troops*0.6*(2-persoAgg)&&p.troops>armyCap(p)*0.3){
+      p.war[target.id]=1;target.war[p.id]=1;
+      if(p.allies[target.id]){breakAlliance(p.id,target.id,true);}
+      launchAttack(p.id,target.id,p.troops*(0.4+0.3*rng()));
+    } else if(neutral){launchAttack(p.id,0,send);}
+  }
+
+  // --- Bateaux : coloniser une île / attaquer outre-mer ---
+  if(p.ports>0&&rng()<0.35&&!neutral){
+    var from=nearestCoast(p.id,p.seed%MW,(p.seed/MW|0));
+    if(from>=0){var tgt=findOverseasTarget(p.id,from);if(tgt>=0)launchBoat(p.id,from,tgt,p.troops*0.3);}
+  }
+}
+function aiSpend(p,neigh,agg){
+  var underAttack=false;for(var a=0;a<attacks.length;a++){if(!attacks[a].dead&&attacks[a].tgt===p.id){underAttack=true;break;}}
+  var coast=hasCoast(p.id);
+  // priorités : défense si attaqué, ville si riche, port si côtier sans port, silo/nuke si grand
+  if(underAttack&&p.gold>=2000&&rng()<0.7){placeAIStruct(p,'defense');}
+  else if(p.gold>=5000&&p.tiles>40&&rng()<0.6){placeAIStruct(p,'city');}
+  if(coast&&p.ports===0&&p.gold>=4000){placeAIStruct(p,'port');}
+  if(p.tiles>90&&p.silos===0&&p.gold>=9000&&rng()<0.5){placeAIStruct(p,'silo');}
+  if(p.sams===0&&p.tiles>110&&p.gold>=7000&&rng()<0.4){placeAIStruct(p,'sam');}
+  // lance une bombe si gros, en guerre, avec silo
+  if(p.silos>0&&p.gold>=12000&&agg>0.9&&rng()<0.5){
+    var enemy=null;for(var n=0;n<neigh.length;n++){var e=neigh[n];if(!p.allies[e.id]&&(p.war[e.id]||e.tiles>p.tiles)){enemy=e;break;}}
+    if(enemy){var tt=enemyRichTile(enemy.id);if(tt>=0){var silo=nearestStruct(p.id,'silo',tt%MW,tt/MW|0);
+      if(silo>=0){var kind=p.gold>=26000?'hydro':'atom';p.gold-=kind==='hydro'?26000:12000;launchMissile(p.id,silo,tt,kind);
+        toast('info',p.flag+' '+p.name+' a lancé une frappe ! ☢️',2200);}}}
+  }
+}
+function hasCoast(id){for(var i=0;i<N;i++)if(owner[i]===id&&isCoast(i))return true;return false;}
+function placeAIStruct(p,k){
+  var b=BUILDS.filter(function(x){return x.k===k;})[0];if(p.gold<b.c)return;
+  // choisit une case valide (côte pour port, sinon intérieur)
+  var cands=[];for(var i=0;i<N;i++){if(owner[i]!==p.id||structAt[i])continue;
+    if(k==='port'&&!isCoast(i))continue; if(k!=='port'&&isCoast(i)&&rng()<0.6)continue; cands.push(i);}
+  if(!cands.length)return;
+  var i2=cands[(rng()*cands.length)|0];p.gold-=b.c;buildStruct(i2,k,p.id);
+}
+function enemyRichTile(id){ // case ennemie avec structure, sinon une case au hasard
+  for(var idx in structAt)if(structAt[idx].owner===id)return +idx;
+  for(var i=0;i<N;i++)if(owner[i]===id)return i;return -1;
+}
+function enemyRichTileFn(id){return enemyRichTile(id);}
+function findOverseasTarget(id,fromTile){
+  // cible côtière neutre/ennemie sans lien terrestre proche
+  var best=-1,bd=1e9,fx=fromTile%MW,fy=(fromTile/MW)|0;
+  for(var i=0;i<N;i++){if(!isCoast(i))continue;var o=owner[i];if(o===id||(o>0&&players[id].allies[o]))continue;
+    var x=i%MW,y=(i/MW)|0,d=(x-fx)*(x-fx)+(y-fy)*(y-fy);if(d>16&&d<bd){bd=d;best=i;}}
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DIPLOMATIE
+// ═══════════════════════════════════════════════════════════════════════════
+function requestAlliance(fromId,toId){
+  var from=players[fromId],to=players[toId];
+  if(!from.alive||!to.alive||from.allies[toId])return;
+  if(toId===ME){ // demande au joueur → toast
+    pushAllianceToast(fromId);
+    return;
+  }
+  // IA décide
+  var accept=aiAcceptsAlliance(to,from);
+  if(accept)makeAlliance(fromId,toId);
+}
+function aiAcceptsAlliance(ai,other){
+  if(ai.perso==='aggressive')return rng()<0.2;
+  if(ai.war[other.id])return rng()<0.3;
+  if(other.traitor)return rng()<0.25;
+  return rng()<(ai.perso==='defensive'?0.85:0.6);
+}
+function makeAlliance(a,b){
+  players[a].allies[b]=1;players[b].allies[a]=1;
+  delete players[a].war[b];delete players[b].war[a];
+  // dissout les fronts entre eux
+  killFront(a,b);killFront(b,a);
+  if(a===ME||b===ME){var o=players[a===ME?b:a];toast('info','🤝 Alliance avec '+o.flag+' '+o.name+'.',2400);}
+  refreshDiplo();
+}
+function breakAlliance(a,b,byTreason){
+  if(!players[a].allies[b])return;
+  delete players[a].allies[b];delete players[b].allies[a];
+  if(byTreason)players[a].traitor=true;
+  if(b===ME||a===ME){var t=players[a],o=players[a===ME?b:a];
+    toast('info','💔 '+ (byTreason&&a!==ME?('Trahison ! '+players[a].flag+' '+players[a].name+' rompt l\'alliance.'):('Alliance rompue avec '+o.flag+' '+o.name+'.')),2800);}
+  refreshDiplo();
+}
+function killFront(a,b){var k=a+'>'+b,at=attackKey[k];if(at)at.dead=true;}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BOUCLE DE SIMULATION
+// ═══════════════════════════════════════════════════════════════════════════
+function simTick(dt){
+  elapsed+=dt;
+  for(var p=1;p<players.length;p++)economy(players[p],dt);
+  for(var a=0;a<attacks.length;a++)processAttack(attacks[a],dt);
+  // purge des fronts morts
+  if(attacks.length){var live=[];for(var i=0;i<attacks.length;i++){var A=attacks[i];if(A.dead){delete attackKey[A.atk+'>'+A.tgt];}else live.push(A);}attacks=live;}
+  updateUnits(dt);
+  // adjacence (périodique)
+  touchClock-=dt;if(touchClock<=0){touchClock=1.0;computeTouch();}
+  // commerce automatique entre ports
+  tradeClock-=dt;if(tradeClock<=0){tradeClock=2.5;autoTrade();}
+  // IA
+  for(p=1;p<players.length;p++){var pl=players[p];if(pl.alive&&!pl.human)aiThink(pl,dt);}
+  // victoire ?
+  checkWin();
+}
+function autoTrade(){
+  var ports=[];for(var idx in structAt)if(structAt[idx].k==='port')ports.push({i:+idx,o:structAt[idx].owner});
+  if(ports.length<2)return;
+  for(var t=0;t<ports.length;t++){if(rng()>0.4)continue;var src=ports[t];
+    var opts=ports.filter(function(x){return x.o!==src.o;});if(!opts.length)continue;
+    var dst=opts[(rng()*opts.length)|0];
+    if(players[src.o].war[dst.o])continue;      // pas de commerce en guerre
+    launchTrade(src.i,dst.i,src.o,dst.o);
+  }
+}
+function checkWin(){
+  var alive=[];for(var p=1;p<players.length;p++)if(players[p].alive)alive.push(players[p]);
+  if(!players[ME].alive)return; // endGame déjà appelé
+  if(alive.length===1&&alive[0].id===ME){endGame(true);return;}
+  // domination : allié+soi > 80% des terres
+  var totalLand=0;for(var i=0;i<N;i++)if(terr[i]===LAND)totalLand++;
+  var mine=players[ME].tiles;for(var al in players[ME].allies)if(players[al]&&players[al].alive)mine+=players[al].tiles;
+  if(totalLand>0&&mine/totalLand>0.82){endGame(true,'domination');}
+}
+function endGame(win,how){
+  running=false;
+  document.getElementById('overTitle').innerHTML=win?'<span class="win">Victoire ! 🏆</span>':'<span class="lose">Défaite… 💀</span>';
+  var pct=Math.round(players[ME].tiles/Math.max(1,landTotal())*100);
+  document.getElementById('overMsg').textContent=win
+    ?(how==='domination'?'Domination totale de la carte ('+pct+'% du territoire) en '+timeStr()+'.':'Tu as éliminé toutes les nations en '+timeStr()+' !')
+    :'Ta nation a disparu de la carte après '+timeStr()+'. Réessaie une autre stratégie.';
+  show('over');
+}
+function landTotal(){var t=0;for(var i=0;i<N;i++)if(terr[i]===LAND)t++;return t;}
+function timeStr(){var s=Math.round(elapsed),m=(s/60)|0;return m>0?(m+' min '+(s%60)+'s'):(s+'s');}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  RENDU
+// ═══════════════════════════════════════════════════════════════════════════
+function ensureBmp(){if(terrBmp)return;terrBmp=document.createElement('canvas');terrBmp.width=MW;terrBmp.height=MH;
+  terrImg=terrBmp.getContext('2d').createImageData(MW,MH);terrBuf=new Uint32Array(terrImg.data.buffer);}
+function buildBitmap(){
+  ensureBmp();
+  for(var i=0;i<N;i++){
+    var o=owner[i], col;
+    if(terr[i]===OCEAN){var sh=0.55+elev[i]/255*0.45;col=packRGB(20*sh,54*sh,92*sh);}
+    else if(o===0){var e=elev[i];col=e>200?packRGB(150,142,120):e>150?packRGB(120,132,96):packRGB(96,120,80);}
+    else{var pl=players[o];
+      // bordure : voisin d'un autre propriétaire
+      var nn=nb4(i),bord=false;for(var k=0;k<nn.length;k++){if(owner[nn[k]]!==o){bord=true;break;}}
+      col=bord?pl.border:pl.packed;
+    }
+    terrBuf[i]=col>>>0;
+  }
+  terrBmp.getContext('2d').putImageData(terrImg,0,0);
+  dirty=false;
+}
+function centerOn(tile,zoom){var x=tile%MW,y=(tile/MW)|0;cam.zoom=zoom||cam.zoom;cam.x=x-VW/(2*cam.zoom);cam.y=y-VH/(2*cam.zoom);clampCam();}
+function clampCam(){cam.zoom=clamp(cam.zoom,1.2,26);
+  var vw=VW/cam.zoom,vh=VH/cam.zoom;
+  cam.x=clamp(cam.x,-vw*0.3,MW-vw*0.7);cam.y=clamp(cam.y,-vh*0.3,MH-vh*0.7);}
+function draw(){
+  ctx.clearRect(0,0,VW,VH);
+  ctx.fillStyle='#070a10';ctx.fillRect(0,0,VW,VH);
+  if(dirty)buildBitmap(); else if(!terrBmp)buildBitmap();
+  ctx.imageSmoothingEnabled=false;
+  var z=cam.zoom;
+  ctx.drawImage(terrBmp,0,0,MW,MH,-cam.x*z,-cam.y*z,MW*z,MH*z);
+  // structures
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  var fs=clamp(z*1.3,9,26);ctx.font=fs+'px serif';
+  for(var idx in structAt){var s=structAt[idx],i=+idx,sx=(i%MW+0.5-cam.x)*z,sy=((i/MW|0)+0.5-cam.y)*z;
+    if(sx<-20||sy<-20||sx>VW+20||sy>VH+20)continue;
+    var em={city:'🏙️',port:'⚓',defense:'🛡️',silo:'🚀',sam:'🛰️'}[s.k];if(em)ctx.fillText(em,sx,sy);}
+  // unités
+  for(var u=0;u<units.length;u++){var it=units[u],ux=(it.x-cam.x)*z,uy=(it.y-cam.y)*z;
+    if(it.type==='blast'){ctx.beginPath();var rr=it.r*z*(0.5+it.t/it.life);ctx.arc(ux,uy,rr,0,7);
+      ctx.fillStyle='rgba(255,'+(150-it.t/it.life*120|0)+',40,'+(0.55*(1-it.t/it.life))+')';ctx.fill();
+      ctx.strokeStyle='rgba(255,220,120,'+(1-it.t/it.life)+')';ctx.lineWidth=2;ctx.stroke();continue;}
+    ctx.font=clamp(z*1.2,10,22)+'px serif';
+    var ge={boat:'⛵',trade:'🚤',warship:'🚢',missile:it.kind==='mirv'?'🌐':it.kind==='hydro'?'☢️':'💥'}[it.type];
+    if(ge)ctx.fillText(ge,ux,uy);
+  }
+  // surbrillance mode ciblage
+  if(mode&&cursorTile>=0){var cx=(cursorTile%MW+0.5-cam.x)*z,cy=((cursorTile/MW|0)+0.5-cam.y)*z;
+    ctx.strokeStyle=mode.build?'#f2b705':'#ff5a5a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,z*0.9,0,7);ctx.stroke();}
+  // noms des nations (au centre de masse approx.)
+  if(z>2.4)drawLabels(z);
+}
+var labelClock=0,labelCache=[];
+function drawLabels(z){
+  labelClock--;if(labelClock<=0){labelClock=30;computeLabels();}
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(var l=0;l<labelCache.length;l++){var L=labelCache[l],sx=(L.x-cam.x)*z,sy=(L.y-cam.y)*z;
+    if(sx<0||sy<0||sx>VW||sy>VH)continue;
+    ctx.font='700 '+clamp(z*1.6,11,20)+'px system-ui';
+    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.55)';ctx.strokeText(L.flag+' '+L.name,sx,sy);
+    ctx.fillStyle='#fff';ctx.fillText(L.flag+' '+L.name,sx,sy);}
+}
+function computeLabels(){
+  labelCache=[];var sx=[],sy=[],c=[];for(var p=0;p<players.length;p++){sx.push(0);sy.push(0);c.push(0);}
+  for(var i=0;i<N;i++){var o=owner[i];if(o>0){sx[o]+=i%MW;sy[o]+=(i/MW)|0;c[o]++;}}
+  for(p=1;p<players.length;p++)if(players[p].alive&&c[p]>0)labelCache.push({x:sx[p]/c[p],y:sy[p]/c[p],name:players[p].name,flag:players[p].flag});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ENTRÉES (pan / zoom / tap)
+// ═══════════════════════════════════════════════════════════════════════════
+var cursorTile=-1;
+function screenToTile(px,py){var tx=(px/cam.zoom+cam.x)|0,ty=(py/cam.zoom+cam.y)|0;if(tx<0||ty<0||tx>=MW||ty>=MH)return -1;return ty*MW+tx;}
+var pointers={}, lastPinch=0, dragMoved=0, dragStart=null;
+cv.addEventListener('pointerdown',function(e){cv.setPointerCapture(e.pointerId);
+  pointers[e.pointerId]={x:e.clientX,y:e.clientY};dragMoved=0;dragStart={x:e.clientX,y:e.clientY};
+  cursorTile=screenToTile(e.clientX,e.clientY);});
+cv.addEventListener('pointermove',function(e){
+  if(!pointers[e.pointerId])return;
+  var ids=Object.keys(pointers);
+  if(ids.length>=2){ // pinch zoom
+    var a=pointers[ids[0]],b=pointers[ids[1]];
+    if(e.pointerId==ids[0]){a.x=e.clientX;a.y=e.clientY;}else{b.x=e.clientX;b.y=e.clientY;}
+    var dist=Math.hypot(a.x-b.x,a.y-b.y);
+    if(lastPinch){var mx=(a.x+b.x)/2,my=(a.y+b.y)/2,wx=mx/cam.zoom+cam.x,wy=my/cam.zoom+cam.y;
+      cam.zoom*=dist/lastPinch;clampCam();cam.x=wx-mx/cam.zoom;cam.y=wy-my/cam.zoom;clampCam();}
+    lastPinch=dist;dragMoved=99;return;
+  }
+  var pt=pointers[e.pointerId],dx=e.clientX-pt.x,dy=e.clientY-pt.y;
+  dragMoved+=Math.abs(dx)+Math.abs(dy);
+  cam.x-=dx/cam.zoom;cam.y-=dy/cam.zoom;clampCam();
+  pt.x=e.clientX;pt.y=e.clientY;cursorTile=screenToTile(e.clientX,e.clientY);
+});
+function endPointer(e){delete pointers[e.pointerId];if(Object.keys(pointers).length<2)lastPinch=0;
+  if(dragMoved<8&&dragStart){onTap(screenToTile(e.clientX,e.clientY));}dragStart=null;}
+cv.addEventListener('pointerup',endPointer);
+cv.addEventListener('pointercancel',function(e){delete pointers[e.pointerId];lastPinch=0;});
+cv.addEventListener('wheel',function(e){e.preventDefault();var mx=e.clientX,my=e.clientY,wx=mx/cam.zoom+cam.x,wy=my/cam.zoom+cam.y;
+  cam.zoom*=e.deltaY<0?1.15:0.87;clampCam();cam.x=wx-mx/cam.zoom;cam.y=wy-my/cam.zoom;clampCam();},{passive:false});
+
+function onTap(tile){
+  if(tile<0||!running)return;
+  var me=players[ME];
+  // mode construction / nuke
+  if(mode){
+    if(mode.build)tryBuild(tile,mode.build);
+    else if(mode.nuke)tryNuke(tile,mode.nuke);
+    setMode(null);return;
+  }
+  var o=owner[tile];
+  if(o===ME){flash('Ta case. Utilise la barre du bas pour construire.');return;}
+  if(o>0&&me.allies[o]){flash('🤝 Allié — impossible d\'attaquer.');return;}
+  var troops=me.troops*(+document.getElementById('atkR').value/100);
+  if(troops<50){flash('Pas assez de troupes.');return;}
+  // as-tu un front terrestre vers cette cible ?
+  if(hasFrontier(ME,o)){
+    if(o>0){me.war[o]=1;players[o].war[ME]=1;}
+    launchAttack(ME,o,troops);
+  } else if(me.ports>0||hasCoast(ME)){
+    // débarquement : bateau vers la case (ou la côte la plus proche)
+    var land=coastNear(tile);if(land<0)land=tile;
+    var from=nearestCoast(ME,land%MW,land/MW|0);
+    if(from<0){flash('Aucune côte pour lancer un bateau.');return;}
+    launchBoat(ME,from,land,troops);flash('⛵ Bateau en route.');
+  } else {flash('Zone hors de portée — construis un port pour débarquer.');}
+}
+function hasFrontier(id,tgt){
+  for(var i=0;i<N;i++){if(owner[i]!==id)continue;var nn=nb4(i);
+    for(var k=0;k<nn.length;k++)if(capturable(nn[k],id,tgt))return true;}
+  return false;
+}
+function tryBuild(tile,k){
+  var me=players[ME],b=BUILDS.filter(function(x){return x.k===k;})[0];
+  if(owner[tile]!==ME){flash('Construis sur ton territoire.');return;}
+  if(structAt[tile]){flash('Case déjà occupée.');return;}
+  if(k==='port'&&!isCoast(tile)){flash('Un port doit être sur la côte.');return;}
+  if(me.gold<b.c){flash('Pas assez d\'or.');return;}
+  me.gold-=b.c;buildStruct(tile,k,ME);
+  if(k==='port'){/* rien */}
+  flash(b.e+' '+b.t+' construit.');
+}
+function tryNuke(tile,kind){
+  var me=players[ME];if(me.silos<1){flash('Il faut un silo 🚀.');return;}
+  var b=BUILDS.filter(function(x){return x.k===kind;})[0];
+  if(me.gold<b.c){flash('Pas assez d\'or.');return;}
+  var silo=nearestStruct(ME,'silo',tile%MW,tile/MW|0);if(silo<0){flash('Aucun silo.');return;}
+  me.gold-=b.c;launchMissile(ME,silo,tile,kind);flash(b.e+' Missile lancé !');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  UI (dock, sliders, panneaux, toasts)
+// ═══════════════════════════════════════════════════════════════════════════
+var dock=document.getElementById('dock');
+function buildDock(){
+  dock.innerHTML='';
+  BUILDS.forEach(function(b){
+    var el=document.createElement('button');el.className='build';el.dataset.k=b.k;
+    el.innerHTML='<span class="e">'+b.e+'</span><span class="t">'+b.t+'</span><span class="c">'+fmt(b.c)+'</span>';
+    el.onclick=function(){toggleBuild(b);};dock.appendChild(el);
+  });
+}
+function toggleBuild(b){
+  var isNuke=(b.need==='nuke');
+  if(mode&&((mode.build===b.k)||(mode.nuke===b.k))){setMode(null);return;}
+  if(b.need==='portUnit'){ // navire : posé directement à un port
+    var me=players[ME];if(me.ports<1){flash('Construis un port ⚓ d\'abord.');return;}
+    if(me.gold<b.c){flash('Pas assez d\'or.');return;}
+    var port=nearestStruct(ME,'port',players[ME].seed%MW,players[ME].seed/MW|0);
+    if(port<0){flash('Aucun port.');return;}me.gold-=b.c;launchWarship(ME,port);flash('🚢 Navire déployé.');setMode(null);return;
+  }
+  setMode(isNuke?{nuke:b.k}:{build:b.k});
+  flash(isNuke?('Touche une cible pour la frappe '+b.e):('Touche ta case pour poser '+b.e+' '+b.t));
+}
+function setMode(m){
+  mode=m;
+  [].forEach.call(dock.children,function(el){
+    var k=el.dataset.k;el.classList.toggle('sel',!!m&&((m.build===k)||(m.nuke===k)));
+  });
+}
+function refreshDock(){
+  var me=players[ME];if(!me)return;
+  [].forEach.call(dock.children,function(el){
+    var b=BUILDS.filter(function(x){return x.k===el.dataset.k;})[0];
+    var lock=me.gold<b.c || (b.need==='nuke'&&me.silos<1) || (b.need==='coast'&&!hasCoast(ME)) || (b.need==='portUnit'&&me.ports<1);
+    el.classList.toggle('lock',lock);
+  });
+}
+
+document.getElementById('atkR').oninput=function(){document.getElementById('atkVal').textContent=this.value+'%';};
+document.getElementById('ratR').oninput=function(){players[ME].ratio=+this.value/100;updateRatLabel();};
+function updateRatLabel(){var r=players[ME]?players[ME].ratio:0.55;
+  document.getElementById('ratLab').textContent=r>0.65?'⚔️ Troupes+':r<0.4?'💰 Or+':'Troupes ⇄ Or';}
+
+function flash(msg){var h=document.getElementById('hint');h.textContent=msg;h.classList.add('show');
+  clearTimeout(flash.t);flash.t=setTimeout(function(){h.classList.remove('show');},1800);}
+function toast(kind,msg,ms){
+  var t=document.getElementById('toasts'),el=document.createElement('div');el.className='toast '+(kind==='info'?'info':'');
+  el.textContent=msg;t.appendChild(el);setTimeout(function(){el.remove();},ms||3000);
+}
+function pushAllianceToast(fromId){
+  var from=players[fromId],t=document.getElementById('toasts'),el=document.createElement('div');el.className='toast';
+  el.innerHTML='<div>'+from.flag+' <b>'+from.name+'</b> ('+PERSO_FR[from.perso]+') propose une alliance.</div>'+
+    '<div class="row"><button class="yes">Accepter 🤝</button><button class="no">Refuser</button></div>';
+  el.querySelector('.yes').onclick=function(){makeAlliance(fromId,ME);el.remove();};
+  el.querySelector('.no').onclick=function(){el.remove();};
+  t.appendChild(el);setTimeout(function(){el.remove();},9000);
+}
+
+// Panneaux
+function togglePanel(id){var p=document.getElementById(id);var wasHidden=p.classList.contains('hidden');
+  document.getElementById('board').classList.add('hidden');document.getElementById('diplo').classList.add('hidden');
+  if(wasHidden){p.classList.remove('hidden');if(id==='board')refreshBoard();else refreshDiplo();}}
+document.getElementById('btnBoard').onclick=function(){togglePanel('board');};
+document.getElementById('btnDiplo').onclick=function(){togglePanel('diplo');};
+document.getElementById('closeBoard').onclick=function(){document.getElementById('board').classList.add('hidden');};
+document.getElementById('closeDiplo').onclick=function(){document.getElementById('diplo').classList.add('hidden');};
+function refreshBoard(){
+  var list=document.getElementById('boardList'),tot=landTotal();
+  var arr=players.slice(1).filter(Boolean).sort(function(a,b){return b.tiles-a.tiles;});
+  list.innerHTML='';
+  arr.forEach(function(p){
+    var pc=Math.round(p.tiles/Math.max(1,tot)*100);
+    var tag=!p.alive?'<span class="tag dead">✖</span>':p.id===ME?'':players[ME].allies[p.id]?'<span class="tag ally">allié</span>':players[ME].war[p.id]?'<span class="tag war">guerre</span>':'';
+    var row=document.createElement('div');row.className='lbrow'+(p.id===ME?' me':'');
+    row.innerHTML='<span class="sw" style="background:rgb('+p.rgb.join(',')+')"></span>'+
+      '<span class="nm">'+p.flag+' '+p.name+(p.traitor?' 🗡️':'')+'</span>'+tag+'<span class="pc">'+pc+'%</span>';
+    list.appendChild(row);
+  });
+}
+function refreshDiplo(){
+  if(document.getElementById('diplo').classList.contains('hidden'))return;
+  var list=document.getElementById('diploList'),me=players[ME];list.innerHTML='';
+  players.slice(1).filter(function(p){return p&&p.id!==ME;}).forEach(function(p){
+    var row=document.createElement('div');row.className='diprow';
+    var st=!p.alive?'<span class="tag dead">éliminée</span>':me.allies[p.id]?'<span class="tag ally">alliée</span>':me.war[p.id]?'<span class="tag war">en guerre</span>':'';
+    var btn;
+    if(!p.alive)btn='<button class="dbtn dis" disabled>—</button>';
+    else if(me.allies[p.id])btn='<button class="dbtn break" data-b="'+p.id+'">Rompre</button>';
+    else btn='<button class="dbtn ally" data-a="'+p.id+'">Alliance</button>';
+    row.innerHTML='<span class="sw" style="width:14px;height:14px;border-radius:4px;background:rgb('+p.rgb.join(',')+')"></span>'+
+      '<span class="nm">'+p.flag+' '+p.name+'<br><small style="opacity:.6">'+PERSO_FR[p.perso]+'</small></span>'+st+btn;
+    list.appendChild(row);
+  });
+  [].forEach.call(list.querySelectorAll('[data-a]'),function(b){b.onclick=function(){requestAlliance(ME,+b.dataset.a);
+    flash('Demande envoyée à '+players[+b.dataset.a].name+'…');refreshDiplo();};});
+  [].forEach.call(list.querySelectorAll('[data-b]'),function(b){b.onclick=function(){breakAlliance(ME,+b.dataset.b,false);refreshDiplo();};});
+}
+
+// HUD haut
+function refreshHUD(){
+  var me=players[ME];if(!me)return;
+  document.getElementById('sTroops').textContent=fmt(me.troops);
+  document.getElementById('sGold').textContent=fmt(me.gold);
+  document.getElementById('sLand').textContent=Math.round(me.tiles/Math.max(1,landTotal())*100)+'%';
+}
+
+// Pause
+document.getElementById('btnPause').onclick=function(){if(!running)return;paused=true;show('paused');};
+document.getElementById('resumeBtn').onclick=function(){paused=false;show('none');};
+document.getElementById('quitBtn').onclick=function(){running=false;show('start');};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ÉCRANS
+// ═══════════════════════════════════════════════════════════════════════════
+function show(which){
+  ['start','over','paused'].forEach(function(id){document.getElementById(id).classList.toggle('hidden',id!==which);});
+}
+// sélecteurs de l'écran de démarrage
+function buildColorPick(){
+  var cp=document.getElementById('colorPick');cp.innerHTML='';
+  PALETTE.forEach(function(pal,idx){var d=document.createElement('div');d.className='col'+(idx+1===settings.color?' sel':'');
+    d.style.background='rgb('+pal.rgb.join(',')+')';d.title=pal.name;
+    d.onclick=function(){settings.color=idx+1;buildColorPick();};cp.appendChild(d);});
+}
+function chipGroup(id,attr,key,cast){
+  var g=document.getElementById(id);
+  [].forEach.call(g.children,function(c){c.onclick=function(){
+    [].forEach.call(g.children,function(x){x.classList.remove('sel');});c.classList.add('sel');
+    settings[key]=cast?cast(c.dataset[attr]):c.dataset[attr];};});
+}
+buildColorPick();
+chipGroup('nationsPick','n','nations',function(v){return +v;});
+chipGroup('diffPick','d','diff');
+chipGroup('mapPick','m','map',function(v){return +v;});
+document.getElementById('playBtn').onclick=function(){startGame();};
+document.getElementById('replayBtn').onclick=function(){show('start');};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BOUCLE PRINCIPALE
+// ═══════════════════════════════════════════════════════════════════════════
+var acc=0,last=0,hudClock=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  var dt=Math.min(0.05,(ts-last)/1000)||0;last=ts;
+  if(running&&!paused){
+    acc+=dt;var guard=0;
+    while(acc>=TICK&&guard++<6){simTick(TICK);acc-=TICK;}
+    hudClock-=dt;if(hudClock<=0){hudClock=0.2;refreshHUD();refreshDock();
+      if(!document.getElementById('board').classList.contains('hidden'))refreshBoard();}
+  }
+  if(running)draw();
+}
+updateRatLabel();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

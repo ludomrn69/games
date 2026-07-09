@@ -19,7 +19,7 @@
 */
 // La version est estampillée automatiquement (empreinte du contenu mis en cache)
 // par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
-var CACHE = 'jeux-c10c6579cc';
+var CACHE = 'jeux-1683c3c687';
 var ASSETS = [
   './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
   'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/pixelifysans-latin-ext.woff2', 'fonts/pixelifysans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',
@@ -30,18 +30,18 @@ var ASSETS = [
   'games/cluedo.html', 'games/codenames.html', 'games/crack-list.html', 'games/dames.html', 'games/diamants.html', 'games/dobble-emoji.html',
   'games/juste-prix.html', 'games/lapaye.html', 'games/loupgarou.html', 'games/ludo.html', 'games/lynx.html', 'games/mastermind.html',
   'games/millebornes.html', 'games/mini-metro.html', 'games/mini-motorways.html', 'games/monopoly.html', 'games/morpion.html', 'games/nothanks.html',
-  'games/papayoo.html', 'games/patches.html', 'games/perudo.html', 'games/petit-bac.html', 'games/pictionary.html', 'games/playus/arena.html',
-  'games/playus/astro-glide.html', 'games/playus/balldrop.html', 'games/playus/balloon-pop.html', 'games/playus/ballracer.html', 'games/playus/balls-cups.html', 'games/playus/bloopy.html',
-  'games/playus/bouncy.html', 'games/playus/boxguesser.html', 'games/playus/call-me.html', 'games/playus/center-hit.html', 'games/playus/color-memory.html', 'games/playus/color-reflex.html',
-  'games/playus/count.html', 'games/playus/dangerwall.html', 'games/playus/descend.html', 'games/playus/drift.html', 'games/playus/flap.html', 'games/playus/grid.html',
-  'games/playus/jumpy.html', 'games/playus/keep-up.html', 'games/playus/kenneys-race.html', 'games/playus/knife-throw.html', 'games/playus/memorizer.html', 'games/playus/memory.html',
-  'games/playus/ninja-chop.html', 'games/playus/on-time.html', 'games/playus/perfect-shape.html', 'games/playus/piano.html', 'games/playus/react.html', 'games/playus/rhythm.html',
-  'games/playus/slicer.html', 'games/playus/snake.html', 'games/playus/speed-tap.html', 'games/playus/speedgolf.html', 'games/playus/swipe-fast.html', 'games/playus/sword-balance.html',
-  'games/playus/target-speed.html', 'games/playus/tilted.html', 'games/playus/times-up.html', 'games/playus/tower-stack.html', 'games/playus/trampbox.html', 'games/playus/zig.html',
-  'games/poker.html', 'games/president.html', 'games/puissance4.html', 'games/queens.html', 'games/reversi.html', 'games/sixnimmt.html',
-  'games/skyjo.html', 'games/soiree.html', 'games/solitaire.html', 'games/sudoku.html', 'games/sutom.html', 'games/tango.html',
-  'games/telephone-dessine.html', 'games/themind.html', 'games/timesup.html', 'games/trio.html', 'games/undercover.html', 'games/uno.html',
-  'games/yams.html', 'games/zip.html'
+  'games/openfront.html', 'games/papayoo.html', 'games/patches.html', 'games/perudo.html', 'games/petit-bac.html', 'games/pictionary.html',
+  'games/playus/arena.html', 'games/playus/astro-glide.html', 'games/playus/balldrop.html', 'games/playus/balloon-pop.html', 'games/playus/ballracer.html', 'games/playus/balls-cups.html',
+  'games/playus/bloopy.html', 'games/playus/bouncy.html', 'games/playus/boxguesser.html', 'games/playus/call-me.html', 'games/playus/center-hit.html', 'games/playus/color-memory.html',
+  'games/playus/color-reflex.html', 'games/playus/count.html', 'games/playus/dangerwall.html', 'games/playus/descend.html', 'games/playus/drift.html', 'games/playus/flap.html',
+  'games/playus/grid.html', 'games/playus/jumpy.html', 'games/playus/keep-up.html', 'games/playus/kenneys-race.html', 'games/playus/knife-throw.html', 'games/playus/memorizer.html',
+  'games/playus/memory.html', 'games/playus/ninja-chop.html', 'games/playus/on-time.html', 'games/playus/perfect-shape.html', 'games/playus/piano.html', 'games/playus/react.html',
+  'games/playus/rhythm.html', 'games/playus/slicer.html', 'games/playus/snake.html', 'games/playus/speed-tap.html', 'games/playus/speedgolf.html', 'games/playus/swipe-fast.html',
+  'games/playus/sword-balance.html', 'games/playus/target-speed.html', 'games/playus/tilted.html', 'games/playus/times-up.html', 'games/playus/tower-stack.html', 'games/playus/trampbox.html',
+  'games/playus/zig.html', 'games/poker.html', 'games/president.html', 'games/puissance4.html', 'games/queens.html', 'games/reversi.html',
+  'games/sixnimmt.html', 'games/skyjo.html', 'games/soiree.html', 'games/solitaire.html', 'games/sudoku.html', 'games/sutom.html',
+  'games/tango.html', 'games/telephone-dessine.html', 'games/themind.html', 'games/timesup.html', 'games/trio.html', 'games/undercover.html',
+  'games/uno.html', 'games/yams.html', 'games/zip.html'
 ];
 
 self.addEventListener('install', function (e) {

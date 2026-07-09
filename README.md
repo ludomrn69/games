@@ -86,6 +86,7 @@ la synchro temps réel.
 | 🚗 Mini Motorways | 1 | ✈️ | gestion / routes (solo) |
 | 🙅 No Thanks! | 2–7 | ✈️ | stop-ou-encore |
 | 🎲 Yam's | 1–6 | ✈️ | dés / combinaisons |
+| 🗺️ OpenFront | 1 | ✈️ | stratégie / conquête (solo vs IA) |
 
 <!-- GAMES:END -->
 
