@@ -40,7 +40,7 @@
   .sl input[type=range]{width:100%;accent-color:#2c7be5;height:20px}
   .dock{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
   .dock::-webkit-scrollbar{display:none}
-  .build{flex:0 0 auto;min-width:62px;border:1px solid rgba(255,255,255,.1);background:rgba(18,22,32,.85);color:#eaeaf0;
+  .build{position:relative;flex:0 0 auto;min-width:62px;border:1px solid rgba(255,255,255,.1);background:rgba(18,22,32,.85);color:#eaeaf0;
     border-radius:13px;padding:7px 8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
   .build:active{transform:scale(.95)}
   .build.sel{border-color:#f2b705;background:rgba(60,50,15,.9)}
@@ -48,6 +48,11 @@
   .build .e{font-size:1.3rem;line-height:1}
   .build .t{font-size:.6rem;font-weight:700;white-space:nowrap}
   .build .c{font-size:.58rem;opacity:.8;font-weight:700;color:#f2c94c;white-space:nowrap}
+  .build .kbd{position:absolute;top:3px;left:5px;font-size:.52rem;font-weight:800;opacity:.55;
+    border:1px solid rgba(255,255,255,.3);border-radius:4px;padding:0 3px;line-height:1.35}
+  .kbdhint{font-size:.72rem;opacity:.55;margin-top:6px;line-height:1.5}
+  /* Sur écran tactile (mobile/iPad sans souris) : pas de badges ni d'aide clavier. */
+  @media (hover:none),(pointer:coarse){ .build .kbd{display:none} .kbdhint{display:none} }
 
   /* ── Panneaux (leaderboard / diplo) ───────────────────────── */
   .panel{position:fixed;top:58px;right:10px;width:min(300px,86vw);max-height:70vh;overflow-y:auto;z-index:8;
@@ -165,6 +170,7 @@
   <button class="btn" id="playBtn">Jouer ▶</button>
   <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#8b5cf6,#b794f6);box-shadow:0 10px 30px rgba(139,92,246,.4)">🗓️ Défi du jour</button>
   <div id="recLine" style="font-size:.8rem;opacity:.72;margin-top:2px"></div>
+  <div class="kbdhint">⌨️ Clavier : <b>1–9</b> construire · <b>Échap</b> annuler · <b>Espace</b> pause · <b>+/−</b> vitesse · <b>D</b> diplomatie · <b>L</b> classement · <b>flèches</b> se déplacer</div>
 </div>
 
 <div class="screen hidden" id="over">
@@ -476,6 +482,26 @@ cv.addEventListener('pointercancel',function(e){delete pointers[e.pointerId];las
 cv.addEventListener('wheel',function(e){e.preventDefault();var mx=e.clientX,my=e.clientY,wx=mx/cam.zoom+cam.x,wy=my/cam.zoom+cam.y;
   cam.zoom*=e.deltaY<0?1.15:0.87;clampCam();cam.x=wx-mx/cam.zoom;cam.y=wy-my/cam.zoom;clampCam();},{passive:false});
 
+// ── Raccourcis clavier (ordinateur ; ignorés au tactile) ──────────────────────
+function setSpeed(v){speed=clamp(v,1,3);document.getElementById('btnSpeed').textContent=speed+'×';}
+addEventListener('keydown',function(e){
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  var k=e.key;
+  if(!running){ if(k==='Enter'){startGame(false);e.preventDefault();} return; }
+  if(k>='1'&&k<='9'){ var idx=+k-1; if(idx<BUILDS_UI.length){toggleBuild(BUILDS_UI[idx]);e.preventDefault();} return; }
+  if(k==='Escape'){ if(mode)setMode(null); else {document.getElementById('board').classList.add('hidden');document.getElementById('diplo').classList.add('hidden');} return; }
+  if(k===' '){ e.preventDefault(); if(paused){paused=false;show('none');} else {paused=true;show('paused');} return; }
+  if(k==='d'||k==='D'){ togglePanel('diplo'); return; }
+  if(k==='l'||k==='L'||k==='c'||k==='C'){ togglePanel('board'); return; }
+  if(k==='+'||k==='='){ setSpeed(speed+1); return; }
+  if(k==='-'||k==='_'){ setSpeed(speed-1); return; }
+  var pan=60/cam.zoom;
+  if(k==='ArrowLeft'){cam.x-=pan;clampCam();e.preventDefault();}
+  else if(k==='ArrowRight'){cam.x+=pan;clampCam();e.preventDefault();}
+  else if(k==='ArrowUp'){cam.y-=pan;clampCam();e.preventDefault();}
+  else if(k==='ArrowDown'){cam.y+=pan;clampCam();e.preventDefault();}
+});
+
 function onTap(tile){
   if(tile<0||!running||!E)return;var me=E.players[ME];
   if(mode){if(mode.build)tryBuild(tile,mode.build);else if(mode.nuke)tryNuke(tile,mode.nuke);setMode(null);return;}
@@ -506,8 +532,8 @@ function tryNuke(tile,kind){
 var dock=document.getElementById('dock');
 function buildDock(){
   dock.innerHTML='';
-  BUILDS_UI.forEach(function(b){var el=document.createElement('button');el.className='build';el.dataset.k=b.k;
-    el.innerHTML='<span class="e">'+b.e+'</span><span class="t">'+b.t+'</span><span class="c">'+fmt(E.BUILD[b.k].cost)+'</span>';
+  BUILDS_UI.forEach(function(b,i){var el=document.createElement('button');el.className='build';el.dataset.k=b.k;
+    el.innerHTML=(i<9?'<span class="kbd">'+(i+1)+'</span>':'')+'<span class="e">'+b.e+'</span><span class="t">'+b.t+'</span><span class="c">'+fmt(E.BUILD[b.k].cost)+'</span>';
     el.onclick=function(){toggleBuild(b);};dock.appendChild(el);});
 }
 function toggleBuild(b){
