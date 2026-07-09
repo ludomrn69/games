@@ -685,7 +685,7 @@ function onTap(tile){
 }
 function tryBuild(tile,k){
   var r=E.build(tile,k,ME);
-  if(r===true){var b=BUILDS_UI.filter(function(x){return x.k===k;})[0];flash(b.e+' '+b.t+' construit.');sound('coin');vibrate(14);}
+  if(r===true){var b=BUILDS_UI.filter(function(x){return x.k===k;})[0];flash(b.e+' '+b.t+' construit'+(k==='defense'?' — ralentit les attaques ennemies alentour.':'.'));sound('coin');vibrate(14);}
   else{flash({territoire:'Construis sur ton territoire.','occupé':'Case déjà occupée.','côte':'Un port doit être sur la côte.',or:'Pas assez d\'or.'}[r]||'Impossible ici.');sound('error');}
 }
 function tryNuke(tile,kind){

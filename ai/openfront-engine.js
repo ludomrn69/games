@@ -210,7 +210,7 @@
         for (var k = 0; k < nn.length; k++) { var n = nn[k]; if (capturable(n, a.atk, a.tgt)) { var c = tileCost(n, a.atk, a.tgt); if (c < bc) { bc = c; best = n; } } }
         if (best < 0) { a.head++; continue; }
         if (a.troops < bc) { a.dead = true; atk.troops += a.troops * 0.5; a.troops = 0; break; }
-        var prev = owner[best];
+        var prev = owner[best], defended = (defMap[best] > 0 && a.tgt > 0) ? defMap[best] : 0;
         if (prev > 0) {
           atk.gold += players[prev].wild ? 9 : 4;                               // butin : les territoires sauvages rapportent plus
           if (structAt[best]) { atk.gold += structAt[best].k === 'city' ? 3000 : 800; removeStruct(best); } // pillage
@@ -218,6 +218,8 @@
           var dp = players[prev]; dp.tiles--; dp.troops = Math.max(0, dp.troops - bc * 0.8); if (dp.tiles <= 0) eliminate(prev, a.atk);
         }
         owner[best] = a.atk; atk.tiles++; a.troops -= bc;
+        // POSTES DE DÉFENSE : ralentissent la progression (le front rampe dans la zone défendue)
+        if (defended) steps -= Math.min(9, defended * 3);
         if (!a.seen.has(best)) { a.seen.add(best); a.front.push(best); }
         did++;
         if (a.head > 20000) { a.front = a.front.slice(a.head); a.head = 0; }
