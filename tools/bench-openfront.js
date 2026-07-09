@@ -20,11 +20,12 @@ var failures = [];
 var W = 120, H = 74;
 
 function pct(a, b) { return Math.round(a / Math.max(1, b) * 100); }
+function mkNations(diffs, persos) { return diffs.map(function (d, i) { return { perso: persos[i], diff: d }; }); }
 
 // Fait tourner une partie jusqu'à résolution (ou plafond). Renvoie l'état final.
 function runToEnd(seed, diffs, persos, cap) {
-  var g = ENG.createGame({ seed: seed, w: W, h: H, nations: diffs.length, diffs: diffs, persos: persos });
-  var land = g.LAND_TOTAL(), resolved = false, t = 0, lastSig = -1, stall = 0;
+  var g = ENG.createGame({ seed: seed, w: W, h: H, nations: mkNations(diffs, persos) });
+  var land = g.landTotal(), resolved = false, t = 0, lastSig = -1, stall = 0;
   for (; t < cap; t++) {
     g.step(0.1);
     var al = g.aliveIds();
@@ -51,7 +52,7 @@ function allianceComponents(g, ids) {
 
 // Territoire à un horizon fixe (comparaison stable difficile vs facile).
 function runToHorizon(seed, diffs, persos, ticks) {
-  var g = ENG.createGame({ seed: seed, w: W, h: H, nations: diffs.length, diffs: diffs, persos: persos });
+  var g = ENG.createGame({ seed: seed, w: W, h: H, nations: mkNations(diffs, persos) });
   for (var t = 0; t < ticks; t++) g.step(0.1);
   return g;
 }
@@ -100,6 +101,23 @@ function runToHorizon(seed, diffs, persos, ticks) {
   var line = ENG.PERSOS.map(function (p) { return p + ' ' + Math.round(sum[p] / Math.max(1, cnt[p])); }).join(' · ');
   console.log('Personnalités (territoire moyen) : ' + line + '.');
   ENG.PERSOS.forEach(function (p) { if (sum[p] === 0) failures.push('Personnalité « ' + p + ' » ne conquiert jamais rien (bug ?).'); });
+})();
+
+// ── 4. Monotonie de la difficulté (facile < normal < difficile < insane) ────
+(function () {
+  var games = FULL ? 30 : 14, ticks = 1600, levels = ['easy', 'normal', 'hard', 'insane'], avg = {};
+  levels.forEach(function (lv) {
+    var tot = 0;
+    for (var s = 0; s < games; s++) {
+      var diffs = [lv, lv, lv, lv], persos = ['balanced', 'balanced', 'balanced', 'balanced'];
+      var g = runToHorizon(20000 + s * 61 + lv.length, diffs, persos, ticks);
+      for (var id = 1; id <= 4; id++) tot += g.tilesOf(id);
+    }
+    avg[lv] = Math.round(tot / games);
+  });
+  console.log('Monotonie difficulté (territoire moyen/partie) : ' + levels.map(function (l) { return l + ' ' + avg[l]; }).join(' < '));
+  if (!(avg.easy < avg.normal && avg.normal < avg.hard && avg.hard <= avg.insane * 1.02))
+    failures.push('Monotonie : le territoire devrait croître avec la difficulté (' + levels.map(function (l) { return avg[l]; }).join(' / ') + ').');
 })();
 
 if (failures.length) { console.error('\n❌ OpenFront bench : ' + failures.length + ' échec(s) :\n - ' + failures.join('\n - ')); process.exit(1); }

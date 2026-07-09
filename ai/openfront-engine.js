@@ -1,20 +1,19 @@
 /*
-  ai/openfront-engine.js — Cœur de simulation PUR d'OpenFront (sans DOM).
+  ai/openfront-engine.js — SIMULATION COMPLÈTE d'OpenFront, sans DOM (source unique).
 
-  Objectif : disposer d'un moteur headless, déterministe (RNG seedé), qui reproduit
-  fidèlement les RÈGLES qui font la force de l'IA : génération de carte, économie
-  (troupes/or, plafond de population), expansion/guerre par fronts, structures
-  (ville/défense), diplomatie (alliances, coalition anti-leader, focus-fire, repli)
-  et conditions de victoire.
+  Ce module EST le jeu : carte (procédurale + cartes réalistes), économie (troupes/or,
+  plafond de population), expansion/guerre par fronts, structures (ville, port, défense,
+  silo, SAM), unités (bateaux, commerce, navires, missiles + interception SAM),
+  diplomatie (alliances, coalition anti-leader, focus-fire, repli, trahison), traits de
+  nation et IA à personnalités × difficulté. Déterministe (RNG seedé).
 
-  Il est chargé par la page de jeu (games/openfront.html, via data-engine) ET par le
-  banc d'essai (tools/bench-openfront.js) — même logique des deux côtés, donc le
-  benchmark mesure la VRAIE IA. Aucune dépendance : marche dans le navigateur
-  (window.OpenFrontEngine) comme dans Node (module.exports).
+  Chargé À LA FOIS par la page (games/openfront.html : rendu + entrées + son) et par le
+  banc d'essai (tools/bench-openfront.js). Une seule logique → le benchmark mesure la
+  VRAIE IA et le jeu ne peut plus « dériver » du test. La page ne garde que l'affichage,
+  les entrées, l'UI, le son et le brouillard (une vue, pas une règle).
 
-  API : OpenFrontEngine.createGame(opts) → { step(dt), owner, players, tilesOf(id),
-        aliveIds(), winner(), leaderId, launchAttack(...), build(...) , … }
-        opts = { seed, w, h, nations, persos:[], diffs:[], meId }
+  API : OpenFrontEngine.createGame(opts) → moteur (voir le `return` en bas).
+        opts = { seed, w, h, mapType, meId, nations:[{name,flag,rgb,perso,diff,trait,human}] }
 */
 (function (root, factory) {
   if (typeof module !== 'undefined' && module.exports) module.exports = factory();
@@ -23,10 +22,33 @@
   'use strict';
   var OCEAN = 0, LAND = 1;
   var PERSOS = ['aggressive', 'defensive', 'expansionist', 'opportunist', 'balanced'];
+  var TRAITS = ['none', 'expansion', 'economy', 'military', 'fortress', 'naval'];
+  // Coûts (or) et paramètres des constructions — source unique partagée avec l'UI.
+  var BUILD = {
+    city:   { cost: 5000,  need: 'land' },
+    port:   { cost: 4000,  need: 'coast' },
+    defense:{ cost: 2000,  need: 'land' },
+    silo:   { cost: 9000,  need: 'land' },
+    sam:    { cost: 7000,  need: 'land' },
+    warship:{ cost: 4500,  need: 'portUnit' },
+    atom:   { cost: 12000, need: 'nuke', r: 6,  warheads: 1 },
+    hydro:  { cost: 26000, need: 'nuke', r: 12, warheads: 1 },
+    mirv:   { cost: 45000, need: 'nuke', r: 7,  warheads: 3 }
+  };
+  var WORLD_BLOBS = [
+    [0.17,0.32,0.11,0.15],[0.22,0.50,0.03,0.06],[0.28,0.72,0.06,0.16],
+    [0.49,0.30,0.05,0.06],[0.53,0.60,0.09,0.16],
+    [0.72,0.31,0.15,0.13],[0.66,0.50,0.04,0.05],[0.80,0.55,0.05,0.04],
+    [0.86,0.78,0.06,0.05]
+  ];
+  var EUROPE_BLOBS = [
+    [0.20,0.70,0.05,0.05],[0.31,0.55,0.055,0.055],[0.24,0.33,0.035,0.055],
+    [0.47,0.17,0.05,0.11],[0.49,0.47,0.08,0.07],[0.44,0.69,0.02,0.075],
+    [0.56,0.62,0.05,0.06],[0.72,0.42,0.13,0.13],[0.73,0.73,0.06,0.04]
+  ];
 
   function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; var t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
-
   function valueNoise(seed) {
     var pr = mulberry32(seed), gw = 24, gh = 16, g = new Float32Array(gw * gh);
     for (var i = 0; i < g.length; i++) g[i] = pr();
@@ -37,51 +59,69 @@
       return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
     };
   }
+  function skillOf(diff) { return diff === 'insane' ? 1.3 : diff === 'hard' ? 1 : diff === 'easy' ? 0 : 0.6; }
 
   function createGame(opts) {
     opts = opts || {};
-    var MW = opts.w || 160, MH = opts.h || 100, N = MW * MH;
+    var MW = opts.w || 200, MH = opts.h || 125, N = MW * MH;
     var seed = opts.seed != null ? opts.seed : (Math.random() * 1e9) | 0;
     var rng = mulberry32(seed);
     var mapType = opts.mapType != null ? opts.mapType : 1;
-    var nations = opts.nations || 6;
+    var meId = opts.meId || 0;
+    var nationData = opts.nations || [];
+    var nations = nationData.length || opts.nations || 6;
 
     var terr = new Uint8Array(N), elev = new Uint8Array(N), owner = new Int16Array(N), defMap = new Uint8Array(N);
-    var players = [null], attacks = [], attackKey = {};
-    var touch = [], touchesNeutral = [], borderTiles = [], centroid = [];
-    var LAND_TOTAL = 0, leaderId = 0, elapsed = 0, touchClock = 0;
-    var meId = opts.meId || 0;
+    var players = [null], attacks = [], attackKey = {}, units = [], structAt = {};
+    var touch = [], touchesNeutral = [], hasCoastCache = [], borderTiles = [], centroid = [], coastTiles = [];
+    var LAND_TOTAL = 0, leaderId = 0, elapsed = 0, touchClock = 0, tradeClock = 0, invasionCd = 0;
+    var events = [];
+    function emit(type, o) { o = o || {}; o.type = type; events.push(o); }
 
     function nb4(i) { var x = i % MW, y = (i / MW) | 0, r = []; if (x > 0) r.push(i - 1); if (x < MW - 1) r.push(i + 1); if (y > 0) r.push(i - MW); if (y < MH - 1) r.push(i + MW); return r; }
     function terrainMult(i) { var e = elev[i]; return e > 200 ? 2.6 : e > 150 ? 1.7 : e > 90 ? 1.15 : 1; }
+    function isCoast(i) { if (terr[i] !== LAND) return false; var nn = nb4(i); for (var k = 0; k < nn.length; k++) if (terr[nn[k]] === OCEAN) return true; return false; }
 
-    // ── Carte (procédurale, même formule que la page) ──────────────────────────
+    // ── Carte ──────────────────────────────────────────────────────────────────
     function genMap() {
       var oct = [valueNoise(seed), valueNoise(seed * 7 + 3), valueNoise(seed * 13 + 9), valueNoise(seed * 29 + 1)];
       var amp = [1, 0.5, 0.26, 0.13], sc = [1, 2.1, 4.3, 8.7];
       function fbm(nx, ny) { var e = 0, tot = 0; for (var o = 0; o < 4; o++) { e += oct[o](nx * sc[o] % 1, ny * sc[o] % 1) * amp[o]; tot += amp[o]; } return e / tot; }
-      var sea = mapType === 2 ? 0.30 : mapType === 0 ? 0.42 : 0.50;
-      var edge = mapType === 2 ? 0.55 : mapType === 0 ? 0.9 : 1.15;
-      for (var y = 0; y < MH; y++) for (var x = 0; x < MW; x++) {
-        var i = y * MW + x, nx = x / MW, ny = y / MH, e = fbm(nx, ny);
-        var dx = (nx - 0.5) * 2, dy = (ny - 0.5) * 2, d = Math.sqrt(dx * dx + dy * dy);
-        e -= Math.max(0, (d - 0.35)) * edge;
-        if (mapType === 1) e -= Math.abs(oct[1](nx * 3 % 1, ny * 3 % 1) - 0.5) * 0.35;
-        if (e > sea) { terr[i] = LAND; elev[i] = clamp(Math.round((e - sea) / (1 - sea) * 255), 0, 255); }
-        else { terr[i] = OCEAN; elev[i] = clamp(Math.round(e / sea * 255), 0, 255); }
+      var i;
+      if (mapType >= 3) {
+        var blobs = (mapType === 3) ? WORLD_BLOBS : EUROPE_BLOBS;
+        for (var y = 0; y < MH; y++) for (var x = 0; x < MW; x++) {
+          i = y * MW + x; var nx = x / MW, ny = y / MH, cov = 0;
+          for (var bI = 0; bI < blobs.length; bI++) { var B = blobs[bI], ddx = (nx - B[0]) / B[2], ddy = (ny - B[1]) / B[3]; cov += Math.exp(-(ddx * ddx + ddy * ddy)); }
+          cov += (fbm(nx, ny) - 0.5) * 0.55;
+          var land = cov > 0.55 && nx > 0.015 && nx < 0.985 && ny > 0.02 && ny < 0.98;
+          if (land) { terr[i] = LAND; elev[i] = clamp(Math.round(clamp((cov - 0.55) / 1.15, 0, 1) * 255), 0, 255); }
+          else { terr[i] = OCEAN; elev[i] = clamp(Math.round(clamp(cov / 0.55, 0, 1) * 120), 0, 255); }
+        }
+      } else {
+        var sea = mapType === 2 ? 0.30 : mapType === 0 ? 0.42 : 0.50;
+        var edge = mapType === 2 ? 0.55 : mapType === 0 ? 0.9 : 1.15;
+        for (var y2 = 0; y2 < MH; y2++) for (var x2 = 0; x2 < MW; x2++) {
+          i = y2 * MW + x2; var e = fbm(x2 / MW, y2 / MH);
+          var dx = (x2 / MW - 0.5) * 2, dy = (y2 / MH - 0.5) * 2, d = Math.sqrt(dx * dx + dy * dy);
+          e -= Math.max(0, (d - 0.35)) * edge;
+          if (mapType === 1) e -= Math.abs(oct[1]((x2 / MW) * 3 % 1, (y2 / MH) * 3 % 1) - 0.5) * 0.35;
+          if (e > sea) { terr[i] = LAND; elev[i] = clamp(Math.round((e - sea) / (1 - sea) * 255), 0, 255); }
+          else { terr[i] = OCEAN; elev[i] = clamp(Math.round(e / sea * 255), 0, 255); }
+        }
       }
       for (var p = 0; p < 2; p++) { var snap = terr.slice();
         for (i = 0; i < N; i++) { var nn = nb4(i), ld = 0; for (var k = 0; k < nn.length; k++) if (snap[nn[k]] === LAND) ld++;
           if (snap[i] === OCEAN && ld >= nn.length) terr[i] = LAND; if (snap[i] === LAND && ld === 0) terr[i] = OCEAN; } }
-      LAND_TOTAL = 0; for (i = 0; i < N; i++) if (terr[i] === LAND) LAND_TOTAL++;
+      LAND_TOTAL = 0; coastTiles = [];
+      for (i = 0; i < N; i++) if (terr[i] === LAND) LAND_TOTAL++;
+      for (i = 0; i < N; i++) if (isCoast(i)) coastTiles.push(i);
     }
-
     function spawnBlob(id, center, radius) {
       var cx = center % MW, cy = (center / MW) | 0, q = [center], seen = {}; seen[center] = 1;
       var got = 0, cap = radius * radius * 3;
       while (q.length && got < cap) { var i = q.shift(), x = i % MW, y = (i / MW) | 0;
-        if (terr[i] !== LAND || owner[i] !== 0) continue;
-        if (Math.hypot(x - cx, y - cy) > radius) continue;
+        if (terr[i] !== LAND || owner[i] !== 0) continue; if (Math.hypot(x - cx, y - cy) > radius) continue;
         owner[i] = id; got++;
         var nn = nb4(i); for (var k = 0; k < nn.length; k++) if (!seen[nn[k]]) { seen[nn[k]] = 1; q.push(nn[k]); } }
       return got;
@@ -98,30 +138,33 @@
       return pts;
     }
 
-    function makePlayer(id, human, perso, diff) {
-      return { id: id, human: human, perso: perso, diff: diff || 'normal', alive: true,
-        gold: 1000, troops: 6000, tiles: 0, cities: 0, defenses: 0,
+    function makePlayer(id, data) {
+      return { id: id, name: data.name || ('IA ' + id), flag: data.flag || '⚑', rgb: data.rgb || [200, 200, 200],
+        human: !!data.human, perso: data.perso || null, diff: data.diff || 'normal', trait: data.trait || 'none',
+        alive: true, gold: 1000, troops: 6000, tiles: 0, cities: 0, ports: 0, silos: 0, sams: 0, defenses: 0,
         allies: {}, war: {}, traitor: false, seed: 0, ratio: 0.55, focus: 0, prevTiles: 0, aiCd: rng() * 1.5 };
     }
 
-    // ── Économie (identique page) ─────────────────────────────────────────────
+    // ── Économie (traits appliqués) ──────────────────────────────────────────
     function armyCap(p) { return 5000 + p.tiles * 120 + p.cities * 25000; }
     function economy(p, dt) {
       if (!p.alive) return;
       var rat = p.ratio, cap = armyCap(p);
-      var grow = (cap - p.troops) * 0.16 * (0.35 + rat) * dt + p.tiles * 2.2 * dt;
-      p.troops = clamp(p.troops + grow, 0, cap);
-      p.gold += (p.tiles * 0.34 + p.cities * 5 + 8) * (1.35 - rat * 0.85) * dt;
+      var grow = ((cap - p.troops) * 0.16 * (0.35 + rat) + p.tiles * 2.2) * (p.trait === 'military' ? 1.2 : 1);
+      p.troops = clamp(p.troops + grow * dt, 0, cap);
+      var inc = (p.tiles * 0.34 + p.ports * 11 + p.cities * 5 + 8) * (1.35 - rat * 0.85) * (p.trait === 'economy' ? 1.3 : 1);
+      p.gold += inc * dt;
     }
 
-    // ── Expansion / guerre (identique page) ───────────────────────────────────
+    // ── Expansion / guerre ───────────────────────────────────────────────────
     function capturable(i, atkId, tgt) {
       if (terr[i] !== LAND) return false; if (owner[i] !== tgt) return false; if (owner[i] === atkId) return false;
       if (tgt > 0 && players[atkId].allies[tgt]) return false; return true;
     }
     function tileCost(i, atkId, tgt) {
       var tm = terrainMult(i), base;
-      if (tgt === 0) base = 6; else { var d = players[tgt], dens = d.troops / Math.max(1, d.tiles); base = 4 + Math.sqrt(dens) * 3; }
+      if (tgt === 0) base = 6 * (players[atkId].trait === 'expansion' ? 0.8 : 1);
+      else { var d = players[tgt], dens = d.troops / Math.max(1, d.tiles); base = 4 + Math.sqrt(dens) * 3; if (d.trait === 'fortress') base *= 1.35; }
       if (defMap[i] > 0 && tgt > 0) base *= 1.9;
       return base * tm;
     }
@@ -170,62 +213,169 @@
     }
     function eliminate(id, by) {
       var p = players[id]; if (!p.alive) return; p.alive = false;
+      for (var idx in structAt) if (structAt[idx].owner === id) removeStruct(+idx);
       for (var i = 0; i < N; i++) if (owner[i] === id) owner[i] = 0; p.tiles = 0;
+      emit('eliminated', { id: id, by: by });
     }
 
-    // ── Structures (ville / défense) ──────────────────────────────────────────
+    // ── Structures ─────────────────────────────────────────────────────────────
     function stampDef(i, delta) { var x = i % MW, y = (i / MW) | 0, R = 4;
       for (var dy = -R; dy <= R; dy++) for (var dx = -R; dx <= R; dx++) { if (dx * dx + dy * dy > R * R) continue;
         var xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= MW || yy >= MH) continue; var j = yy * MW + xx; defMap[j] = clamp(defMap[j] + delta, 0, 255); } }
-    function build(i, k, ownerId) { var pl = players[ownerId];
-      if (k === 'city') pl.cities++; else if (k === 'defense') { pl.defenses++; stampDef(i, 1); } }
-    function placeAIStruct(p, k) {
-      var cost = k === 'city' ? 5000 : 2000; if (p.gold < cost) return;
-      var cands = []; for (var i = 0; i < N; i++) if (owner[i] === p.id) cands.push(i);
-      if (!cands.length) return; p.gold -= cost; build(cands[(rng() * cands.length) | 0], k, p.id);
+    function buildCost(k, ownerId) { var c = BUILD[k].cost; if (k === 'port' && players[ownerId] && players[ownerId].trait === 'naval') c *= 0.6; return Math.round(c); }
+    function placeStruct(i, k, ownerId) { var pl = players[ownerId]; structAt[i] = { k: k, owner: ownerId };
+      if (k === 'city') pl.cities++; else if (k === 'port') pl.ports++; else if (k === 'silo') pl.silos++; else if (k === 'sam') pl.sams++; else if (k === 'defense') { pl.defenses++; stampDef(i, 1); } }
+    function removeStruct(i) { var s = structAt[i]; if (!s) return; var pl = players[s.owner];
+      if (pl) { if (s.k === 'city') pl.cities--; else if (s.k === 'port') pl.ports--; else if (s.k === 'silo') pl.silos--; else if (s.k === 'sam') pl.sams--; else if (s.k === 'defense') { pl.defenses--; stampDef(i, -1); } }
+      delete structAt[i]; }
+    // Construction validée + facturée (renvoie true, ou une chaîne d'erreur).
+    function build(i, k, ownerId) {
+      var pl = players[ownerId], b = BUILD[k]; if (!b || !pl) return 'invalide';
+      if (owner[i] !== ownerId) return 'territoire';
+      if (structAt[i]) return 'occupé';
+      if (b.need === 'coast' && !isCoast(i)) return 'côte';
+      var cost = buildCost(k, ownerId); if (pl.gold < cost) return 'or';
+      pl.gold -= cost; placeStruct(i, k, ownerId); return true;
     }
+    function nearestStruct(ownerId, k, tx, ty) { var best = -1, bd = 1e9;
+      for (var idx in structAt) { var s = structAt[idx]; if (s.owner !== ownerId || s.k !== k) continue; var i = +idx, x = i % MW, y = (i / MW) | 0, d = (x - tx) * (x - tx) + (y - ty) * (y - ty); if (d < bd) { bd = d; best = i; } }
+      return best; }
 
-    // ── Adjacence + caches (identique page) ───────────────────────────────────
+    // ── Unités (bateaux / commerce / navires / missiles) ──────────────────────
+    function launchBoat(ownerId, fromTile, toTile, troops) {
+      var mul = players[ownerId].trait === 'naval' ? 1.25 : 1;
+      units.push({ type: 'boat', owner: ownerId, x: fromTile % MW + 0.5, y: (fromTile / MW | 0) + 0.5, tx: toTile % MW + 0.5, ty: (toTile / MW | 0) + 0.5, tgtTile: toTile, troops: troops * mul, spd: 11 });
+    }
+    function launchTrade(fromTile, toTile, ownerId, destOwner) {
+      units.push({ type: 'trade', owner: ownerId, dest: destOwner, x: fromTile % MW + 0.5, y: (fromTile / MW | 0) + 0.5, tx: toTile % MW + 0.5, ty: (toTile / MW | 0) + 0.5, tgtTile: toTile, gold: 900 + rng() * 700, spd: 8 });
+    }
+    function launchWarship(ownerId, atTile) {
+      units.push({ type: 'warship', owner: ownerId, x: atTile % MW + 0.5, y: (atTile / MW | 0) + 0.5, tx: atTile % MW + 0.5, ty: (atTile / MW | 0) + 0.5, home: atTile, spd: 9, cd: 0 });
+    }
+    function launchMissile(ownerId, fromTile, toTile, kind) {
+      var b = BUILD[kind];
+      units.push({ type: 'missile', owner: ownerId, x: fromTile % MW + 0.5, y: (fromTile / MW | 0) + 0.5, tx: toTile % MW + 0.5, ty: (toTile / MW | 0) + 0.5, tgtTile: toTile, r: b.r, warheads: b.warheads || 1, spd: 26, kind: kind });
+    }
+    function detonate(i0, radius, byId) {
+      var x0 = i0 % MW, y0 = (i0 / MW) | 0;
+      for (var dy = -radius; dy <= radius; dy++) for (var dx = -radius; dx <= radius; dx++) {
+        if (dx * dx + dy * dy > radius * radius) continue; var xx = x0 + dx, yy = y0 + dy; if (xx < 0 || yy < 0 || xx >= MW || yy >= MH) continue;
+        var i = yy * MW + xx; if (structAt[i]) removeStruct(i);
+        if (owner[i] > 0) { var p = players[owner[i]]; p.tiles--; p.troops = Math.max(0, p.troops - 40); owner[i] = 0; if (p.tiles <= 0) eliminate(p.id, byId); }
+      }
+      units.push({ type: 'blast', x: x0 + 0.5, y: y0 + 0.5, r: radius, t: 0, life: 0.7 });
+      emit('detonate', { by: byId });
+    }
+    function updateUnits(dt) {
+      for (var u = units.length - 1; u >= 0; u--) {
+        var it = units[u];
+        if (it.type === 'blast') { it.t += dt; if (it.t >= it.life) units.splice(u, 1); continue; }
+        var dx = it.tx - it.x, dy = it.ty - it.y, d = Math.hypot(dx, dy);
+        if (it.type === 'missile') {
+          var hit = false;
+          for (var idx in structAt) { var s = structAt[idx]; if (s.k !== 'sam') continue; if (s.owner === it.owner || players[s.owner].allies[it.owner]) continue;
+            var si = +idx, sx = si % MW, sy = (si / MW) | 0; if (Math.hypot(sx - it.x, sy - it.y) < 9 && rng() < 0.65 * dt * 8) { units.push({ type: 'blast', x: it.x, y: it.y, r: 2, t: 0, life: 0.5 }); units.splice(u, 1); hit = true; break; } }
+          if (hit) continue;
+        }
+        if (d < 0.6) { arrive(it); units.splice(u, 1); continue; }
+        var mv = it.spd * dt; it.x += dx / d * Math.min(mv, d); it.y += dy / d * Math.min(mv, d);
+        if (it.type === 'warship') {
+          it.cd = (it.cd || 0) - dt;
+          for (var v = units.length - 1; v >= 0; v--) { var e = units[v]; if (v === u) continue;
+            if ((e.type === 'boat' || e.type === 'trade') && e.owner !== it.owner && !players[it.owner].allies[e.owner]) {
+              if (Math.hypot(e.x - it.x, e.y - it.y) < 6) { it.tx = e.x; it.ty = e.y;
+                if (it.cd <= 0 && Math.hypot(e.x - it.x, e.y - it.y) < 2.5) { units.push({ type: 'blast', x: e.x, y: e.y, r: 1.5, t: 0, life: 0.4 }); units.splice(v, 1); it.cd = 1.2; if (v < u) u--; } break; } } }
+          if (it.tx === it.x && it.ty === it.y) { it.tx = it.home % MW + 0.5; it.ty = (it.home / MW | 0) + 0.5; }
+        }
+      }
+    }
+    function arrive(it) {
+      if (it.type === 'boat') {
+        var i = it.tgtTile; if (terr[i] !== LAND) return;
+        var prev = owner[i]; if (prev === it.owner || players[it.owner].allies[prev]) return;
+        if (prev > 0) { players[prev].tiles--; if (players[prev].tiles <= 0) eliminate(prev, it.owner); }
+        owner[i] = it.owner; players[it.owner].tiles++;
+        var a = { atk: it.owner, tgt: prev, troops: it.troops, front: [i], head: 0, seen: new Uint8Array(N), carry: 0, dead: false, aim: null }; a.seen[i] = 1; attacks.push(a);
+      } else if (it.type === 'trade') {
+        var o = players[it.owner], de = players[it.dest], mul = 1;
+        if (o && o.alive) { o.gold += it.gold * 0.6 * (o.trait === 'naval' ? 1.6 : 1); }
+        if (de && de.alive) { de.gold += it.gold * 0.4 * (de.trait === 'naval' ? 1.6 : 1); }
+      } else if (it.type === 'missile') {
+        if (it.warheads > 1) { for (var w = 0; w < it.warheads; w++) { var jx = clamp(it.tgtTile % MW + ((rng() - 0.5) * 14 | 0), 0, MW - 1), jy = clamp((it.tgtTile / MW | 0) + ((rng() - 0.5) * 14 | 0), 0, MH - 1); detonate(jy * MW + jx, it.r, it.owner); } }
+        else detonate(it.tgtTile, it.r, it.owner);
+      }
+    }
+    function nearestCoast(ownerId, tx, ty) { var best = -1, bd = 1e9;
+      for (var c = 0; c < coastTiles.length; c++) { var i = coastTiles[c]; if (owner[i] !== ownerId) continue; var x = i % MW, y = (i / MW) | 0, d = (x - tx) * (x - tx) + (y - ty) * (y - ty); if (d < bd) { bd = d; best = i; } }
+      return best; }
+    function coastNear(tile) { if (terr[tile] === LAND) return tile; var best = -1, bd = 1e9, x0 = tile % MW, y0 = (tile / MW) | 0;
+      for (var c = 0; c < coastTiles.length; c++) { var i = coastTiles[c]; var x = i % MW, y = (i / MW) | 0, d = (x - x0) * (x - x0) + (y - y0) * (y - y0); if (d < bd) { bd = d; best = i; } }
+      return best; }
+    function findOverseasTarget(id, fromTile) { var best = -1, bd = 1e9, fx = fromTile % MW, fy = (fromTile / MW) | 0;
+      for (var c = 0; c < coastTiles.length; c++) { var i = coastTiles[c]; var o = owner[i]; if (o === id || (o > 0 && players[id].allies[o])) continue; var x = i % MW, y = (i / MW) | 0, d = (x - fx) * (x - fx) + (y - fy) * (y - fy); if (d > 16 && d < bd) { bd = d; best = i; } }
+      return best; }
+
+    // ── Adjacence + caches ─────────────────────────────────────────────────────
     function computeTouch() {
-      var P = players.length; touch = []; touchesNeutral = []; borderTiles = []; centroid = [];
+      var P = players.length; touch = []; touchesNeutral = []; hasCoastCache = []; borderTiles = []; centroid = [];
       var sx = new Float64Array(P), sy = new Float64Array(P), cnt = new Float64Array(P);
-      for (var a = 0; a < P; a++) { touch.push(new Uint8Array(P)); touchesNeutral.push(false); borderTiles.push([]); centroid.push(null); }
-      for (var i = 0; i < N; i++) { var o = owner[i]; if (o <= 0) continue; var x = i % MW, y = (i / MW) | 0, isB = false;
+      for (var a = 0; a < P; a++) { touch.push(new Uint8Array(P)); touchesNeutral.push(false); hasCoastCache.push(false); borderTiles.push([]); centroid.push(null); }
+      for (var i = 0; i < N; i++) { var o = owner[i]; if (o <= 0) continue; var x = i % MW, y = (i / MW) | 0, isB = false, coast = false;
         sx[o] += x; sy[o] += y; cnt[o]++;
         var ns = [x > 0 ? i - 1 : -1, x < MW - 1 ? i + 1 : -1, y > 0 ? i - MW : -1, y < MH - 1 ? i + MW : -1];
-        for (var k = 0; k < 4; k++) { var n = ns[k]; if (n < 0) continue; if (terr[n] === OCEAN) continue; var no = owner[n];
+        for (var k = 0; k < 4; k++) { var n = ns[k]; if (n < 0) continue; if (terr[n] === OCEAN) { coast = true; continue; } var no = owner[n];
           if (no !== o) { isB = true; if (no > 0) touch[o][no] = 1; else touchesNeutral[o] = true; } }
-        if (isB) borderTiles[o].push(i); }
+        if (isB) borderTiles[o].push(i); if (coast) hasCoastCache[o] = true; }
       for (a = 1; a < P; a++) if (cnt[a] > 0) centroid[a] = { x: sx[a] / cnt[a], y: sy[a] / cnt[a] };
       leaderId = 0; var lt = -1; for (var q = 1; q < players.length; q++) if (players[q].alive && players[q].tiles > lt) { lt = players[q].tiles; leaderId = q; }
     }
     function neutralAdjacent(id) { return !!touchesNeutral[id]; }
+    function hasCoast(id) { return !!hasCoastCache[id]; }
+    function hasFrontier(id, tgt) { var bl = borderTiles[id]; if (!bl) return false;
+      for (var b = 0; b < bl.length; b++) { var i = bl[b]; if (owner[i] !== id) continue; var nn = nb4(i); for (var k = 0; k < nn.length; k++) if (capturable(nn[k], id, tgt)) return true; } return false; }
 
-    // ── Diplomatie (identique page) ───────────────────────────────────────────
+    // ── Diplomatie ─────────────────────────────────────────────────────────────
     function requestAlliance(fromId, toId) {
       var from = players[fromId], to = players[toId]; if (!from.alive || !to.alive || from.allies[toId]) return;
-      if (toId === meId) return; // décision humaine : gérée hors moteur
+      if (toId === meId) { emit('allyRequest', { from: fromId }); return; }
       if (aiAccepts(to, from)) makeAlliance(fromId, toId);
     }
     function aiAccepts(ai, other) {
       if (ai.perso === 'aggressive') return rng() < 0.2; if (ai.war[other.id]) return rng() < 0.3;
       if (other.traitor) return rng() < 0.25; return rng() < (ai.perso === 'defensive' ? 0.85 : 0.6);
     }
-    function makeAlliance(a, b) { players[a].allies[b] = 1; players[b].allies[a] = 1; delete players[a].war[b]; delete players[b].war[a];
-      killFront(a, b); killFront(b, a); }
-    function breakAlliance(a, b, treason) { if (!players[a].allies[b]) return; delete players[a].allies[b]; delete players[b].allies[a]; if (treason) players[a].traitor = true; }
+    function makeAlliance(a, b) { players[a].allies[b] = 1; players[b].allies[a] = 1; delete players[a].war[b]; delete players[b].war[a]; killFront(a, b); killFront(b, a); emit('ally', { a: a, b: b }); }
+    function breakAlliance(a, b, treason) { if (!players[a].allies[b]) return; delete players[a].allies[b]; delete players[b].allies[a]; if (treason) players[a].traitor = true; emit('break', { a: a, b: b, treason: !!treason }); }
     function killFront(a, b) { var at = attackKey[a + '>' + b]; if (at) at.dead = true; }
 
-    // ── IA (identique page, mais difficulté PAR joueur pour le bench) ──────────
+    // ── IA ─────────────────────────────────────────────────────────────────────
+    function placeAIStruct(p, k) {
+      var cost = buildCost(k, p.id); if (p.gold < cost) return;
+      var cands = []; for (var i = 0; i < N; i++) { if (owner[i] !== p.id || structAt[i]) continue;
+        if (k === 'port' && !isCoast(i)) continue; if (k !== 'port' && isCoast(i) && rng() < 0.6) continue; cands.push(i); }
+      if (!cands.length) return; p.gold -= cost; placeStruct(cands[(rng() * cands.length) | 0], k, p.id);
+    }
+    function enemyRichTile(id) { for (var idx in structAt) if (structAt[idx].owner === id) return +idx; for (var i = 0; i < N; i++) if (owner[i] === id) return i; return -1; }
+    function aiSpend(p, neigh, underAtk, skill) {
+      var coast = hasCoast(p.id);
+      if (underAtk && p.gold >= 2000 && rng() < 0.7) placeAIStruct(p, 'defense');
+      else if (p.gold >= 5000 && p.tiles > 35 && rng() < 0.3 + 0.5 * skill) placeAIStruct(p, 'city');
+      if (coast && p.ports === 0 && p.gold >= buildCost('port', p.id)) placeAIStruct(p, 'port');
+      if (p.tiles > 90 && p.silos === 0 && p.gold >= 9000 && rng() < 0.4 + 0.4 * skill) placeAIStruct(p, 'silo');
+      if (p.sams === 0 && p.tiles > 110 && p.gold >= 7000 && rng() < 0.4) placeAIStruct(p, 'sam');
+      if (p.silos > 0 && p.gold >= 12000 && rng() < 0.4 * (0.5 + skill)) {
+        var enemy = null; for (var n = 0; n < neigh.length; n++) { var e = neigh[n]; if (!p.allies[e.id] && (p.war[e.id] || e.tiles > p.tiles)) { enemy = e; break; } }
+        if (enemy) { var tt = enemyRichTile(enemy.id); if (tt >= 0) { var silo = nearestStruct(p.id, 'silo', tt % MW, tt / MW | 0);
+          if (silo >= 0) { var kind = p.gold >= 26000 ? 'hydro' : 'atom'; p.gold -= BUILD[kind].cost; launchMissile(p.id, silo, tt, kind); emit('nuke', { by: p.id, kind: kind }); } } }
+      }
+    }
     function aiThink(p, dt) {
       p.aiCd -= dt; if (p.aiCd > 0) return; p.aiCd = 1.1 + rng() * 1.4; if (!p.alive) return;
-      // niveau : 0 (facile) .. 1 (difficile) — pilote l'EFFICACITÉ, pas l'agressivité.
-      var skill = p.diff === 'hard' ? 1 : p.diff === 'easy' ? 0 : 0.6;
+      var skill = skillOf(p.diff);
       var underAtk = false; for (var ua = 0; ua < attacks.length; ua++) if (!attacks[ua].dead && attacks[ua].tgt === p.id) { underAtk = true; break; }
       var losing = p.prevTiles > 0 && p.tiles < p.prevTiles * 0.9; p.prevTiles = p.tiles;
       p.ratio = underAtk ? 0.82 : (p.perso === 'defensive' ? 0.5 : p.perso === 'aggressive' ? 0.72 : 0.6);
-      // les IA faibles agissent moins souvent → grossissent plus lentement
-      if (rng() > 0.45 + 0.55 * skill) return;
+      if (rng() > 0.45 + 0.55 * skill) return;   // les IA faibles agissent moins souvent
       var diffMul = 0.6 + 0.75 * skill;
       var persoAgg = { aggressive: 1.4, defensive: 0.5, expansionist: 0.7, opportunist: 1.0, balanced: 0.9 }[p.perso] * diffMul;
       var neigh = []; for (var q = 1; q < players.length; q++) { if (q === p.id || !players[q].alive) continue; if (touch[p.id] && touch[p.id][q]) neigh.push(players[q]); }
@@ -233,8 +383,7 @@
       aiSpend(p, neigh, underAtk, skill);
 
       var strongest = null; for (var s = 0; s < neigh.length; s++) if (!strongest || neigh[s].tiles > strongest.tiles) strongest = neigh[s];
-      var myThreat = strongest && strongest.tiles > p.tiles * 1.4;
-      if (myThreat && p.perso !== 'aggressive' && rng() < 0.55) {
+      if (strongest && strongest.tiles > p.tiles * 1.4 && p.perso !== 'aggressive' && rng() < 0.55) {
         var partner = null; for (var s2 = 0; s2 < neigh.length; s2++) { var e2 = neigh[s2]; if (e2.id === leaderId) continue; if (!p.allies[e2.id] && !p.war[e2.id] && (!partner || e2.tiles > partner.tiles)) partner = e2; }
         if (!partner) partner = strongest; if (partner && !p.allies[partner.id] && !p.war[partner.id]) requestAlliance(p.id, partner.id);
       }
@@ -243,13 +392,10 @@
       var aggressor = 0; for (var ax = 0; ax < attacks.length; ax++) { var AA = attacks[ax]; if (!AA.dead && AA.tgt === p.id) { aggressor = AA.atk; break; } }
       if (underAtk && losing) { if (aggressor && p.perso !== 'aggressive' && !p.allies[aggressor] && rng() < 0.6) requestAlliance(p.id, aggressor); return; }
 
-      // Expansion : le NEUTRE (peu cher) d'abord ; la guerre quand on a l'avantage.
       var neutral = neutralAdjacent(p.id);
-      var reserve = armyCap(p) * (0.32 - 0.18 * skill);           // « difficile » engage plus tôt
-      var send = p.troops * (0.28 + 0.32 * rng()) * (0.7 + 0.5 * skill);
+      var reserve = armyCap(p) * (0.32 - 0.18 * skill), send = p.troops * (0.28 + 0.32 * rng()) * (0.7 + 0.5 * skill);
       if (p.perso === 'expansionist') send *= 1.15;
-      var forceWar = p.perso === 'aggressive' && rng() < 0.4 * (0.5 + skill);
-      var didAttack = false;
+      var forceWar = p.perso === 'aggressive' && rng() < 0.4 * (0.5 + skill), didAttack = false;
       if (neutral && p.troops > reserve && !forceWar) { launchAttack(p.id, 0, send); didAttack = true; }
       if (!didAttack && neigh.length) {
         var target = null, tb = 1e9;
@@ -261,21 +407,30 @@
         if (target && p.troops > target.troops * warNeed && p.troops > reserve) {
           p.war[target.id] = 1; target.war[p.id] = 1; if (p.allies[target.id]) breakAlliance(p.id, target.id, true);
           launchAttack(p.id, target.id, p.troops * (0.4 + 0.3 * rng()), centroid[target.id] ? { x: centroid[target.id].x, y: centroid[target.id].y } : null);
+          if (target.id === meId && invasionCd <= 0) { invasionCd = 6; emit('invasion', { by: p.id }); }
         } else if (neutral && p.troops > reserve) launchAttack(p.id, 0, send);
       }
+      // colonisation / débarquement outre-mer
+      if (p.ports > 0 && rng() < 0.35 && !neutral) { var from = nearestCoast(p.id, p.seed % MW, (p.seed / MW | 0));
+        if (from >= 0) { var tgt = findOverseasTarget(p.id, from); if (tgt >= 0) launchBoat(p.id, from, tgt, p.troops * 0.3); } }
     }
-    function aiSpend(p, neigh, underAtk, skill) {
-      if (underAtk && p.gold >= 2000 && rng() < 0.7) placeAIStruct(p, 'defense');
-      else if (p.gold >= 5000 && p.tiles > 35 && rng() < 0.3 + 0.5 * skill) placeAIStruct(p, 'city');
+    function autoTrade() {
+      var ports = []; for (var idx in structAt) if (structAt[idx].k === 'port') ports.push({ i: +idx, o: structAt[idx].owner });
+      if (ports.length < 2) return;
+      for (var t = 0; t < ports.length; t++) { if (rng() > 0.4) continue; var src = ports[t];
+        var opts2 = ports.filter(function (x) { return x.o !== src.o; }); if (!opts2.length) continue;
+        var dst = opts2[(rng() * opts2.length) | 0]; if (players[src.o].war[dst.o]) continue; launchTrade(src.i, dst.i, src.o, dst.o); }
     }
 
     // ── Boucle ────────────────────────────────────────────────────────────────
     function step(dt) {
-      elapsed += dt;
+      elapsed += dt; if (invasionCd > 0) invasionCd -= dt;
       for (var p = 1; p < players.length; p++) economy(players[p], dt);
       for (var a = 0; a < attacks.length; a++) processAttack(attacks[a], dt);
       if (attacks.length) { var live = []; for (var i = 0; i < attacks.length; i++) { var A = attacks[i]; if (A.dead) delete attackKey[A.atk + '>' + A.tgt]; else live.push(A); } attacks = live; }
+      updateUnits(dt);
       touchClock -= dt; if (touchClock <= 0) { touchClock = 1.0; computeTouch(); }
+      tradeClock -= dt; if (tradeClock <= 0) { tradeClock = 2.5; autoTrade(); }
       for (p = 1; p < players.length; p++) { var pl = players[p]; if (pl.alive && !pl.human) aiThink(pl, dt); }
     }
 
@@ -283,11 +438,8 @@
     genMap();
     var spawns = pickSpawns(nations);
     for (var pi = 0; pi < nations; pi++) {
-      var human = (pi + 1) === meId;
-      var perso = opts.persos && opts.persos[pi] ? opts.persos[pi] : PERSOS[pi % PERSOS.length];
-      var diff = opts.diffs && opts.diffs[pi] ? opts.diffs[pi] : (opts.diff || 'normal');
-      var pl = makePlayer(pi + 1, human, perso, diff); pl.seed = spawns[pi]; players.push(pl);
-      spawnBlob(pi + 1, spawns[pi], 4.5);
+      var data = nationData[pi] || { perso: PERSOS[pi % PERSOS.length], diff: opts.diff || 'normal', human: (pi + 1) === meId };
+      var pl = makePlayer(pi + 1, data); pl.seed = spawns[pi]; players.push(pl); spawnBlob(pi + 1, spawns[pi], 5.5);
     }
     for (var rp = 1; rp < players.length; rp++) players[rp].tiles = 0;
     for (var ti = 0; ti < N; ti++) if (owner[ti] > 0) players[owner[ti]].tiles++;
@@ -295,16 +447,20 @@
 
     return {
       MW: MW, MH: MH, N: N, terr: terr, elev: elev, owner: owner, defMap: defMap,
-      get players() { return players; }, get attacks() { return attacks; },
-      get touch() { return touch; }, get borderTiles() { return borderTiles; }, get centroid() { return centroid; },
-      get leaderId() { return leaderId; }, get elapsed() { return elapsed; }, LAND_TOTAL: function () { return LAND_TOTAL; },
-      step: step, launchAttack: launchAttack, build: build, computeTouch: computeTouch,
-      neutralAdjacent: neutralAdjacent, requestAlliance: requestAlliance, makeAlliance: makeAlliance, breakAlliance: breakAlliance,
+      get players() { return players; }, get attacks() { return attacks; }, get units() { return units; }, get structAt() { return structAt; },
+      get touch() { return touch; }, get borderTiles() { return borderTiles; }, get centroid() { return centroid; }, get coastTiles() { return coastTiles; },
+      get leaderId() { return leaderId; }, get elapsed() { return elapsed; },
+      BUILD: BUILD, buildCost: buildCost, landTotal: function () { return LAND_TOTAL; }, armyCap: armyCap,
+      step: step, takeEvents: function () { var e = events; events = []; return e; },
+      launchAttack: launchAttack, build: build, launchBoat: launchBoat, launchWarship: launchWarship, launchMissile: launchMissile,
+      requestAlliance: requestAlliance, makeAlliance: makeAlliance, breakAlliance: breakAlliance,
+      neutralAdjacent: neutralAdjacent, hasCoast: hasCoast, hasFrontier: hasFrontier, isCoast: isCoast,
+      coastNear: coastNear, nearestCoast: nearestCoast, nearestStruct: nearestStruct,
       tilesOf: function (id) { return players[id] ? players[id].tiles : 0; },
       aliveIds: function () { var r = []; for (var i = 1; i < players.length; i++) if (players[i].alive) r.push(i); return r; },
       winner: function () { var al = this.aliveIds(); return al.length === 1 ? al[0] : 0; }
     };
   }
 
-  return { createGame: createGame, PERSOS: PERSOS };
+  return { createGame: createGame, PERSOS: PERSOS, TRAITS: TRAITS, BUILD: BUILD };
 });
