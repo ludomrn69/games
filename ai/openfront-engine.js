@@ -145,10 +145,12 @@
     }
 
     function makePlayer(id, data) {
+      var wild = !!data.wild;
       return { id: id, name: data.name || ('IA ' + id), flag: data.flag || '⚑', rgb: data.rgb || [200, 200, 200],
-        human: !!data.human, perso: data.perso || null, diff: data.diff || 'normal', trait: data.trait || 'none',
-        alive: true, gold: startGold, troops: startTroops, tiles: 0, cities: 0, ports: 0, silos: 0, sams: 0, defenses: 0,
-        allies: {}, war: {}, traitor: false, seed: 0, capital: 0, ratio: 0.55, focus: 0, prevTiles: 0, aiCd: rng() * 1.5 };
+        human: !!data.human, wild: wild, perso: data.perso || null, diff: data.diff || 'normal', trait: data.trait || 'none',
+        alive: true, gold: wild ? 0 : startGold, troops: wild ? (400 + rng() * 500) : startTroops,
+        tiles: 0, cities: 0, ports: 0, silos: 0, sams: 0, defenses: 0,
+        allies: {}, war: {}, traitor: false, seed: 0, capital: 0, ratio: wild ? 0.85 : 0.55, focus: 0, prevTiles: 0, aiCd: rng() * 1.5 };
     }
 
     // ── Économie (traits appliqués) — débits exposés au HUD ───────────────────
@@ -180,7 +182,7 @@
       troops = Math.min(troops, atk.troops); atk.troops -= troops;
       var key = atkId + '>' + tgtId, a = attackKey[key];
       if (a) { a.troops += troops; a.aim = aim || null; if (a.dead) a.dead = false; seedFrontier(a); }
-      else { a = { atk: atkId, tgt: tgtId, troops: troops, front: [], head: 0, seen: new Uint8Array(N), carry: 0, dead: false, aim: aim || null };
+      else { a = { atk: atkId, tgt: tgtId, troops: troops, front: [], head: 0, seen: new Set(), carry: 0, dead: false, aim: aim || null };
         attackKey[key] = a; attacks.push(a); seedFrontier(a); }
     }
     function seedFrontier(a) {
@@ -195,7 +197,7 @@
         var near = []; for (var c = 0; c < cands.length; c++) { var i2 = cands[c], dd = (i2 % MW - ax) * (i2 % MW - ax) + ((i2 / MW | 0) - ay) * ((i2 / MW | 0) - ay);
           if (dd <= rad * rad || near.length < 6) near.push(i2); else break; } cands = near;
       }
-      for (var f = 0; f < cands.length; f++) { var t = cands[f]; if (!a.seen[t]) { a.seen[t] = 1; a.front.push(t); } }
+      for (var f = 0; f < cands.length; f++) { var t = cands[f]; if (!a.seen.has(t)) { a.seen.add(t); a.front.push(t); } }
     }
     function processAttack(a, dt) {
       if (a.dead) return; var atk = players[a.atk]; if (!atk || !atk.alive) { a.dead = true; return; }
@@ -210,13 +212,13 @@
         if (a.troops < bc) { a.dead = true; atk.troops += a.troops * 0.5; a.troops = 0; break; }
         var prev = owner[best];
         if (prev > 0) {
-          atk.gold += 4;                                                        // butin : chaque case ennemie rapporte
+          atk.gold += players[prev].wild ? 9 : 4;                               // butin : les territoires sauvages rapportent plus
           if (structAt[best]) { atk.gold += structAt[best].k === 'city' ? 3000 : 800; removeStruct(best); } // pillage
           if (best === players[prev].capital) captureCapital(prev, a.atk);       // décapitation
           var dp = players[prev]; dp.tiles--; dp.troops = Math.max(0, dp.troops - bc * 0.8); if (dp.tiles <= 0) eliminate(prev, a.atk);
         }
         owner[best] = a.atk; atk.tiles++; a.troops -= bc;
-        if (!a.seen[best]) { a.seen[best] = 1; a.front.push(best); }
+        if (!a.seen.has(best)) { a.seen.add(best); a.front.push(best); }
         did++;
         if (a.head > 20000) { a.front = a.front.slice(a.head); a.head = 0; }
       }
@@ -226,7 +228,8 @@
       var p = players[id]; if (!p.alive) return; p.alive = false; p.capital = 0;
       for (var idx in structAt) if (structAt[idx].owner === id) removeStruct(+idx);
       for (var i = 0; i < N; i++) if (owner[i] === id) owner[i] = 0; p.tiles = 0;
-      emit('eliminated', { id: id, by: by });
+      if (p.wild && by && players[by]) players[by].gold += 250;   // prime en conquérant un territoire sauvage
+      emit('eliminated', { id: id, by: by, wild: p.wild });
     }
     // Bonus de défense permanent autour d'une capitale (rayon 3).
     function capBonus(i, d) { var x = i % MW, y = (i / MW) | 0, R = 3;
@@ -324,7 +327,7 @@
         var prev = owner[i]; if (prev === it.owner || players[it.owner].allies[prev]) return;
         if (prev > 0) { players[prev].tiles--; if (players[prev].tiles <= 0) eliminate(prev, it.owner); }
         owner[i] = it.owner; players[it.owner].tiles++;
-        var a = { atk: it.owner, tgt: prev, troops: it.troops, front: [i], head: 0, seen: new Uint8Array(N), carry: 0, dead: false, aim: null }; a.seen[i] = 1; attacks.push(a);
+        var a = { atk: it.owner, tgt: prev, troops: it.troops, front: [i], head: 0, seen: new Set(), carry: 0, dead: false, aim: null }; a.seen.add(i); attacks.push(a);
       } else if (it.type === 'trade') {
         var o = players[it.owner], de = players[it.dest], mul = 1;
         if (o && o.alive) { o.gold += it.gold * 0.6 * (o.trait === 'naval' ? 1.6 : 1); }
@@ -366,6 +369,7 @@
     // ── Diplomatie ─────────────────────────────────────────────────────────────
     function requestAlliance(fromId, toId) {
       var from = players[fromId], to = players[toId]; if (!from.alive || !to.alive || from.allies[toId]) return;
+      if (to.wild || from.wild) return;   // les territoires sauvages ne font pas d'alliance
       if (toId === meId) { emit('allyRequest', { from: fromId }); return; }
       if (aiAccepts(to, from)) makeAlliance(fromId, toId);
     }
@@ -382,14 +386,17 @@
     // Fin de partie : part du territoire CONQUIS tenue par soi + alliés ; « dernier bloc ».
     function ownedTotal() { var s = 0; for (var i = 1; i < players.length; i++) if (players[i].alive) s += players[i].tiles; return s; }
     function dominationPct(id) { var me = players[id]; if (!me) return 0; var mine = me.tiles; for (var al in me.allies) { var a = players[al]; if (a && a.alive) mine += a.tiles; } var tot = ownedTotal(); return tot > 0 ? mine / tot : 0; }
-    function onlyBlocLeft(id) { var me = players[id]; for (var i = 1; i < players.length; i++) { var p = players[i]; if (!p.alive || i === id) continue; if (!me.allies[i]) return false; } return true; }
+    function onlyBlocLeft(id) { var me = players[id]; for (var i = 1; i < players.length; i++) { var p = players[i]; if (!p.alive || i === id || p.wild) continue; if (!me.allies[i]) return false; } return true; }
 
     // ── IA ─────────────────────────────────────────────────────────────────────
     function placeAIStruct(p, k) {
       var cost = buildCost(k, p.id); if (p.gold < cost) return;
-      var cands = []; for (var i = 0; i < N; i++) { if (owner[i] !== p.id || structAt[i]) continue;
-        if (k === 'port' && !isCoast(i)) continue; if (k !== 'port' && isCoast(i) && rng() < 0.6) continue; cands.push(i); }
-      if (!cands.length) return; p.gold -= cost; placeStruct(cands[(rng() * cands.length) | 0], k, p.id);
+      var c = centroid[p.id]; if (!c) return; var cx = c.x | 0, cy = c.y | 0;   // recherche BORNÉE autour du centre (perf : pas de scan O(N))
+      for (var r = 1; r < 45; r++) for (var a = 0; a < 10; a++) {
+        var ang = a / 10 * 6.2832 + r * 0.7, x = (cx + Math.cos(ang) * r) | 0, y = (cy + Math.sin(ang) * r) | 0;
+        if (x < 0 || y < 0 || x >= MW || y >= MH) continue; var i = y * MW + x;
+        if (owner[i] === p.id && !structAt[i] && (k !== 'port' || isCoast(i))) { p.gold -= cost; placeStruct(i, k, p.id); return; }
+      }
     }
     function enemyRichTile(id) { for (var idx in structAt) if (structAt[idx].owner === id) return +idx; for (var i = 0; i < N; i++) if (owner[i] === id) return i; return -1; }
     function aiSpend(p, neigh, underAtk, skill) {
@@ -471,15 +478,20 @@
       updateUnits(dt);
       touchClock -= dt; if (touchClock <= 0) { touchClock = 1.0; computeTouch(); }
       tradeClock -= dt; if (tradeClock <= 0) { tradeClock = 2.5; autoTrade(); }
-      for (p = 1; p < players.length; p++) { var pl = players[p]; if (pl.alive && !pl.human) aiThink(pl, dt); }
+      for (p = 1; p < players.length; p++) { var pl = players[p]; if (pl.alive && !pl.human && !pl.wild) aiThink(pl, dt); }
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
     genMap();
-    var spawns = pickSpawns(nations);
+    // vraies nations = spawns bien espacés ; territoires sauvages = petits blobs dispersés.
+    var realCount = 0; for (var ri = 0; ri < nations; ri++) if (!(nationData[ri] && nationData[ri].wild)) realCount++;
+    var realSpawns = pickSpawns(realCount || 1), ridx = 0;
+    var landTiles = []; for (var lt = 0; lt < N; lt++) if (terr[lt] === LAND) landTiles.push(lt);
     for (var pi = 0; pi < nations; pi++) {
       var data = nationData[pi] || { perso: PERSOS[pi % PERSOS.length], diff: opts.diff || 'normal', human: (pi + 1) === meId };
-      var pl = makePlayer(pi + 1, data); pl.seed = spawns[pi]; pl.capital = spawns[pi]; players.push(pl); spawnBlob(pi + 1, spawns[pi], 5.5);
+      var pl = makePlayer(pi + 1, data); players.push(pl);
+      if (pl.wild) { pl.seed = landTiles.length ? landTiles[(rng() * landTiles.length) | 0] : 0; spawnBlob(pi + 1, pl.seed, 2.4 + rng() * 1.6); }
+      else { pl.seed = realSpawns[ridx++] || landTiles[(rng() * landTiles.length) | 0]; pl.capital = pl.seed; spawnBlob(pi + 1, pl.seed, 5.5); }
     }
     for (var rp = 1; rp < players.length; rp++) players[rp].tiles = 0;
     for (var ti = 0; ti < N; ti++) if (owner[ti] > 0) players[owner[ti]].tiles++;
