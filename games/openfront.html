@@ -111,6 +111,32 @@
   .btn:active{transform:scale(.96)}
   .big{font-size:3rem;font-weight:900}
   .win{color:#4fd18b}.lose{color:#f0655a}
+
+  /* Mini-classement toujours visible */
+  .lbbar{position:fixed;top:58px;right:10px;z-index:5;display:flex;flex-direction:column;gap:3px;cursor:pointer}
+  .lbbar .r{display:flex;align-items:center;gap:5px;background:rgba(16,20,29,.72);border:1px solid rgba(255,255,255,.07);
+    border-radius:8px;padding:2px 7px 2px 5px;font-size:.72rem;font-weight:700;min-width:78px}
+  .lbbar .r .sw{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+  .lbbar .r .pc{margin-left:auto;font-variant-numeric:tabular-nums;opacity:.9}
+  .lbbar .r.me{border-color:rgba(255,255,255,.4);background:rgba(44,123,229,.28)}
+  /* Alerte d'attaque */
+  .alert{position:fixed;left:50%;top:98px;transform:translateX(-50%);z-index:9;background:#c0392b;color:#fff;border:none;
+    border-radius:20px;padding:8px 16px;font-weight:800;font-size:.82rem;cursor:pointer;box-shadow:0 6px 20px rgba(192,57,43,.55);
+    animation:apulse 1s infinite;display:none}
+  .alert.on{display:block}
+  @keyframes apulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.06)}}
+  /* Confettis de victoire */
+  .confetti{position:fixed;inset:0;z-index:21;pointer-events:none;overflow:hidden}
+  .confetti.hidden{display:none}
+  .confetti i{position:absolute;top:-24px;width:9px;height:15px;border-radius:2px;animation:cfall linear forwards}
+  @keyframes cfall{to{transform:translateY(112vh) rotate(760deg)}}
+  .over-emo{font-size:3.6rem;animation:pop2 .5s ease-out}
+  @keyframes pop2{from{transform:scale(0) rotate(-30deg)}60%{transform:scale(1.25)}to{transform:scale(1)}}
+  /* Défis */
+  .chal{display:flex;align-items:flex-start;gap:9px;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.06);font-size:.82rem}
+  .chal .ic{font-size:1.2rem;line-height:1}
+  .chal .d{flex:1}.chal .d small{opacity:.6;display:block;font-size:.72rem;margin-top:1px}
+  .chal.done{opacity:.55}.chal .st{font-weight:800;font-size:1rem}
 </style>
 </head>
 <body>
@@ -140,6 +166,10 @@
 
 <div class="panel hidden" id="board"><h3>Classement <span id="domPct" style="font-size:.7rem;opacity:.7;font-weight:600;margin-left:auto;margin-right:8px"></span><button id="closeBoard">✕</button></h3><div id="boardList"></div></div>
 <div class="panel hidden" id="diplo"><h3>Diplomatie <button id="closeDiplo">✕</button></h3><div id="diploList"></div></div>
+<div class="lbbar" id="lbbar"></div>
+<button class="alert" id="alertBtn">⚠️ Sous attaque — voir</button>
+<div class="confetti hidden" id="confetti"></div>
+<div class="panel hidden" id="chalPanel"><h3>🎯 Défis <button id="closeChal">✕</button></h3><div id="chalList"></div></div>
 <div class="toasts" id="toasts"></div>
 
 <div class="screen" id="start">
@@ -149,6 +179,10 @@
     <div class="lab">Mode rapide (applique un jeu de règles)</div>
     <div class="chips" id="modePick"></div>
     <div class="lab">Ta couleur</div><div class="colorpick" id="colorPick"></div>
+    <div class="lab">Palette (daltonisme)</div>
+    <div class="chips" id="cbPick">
+      <div class="chip sel" data-c="0">Standard</div><div class="chip" data-c="1">♿ Accessible</div>
+    </div>
     <div class="lab">Nombre de nations</div>
     <div class="chips" id="nationsPick">
       <div class="chip" data-n="4">4</div><div class="chip sel" data-n="6">6</div><div class="chip" data-n="8">8</div>
@@ -187,6 +221,7 @@
   </div>
   <button class="btn" id="playBtn">Jouer ▶</button>
   <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#8b5cf6,#b794f6);box-shadow:0 10px 30px rgba(139,92,246,.4)">🗓️ Défi du jour</button>
+  <button class="btn" id="chalBtn" style="background:linear-gradient(135deg,#1f7a4d,#3fbf7f);box-shadow:0 10px 30px rgba(31,122,77,.4)">🎯 Défis</button>
   <div id="recLine" style="font-size:.8rem;opacity:.72;margin-top:2px"></div>
   <div class="kbdhint">⌨️ Clavier : <b>1–9</b> construire · <b>Échap</b> annuler · <b>Espace</b> pause · <b>+/−</b> vitesse · <b>D</b> diplomatie · <b>L</b> classement · <b>flèches</b> se déplacer</div>
 </div>
@@ -231,6 +266,18 @@ var PALETTE=[
   {name:'Turquia',  flag:'🩵', rgb:[42,196,196]},
   {name:'Rosalie',  flag:'🩷', rgb:[232,104,182]}
 ];
+// Palette daltonien-safe (Okabe-Ito) : distincte en teinte ET luminance, sans piège rouge/vert.
+var PALETTE_CB=[
+  {name:'Vermilia', flag:'🟥', rgb:[213,94,0]},
+  {name:'Cielia',   flag:'🟦', rgb:[86,180,233]},
+  {name:'Menthie',  flag:'🟩', rgb:[0,158,115]},
+  {name:'Citrona',  flag:'🟨', rgb:[240,228,66]},
+  {name:'Marina',   flag:'🔵', rgb:[0,114,178]},
+  {name:'Ambrie',   flag:'🟧', rgb:[230,159,0]},
+  {name:'Prunelle', flag:'🟪', rgb:[204,121,167]},
+  {name:'Cendrie',  flag:'⬜', rgb:[155,155,155]}
+];
+function activePalette(){return settings.cb?PALETTE_CB:PALETTE;}
 var PERSOS=['aggressive','defensive','expansionist','opportunist','balanced'];
 var PERSO_FR={aggressive:'Belliqueuse',defensive:'Défensive',expansionist:'Colonisatrice',opportunist:'Opportuniste',balanced:'Équilibrée'};
 // Atouts de nation (traits) — effets appliqués côté moteur.
@@ -252,7 +299,8 @@ var BUILDS_UI=[
   {k:'mirv',e:'🌐',t:'MIRV',need:'nuke'}
 ];
 
-var settings={color:1, nations:6, diff:'normal', map:1, fog:false, trait:'none', size:0, start:1, nukes:true, naval:true};
+var settings={color:1, nations:6, diff:'normal', map:1, fog:false, trait:'none', size:0, start:1, nukes:true, naval:true, cb:false};
+try{settings.cb=localStorage.getItem('openfront.cb')==='1';}catch(e){}
 // Tailles de carte (tuiles). Plus grand = plus de territoire à conquérir, parties plus longues.
 var SIZES=[{w:200,h:125,t:'Normale'},{w:320,h:200,t:'Grande'},{w:440,h:275,t:'Immense'}];
 // Départs (troupes / or de départ) — façon lobby OpenFront.
@@ -303,6 +351,61 @@ function saveResult(win,pct){
 function recLine(){var r=readRec();if(!r.games)return 'Aucune partie jouée — écris ton histoire.';
   return '🏆 '+(r.wins||0)+'/'+r.games+' victoires · 📈 record territoire '+(r.bestPct||0)+'%'+(r.fastest?' · ⏱️ '+Math.round(r.fastest)+'s':'');}
 
+// ── Défis (objectifs persistants) ─────────────────────────────────────────────
+var CHALLENGES=[
+  {id:'firstwin',ic:'🏅',t:'Première victoire',d:'Gagne une partie.',test:function(w,g){return w;}},
+  {id:'nonukes', ic:'☮️',t:'Pacifiste nucléaire',d:'Gagne avec les missiles désactivés.',test:function(w,g){return w&&!g.nukes;}},
+  {id:'land',    ic:'🏔️',t:'Terrien',d:'Gagne en mode terrestre (naval désactivé).',test:function(w,g){return w&&!g.naval;}},
+  {id:'insane8', ic:'🔥',t:'Enfer',d:'Gagne face à 8 nations en Insane.',test:function(w,g){return w&&g.diff==='insane'&&g.nations>=8;}},
+  {id:'fast',    ic:'⏱️',t:'Guerre éclair',d:'Gagne en moins de 5 minutes.',test:function(w,g){return w&&g.time<300;}},
+  {id:'immense', ic:'🗺️',t:'Conquérant',d:'Gagne sur une carte Immense.',test:function(w,g){return w&&g.size===2;}},
+  {id:'survivor',ic:'🐢',t:'Survivant',d:'Gagne avec le départ Survie.',test:function(w,g){return w&&g.start===0;}},
+  {id:'lonewolf',ic:'🗡️',t:'Loup solitaire',d:'Gagne sans jamais faire d\'alliance.',test:function(w,g){return w&&!g.allied;}}
+];
+var gameStats={};
+function chalDone(){return readRec().chal||{};}
+function evaluateChallenges(win){
+  var r=readRec(),done=r.chal||{},newly=[];gameStats.time=E?E.elapsed:0;
+  CHALLENGES.forEach(function(c){if(!done[c.id]&&c.test(win,gameStats)){done[c.id]=1;newly.push(c);}});
+  if(newly.length){r.chal=done;writeRec(r);sound('big');newly.forEach(function(c){toast('info','🎯 Défi accompli : '+c.ic+' '+c.t,3600);});}
+}
+function refreshChal(){var list=document.getElementById('chalList'),done=chalDone(),n=0;list.innerHTML='';
+  CHALLENGES.forEach(function(c){if(done[c.id])n++;var row=document.createElement('div');row.className='chal'+(done[c.id]?' done':'');
+    row.innerHTML='<span class="ic">'+c.ic+'</span><span class="d">'+c.t+'<small>'+c.d+'</small></span><span class="st">'+(done[c.id]?'✅':'🔒')+'</span>';list.appendChild(row);});
+  document.querySelector('#chalPanel h3').firstChild.textContent='🎯 Défis '+n+'/'+CHALLENGES.length+' ';}
+function openChal(){var p=document.getElementById('chalPanel');p.style.zIndex=22;p.classList.remove('hidden');refreshChal();}
+document.getElementById('chalBtn').onclick=openChal;
+document.getElementById('closeChal').onclick=function(){document.getElementById('chalPanel').classList.add('hidden');};
+
+// ── Mini-classement permanent ─────────────────────────────────────────────────
+function refreshLbbar(){
+  if(!E)return;var bar=document.getElementById('lbbar'),tot=E.landTotal();
+  var arr=E.players.slice(1).filter(function(p){return p&&p.alive;}).sort(function(a,b){return b.tiles-a.tiles;});
+  var show=arr.slice(0,4);if(show.indexOf(E.players[ME])<0&&E.players[ME].alive)show.push(E.players[ME]);
+  bar.innerHTML=show.map(function(p,i){var pc=Math.round(p.tiles/Math.max(1,tot)*100);
+    return '<div class="r'+(p.id===ME?' me':'')+'"><span class="sw" style="background:rgb('+p.rgb.join(',')+')"></span><span>'+(i===0?'👑':'')+(p.id===ME?'Toi':p.flag)+'</span><span class="pc">'+pc+'%</span></div>';}).join('');
+}
+document.getElementById('lbbar').onclick=function(){togglePanel('board');};
+
+// ── Alerte d'attaque + confettis + flash de capture ──────────────────────────
+var threat=null, prevOwner=null, flashes=[];
+document.getElementById('alertBtn').onclick=function(){
+  if(threat&&E&&E.centroid[threat.by]){centerOn((E.centroid[threat.by].y|0)*MW+(E.centroid[threat.by].x|0),Math.max(cam.zoom,6));}
+  this.classList.remove('on');};
+function confetti(){var c=document.getElementById('confetti');c.innerHTML='';var cols=['#e8582c','#f2b705','#37a86b','#2c7be5','#e5439b','#8b5cf6','#14b8c4'];
+  for(var i=0;i<48;i++){var el=document.createElement('i');el.style.left=(Math.random()*100)+'%';el.style.background=cols[i%cols.length];
+    el.style.animationDuration=(1.6+Math.random()*1.8)+'s';el.style.animationDelay=(Math.random()*0.6)+'s';c.appendChild(el);}
+  c.classList.remove('hidden');}
+function detectCaptures(){
+  if(!E||N>90000)return;                       // trop lourd à diff sur carte Immense
+  var owner=E.owner;
+  if(!prevOwner||prevOwner.length!==N){prevOwner=new Int16Array(N);prevOwner.set(owner);return;}
+  var added=0;
+  for(var i=0;i<N;i++){if(owner[i]!==prevOwner[i]){prevOwner[i]=owner[i];
+    if(owner[i]>0&&added<180){flashes.push({x:i%MW+0.5,y:(i/MW|0)+0.5,t:0});added++;}}}
+  if(flashes.length>700)flashes.splice(0,flashes.length-700);
+}
+
 // ── Démarrage ─────────────────────────────────────────────────────────────────
 function startGame(daily){
   DAILY=!!daily;
@@ -311,7 +414,7 @@ function startGame(daily){
   else{seed=(Math.random()*1e9)|0;mapType=settings.map;nations=settings.nations;diff=settings.diff;}
   // compose les nations : le joueur d'abord (sa couleur + son atout), puis des IA.
   var srng=mulberry32(seed);
-  var pool=PALETTE.slice(); var mine=pool.splice(settings.color-1,1)[0];
+  var pool=activePalette().slice(); var mine=pool.splice(settings.color-1,1)[0];
   for(var s=pool.length-1;s>0;s--){var j=(srng()*(s+1))|0;var tmp=pool[s];pool[s]=pool[j];pool[j]=tmp;}
   var order=[mine].concat(pool).slice(0,nations);
   var nd=[];
@@ -327,6 +430,9 @@ function startGame(daily){
   E=ENG.createGame({seed:seed,mapType:mapType,meId:ME,nations:nd,w:sz.w,h:sz.h,
     startTroops:st.troops,startGold:st.gold,nukes:nukes,naval:naval});
   MW=E.MW;MH=E.MH;N=E.N;
+  threat=null;flashes=[];prevOwner=null;
+  document.getElementById('alertBtn').classList.remove('on');document.getElementById('confetti').classList.add('hidden');
+  gameStats={nukes:nukes,naval:naval,diff:diff,nations:nations,size:DAILY?0:settings.size,start:DAILY?1:settings.start,allied:false,daily:DAILY,time:0};
   discovered=new Uint8Array(N);discovered.fill(settings.fog?0:1);
   terrBmp=null;
   // couleurs préparées pour le rendu
@@ -351,12 +457,13 @@ function handleEvents(){
   var evs=E.takeEvents();
   for(var i=0;i<evs.length;i++){var ev=evs[i];
     if(ev.type==='eliminated'){ if(ev.id!==ME){var p=E.players[ev.id];toast('info',p.flag+' '+p.name+' a été éliminée.',2600);} }
-    else if(ev.type==='ally'){ if(ev.a===ME||ev.b===ME){var o=E.players[ev.a===ME?ev.b:ev.a];toast('info','🤝 Alliance avec '+o.flag+' '+o.name+'.',2400);} refreshDiplo(); }
+    else if(ev.type==='ally'){ if(ev.a===ME||ev.b===ME){gameStats.allied=true;var o=E.players[ev.a===ME?ev.b:ev.a];toast('info','🤝 Alliance avec '+o.flag+' '+o.name+'.',2400);} refreshDiplo(); }
     else if(ev.type==='break'){ if(ev.a===ME||ev.b===ME){var t=E.players[ev.a],o=E.players[ev.a===ME?ev.b:ev.a];
       toast('info',(ev.treason&&ev.a!==ME)?('💔 Trahison ! '+t.flag+' '+t.name+' rompt l\'alliance.'):('💔 Alliance rompue avec '+o.flag+' '+o.name+'.'),2800);} refreshDiplo(); }
     else if(ev.type==='allyRequest'){ pushAllianceToast(ev.from); }
     else if(ev.type==='nuke'){ var p2=E.players[ev.by];toast('info',p2.flag+' '+p2.name+' a lancé une frappe ! ☢️',2200); }
-    else if(ev.type==='invasion'){ var p3=E.players[ev.by];toast('info','⚠️ '+p3.flag+' '+p3.name+' envahit ton territoire !',2600);sound('error');vibrate([30,40,30]); }
+    else if(ev.type==='invasion'){ var p3=E.players[ev.by];toast('info','⚠️ '+p3.flag+' '+p3.name+' envahit ton territoire !',2600);sound('error');vibrate([30,40,30]);
+      threat={by:ev.by,t:E.elapsed};document.getElementById('alertBtn').classList.add('on'); }
     else if(ev.type==='detonate'){ sound('big');vibrate(24); }
     else if(ev.type==='capital'){ var pv=E.players[ev.victim];
       if(ev.victim===ME){toast('info','🏛️ Ta capitale est tombée ! (-30 % de troupes)',3200);sound('lose');vibrate([60,40,60]);}
@@ -374,9 +481,11 @@ function checkWin(){
 }
 function endGame(win,how){
   running=false;
-  document.getElementById('overTitle').innerHTML=win?'<span class="win">Victoire ! 🏆</span>':'<span class="lose">Défaite… 💀</span>';
+  document.getElementById('overTitle').innerHTML='<div class="over-emo">'+(win?'🏆':'💀')+'</div>'+(win?'<span class="win">Victoire !</span>':'<span class="lose">Défaite…</span>');
   var pct=Math.round(E.players[ME].tiles/Math.max(1,E.landTotal())*100), dom=Math.round(E.dominationPct(ME)*100);
   var extra=saveResult(win,pct);
+  evaluateChallenges(win);
+  if(win)confetti();
   document.getElementById('overMsg').innerHTML=(win
     ?(how==='domination'?('Domination : toi et tes alliés tenez '+dom+'% du territoire conquis, en '+timeStr()+'.')
       :how==='bloc'?('Ton alliance a soumis toutes les autres nations en '+timeStr()+' !')
@@ -449,6 +558,10 @@ function draw(){
     ctx.font=clamp(z*1.2,10,22)+'px serif';
     var ge={boat:'⛵',trade:'🚤',warship:'🚢',missile:it.kind==='mirv'?'🌐':it.kind==='hydro'?'☢️':'💥'}[it.type];
     if(ge)ctx.fillText(ge,ux,uy);}
+  // flashs de capture (juice)
+  for(var f=0;f<flashes.length;f++){var fl=flashes[f],fx=(fl.x-cam.x)*z,fy=(fl.y-cam.y)*z;
+    if(fx<-10||fy<-10||fx>VW+10||fy>VH+10)continue;var fa=1-fl.t/0.5,ss=z*(0.6+fl.t*2.2);
+    ctx.fillStyle='rgba(255,255,235,'+(fa*0.55)+')';ctx.fillRect(fx-ss/2,fy-ss/2,ss,ss);}
   drawArrows(z);
   if(mode&&cursorTile>=0){var cx=(cursorTile%MW+0.5-cam.x)*z,cy=((cursorTile/MW|0)+0.5-cam.y)*z;
     ctx.strokeStyle=mode.build?'#f2b705':'#ff5a5a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,z*0.9,0,7);ctx.stroke();}
@@ -474,8 +587,9 @@ function drawArrows(z){
     var to=at.aim?{x:at.aim.x,y:at.aim.y}:(at.tgt>0&&cen[at.tgt]?cen[at.tgt]:null);if(!to)continue;
     var x1=(from.x-cam.x)*z,y1=(from.y-cam.y)*z,x2=(to.x-cam.x)*z,y2=(to.y-cam.y)*z;
     if(Math.hypot(x2-x1,y2-y1)<12)continue;
-    var pl=players[at.atk],col=pl.rgb[0]+','+pl.rgb[1]+','+pl.rgb[2];
-    ctx.strokeStyle='rgba('+col+',.6)';ctx.lineWidth=Math.max(2,z*0.35);ctx.setLineDash([9,7]);ctx.lineDashOffset=-dash;
+    var toMe=at.tgt===ME, pl=players[at.atk], col=toMe?'235,70,55':(pl.rgb[0]+','+pl.rgb[1]+','+pl.rgb[2]);
+    var pulse=toMe?(0.65+0.35*Math.sin(E.elapsed*8)):0.6;
+    ctx.strokeStyle='rgba('+col+','+pulse+')';ctx.lineWidth=Math.max(2,z*(toMe?0.6:0.35));ctx.setLineDash([9,7]);ctx.lineDashOffset=-dash;
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
     var ang=Math.atan2(y2-y1,x2-x1),hl=Math.max(7,z*1.3);ctx.fillStyle='rgba('+col+',.9)';
     ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(ang-0.42),y2-hl*Math.sin(ang-0.42));ctx.lineTo(x2-hl*Math.cos(ang+0.42),y2-hl*Math.sin(ang+0.42));ctx.closePath();ctx.fill();}
@@ -647,7 +761,8 @@ function refreshHUD(){if(!E)return;var me=E.players[ME];
   document.getElementById('sGold').textContent=fmt(me.gold);
   document.getElementById('sLand').textContent=Math.round(me.tiles/Math.max(1,E.landTotal())*100)+'%';
   var tr=E.troopsPerSec(ME);document.getElementById('sTroopsL').textContent='⚔ '+(tr>=0?'+':'')+fmt(tr)+'/s';
-  document.getElementById('sGoldL').textContent='💰 +'+fmt(E.goldPerSec(ME))+'/s';}
+  document.getElementById('sGoldL').textContent='💰 +'+fmt(E.goldPerSec(ME))+'/s';
+  refreshLbbar();}
 
 document.getElementById('btnSpeed').onclick=function(){speed=speed>=3?1:speed+1;this.textContent=speed+'×';};
 document.getElementById('btnPause').onclick=function(){if(!running)return;paused=true;show('paused');};
@@ -656,9 +771,13 @@ document.getElementById('quitBtn').onclick=function(){running=false;show('start'
 
 // ── Écrans ────────────────────────────────────────────────────────────────────
 function show(which){['start','over','paused'].forEach(function(id){document.getElementById(id).classList.toggle('hidden',id!==which);});
+  var inGame=(which==='none');
+  document.getElementById('lbbar').style.display=inGame?'flex':'none';
+  if(!inGame)document.getElementById('alertBtn').classList.remove('on');
+  if(which!=='over')document.getElementById('confetti').classList.add('hidden');
   if(which==='start'){var rl=document.getElementById('recLine');if(rl)rl.textContent=recLine();}}
 function buildColorPick(){var cp=document.getElementById('colorPick');cp.innerHTML='';
-  PALETTE.forEach(function(pal,idx){var d=document.createElement('div');d.className='col'+(idx+1===settings.color?' sel':'');
+  activePalette().forEach(function(pal,idx){var d=document.createElement('div');d.className='col'+(idx+1===settings.color?' sel':'');
     d.style.background='rgb('+pal.rgb.join(',')+')';d.title=pal.name;d.onclick=function(){settings.color=idx+1;buildColorPick();};cp.appendChild(d);});}
 function buildTraitPick(){var tp=document.getElementById('traitPick');tp.innerHTML='';
   TRAITS_UI.forEach(function(tr){var d=document.createElement('div');d.className='chip'+(tr.k===settings.trait?' sel':'');
@@ -684,6 +803,10 @@ chipGroup('sizePick','s','size',function(v){return +v;});
 chipGroup('startPick','st','start',function(v){return +v;});
 chipGroup('nukePick','k','nukes',function(v){return v==='1';});
 chipGroup('navalPick','k','naval',function(v){return v==='1';});
+(function(){var g=document.getElementById('cbPick');[].forEach.call(g.children,function(c){c.onclick=function(){
+  [].forEach.call(g.children,function(x){x.classList.remove('sel');});c.classList.add('sel');
+  settings.cb=(c.dataset.c==='1');try{localStorage.setItem('openfront.cb',settings.cb?'1':'0');}catch(e){}buildColorPick();};});
+  selectChip('cbPick','c',settings.cb?1:0);})();
 document.getElementById('playBtn').onclick=function(){startGame(false);};
 document.getElementById('dailyBtn').onclick=function(){startGame(true);};
 document.getElementById('replayBtn').onclick=function(){show('start');};
@@ -698,12 +821,16 @@ function loop(ts){
     while(acc>=TICK&&guard++<12){E.step(TICK);acc-=TICK;stepped=true;}
     // on ne reconstruit le fond de carte QUE quand la simulation a avancé (pas 60×/s) :
     // décisif pour la fluidité des grandes cartes.
-    if(stepped){handleEvents();checkWin();dirty=true;}
+    if(stepped){handleEvents();checkWin();detectCaptures();dirty=true;
+      if(threat&&(E.elapsed-threat.t>8)){threat=null;document.getElementById('alertBtn').classList.remove('on');}}
     revealFog();
     hudClock-=dt;if(hudClock<=0){hudClock=0.2;refreshHUD();refreshDock();
       if(!document.getElementById('board').classList.contains('hidden'))refreshBoard();}
   }
-  if(running)draw();
+  if(running){
+    for(var fi=flashes.length-1;fi>=0;fi--){flashes[fi].t+=dt;if(flashes[fi].t>0.5)flashes.splice(fi,1);}
+    draw();
+  }
 }
 updateRatLabel();show('start');requestAnimationFrame(loop);
 })();
