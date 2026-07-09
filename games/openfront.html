@@ -113,8 +113,8 @@
 
 <div class="top">
   <a class="back" href="../index.html" aria-label="Retour">‹</a>
-  <div class="stat"><span class="n" id="sTroops">0</span><span class="l">Troupes</span></div>
-  <div class="stat"><span class="n" id="sGold">0</span><span class="l">Or</span></div>
+  <div class="stat"><span class="n" id="sTroops">0</span><span class="l" id="sTroopsL">Troupes</span></div>
+  <div class="stat"><span class="n" id="sGold">0</span><span class="l" id="sGoldL">Or</span></div>
   <div class="stat"><span class="n" id="sLand">0%</span><span class="l">Territoire</span></div>
   <div class="grow"></div>
   <button class="iconbtn" id="btnSpeed" title="Vitesse">1×</button>
@@ -133,7 +133,7 @@
   </div>
 </div>
 
-<div class="panel hidden" id="board"><h3>Classement <button id="closeBoard">✕</button></h3><div id="boardList"></div></div>
+<div class="panel hidden" id="board"><h3>Classement <span id="domPct" style="font-size:.7rem;opacity:.7;font-weight:600;margin-left:auto;margin-right:8px"></span><button id="closeBoard">✕</button></h3><div id="boardList"></div></div>
 <div class="panel hidden" id="diplo"><h3>Diplomatie <button id="closeDiplo">✕</button></h3><div id="diploList"></div></div>
 <div class="toasts" id="toasts"></div>
 
@@ -318,24 +318,29 @@ function handleEvents(){
     else if(ev.type==='nuke'){ var p2=E.players[ev.by];toast('info',p2.flag+' '+p2.name+' a lancé une frappe ! ☢️',2200); }
     else if(ev.type==='invasion'){ var p3=E.players[ev.by];toast('info','⚠️ '+p3.flag+' '+p3.name+' envahit ton territoire !',2600);sound('error');vibrate([30,40,30]); }
     else if(ev.type==='detonate'){ sound('big');vibrate(24); }
+    else if(ev.type==='capital'){ var pv=E.players[ev.victim];
+      if(ev.victim===ME){toast('info','🏛️ Ta capitale est tombée ! (-30 % de troupes)',3200);sound('lose');vibrate([60,40,60]);}
+      else if(ev.by===ME){toast('info','🏛️ Capitale de '+pv.flag+' '+pv.name+' capturée ! +5000 or',2600);sound('coin');} }
+    else if(ev.type==='capitulate'){ var cp=E.players[ev.id]; if(ev.id!==ME)toast('info','🏳️ '+cp.flag+' '+cp.name+' capitule.',2400); }
   }
 }
 function checkWin(){
   if(!E)return;
   var me=E.players[ME];
   if(!me.alive){endGame(false);return;}
-  var alive=E.aliveIds();
-  if(alive.length===1&&alive[0]===ME){endGame(true);return;}
-  var tot=E.landTotal(), mine=me.tiles; for(var al in me.allies){var a=E.players[al];if(a&&a.alive)mine+=a.tiles;}
-  if(tot>0&&mine/tot>0.82)endGame(true,'domination');
+  // victoire : dernier bloc debout (toi + tes alliés), ou 80 % du territoire CONQUIS (anti-corvée)
+  if(E.onlyBlocLeft(ME)){endGame(true,E.aliveIds().length===1?'solo':'bloc');return;}
+  if(E.dominationPct(ME)>=0.80)endGame(true,'domination');
 }
 function endGame(win,how){
   running=false;
   document.getElementById('overTitle').innerHTML=win?'<span class="win">Victoire ! 🏆</span>':'<span class="lose">Défaite… 💀</span>';
-  var pct=Math.round(E.players[ME].tiles/Math.max(1,E.landTotal())*100);
+  var pct=Math.round(E.players[ME].tiles/Math.max(1,E.landTotal())*100), dom=Math.round(E.dominationPct(ME)*100);
   var extra=saveResult(win,pct);
   document.getElementById('overMsg').innerHTML=(win
-    ?(how==='domination'?'Domination totale de la carte ('+pct+'% du territoire) en '+timeStr()+'.':'Tu as éliminé toutes les nations en '+timeStr()+' !')
+    ?(how==='domination'?('Domination : toi et tes alliés tenez '+dom+'% du territoire conquis, en '+timeStr()+'.')
+      :how==='bloc'?('Ton alliance a soumis toutes les autres nations en '+timeStr()+' !')
+      :('Tu as éliminé toutes les nations en '+timeStr()+' !'))
     :'Ta nation a disparu de la carte après '+timeStr()+'. Réessaie une autre stratégie.')+extra;
   sound(win?'win':'lose');vibrate(win?[40,60,120]:[120,40,120]);
   show('over');
@@ -365,6 +370,7 @@ function buildBitmap(){
   for(var i=0;i<N;i++){var o=owner[i],col;
     if(fog&&!discovered[i]){terrBuf[i]=FOGCOL;continue;}
     if(terr[i]===0){var sh=0.55+elev[i]/255*0.45;col=packRGB(20*sh,54*sh,92*sh);}
+    else if(terr[i]===2){var ms=0.55+elev[i]/255*0.4;col=packRGB(84*ms,78*ms,72*ms);}   // montagne infranchissable
     else if(o===0){var e=elev[i];col=e>200?packRGB(186,176,152):e>150?packRGB(166,156,130):packRGB(146,138,112);}
     else{var x=i%MW,bord=false;
       if((x>0&&owner[i-1]!==o)||(x<MW-1&&owner[i+1]!==o)||(i-MW>=0&&owner[i-MW]!==o)||(i+MW<N&&owner[i+MW]!==o))bord=true;
@@ -387,6 +393,12 @@ function draw(){
   for(var idx in structAt){var s=structAt[idx],i=+idx,sx=(i%MW+0.5-cam.x)*z,sy=((i/MW|0)+0.5-cam.y)*z;
     if(sx<-20||sy<-20||sx>VW+20||sy>VH+20)continue;if(settings.fog&&!discovered[i])continue;
     var em={city:'🏙️',port:'⚓',defense:'🛡️',silo:'🚀',sam:'🛰️'}[s.k];if(em)ctx.fillText(em,sx,sy);}
+  // capitales
+  var pls=E.players;ctx.font=clamp(z*1.5,12,30)+'px serif';
+  for(var cpi=1;cpi<pls.length;cpi++){var pl=pls[cpi];if(!pl.alive||!pl.capital)continue;var ci=pl.capital;
+    if(settings.fog&&!discovered[ci])continue;
+    var cxx=(ci%MW+0.5-cam.x)*z,cyy=((ci/MW|0)+0.5-cam.y)*z;if(cxx<-20||cyy<-20||cxx>VW+20||cyy>VH+20)continue;
+    ctx.fillText('⭐',cxx,cyy);}
   // unités
   var units=E.units;
   for(var u=0;u<units.length;u++){var it=units[u],ux=(it.x-cam.x)*z,uy=(it.y-cam.y)*z;
@@ -545,6 +557,7 @@ function refreshBoard(){
     var row=document.createElement('div');row.className='lbrow'+(p.id===ME?' me':'');
     row.innerHTML='<span class="sw" style="background:rgb('+p.rgb.join(',')+')"></span><span class="nm">'+p.flag+' '+p.name+(p.traitor?' 🗡️':'')+'</span>'+tag+'<span class="pc">'+pc+'%</span>';
     list.appendChild(row);});
+  document.getElementById('domPct').textContent='Domination '+Math.round(E.dominationPct(ME)*100)+'%';
 }
 function refreshDiplo(){
   if(!E||document.getElementById('diplo').classList.contains('hidden'))return;
@@ -552,17 +565,25 @@ function refreshDiplo(){
   E.players.slice(1).filter(function(p){return p&&p.id!==ME;}).forEach(function(p){
     var row=document.createElement('div');row.className='diprow';
     var st=!p.alive?'<span class="tag dead">éliminée</span>':me.allies[p.id]?'<span class="tag ally">alliée</span>':me.war[p.id]?'<span class="tag war">en guerre</span>':'';
-    var btn=!p.alive?'<button class="dbtn dis" disabled>—</button>':me.allies[p.id]?'<button class="dbtn break" data-b="'+p.id+'">Rompre</button>':'<button class="dbtn ally" data-a="'+p.id+'">Alliance</button>';
+    var btn=!p.alive?'<button class="dbtn dis" disabled>—</button>':me.allies[p.id]
+      ?('<button class="dbtn" style="background:#b8860b" data-g="'+p.id+'">＋or</button><button class="dbtn" style="background:#2c7be5" data-t="'+p.id+'">＋⚔</button><button class="dbtn break" data-b="'+p.id+'">Rompre</button>')
+      :'<button class="dbtn ally" data-a="'+p.id+'">Alliance</button>';
     row.innerHTML='<span class="sw" style="width:14px;height:14px;border-radius:4px;background:rgb('+p.rgb.join(',')+')"></span>'+
-      '<span class="nm">'+p.flag+' '+p.name+'<br><small style="opacity:.6">'+PERSO_FR[p.perso]+' · '+TRAIT_FR[p.trait]+'</small></span>'+st+btn;
+      '<span class="nm">'+p.flag+' '+p.name+'<br><small style="opacity:.6">'+PERSO_FR[p.perso]+' · '+TRAIT_FR[p.trait]+'</small></span>'+st+'<span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">'+btn+'</span>';
     list.appendChild(row);});
   [].forEach.call(list.querySelectorAll('[data-a]'),function(b){b.onclick=function(){E.requestAlliance(ME,+b.dataset.a);flash('Demande envoyée à '+E.players[+b.dataset.a].name+'…');refreshDiplo();};});
   [].forEach.call(list.querySelectorAll('[data-b]'),function(b){b.onclick=function(){E.breakAlliance(ME,+b.dataset.b,false);refreshDiplo();};});
+  [].forEach.call(list.querySelectorAll('[data-g]'),function(b){b.onclick=function(){var id=+b.dataset.g,amt=Math.round(E.players[ME].gold*0.25);
+    if(E.giftGold(ME,id,amt))flash('💰 '+fmt(amt)+' or envoyés à '+E.players[id].name+'.');else flash('Pas assez d\'or.');};});
+  [].forEach.call(list.querySelectorAll('[data-t]'),function(b){b.onclick=function(){var id=+b.dataset.t,amt=E.players[ME].troops*0.2;
+    if(E.giftTroops(ME,id,amt))flash('⚔ '+fmt(amt)+' troupes envoyées à '+E.players[id].name+'.');else flash('Pas assez de troupes.');};});
 }
 function refreshHUD(){if(!E)return;var me=E.players[ME];
   document.getElementById('sTroops').textContent=fmt(me.troops);
   document.getElementById('sGold').textContent=fmt(me.gold);
-  document.getElementById('sLand').textContent=Math.round(me.tiles/Math.max(1,E.landTotal())*100)+'%';}
+  document.getElementById('sLand').textContent=Math.round(me.tiles/Math.max(1,E.landTotal())*100)+'%';
+  document.getElementById('sTroopsL').textContent='⚔ +'+fmt(E.troopsPerSec(ME))+'/s';
+  document.getElementById('sGoldL').textContent='💰 +'+fmt(E.goldPerSec(ME))+'/s';}
 
 document.getElementById('btnSpeed').onclick=function(){speed=speed>=3?1:speed+1;this.textContent=speed+'×';};
 document.getElementById('btnPause').onclick=function(){if(!running)return;paused=true;show('paused');};

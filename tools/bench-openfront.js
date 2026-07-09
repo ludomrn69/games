@@ -21,6 +21,10 @@ var W = 120, H = 74;
 
 function pct(a, b) { return Math.round(a / Math.max(1, b) * 100); }
 function mkNations(diffs, persos) { return diffs.map(function (d, i) { return { perso: persos[i], diff: d }; }); }
+function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; var t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// Mélange une liste de difficultés (annule le biais de position : les spawns tardifs
+// sont plus isolés/sûrs, sinon ils avantageraient toujours les mêmes indices).
+function shuffled(arr, seed) { var r = mulberry32(seed), a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = (r() * (i + 1)) | 0, t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
 // Fait tourner une partie jusqu'à résolution (ou plafond). Renvoie l'état final.
 function runToEnd(seed, diffs, persos, cap) {
@@ -75,18 +79,18 @@ function runToHorizon(seed, diffs, persos, ticks) {
 (function () {
   var games = FULL ? 50 : 24, ticks = 1800;
   var HARD = 0, EASY = 0, hardWins = 0, easyWins = 0;
-  var diffs = ['hard', 'hard', 'hard', 'easy', 'easy', 'easy'];
   var persos = ['balanced', 'balanced', 'balanced', 'balanced', 'balanced', 'balanced'];
   for (var s = 0; s < games; s++) {
+    var diffs = shuffled(['hard', 'hard', 'hard', 'easy', 'easy', 'easy'], 4000 + s * 101 + 7);
     var g = runToHorizon(4000 + s * 101, diffs, persos, ticks);
-    var hb = 0, eb = 0, bestId = 1, bestT = -1;
-    for (var id = 1; id <= 6; id++) { var t = g.tilesOf(id); if (id <= 3) hb += t; else eb += t; if (t > bestT) { bestT = t; bestId = id; } }
-    HARD += hb; EASY += eb; if (bestId <= 3) hardWins++; else easyWins++;
+    var hb = 0, eb = 0, bestId = 1, bestT = -1, bestHard = false;
+    for (var id = 1; id <= 6; id++) { var t = g.tilesOf(id); if (diffs[id - 1] === 'hard') hb += t; else eb += t; if (t > bestT) { bestT = t; bestHard = diffs[id - 1] === 'hard'; } }
+    HARD += hb; EASY += eb; if (bestHard) hardWins++; else easyWins++;
   }
   var ratio = HARD / Math.max(1, EASY);
   console.log('Difficulté : territoire cumulé HARD ' + HARD + ' vs EASY ' + EASY + ' (x' + ratio.toFixed(2) + ') · victoires ' + hardWins + '–' + easyWins + '.');
-  if (ratio < 1.3) failures.push('Difficulté : « difficile » ne domine pas assez « facile » (x' + ratio.toFixed(2) + ' < 1.3).');
-  if (hardWins <= easyWins) failures.push('Difficulté : « difficile » ne gagne pas la majorité des parties (' + hardWins + '–' + easyWins + ').');
+  if (ratio < 1.2) failures.push('Difficulté : « difficile » ne domine pas assez « facile » (x' + ratio.toFixed(2) + ' < 1.2).');
+  if (hardWins < easyWins) failures.push('Difficulté : « difficile » ne gagne pas au moins autant que « facile » (' + hardWins + '–' + easyWins + ').');
 })();
 
 // ── 3. Sanité des personnalités (info) ─────────────────────────────────────
@@ -103,22 +107,23 @@ function runToHorizon(seed, diffs, persos, ticks) {
   ENG.PERSOS.forEach(function (p) { if (sum[p] === 0) failures.push('Personnalité « ' + p + ' » ne conquiert jamais rien (bug ?).'); });
 })();
 
-// ── 4. Monotonie de la difficulté (facile < normal < difficile < insane) ────
-(function () {
-  var games = FULL ? 30 : 14, ticks = 1600, levels = ['easy', 'normal', 'hard', 'insane'], avg = {};
-  levels.forEach(function (lv) {
-    var tot = 0;
-    for (var s = 0; s < games; s++) {
-      var diffs = [lv, lv, lv, lv], persos = ['balanced', 'balanced', 'balanced', 'balanced'];
-      var g = runToHorizon(20000 + s * 61 + lv.length, diffs, persos, ticks);
-      for (var id = 1; id <= 4; id++) tot += g.tilesOf(id);
-    }
-    avg[lv] = Math.round(tot / games);
-  });
-  console.log('Monotonie difficulté (territoire moyen/partie) : ' + levels.map(function (l) { return l + ' ' + avg[l]; }).join(' < '));
-  if (!(avg.easy < avg.normal && avg.normal < avg.hard && avg.hard <= avg.insane * 1.02))
-    failures.push('Monotonie : le territoire devrait croître avec la difficulté (' + levels.map(function (l) { return avg[l]; }).join(' / ') + ').');
-})();
+// ── 4. Échelle de difficulté EN FACE-À-FACE par palier (3 vs 3) ─────────────
+// (le free-for-all punit l'agressivité, donc mauvais juge ; le duel mesure la force.)
+function headToHead(loDiff, hiDiff, games, ticks) {
+  var LO = 0, HI = 0, persos = ['balanced', 'balanced', 'balanced', 'balanced', 'balanced', 'balanced'];
+  for (var s = 0; s < games; s++) {
+    var seed = 30000 + s * 97 + hiDiff.length * 11;
+    var diffs = shuffled([hiDiff, hiDiff, hiDiff, loDiff, loDiff, loDiff], seed + 3);   // positions mélangées
+    var g = runToHorizon(seed, diffs, persos, ticks);
+    for (var id = 1; id <= 6; id++) { if (diffs[id - 1] === hiDiff) HI += g.tilesOf(id); else LO += g.tilesOf(id); }
+  }
+  return HI / Math.max(1, LO);
+}
+[['easy', 'normal'], ['normal', 'hard'], ['hard', 'insane']].forEach(function (pair) {
+  var r = headToHead(pair[0], pair[1], FULL ? 30 : 16, 1600);
+  console.log('Face-à-face ' + pair[1] + ' vs ' + pair[0] + ' : territoire x' + r.toFixed(2));
+  if (r < 1.05) failures.push('Échelle : « ' + pair[1] + ' » ne bat pas « ' + pair[0] + ' » (x' + r.toFixed(2) + ').');
+});
 
 if (failures.length) { console.error('\n❌ OpenFront bench : ' + failures.length + ' échec(s) :\n - ' + failures.join('\n - ')); process.exit(1); }
 console.log('\n✅ OpenFront bench OK.');

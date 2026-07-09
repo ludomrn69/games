@@ -20,7 +20,7 @@
   else root.OpenFrontEngine = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-  var OCEAN = 0, LAND = 1;
+  var OCEAN = 0, LAND = 1, MOUNTAIN = 2;   // MOUNTAIN = infranchissable (chokepoints)
   var PERSOS = ['aggressive', 'defensive', 'expansionist', 'opportunist', 'balanced'];
   var TRAITS = ['none', 'expansion', 'economy', 'military', 'fortress', 'naval'];
   // Coûts (or) et paramètres des constructions — source unique partagée avec l'UI.
@@ -113,6 +113,8 @@
       for (var p = 0; p < 2; p++) { var snap = terr.slice();
         for (i = 0; i < N; i++) { var nn = nb4(i), ld = 0; for (var k = 0; k < nn.length; k++) if (snap[nn[k]] === LAND) ld++;
           if (snap[i] === OCEAN && ld >= nn.length) terr[i] = LAND; if (snap[i] === LAND && ld === 0) terr[i] = OCEAN; } }
+      // montagnes infranchissables (chokepoints) sur les cartes non-réalistes
+      if (mapType < 3) for (i = 0; i < N; i++) if (terr[i] === LAND && elev[i] > 240) terr[i] = MOUNTAIN;
       LAND_TOTAL = 0; coastTiles = [];
       for (i = 0; i < N; i++) if (terr[i] === LAND) LAND_TOTAL++;
       for (i = 0; i < N; i++) if (isCoast(i)) coastTiles.push(i);
@@ -142,19 +144,15 @@
       return { id: id, name: data.name || ('IA ' + id), flag: data.flag || '⚑', rgb: data.rgb || [200, 200, 200],
         human: !!data.human, perso: data.perso || null, diff: data.diff || 'normal', trait: data.trait || 'none',
         alive: true, gold: 1000, troops: 6000, tiles: 0, cities: 0, ports: 0, silos: 0, sams: 0, defenses: 0,
-        allies: {}, war: {}, traitor: false, seed: 0, ratio: 0.55, focus: 0, prevTiles: 0, aiCd: rng() * 1.5 };
+        allies: {}, war: {}, traitor: false, seed: 0, capital: 0, ratio: 0.55, focus: 0, prevTiles: 0, aiCd: rng() * 1.5 };
     }
 
-    // ── Économie (traits appliqués) ──────────────────────────────────────────
+    // ── Économie (traits appliqués) — débits exposés au HUD ───────────────────
+    var GOLD_MUL = 1.8;                                    // éco accélérée : villes/nukes atteignables
     function armyCap(p) { return 5000 + p.tiles * 120 + p.cities * 25000; }
-    function economy(p, dt) {
-      if (!p.alive) return;
-      var rat = p.ratio, cap = armyCap(p);
-      var grow = ((cap - p.troops) * 0.16 * (0.35 + rat) + p.tiles * 2.2) * (p.trait === 'military' ? 1.2 : 1);
-      p.troops = clamp(p.troops + grow * dt, 0, cap);
-      var inc = (p.tiles * 0.34 + p.ports * 11 + p.cities * 5 + 8) * (1.35 - rat * 0.85) * (p.trait === 'economy' ? 1.3 : 1);
-      p.gold += inc * dt;
-    }
+    function troopRate(p) { return ((armyCap(p) - p.troops) * 0.16 * (0.35 + p.ratio) + p.tiles * 2.2) * (p.trait === 'military' ? 1.2 : 1); }
+    function goldRate(p) { return (p.tiles * 0.34 + p.ports * 11 + p.cities * 5 + 8) * (1.35 - p.ratio * 0.85) * (p.trait === 'economy' ? 1.3 : 1) * GOLD_MUL; }
+    function economy(p, dt) { if (!p.alive) return; p.troops = clamp(p.troops + troopRate(p) * dt, 0, armyCap(p)); p.gold += goldRate(p) * dt; }
 
     // ── Expansion / guerre ───────────────────────────────────────────────────
     function capturable(i, atkId, tgt) {
@@ -203,7 +201,12 @@
         if (best < 0) { a.head++; continue; }
         if (a.troops < bc) { a.dead = true; atk.troops += a.troops * 0.5; a.troops = 0; break; }
         var prev = owner[best];
-        if (prev > 0) { var dp = players[prev]; dp.tiles--; dp.troops = Math.max(0, dp.troops - bc * 0.8); if (dp.tiles <= 0) eliminate(prev, a.atk); }
+        if (prev > 0) {
+          atk.gold += 4;                                                        // butin : chaque case ennemie rapporte
+          if (structAt[best]) { atk.gold += structAt[best].k === 'city' ? 3000 : 800; removeStruct(best); } // pillage
+          if (best === players[prev].capital) captureCapital(prev, a.atk);       // décapitation
+          var dp = players[prev]; dp.tiles--; dp.troops = Math.max(0, dp.troops - bc * 0.8); if (dp.tiles <= 0) eliminate(prev, a.atk);
+        }
         owner[best] = a.atk; atk.tiles++; a.troops -= bc;
         if (!a.seen[best]) { a.seen[best] = 1; a.front.push(best); }
         did++;
@@ -212,10 +215,22 @@
       if (a.troops <= 1 && !did) a.dead = true;
     }
     function eliminate(id, by) {
-      var p = players[id]; if (!p.alive) return; p.alive = false;
+      var p = players[id]; if (!p.alive) return; p.alive = false; p.capital = 0;
       for (var idx in structAt) if (structAt[idx].owner === id) removeStruct(+idx);
       for (var i = 0; i < N; i++) if (owner[i] === id) owner[i] = 0; p.tiles = 0;
       emit('eliminated', { id: id, by: by });
+    }
+    // Bonus de défense permanent autour d'une capitale (rayon 3).
+    function capBonus(i, d) { var x = i % MW, y = (i / MW) | 0, R = 3;
+      for (var dy = -R; dy <= R; dy++) for (var dx = -R; dx <= R; dx++) { if (dx * dx + dy * dy > R * R) continue;
+        var xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= MW || yy >= MH) continue; var j = yy * MW + xx; defMap[j] = clamp(defMap[j] + d, 0, 255); } }
+    // Prise d'une capitale : gros butin, -30 % de troupes à la victime, capitale relocalisée.
+    function captureCapital(victimId, byId) {
+      var v = players[victimId]; v.troops = Math.max(0, v.troops * 0.7); players[byId].gold += 5000;
+      capBonus(v.capital, -2);
+      var nc = 0; for (var i = 0; i < N; i++) if (owner[i] === victimId && i !== v.capital) { nc = i; break; }
+      v.capital = nc; if (nc) capBonus(nc, 2);
+      emit('capital', { victim: victimId, by: byId });
     }
 
     // ── Structures ─────────────────────────────────────────────────────────────
@@ -347,6 +362,13 @@
     function makeAlliance(a, b) { players[a].allies[b] = 1; players[b].allies[a] = 1; delete players[a].war[b]; delete players[b].war[a]; killFront(a, b); killFront(b, a); emit('ally', { a: a, b: b }); }
     function breakAlliance(a, b, treason) { if (!players[a].allies[b]) return; delete players[a].allies[b]; delete players[b].allies[a]; if (treason) players[a].traitor = true; emit('break', { a: a, b: b, treason: !!treason }); }
     function killFront(a, b) { var at = attackKey[a + '>' + b]; if (at) at.dead = true; }
+    // Dons entre alliés (le joueur peut soutenir un allié).
+    function giftGold(fromId, toId, amt) { var f = players[fromId], t = players[toId]; if (!f || !t || !f.allies[toId]) return false; amt = Math.min(amt, f.gold); if (amt <= 0) return false; f.gold -= amt; t.gold += amt; return true; }
+    function giftTroops(fromId, toId, amt) { var f = players[fromId], t = players[toId]; if (!f || !t || !f.allies[toId]) return false; amt = Math.min(amt, f.troops * 0.9); if (amt <= 0) return false; f.troops -= amt; t.troops += amt; return true; }
+    // Fin de partie : part du territoire CONQUIS tenue par soi + alliés ; « dernier bloc ».
+    function ownedTotal() { var s = 0; for (var i = 1; i < players.length; i++) if (players[i].alive) s += players[i].tiles; return s; }
+    function dominationPct(id) { var me = players[id]; if (!me) return 0; var mine = me.tiles; for (var al in me.allies) { var a = players[al]; if (a && a.alive) mine += a.tiles; } var tot = ownedTotal(); return tot > 0 ? mine / tot : 0; }
+    function onlyBlocLeft(id) { var me = players[id]; for (var i = 1; i < players.length; i++) { var p = players[i]; if (!p.alive || i === id) continue; if (!me.allies[i]) return false; } return true; }
 
     // ── IA ─────────────────────────────────────────────────────────────────────
     function placeAIStruct(p, k) {
@@ -376,8 +398,7 @@
       var losing = p.prevTiles > 0 && p.tiles < p.prevTiles * 0.9; p.prevTiles = p.tiles;
       p.ratio = underAtk ? 0.82 : (p.perso === 'defensive' ? 0.5 : p.perso === 'aggressive' ? 0.72 : 0.6);
       if (rng() > 0.45 + 0.55 * skill) return;   // les IA faibles agissent moins souvent
-      var diffMul = 0.6 + 0.75 * skill;
-      var persoAgg = { aggressive: 1.4, defensive: 0.5, expansionist: 0.7, opportunist: 1.0, balanced: 0.9 }[p.perso] * diffMul;
+      var pAgg = { aggressive: 1.4, defensive: 0.5, expansionist: 0.7, opportunist: 1.0, balanced: 0.9 }[p.perso];  // agressivité = PERSONNALITÉ
       var neigh = []; for (var q = 1; q < players.length; q++) { if (q === p.id || !players[q].alive) continue; if (touch[p.id] && touch[p.id][q]) neigh.push(players[q]); }
 
       aiSpend(p, neigh, underAtk, skill);
@@ -390,12 +411,16 @@
       if (p.perso === 'opportunist') for (var al in p.allies) { var A = players[al]; if (A && A.alive && A.tiles < p.tiles * 0.5 && rng() < 0.25) breakAlliance(p.id, +al, true); }
 
       var aggressor = 0; for (var ax = 0; ax < attacks.length; ax++) { var AA = attacks[ax]; if (!AA.dead && AA.tgt === p.id) { aggressor = AA.atk; break; } }
-      if (underAtk && losing) { if (aggressor && p.perso !== 'aggressive' && !p.allies[aggressor] && rng() < 0.6) requestAlliance(p.id, aggressor); return; }
+      if (underAtk && losing) {
+        // capitulation : une petite nation écrasée se rend (accélère la fin de partie)
+        if (p.tiles <= 4 && aggressor && p.troops < players[aggressor].troops * 0.3) { emit('capitulate', { id: p.id, by: aggressor }); eliminate(p.id, aggressor); return; }
+        if (aggressor && p.perso !== 'aggressive' && !p.allies[aggressor] && rng() < 0.6) requestAlliance(p.id, aggressor); return;
+      }
 
       var neutral = neutralAdjacent(p.id);
       var reserve = armyCap(p) * (0.32 - 0.18 * skill), send = p.troops * (0.28 + 0.32 * rng()) * (0.7 + 0.5 * skill);
       if (p.perso === 'expansionist') send *= 1.15;
-      var forceWar = p.perso === 'aggressive' && rng() < 0.4 * (0.5 + skill), didAttack = false;
+      var forceWar = p.perso === 'aggressive' && rng() < 0.35, didAttack = false;   // l'envie de guerre = personnalité, PAS difficulté
       if (neutral && p.troops > reserve && !forceWar) { launchAttack(p.id, 0, send); didAttack = true; }
       if (!didAttack && neigh.length) {
         var target = null, tb = 1e9;
@@ -403,7 +428,7 @@
         if (leaderId && leaderId !== p.id && touch[p.id] && touch[p.id][leaderId] && !p.allies[leaderId] && players[leaderId].tiles > p.tiles * 1.25 && rng() < 0.6) target = players[leaderId];
         if (p.focus && players[p.focus] && players[p.focus].alive && touch[p.id] && touch[p.id][p.focus] && !p.allies[p.focus] && rng() < 0.7) target = players[p.focus];
         if (target) p.focus = target.id;
-        var warNeed = (1.25 - 0.55 * skill) - Math.max(0, persoAgg - 0.9) * 0.22;
+        var warNeed = 1.18 - Math.max(0, pAgg - 0.9) * 0.22;   // avantage requis pour attaquer (indépendant de la difficulté)
         if (target && p.troops > target.troops * warNeed && p.troops > reserve) {
           p.war[target.id] = 1; target.war[p.id] = 1; if (p.allies[target.id]) breakAlliance(p.id, target.id, true);
           launchAttack(p.id, target.id, p.troops * (0.4 + 0.3 * rng()), centroid[target.id] ? { x: centroid[target.id].x, y: centroid[target.id].y } : null);
@@ -439,10 +464,11 @@
     var spawns = pickSpawns(nations);
     for (var pi = 0; pi < nations; pi++) {
       var data = nationData[pi] || { perso: PERSOS[pi % PERSOS.length], diff: opts.diff || 'normal', human: (pi + 1) === meId };
-      var pl = makePlayer(pi + 1, data); pl.seed = spawns[pi]; players.push(pl); spawnBlob(pi + 1, spawns[pi], 5.5);
+      var pl = makePlayer(pi + 1, data); pl.seed = spawns[pi]; pl.capital = spawns[pi]; players.push(pl); spawnBlob(pi + 1, spawns[pi], 5.5);
     }
     for (var rp = 1; rp < players.length; rp++) players[rp].tiles = 0;
     for (var ti = 0; ti < N; ti++) if (owner[ti] > 0) players[owner[ti]].tiles++;
+    for (var cp = 1; cp < players.length; cp++) if (players[cp].capital) capBonus(players[cp].capital, 2);
     computeTouch();
 
     return {
@@ -450,7 +476,11 @@
       get players() { return players; }, get attacks() { return attacks; }, get units() { return units; }, get structAt() { return structAt; },
       get touch() { return touch; }, get borderTiles() { return borderTiles; }, get centroid() { return centroid; }, get coastTiles() { return coastTiles; },
       get leaderId() { return leaderId; }, get elapsed() { return elapsed; },
+      MOUNTAIN: MOUNTAIN,
       BUILD: BUILD, buildCost: buildCost, landTotal: function () { return LAND_TOTAL; }, armyCap: armyCap,
+      goldPerSec: function (id) { return players[id] ? goldRate(players[id]) : 0; },
+      troopsPerSec: function (id) { return players[id] ? troopRate(players[id]) : 0; },
+      dominationPct: dominationPct, onlyBlocLeft: onlyBlocLeft, giftGold: giftGold, giftTroops: giftTroops,
       step: step, takeEvents: function () { var e = events; events = []; return e; },
       launchAttack: launchAttack, build: build, launchBoat: launchBoat, launchWarship: launchWarship, launchMissile: launchMissile,
       requestAlliance: requestAlliance, makeAlliance: makeAlliance, breakAlliance: breakAlliance,
