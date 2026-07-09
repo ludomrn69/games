@@ -152,6 +152,11 @@
     <div class="lab">Carte</div>
     <div class="chips" id="mapPick">
       <div class="chip" data-m="0">Continents</div><div class="chip sel" data-m="1">Archipel</div><div class="chip" data-m="2">Pangée</div>
+      <div class="chip" data-m="3">🌍 Monde</div><div class="chip" data-m="4">🗺️ Europe</div>
+    </div>
+    <div class="lab">Brouillard de guerre</div>
+    <div class="chips" id="fogPick">
+      <div class="chip sel" data-f="0">Non</div><div class="chip" data-f="1">Oui · exploration</div>
     </div>
   </div>
   <button class="btn" id="playBtn">Jouer ▶</button>
@@ -195,6 +200,19 @@ var PALETTE=[
   {name:'Turquia',  flag:'🩵', rgb:[42,196,196]},
   {name:'Rosalie',  flag:'🩷', rgb:[232,104,182]}
 ];
+// Cartes « réalistes » : masses continentales approchées par ellipses gaussiennes
+// [cx, cy, rx, ry] en coordonnées normalisées 0..1 (bruit côtier ajouté au rendu).
+var WORLD_BLOBS=[
+  [0.17,0.32,0.11,0.15],[0.22,0.50,0.03,0.06],[0.28,0.72,0.06,0.16], // Amériques
+  [0.49,0.30,0.05,0.06],[0.53,0.60,0.09,0.16],                       // Europe · Afrique
+  [0.72,0.31,0.15,0.13],[0.66,0.50,0.04,0.05],[0.80,0.55,0.05,0.04], // Asie · Inde · SE
+  [0.86,0.78,0.06,0.05]                                              // Océanie
+];
+var EUROPE_BLOBS=[
+  [0.20,0.70,0.05,0.05],[0.31,0.55,0.055,0.055],[0.24,0.33,0.035,0.055], // Ibérie · France · Îles Britanniques
+  [0.47,0.17,0.05,0.11],[0.49,0.47,0.08,0.07],[0.44,0.69,0.02,0.075],    // Scandinavie · Europe centrale · Italie
+  [0.56,0.62,0.05,0.06],[0.72,0.42,0.13,0.13],[0.73,0.73,0.06,0.04]      // Balkans · Europe de l'Est · Anatolie
+];
 var PERSOS=['aggressive','defensive','expansionist','opportunist','balanced'];
 var PERSO_FR={aggressive:'Belliqueuse',defensive:'Défensive',expansionist:'Colonisatrice',opportunist:'Opportuniste',balanced:'Équilibrée'};
 
@@ -225,6 +243,7 @@ var terr=new Uint8Array(N);       // OCEAN / LAND
 var elev=new Uint8Array(N);       // 0..255 (relief → défense + rendu)
 var owner=new Int16Array(N);      // 0 = personne, sinon id de joueur (1..)
 var defMap=new Uint8Array(N);     // couverture des postes de défense (rayon)
+var discovered=new Uint8Array(N); // brouillard de guerre : cases déjà explorées par le joueur
 var structAt={};                  // idx -> {k, owner}
 var players=[];                   // index 0 inutilisé ; joueurs 1..P
 var ME=1;                         // id du joueur humain
@@ -236,7 +255,7 @@ var terrBmp, terrImg, terrBuf;    // bitmap du territoire
 var running=false, paused=false, dirty=true;
 var elapsed=0, aiClock=0, touchClock=0, tradeClock=0;
 var rng=Math.random;
-var settings={color:1, nations:6, diff:'normal', map:1};
+var settings={color:1, nations:6, diff:'normal', map:1, fog:false};
 
 // caches de perf (évitent les scans O(N) répétés)
 var LAND_TOTAL=0, coastTiles=[], touchesNeutral=[], hasCoastCache=[], borderTiles=[], leaderId=0, centroid=[];
@@ -273,21 +292,29 @@ function valueNoise(seed){
 function genMap(seed, mapType){
   var oct=[valueNoise(seed),valueNoise(seed*7+3),valueNoise(seed*13+9),valueNoise(seed*29+1)];
   var amp=[1,0.5,0.26,0.13], sc=[1,2.1,4.3,8.7];
-  // paramètres selon le type de carte
-  var sea = mapType===2?0.30 : mapType===0?0.42 : 0.50;   // niveau de la mer
-  var edge= mapType===2?0.55 : mapType===0?0.9  : 1.15;   // atténuation des bords
-  for(var y=0;y<MH;y++)for(var x=0;x<MW;x++){
-    var i=y*MW+x, nx=x/MW, ny=y/MH, e=0, tot=0;
-    for(var o=0;o<4;o++){e+=oct[o](nx*sc[o]%1,ny*sc[o]%1)*amp[o];tot+=amp[o];}
-    e/=tot;
-    // atténuation radiale → continents centrés / bords océan
-    var dx=(nx-0.5)*2, dy=(ny-0.5)*2, d=Math.sqrt(dx*dx+dy*dy);
-    e-=Math.max(0,(d-0.35))*edge;
-    if(mapType===1){ // archipel : creuse des détroits
-      e-=Math.abs(oct[1](nx*3%1,ny*3%1)-0.5)*0.35;
+  function fbm(nx,ny){var e=0,tot=0;for(var o=0;o<4;o++){e+=oct[o](nx*sc[o]%1,ny*sc[o]%1)*amp[o];tot+=amp[o];}return e/tot;}
+  if(mapType>=3){
+    // cartes réalistes : masse continentale = somme d'ellipses gaussiennes + bruit côtier
+    var blobs=(mapType===3)?WORLD_BLOBS:EUROPE_BLOBS;
+    for(var y=0;y<MH;y++)for(var x=0;x<MW;x++){
+      var i=y*MW+x, nx=x/MW, ny=y/MH, cov=0;
+      for(var bI=0;bI<blobs.length;bI++){var B=blobs[bI],ddx=(nx-B[0])/B[2],ddy=(ny-B[1])/B[3];cov+=Math.exp(-(ddx*ddx+ddy*ddy));}
+      cov+=(fbm(nx,ny)-0.5)*0.55;                    // casse les ellipses → côtes crédibles
+      var land=cov>0.55 && nx>0.015 && nx<0.985 && ny>0.02 && ny<0.98;
+      if(land){terr[i]=LAND;elev[i]=clamp(Math.round(clamp((cov-0.55)/1.15,0,1)*255),0,255);}
+      else{terr[i]=OCEAN;elev[i]=clamp(Math.round(clamp(cov/0.55,0,1)*120),0,255);}
     }
-    if(e>sea){terr[i]=LAND;elev[i]=clamp(Math.round((e-sea)/(1-sea)*255),0,255);}
-    else{terr[i]=OCEAN;elev[i]=clamp(Math.round(e/sea*255),0,255);}
+  } else {
+    var sea = mapType===2?0.30 : mapType===0?0.42 : 0.50;   // niveau de la mer
+    var edge= mapType===2?0.55 : mapType===0?0.9  : 1.15;   // atténuation des bords
+    for(var y2=0;y2<MH;y2++)for(var x2=0;x2<MW;x2++){
+      var i2=y2*MW+x2, nx2=x2/MW, ny2=y2/MH, e=fbm(nx2,ny2);
+      var dx=(nx2-0.5)*2, dy=(ny2-0.5)*2, d=Math.sqrt(dx*dx+dy*dy);
+      e-=Math.max(0,(d-0.35))*edge;                         // continents centrés / bords océan
+      if(mapType===1)e-=Math.abs(oct[1](nx2*3%1,ny2*3%1)-0.5)*0.35; // archipel : détroits
+      if(e>sea){terr[i2]=LAND;elev[i2]=clamp(Math.round((e-sea)/(1-sea)*255),0,255);}
+      else{terr[i2]=OCEAN;elev[i2]=clamp(Math.round(e/sea*255),0,255);}
+    }
   }
   // lisse les tuiles isolées (une case océan entourée de terre → terre)
   for(var p=0;p<2;p++){
@@ -314,7 +341,8 @@ function makePlayer(id,pal,human,perso){
     human:human,perso:perso,alive:true,
     gold:1000,troops:6000,pop:6000,tiles:0,
     cities:0,ports:0,silos:0,sams:0,defenses:0,
-    allies:{},war:{},traitor:false,seed:0,
+    allies:{},war:{},traitor:false,seed:0,ratio:0.55,
+    focus:0,prevTiles:0,
     aiCd:Math.random()*1.5,lastAtkT:0};
 }
 function packRGB(r,g,b){return (255<<24)|((b&255)<<16)|((g&255)<<8)|(r&255);}
@@ -353,6 +381,7 @@ function startGame(daily){
   DAILY=!!daily;
   // reset
   owner.fill(0);defMap.fill(0);structAt={};players=[null];attacks=[];attackKey={};units=[];touch=[];centroid=[];
+  discovered.fill(settings.fog?0:1);
   elapsed=0;aiClock=0;touchClock=0;tradeClock=0;invasionCd=0;paused=false;mode=null;setMode(null);
   // défi du jour : carte + réglages IDENTIQUES pour tous, seedés par la date
   var seed, mapType, nations;
@@ -375,7 +404,7 @@ function startGame(daily){
     spawnBlob(p+1,spawns[p],5.5);
   }
   recountTiles();
-  computeTouch();               // amorce tout de suite les caches (bordures, littoral…)
+  computeTouch();revealFog();   // amorce tout de suite les caches (bordures, littoral…) + brouillard
   // caméra centrée sur le joueur
   centerOn(players[ME].seed, 5.5);
   document.getElementById('ratR').value=55;players[ME].ratio=0.55;updateRatLabel();
@@ -632,6 +661,7 @@ function computeTouch(){
   for(var i=0;i<N;i++){var o=owner[i];if(o<=0)continue;
     var x=i%MW,y=(i/MW)|0,isB=false,coast=false;
     sx[o]+=x;sy[o]+=y;cnt[o]++;
+    if(o===ME&&settings.fog)discovered[i]=1;
     var ns=[x>0?i-1:-1, x<MW-1?i+1:-1, y>0?i-MW:-1, y<MH-1?i+MW:-1];
     for(var k=0;k<4;k++){var n=ns[k];if(n<0)continue;var no=owner[n];
       if(terr[n]===OCEAN){coast=true;continue;}
@@ -646,6 +676,20 @@ function computeTouch(){
   for(var q=1;q<players.length;q++){if(players[q]&&players[q].alive&&players[q].tiles>lt){lt=players[q].tiles;leaderId=q;}}
 }
 function neutralAdjacent(id){ return !!touchesNeutral[id]; }
+function revealRadius(i0,R){
+  var x0=i0%MW,y0=(i0/MW)|0,chg=false;
+  for(var dy=-R;dy<=R;dy++)for(var dx=-R;dx<=R;dx++){if(dx*dx+dy*dy>R*R)continue;
+    var xx=x0+dx,yy=y0+dy;if(xx<0||yy<0||xx>=MW||yy>=MH)continue;
+    var j=yy*MW+xx;if(!discovered[j]){discovered[j]=1;chg=true;}}
+  return chg;
+}
+function revealFog(){
+  if(!settings.fog)return;
+  var chg=false, bl=borderTiles[ME]||[];
+  for(var b=0;b<bl.length;b++)chg=revealRadius(bl[b],5)||chg;      // exploration au front
+  for(var u=0;u<units.length;u++){var it=units[u];if(it.owner===ME&&it.type!=='blast')chg=revealRadius((it.y|0)*MW+(it.x|0),6)||chg;}
+  if(chg)dirty=true;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  INTELLIGENCE ARTIFICIELLE
@@ -682,6 +726,15 @@ function aiThink(p,dt){
     for(var al in p.allies){var A=players[al];if(A&&A.alive&&A.tiles<p.tiles*0.5&&rng()<0.25){breakAlliance(p.id,+al,true);}}
   }
 
+  // --- Repli tactique : si on saigne, on consolide et on tente la paix ---
+  var losing=p.prevTiles>0 && p.tiles<p.prevTiles*0.9;
+  p.prevTiles=p.tiles;
+  var aggressor=0;for(var ax=0;ax<attacks.length;ax++){var AA=attacks[ax];if(!AA.dead&&AA.tgt===p.id){aggressor=AA.atk;break;}}
+  if(underAtk&&losing){
+    if(aggressor&&p.perso!=='aggressive'&&!p.allies[aggressor]&&rng()<0.6)requestAlliance(p.id,aggressor);
+    return; // on ne lance aucune offensive ce tour-ci (défense/consolidation)
+  }
+
   // --- Expansion / guerre ---
   var wantWar=rng()<0.15*persoAgg;
   var neutral=neutralAdjacent(p.id);
@@ -698,6 +751,11 @@ function aiThink(p,dt){
     if(leaderId&&leaderId!==p.id&&touch[p.id]&&touch[p.id][leaderId]&&!p.allies[leaderId]&&players[leaderId].tiles>p.tiles*1.25&&rng()<0.6){
       target=players[leaderId];
     }
+    // focus-fire : on s'acharne sur la même cible tant qu'elle vit et reste voisine
+    if(p.focus&&players[p.focus]&&players[p.focus].alive&&touch[p.id]&&touch[p.id][p.focus]&&!p.allies[p.focus]&&rng()<0.7){
+      target=players[p.focus];
+    }
+    if(target)p.focus=target.id;
     if(target&&p.troops>target.troops*0.6*(2-persoAgg)&&p.troops>armyCap(p)*0.3){
       p.war[target.id]=1;target.war[p.id]=1;
       if(p.allies[target.id]){breakAlliance(p.id,target.id,true);}
@@ -800,7 +858,7 @@ function simTick(dt){
   if(attacks.length){var live=[];for(var i=0;i<attacks.length;i++){var A=attacks[i];if(A.dead){delete attackKey[A.atk+'>'+A.tgt];}else live.push(A);}attacks=live;}
   updateUnits(dt);
   // adjacence (périodique)
-  touchClock-=dt;if(touchClock<=0){touchClock=1.0;computeTouch();}
+  touchClock-=dt;if(touchClock<=0){touchClock=1.0;computeTouch();revealFog();}
   // commerce automatique entre ports
   tradeClock-=dt;if(tradeClock<=0){tradeClock=2.5;autoTrade();}
   // IA
@@ -871,6 +929,7 @@ function buildBitmap(){
   ensureBmp();
   for(var i=0;i<N;i++){
     var o=owner[i], col;
+    if(settings.fog&&!discovered[i]){terrBuf[i]=packRGB(9,11,17)>>>0;continue;}
     if(terr[i]===OCEAN){var sh=0.55+elev[i]/255*0.45;col=packRGB(20*sh,54*sh,92*sh);}
     else if(o===0){var e=elev[i];col=e>200?packRGB(186,176,152):e>150?packRGB(166,156,130):packRGB(146,138,112);}
     else{var pl=players[o];
@@ -921,6 +980,7 @@ function draw(){
 function drawLabels(z){
   ctx.textAlign='center';ctx.textBaseline='middle';
   for(var p=1;p<players.length;p++){var pl=players[p];if(!pl.alive||!centroid[p])continue;
+    if(settings.fog&&pl.id!==ME){var ci=(centroid[p].y|0)*MW+(centroid[p].x|0);if(!discovered[ci])continue;} // brouillard : pas de fuite
     var sx=(centroid[p].x-cam.x)*z,sy=(centroid[p].y-cam.y)*z;
     if(sx<-40||sy<-40||sx>VW+40||sy>VH+40)continue;
     var label=pl.flag+' '+pl.name+(pl.id===ME?'':(players[ME].allies[pl.id]?' 🤝':players[ME].war[pl.id]?' ⚔️':''));
@@ -937,6 +997,7 @@ function drawArrows(z){
   if(!attacks.length)return;
   var dash=(elapsed*12)%16;
   for(var a=0;a<attacks.length;a++){var at=attacks[a];if(at.dead||at.troops<50)continue;
+    if(settings.fog&&at.atk!==ME&&at.tgt!==ME)continue; // brouillard : pas de fuite des guerres lointaines
     var from=centroid[at.atk];if(!from)continue;
     var to=at.aim?{x:at.aim.x,y:at.aim.y}:(at.tgt>0&&centroid[at.tgt]?centroid[at.tgt]:null);if(!to)continue;
     var x1=(from.x-cam.x)*z,y1=(from.y-cam.y)*z,x2=(to.x-cam.x)*z,y2=(to.y-cam.y)*z;
@@ -1198,6 +1259,7 @@ buildColorPick();
 chipGroup('nationsPick','n','nations',function(v){return +v;});
 chipGroup('diffPick','d','diff');
 chipGroup('mapPick','m','map',function(v){return +v;});
+chipGroup('fogPick','f','fog',function(v){return v==='1';});
 document.getElementById('playBtn').onclick=function(){startGame(false);};
 document.getElementById('dailyBtn').onclick=function(){startGame(true);};
 document.getElementById('replayBtn').onclick=function(){show('start');};
