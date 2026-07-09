@@ -162,6 +162,10 @@
       <div class="chip" data-m="0">Continents</div><div class="chip sel" data-m="1">Archipel</div><div class="chip" data-m="2">Pangée</div>
       <div class="chip" data-m="3">🌍 Monde</div><div class="chip" data-m="4">🗺️ Europe</div>
     </div>
+    <div class="lab">Taille de carte</div>
+    <div class="chips" id="sizePick">
+      <div class="chip sel" data-s="0">Normale</div><div class="chip" data-s="1">Grande</div><div class="chip" data-s="2">Immense</div>
+    </div>
     <div class="lab">Brouillard de guerre</div>
     <div class="chips" id="fogPick">
       <div class="chip sel" data-f="0">Non</div><div class="chip" data-f="1">Oui · exploration</div>
@@ -234,7 +238,9 @@ var BUILDS_UI=[
   {k:'mirv',e:'🌐',t:'MIRV',need:'nuke'}
 ];
 
-var settings={color:1, nations:6, diff:'normal', map:1, fog:false, trait:'none'};
+var settings={color:1, nations:6, diff:'normal', map:1, fog:false, trait:'none', size:0};
+// Tailles de carte (tuiles). Plus grand = plus de territoire à conquérir, parties plus longues.
+var SIZES=[{w:200,h:125,t:'Normale'},{w:320,h:200,t:'Grande'},{w:440,h:275,t:'Immense'}];
 var cam={x:0,y:0,zoom:4}, mode=null, cursorTile=-1, mmRect=null, mmDrag=false;
 var discovered=new Uint8Array(N), pcol=[], pbord=[];
 var terrBmp, terrImg, terrBuf;
@@ -291,7 +297,8 @@ function startGame(daily){
       perso:human?null:PERSOS[p%PERSOS.length],diff:diff,
       trait:human?settings.trait:TRAITS_UI[1+((srng()*(TRAITS_UI.length-1))|0)].k});
   }
-  E=ENG.createGame({seed:seed,mapType:mapType,meId:ME,nations:nd});
+  var sz=DAILY?SIZES[0]:SIZES[settings.size]||SIZES[0];
+  E=ENG.createGame({seed:seed,mapType:mapType,meId:ME,nations:nd,w:sz.w,h:sz.h});
   MW=E.MW;MH=E.MH;N=E.N;
   discovered=new Uint8Array(N);discovered.fill(settings.fog?0:1);
   terrBmp=null;
@@ -386,8 +393,8 @@ function buildBitmap(){
   terrBmp.getContext('2d').putImageData(terrImg,0,0);dirty=false;
 }
 function centerOn(tile,zoom){var x=tile%MW,y=(tile/MW)|0;cam.zoom=zoom||cam.zoom;cam.x=x-VW/(2*cam.zoom);cam.y=y-VH/(2*cam.zoom);clampCam();}
-function clampCam(){cam.zoom=clamp(cam.zoom,1.2,26);var vw=VW/cam.zoom,vh=VH/cam.zoom;
-  cam.x=clamp(cam.x,-vw*0.3,MW-vw*0.7);cam.y=clamp(cam.y,-vh*0.3,MH-vh*0.7);}
+function clampCam(){var mz=Math.max(0.4,Math.min(1.2,(VW/MW)*0.85,(VH/MH)*0.85));cam.zoom=clamp(cam.zoom,mz,26);
+  var vw=VW/cam.zoom,vh=VH/cam.zoom;cam.x=clamp(cam.x,-vw*0.3,MW-vw*0.7);cam.y=clamp(cam.y,-vh*0.3,MH-vh*0.7);}
 function draw(){
   ctx.clearRect(0,0,VW,VH);ctx.fillStyle='#070a10';ctx.fillRect(0,0,VW,VH);
   if(dirty||!terrBmp)buildBitmap();
@@ -633,6 +640,7 @@ chipGroup('nationsPick','n','nations',function(v){return +v;});
 chipGroup('diffPick','d','diff');
 chipGroup('mapPick','m','map',function(v){return +v;});
 chipGroup('fogPick','f','fog',function(v){return v==='1';});
+chipGroup('sizePick','s','size',function(v){return +v;});
 document.getElementById('playBtn').onclick=function(){startGame(false);};
 document.getElementById('dailyBtn').onclick=function(){startGame(true);};
 document.getElementById('replayBtn').onclick=function(){show('start');};
@@ -643,9 +651,12 @@ function loop(ts){
   requestAnimationFrame(loop);
   var dt=Math.min(0.05,(ts-last)/1000)||0;last=ts;
   if(running&&!paused&&E){
-    acc+=dt*speed;var guard=0;
-    while(acc>=TICK&&guard++<12){E.step(TICK);acc-=TICK;}
-    handleEvents();revealFog();checkWin();dirty=true;
+    acc+=dt*speed;var guard=0,stepped=false;
+    while(acc>=TICK&&guard++<12){E.step(TICK);acc-=TICK;stepped=true;}
+    // on ne reconstruit le fond de carte QUE quand la simulation a avancé (pas 60×/s) :
+    // décisif pour la fluidité des grandes cartes.
+    if(stepped){handleEvents();checkWin();dirty=true;}
+    revealFog();
     hudClock-=dt;if(hudClock<=0){hudClock=0.2;refreshHUD();refreshDock();
       if(!document.getElementById('board').classList.contains('hidden'))refreshBoard();}
   }
