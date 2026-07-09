@@ -155,6 +155,8 @@
     </div>
   </div>
   <button class="btn" id="playBtn">Jouer ▶</button>
+  <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#8b5cf6,#b794f6);box-shadow:0 10px 30px rgba(139,92,246,.4)">🗓️ Défi du jour</button>
+  <div id="recLine" style="font-size:.8rem;opacity:.72;margin-top:2px"></div>
 </div>
 
 <div class="screen hidden" id="over">
@@ -169,6 +171,7 @@
   <button class="btn" id="quitBtn" style="background:linear-gradient(135deg,#a3352f,#d05a4f)">Abandonner</button>
 </div>
 
+<script src="../sfx.js"></script>
 <script>
 (function(){
 "use strict";
@@ -235,6 +238,11 @@ var elapsed=0, aiClock=0, touchClock=0, tradeClock=0;
 var rng=Math.random;
 var settings={color:1, nations:6, diff:'normal', map:1};
 
+// caches de perf (évitent les scans O(N) répétés)
+var LAND_TOTAL=0, coastTiles=[], touchesNeutral=[], hasCoastCache=[], borderTiles=[], leaderId=0, centroid=[];
+var DAILY=false, invasionCd=0, DIFF='normal';
+var REC_KEY='openfront.records';
+
 // caméra
 var cam={x:0,y:0,zoom:4};
 
@@ -245,6 +253,9 @@ function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;var t=Math.imul
 function clamp(v,a,b){return v<a?a:v>b?b:v;}
 function fmt(n){n=Math.round(n);if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e4)return(n/1e3).toFixed(0)+'k';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return''+n;}
 var nb4=function(i){var x=i%MW,y=(i/MW)|0,r=[];if(x>0)r.push(i-1);if(x<MW-1)r.push(i+1);if(y>0)r.push(i-MW);if(y<MH-1)r.push(i+MW);return r;};
+var Sfx=window.Sfx||{play:function(){}};
+function vibrate(m){try{if(navigator.vibrate)navigator.vibrate(m);}catch(e){}}
+function sound(n){try{Sfx.play(n);}catch(e){}}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  GÉNÉRATION DE CARTE (bruit de valeur fractal + seuil mer)
@@ -285,6 +296,10 @@ function genMap(seed, mapType){
       if(snap[i]===OCEAN&&ld>=nn.length)terr[i]=LAND;
       if(snap[i]===LAND&&ld===0)terr[i]=OCEAN;}
   }
+  // précalculs statiques (le terrain ne change plus) : total de terres + littoral
+  LAND_TOTAL=0;coastTiles=[];
+  for(i=0;i<N;i++)if(terr[i]===LAND)LAND_TOTAL++;
+  for(i=0;i<N;i++)if(isCoast(i))coastTiles.push(i);
 }
 function terrainMult(i){var e=elev[i];return e>200?2.6:e>150?1.7:e>90?1.15:1;} // relief = plus cher à prendre
 function isCoast(i){if(terr[i]!==LAND)return false;var nn=nb4(i);for(var k=0;k<nn.length;k++)if(terr[nn[k]]===OCEAN)return true;return false;}
@@ -334,19 +349,24 @@ function pickSpawns(count){
   return pts;
 }
 
-function startGame(){
+function startGame(daily){
+  DAILY=!!daily;
   // reset
-  owner.fill(0);defMap.fill(0);structAt={};players=[null];attacks=[];attackKey={};units=[];touch=[];
-  elapsed=0;aiClock=0;touchClock=0;tradeClock=0;paused=false;mode=null;setMode(null);
-  var seed=(Math.random()*1e9)|0; rng=mulberry32(seed);
-  genMap(seed,settings.map);
+  owner.fill(0);defMap.fill(0);structAt={};players=[null];attacks=[];attackKey={};units=[];touch=[];centroid=[];
+  elapsed=0;aiClock=0;touchClock=0;tradeClock=0;invasionCd=0;paused=false;mode=null;setMode(null);
+  // défi du jour : carte + réglages IDENTIQUES pour tous, seedés par la date
+  var seed, mapType, nations;
+  if(DAILY){seed=dailyNum();mapType=seed%3;nations=6;DIFF='normal';}
+  else{seed=(Math.random()*1e9)|0;mapType=settings.map;nations=settings.nations;DIFF=settings.diff;}
+  rng=mulberry32(seed);
+  genMap(seed,mapType);
 
   // ordre des nations : le joueur d'abord avec sa couleur, puis les autres
   var pool=PALETTE.slice(); var mine=pool.splice(settings.color-1,1)[0];
   for(var s=pool.length-1;s>0;s--){var j=(rng()*(s+1))|0;var tmp=pool[s];pool[s]=pool[j];pool[j]=tmp;}
-  var order=[mine].concat(pool).slice(0,settings.nations);
-  var spawns=pickSpawns(settings.nations);
-  for(var p=0;p<settings.nations;p++){
+  var order=[mine].concat(pool).slice(0,nations);
+  var spawns=pickSpawns(nations);
+  for(var p=0;p<nations;p++){
     var human=(p===0);
     var perso=human?null:PERSOS[p%PERSOS.length];
     var pl=makePlayer(p+1,order[p],human,perso);
@@ -355,12 +375,14 @@ function startGame(){
     spawnBlob(p+1,spawns[p],5.5);
   }
   recountTiles();
+  computeTouch();               // amorce tout de suite les caches (bordures, littoral…)
   // caméra centrée sur le joueur
   centerOn(players[ME].seed, 5.5);
+  document.getElementById('ratR').value=55;players[ME].ratio=0.55;updateRatLabel();
   buildDock();
   dirty=true;running=true;
   show('none');
-  toast('info','🗺️ '+settings.nations+' nations. Touche le neutre pour t\'étendre, un ennemi pour l\'attaquer.',4200);
+  toast('info',DAILY?'🗓️ Défi du jour — même carte pour tous aujourd\'hui.':('🗺️ '+nations+' nations. Touche le neutre pour t\'étendre, un ennemi pour l\'attaquer.'),4200);
 }
 
 function recountTiles(){
@@ -385,25 +407,38 @@ function economy(p,dt){
 // ═══════════════════════════════════════════════════════════════════════════
 //  EXPANSION / GUERRE  (fronts d'attaque)
 // ═══════════════════════════════════════════════════════════════════════════
-function launchAttack(atkId,tgtId,troops){
+function launchAttack(atkId,tgtId,troops,aim){
   var atk=players[atkId];
   if(!atk||!atk.alive||troops<50)return;
   if(tgtId>0&&(atk.allies[tgtId]||atk.id===tgtId))return;
   troops=Math.min(troops,atk.troops);
   atk.troops-=troops;
   var key=atkId+'>'+tgtId, a=attackKey[key];
-  if(a){a.troops+=troops; if(a.dead){a.dead=false;} seedFrontier(a);}
-  else{a={atk:atkId,tgt:tgtId,troops:troops,front:[],head:0,seen:new Uint8Array(N),carry:0,dead:false};
+  if(a){a.troops+=troops;a.aim=aim||null;if(a.dead){a.dead=false;}seedFrontier(a);}
+  else{a={atk:atkId,tgt:tgtId,troops:troops,front:[],head:0,seen:new Uint8Array(N),carry:0,dead:false,aim:aim||null};
     attackKey[key]=a;attacks.push(a);seedFrontier(a);}
 }
 function seedFrontier(a){
-  // (ré)amorce le front : cases de l'attaquant adjacentes à une cible capturable
-  var atkId=a.atk, tgt=a.tgt;
-  for(var i=0;i<N;i++){
-    if(owner[i]!==atkId)continue;
-    var nn=nb4(i);
-    for(var k=0;k<nn.length;k++){if(capturable(nn[k],atkId,tgt)){if(!a.seen[i]){a.seen[i]=1;a.front.push(i);}break;}}
+  // amorce le front depuis les cases de bordure de l'attaquant qui touchent la cible.
+  var atkId=a.atk, tgt=a.tgt, bl=borderTiles[atkId];
+  var cands=[];
+  if(bl&&bl.length){
+    for(var b=0;b<bl.length;b++){var i=bl[b];if(owner[i]!==atkId)continue;
+      var nn=nb4(i);for(var k=0;k<nn.length;k++){if(capturable(nn[k],atkId,tgt)){cands.push(i);break;}}}
+  } else { // repli (cache pas encore prêt) : balayage complet
+    for(var j=0;j<N;j++){if(owner[j]!==atkId)continue;var mm=nb4(j);
+      for(var m=0;m<mm.length;m++){if(capturable(mm[m],atkId,tgt)){cands.push(j);break;}}}
   }
+  // attaque DIRECTIONNELLE : si une visée est fournie, on ne part que des cases
+  // de bordure les plus proches du point touché (émane vers là où on a tapé).
+  if(a.aim&&cands.length){
+    var ax=a.aim.x, ay=a.aim.y, rad=clamp(10+Math.sqrt(a.troops)/6,10,42);
+    cands.sort(function(p,q){return((p%MW-ax)*(p%MW-ax)+((p/MW|0)-ay)*((p/MW|0)-ay))-((q%MW-ax)*(q%MW-ax)+((q/MW|0)-ay)*((q/MW|0)-ay));});
+    var near=[];for(var c=0;c<cands.length;c++){var i2=cands[c],dd=(i2%MW-ax)*(i2%MW-ax)+((i2/MW|0)-ay)*((i2/MW|0)-ay);
+      if(dd<=rad*rad||near.length<6)near.push(i2);else break;}
+    cands=near;
+  }
+  for(var f=0;f<cands.length;f++){var t=cands[f];if(!a.seen[t]){a.seen[t]=1;a.front.push(t);}}
 }
 function capturable(i,atkId,tgt){
   if(terr[i]!==LAND)return false;
@@ -524,6 +559,7 @@ function detonate(i0,radius,byId){
   }
   dirty=true;
   spawnUnit({type:'blast',x:x0+0.5,y:y0+0.5,r:radius,t:0,life:0.7});
+  sound('big');vibrate(24);
 }
 function updateUnits(dt){
   for(var u=units.length-1;u>=0;u--){
@@ -574,14 +610,14 @@ function arrive(it){
 }
 function nearestCoast(ownerId,tx,ty){ // case côtière de ownerId la plus proche de (tx,ty)
   var best=-1,bd=1e9;
-  for(var i=0;i<N;i++){if(owner[i]!==ownerId)continue;if(!isCoast(i))continue;
+  for(var c=0;c<coastTiles.length;c++){var i=coastTiles[c];if(owner[i]!==ownerId)continue;
     var x=i%MW,y=(i/MW)|0,d=(x-tx)*(x-tx)+(y-ty)*(y-ty);if(d<bd){bd=d;best=i;}}
   return best;
 }
 function coastNear(tile){ // case côtière/terre proche de tile (pour débarquer)
   if(terr[tile]===LAND)return tile;
   var best=-1,bd=1e9,x0=tile%MW,y0=(tile/MW)|0;
-  for(var i=0;i<N;i++){if(!isCoast(i))continue;var x=i%MW,y=(i/MW)|0,d=(x-x0)*(x-x0)+(y-y0)*(y-y0);if(d<bd){bd=d;best=i;}}
+  for(var c=0;c<coastTiles.length;c++){var i=coastTiles[c];var x=i%MW,y=(i/MW)|0,d=(x-x0)*(x-x0)+(y-y0)*(y-y0);if(d<bd){bd=d;best=i;}}
   return best;
 }
 
@@ -589,15 +625,27 @@ function coastNear(tile){ // case côtière/terre proche de tile (pour débarque
 //  ADJACENCE DES TERRITOIRES (pour l'IA & la diplomatie)
 // ═══════════════════════════════════════════════════════════════════════════
 function computeTouch(){
-  var P=players.length;touch=[];for(var a=0;a<P;a++)touch.push(new Uint8Array(P));
-  for(var i=0;i<N;i++){var o=owner[i];if(o<=0)continue;var nn=nb4(i);
-    for(var k=0;k<nn.length;k++){var no=owner[nn[k]];if(no>0&&no!==o){touch[o][no]=1;}}}
+  // UN seul balayage remplit : adjacence, contact du neutre, littoral, bordures, leader.
+  var P=players.length;touch=[];touchesNeutral=[];hasCoastCache=[];borderTiles=[];centroid=[];
+  var sx=new Float64Array(P),sy=new Float64Array(P),cnt=new Float64Array(P);
+  for(var a=0;a<P;a++){touch.push(new Uint8Array(P));touchesNeutral.push(false);hasCoastCache.push(false);borderTiles.push([]);centroid.push(null);}
+  for(var i=0;i<N;i++){var o=owner[i];if(o<=0)continue;
+    var x=i%MW,y=(i/MW)|0,isB=false,coast=false;
+    sx[o]+=x;sy[o]+=y;cnt[o]++;
+    var ns=[x>0?i-1:-1, x<MW-1?i+1:-1, y>0?i-MW:-1, y<MH-1?i+MW:-1];
+    for(var k=0;k<4;k++){var n=ns[k];if(n<0)continue;var no=owner[n];
+      if(terr[n]===OCEAN){coast=true;continue;}
+      if(no!==o){isB=true;if(no>0)touch[o][no]=1;else touchesNeutral[o]=true;}
+    }
+    if(isB)borderTiles[o].push(i);
+    if(coast)hasCoastCache[o]=true;
+  }
+  for(a=1;a<P;a++)if(cnt[a]>0)centroid[a]={x:sx[a]/cnt[a],y:sy[a]/cnt[a]};
+  // leader du moment (plus grand territoire vivant) → utilisé par l'IA
+  leaderId=0;var lt=-1;
+  for(var q=1;q<players.length;q++){if(players[q]&&players[q].alive&&players[q].tiles>lt){lt=players[q].tiles;leaderId=q;}}
 }
-function neutralAdjacent(id){ // le joueur id touche-t-il du neutre ?
-  for(var i=0;i<N;i++){if(owner[i]!==id)continue;var nn=nb4(i);
-    for(var k=0;k<nn.length;k++)if(terr[nn[k]]===LAND&&owner[nn[k]]===0)return true;}
-  return false;
-}
+function neutralAdjacent(id){ return !!touchesNeutral[id]; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  INTELLIGENCE ARTIFICIELLE
@@ -606,7 +654,10 @@ function aiThink(p,dt){
   p.aiCd-=dt;if(p.aiCd>0)return;
   p.aiCd=1.1+rng()*1.4;
   if(!p.alive)return;
-  var diffMul=settings.diff==='hard'?1.35:settings.diff==='easy'?0.6:1;
+  // arbitrage troupes/or : bascule sur les troupes quand on est attaqué (défense)
+  var underAtk=false;for(var ua=0;ua<attacks.length;ua++){if(!attacks[ua].dead&&attacks[ua].tgt===p.id){underAtk=true;break;}}
+  p.ratio=underAtk?0.82:(p.perso==='defensive'?0.5:p.perso==='aggressive'?0.72:0.6);
+  var diffMul=DIFF==='hard'?1.35:DIFF==='easy'?0.6:1;
   var persoAgg={aggressive:1.4,defensive:0.5,expansionist:0.7,opportunist:1.0,balanced:0.9}[p.perso]*diffMul;
 
   // voisins (via matrice touch)
@@ -618,10 +669,13 @@ function aiThink(p,dt){
 
   // --- Diplomatie : demander alliance à un voisin fort si menacé ---
   var strongest=null;for(var s=0;s<neigh.length;s++)if(!strongest||neigh[s].tiles>strongest.tiles)strongest=neigh[s];
-  var myThreat=strongest&&strongest.tiles>p.tiles*1.5;
-  if(myThreat&&p.perso!=='aggressive'&&rng()<0.5){
-    // propose alliance au plus fort (souvent le joueur si c'est lui)
-    if(!p.allies[strongest.id]&&!p.war[strongest.id]){requestAlliance(p.id,strongest.id);}
+  var myThreat=strongest&&strongest.tiles>p.tiles*1.4;
+  if(myThreat&&p.perso!=='aggressive'&&rng()<0.55){
+    // coalition anti-leader : s'allier de préférence à un voisin fort qui N'EST PAS le leader
+    var partner=null;for(var s2=0;s2<neigh.length;s2++){var e2=neigh[s2];if(e2.id===leaderId)continue;
+      if(!p.allies[e2.id]&&!p.war[e2.id]&&(!partner||e2.tiles>partner.tiles))partner=e2;}
+    if(!partner)partner=strongest;
+    if(partner&&!p.allies[partner.id]&&!p.war[partner.id])requestAlliance(p.id,partner.id);
   }
   // opportuniste : trahison si l'allié est faible et qu'on peut le croquer
   if(p.perso==='opportunist'){
@@ -640,10 +694,15 @@ function aiThink(p,dt){
     var target=null,tb=1e9;
     for(var n=0;n<neigh.length;n++){var e=neigh[n];if(p.allies[e.id])continue;
       var dens=e.troops/Math.max(1,e.tiles)+e.tiles*0.4;if(dens<tb){tb=dens;target=e;}}
+    // coalition : viser le leader en priorité s'il est voisin, non-allié et bien plus gros
+    if(leaderId&&leaderId!==p.id&&touch[p.id]&&touch[p.id][leaderId]&&!p.allies[leaderId]&&players[leaderId].tiles>p.tiles*1.25&&rng()<0.6){
+      target=players[leaderId];
+    }
     if(target&&p.troops>target.troops*0.6*(2-persoAgg)&&p.troops>armyCap(p)*0.3){
       p.war[target.id]=1;target.war[p.id]=1;
       if(p.allies[target.id]){breakAlliance(p.id,target.id,true);}
-      launchAttack(p.id,target.id,p.troops*(0.4+0.3*rng()));
+      launchAttack(p.id,target.id,p.troops*(0.4+0.3*rng()),{x:centroid[target.id]?centroid[target.id].x:target.seed%MW,y:centroid[target.id]?centroid[target.id].y:(target.seed/MW|0)});
+      if(target.id===ME)warnInvasion(p);
     } else if(neutral){launchAttack(p.id,0,send);}
   }
 
@@ -670,7 +729,7 @@ function aiSpend(p,neigh,agg){
         toast('info',p.flag+' '+p.name+' a lancé une frappe ! ☢️',2200);}}}
   }
 }
-function hasCoast(id){for(var i=0;i<N;i++)if(owner[i]===id&&isCoast(i))return true;return false;}
+function hasCoast(id){return !!hasCoastCache[id];}
 function placeAIStruct(p,k){
   var b=BUILDS.filter(function(x){return x.k===k;})[0];if(p.gold<b.c)return;
   // choisit une case valide (côte pour port, sinon intérieur)
@@ -687,7 +746,7 @@ function enemyRichTileFn(id){return enemyRichTile(id);}
 function findOverseasTarget(id,fromTile){
   // cible côtière neutre/ennemie sans lien terrestre proche
   var best=-1,bd=1e9,fx=fromTile%MW,fy=(fromTile/MW)|0;
-  for(var i=0;i<N;i++){if(!isCoast(i))continue;var o=owner[i];if(o===id||(o>0&&players[id].allies[o]))continue;
+  for(var c=0;c<coastTiles.length;c++){var i=coastTiles[c];var o=owner[i];if(o===id||(o>0&&players[id].allies[o]))continue;
     var x=i%MW,y=(i/MW)|0,d=(x-fx)*(x-fx)+(y-fy)*(y-fy);if(d>16&&d<bd){bd=d;best=i;}}
   return best;
 }
@@ -734,7 +793,7 @@ function killFront(a,b){var k=a+'>'+b,at=attackKey[k];if(at)at.dead=true;}
 //  BOUCLE DE SIMULATION
 // ═══════════════════════════════════════════════════════════════════════════
 function simTick(dt){
-  elapsed+=dt;
+  elapsed+=dt;if(invasionCd>0)invasionCd-=dt;
   for(var p=1;p<players.length;p++)economy(players[p],dt);
   for(var a=0;a<attacks.length;a++)processAttack(attacks[a],dt);
   // purge des fronts morts
@@ -772,13 +831,36 @@ function endGame(win,how){
   running=false;
   document.getElementById('overTitle').innerHTML=win?'<span class="win">Victoire ! 🏆</span>':'<span class="lose">Défaite… 💀</span>';
   var pct=Math.round(players[ME].tiles/Math.max(1,landTotal())*100);
-  document.getElementById('overMsg').textContent=win
+  var extra=saveResult(win,pct);
+  document.getElementById('overMsg').innerHTML=(win
     ?(how==='domination'?'Domination totale de la carte ('+pct+'% du territoire) en '+timeStr()+'.':'Tu as éliminé toutes les nations en '+timeStr()+' !')
-    :'Ta nation a disparu de la carte après '+timeStr()+'. Réessaie une autre stratégie.';
+    :'Ta nation a disparu de la carte après '+timeStr()+'. Réessaie une autre stratégie.')+extra;
+  sound(win?'win':'lose');vibrate(win?[40,60,120]:[120,40,120]);
   show('over');
 }
-function landTotal(){var t=0;for(var i=0;i<N;i++)if(terr[i]===LAND)t++;return t;}
+function landTotal(){return LAND_TOTAL;}
 function timeStr(){var s=Math.round(elapsed),m=(s/60)|0;return m>0?(m+' min '+(s%60)+'s'):(s+'s');}
+// ── Records (localStorage) + défi du jour seedé par la date ──────────────────
+function dailyNum(){var d=new Date();return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
+function readRec(){try{return JSON.parse(localStorage.getItem(REC_KEY))||{};}catch(e){return {};}}
+function writeRec(r){try{localStorage.setItem(REC_KEY,JSON.stringify(r));}catch(e){}}
+function saveResult(win,pct){
+  var r=readRec(), msg='';
+  r.games=(r.games||0)+1; if(win)r.wins=(r.wins||0)+1;
+  if(pct>(r.bestPct||0))r.bestPct=pct;
+  if(win){var s=Math.round(elapsed); if(!r.fastest||s<r.fastest){r.fastest=s;msg='<br><b>⏱️ Nouveau record de rapidité !</b>';}}
+  if(DAILY){var dk=''+dailyNum(); r.daily=r.daily||{};
+    if(!r.daily[dk]||(win&&(!r.daily[dk].win||Math.round(elapsed)<r.daily[dk].t))||(!r.daily[dk].win&&pct>(r.daily[dk].pct||0))){
+      r.daily[dk]={win:win,t:Math.round(elapsed),pct:pct};}
+    msg+='<br>🗓️ Défi du jour '+(win?('gagné en '+timeStr()):(pct+'% du territoire'));}
+  writeRec(r);
+  return msg;
+}
+function recLine(){
+  var r=readRec();
+  if(!r.games)return 'Aucune partie jouée — écris ton histoire.';
+  return '🏆 '+(r.wins||0)+'/'+r.games+' victoires · 📈 record territoire '+(r.bestPct||0)+'%'+(r.fastest?' · ⏱️ '+Math.round(r.fastest)+'s':'');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  RENDU
@@ -790,7 +872,7 @@ function buildBitmap(){
   for(var i=0;i<N;i++){
     var o=owner[i], col;
     if(terr[i]===OCEAN){var sh=0.55+elev[i]/255*0.45;col=packRGB(20*sh,54*sh,92*sh);}
-    else if(o===0){var e=elev[i];col=e>200?packRGB(150,142,120):e>150?packRGB(120,132,96):packRGB(96,120,80);}
+    else if(o===0){var e=elev[i];col=e>200?packRGB(186,176,152):e>150?packRGB(166,156,130):packRGB(146,138,112);}
     else{var pl=players[o];
       // bordure : voisin d'un autre propriétaire
       var nn=nb4(i),bord=false;for(var k=0;k<nn.length;k++){if(owner[nn[k]]!==o){bord=true;break;}}
@@ -827,38 +909,82 @@ function draw(){
     var ge={boat:'⛵',trade:'🚤',warship:'🚢',missile:it.kind==='mirv'?'🌐':it.kind==='hydro'?'☢️':'💥'}[it.type];
     if(ge)ctx.fillText(ge,ux,uy);
   }
+  // flèches d'attaque (qui frappe qui, et vers où)
+  drawArrows(z);
   // surbrillance mode ciblage
   if(mode&&cursorTile>=0){var cx=(cursorTile%MW+0.5-cam.x)*z,cy=((cursorTile/MW|0)+0.5-cam.y)*z;
     ctx.strokeStyle=mode.build?'#f2b705':'#ff5a5a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,z*0.9,0,7);ctx.stroke();}
-  // noms des nations (au centre de masse approx.)
-  if(z>2.4)drawLabels(z);
+  // noms des nations + compteur de troupes
+  if(z>2.2)drawLabels(z);
+  drawMinimap();
 }
-var labelClock=0,labelCache=[];
 function drawLabels(z){
-  labelClock--;if(labelClock<=0){labelClock=30;computeLabels();}
   ctx.textAlign='center';ctx.textBaseline='middle';
-  for(var l=0;l<labelCache.length;l++){var L=labelCache[l],sx=(L.x-cam.x)*z,sy=(L.y-cam.y)*z;
-    if(sx<0||sy<0||sx>VW||sy>VH)continue;
-    ctx.font='700 '+clamp(z*1.6,11,20)+'px system-ui';
-    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.55)';ctx.strokeText(L.flag+' '+L.name,sx,sy);
-    ctx.fillStyle='#fff';ctx.fillText(L.flag+' '+L.name,sx,sy);}
+  for(var p=1;p<players.length;p++){var pl=players[p];if(!pl.alive||!centroid[p])continue;
+    var sx=(centroid[p].x-cam.x)*z,sy=(centroid[p].y-cam.y)*z;
+    if(sx<-40||sy<-40||sx>VW+40||sy>VH+40)continue;
+    var label=pl.flag+' '+pl.name+(pl.id===ME?'':(players[ME].allies[pl.id]?' 🤝':players[ME].war[pl.id]?' ⚔️':''));
+    ctx.font='800 '+clamp(z*1.4,11,18)+'px system-ui';
+    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.strokeText(label,sx,sy);
+    ctx.fillStyle='#fff';ctx.fillText(label,sx,sy);
+    var off=clamp(z*1.4,12,19);
+    ctx.font='700 '+clamp(z*1.05,9,13)+'px system-ui';
+    ctx.strokeText('⚔ '+fmt(pl.troops),sx,sy+off);
+    ctx.fillStyle='rgba(255,255,255,.82)';ctx.fillText('⚔ '+fmt(pl.troops),sx,sy+off);
+  }
 }
-function computeLabels(){
-  labelCache=[];var sx=[],sy=[],c=[];for(var p=0;p<players.length;p++){sx.push(0);sy.push(0);c.push(0);}
-  for(var i=0;i<N;i++){var o=owner[i];if(o>0){sx[o]+=i%MW;sy[o]+=(i/MW)|0;c[o]++;}}
-  for(p=1;p<players.length;p++)if(players[p].alive&&c[p]>0)labelCache.push({x:sx[p]/c[p],y:sy[p]/c[p],name:players[p].name,flag:players[p].flag});
+function drawArrows(z){
+  if(!attacks.length)return;
+  var dash=(elapsed*12)%16;
+  for(var a=0;a<attacks.length;a++){var at=attacks[a];if(at.dead||at.troops<50)continue;
+    var from=centroid[at.atk];if(!from)continue;
+    var to=at.aim?{x:at.aim.x,y:at.aim.y}:(at.tgt>0&&centroid[at.tgt]?centroid[at.tgt]:null);if(!to)continue;
+    var x1=(from.x-cam.x)*z,y1=(from.y-cam.y)*z,x2=(to.x-cam.x)*z,y2=(to.y-cam.y)*z;
+    if(Math.hypot(x2-x1,y2-y1)<12)continue;
+    var pl=players[at.atk],col=pl.rgb[0]+','+pl.rgb[1]+','+pl.rgb[2];
+    ctx.strokeStyle='rgba('+col+',.6)';ctx.lineWidth=Math.max(2,z*0.35);
+    ctx.setLineDash([9,7]);ctx.lineDashOffset=-dash;
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
+    var ang=Math.atan2(y2-y1,x2-x1),hl=Math.max(7,z*1.3);
+    ctx.fillStyle='rgba('+col+',.9)';
+    ctx.beginPath();ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-hl*Math.cos(ang-0.42),y2-hl*Math.sin(ang-0.42));
+    ctx.lineTo(x2-hl*Math.cos(ang+0.42),y2-hl*Math.sin(ang+0.42));
+    ctx.closePath();ctx.fill();
+  }
+}
+function drawMinimap(){
+  if(!terrBmp)return;
+  var mw=Math.min(120,VW*0.34),mh=mw*MH/MW,px=8,py=VH-mh-124;
+  if(py<52)py=52;
+  ctx.save();
+  ctx.fillStyle='rgba(6,9,15,.82)';ctx.fillRect(px-3,py-3,mw+6,mh+6);
+  ctx.imageSmoothingEnabled=false;ctx.drawImage(terrBmp,0,0,MW,MH,px,py,mw,mh);
+  var rx=px+cam.x/MW*mw,ry=py+cam.y/MH*mh,rw=(VW/cam.zoom)/MW*mw,rh=(VH/cam.zoom)/MH*mh;
+  ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.strokeRect(rx,ry,rw,rh);
+  ctx.strokeStyle='rgba(255,255,255,.28)';ctx.lineWidth=1;ctx.strokeRect(px-3,py-3,mw+6,mh+6);
+  ctx.restore();
+  mmRect={x:px,y:py,w:mw,h:mh};
+}
+function recenterFromMinimap(px,py){
+  if(!mmRect)return;
+  var wx=(px-mmRect.x)/mmRect.w*MW,wy=(py-mmRect.y)/mmRect.h*MH;
+  cam.x=wx-VW/(2*cam.zoom);cam.y=wy-VH/(2*cam.zoom);clampCam();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  ENTRÉES (pan / zoom / tap)
 // ═══════════════════════════════════════════════════════════════════════════
-var cursorTile=-1;
+var cursorTile=-1, mmRect=null, mmDrag=false;
 function screenToTile(px,py){var tx=(px/cam.zoom+cam.x)|0,ty=(py/cam.zoom+cam.y)|0;if(tx<0||ty<0||tx>=MW||ty>=MH)return -1;return ty*MW+tx;}
+function inMinimap(px,py){return mmRect&&px>=mmRect.x-3&&px<=mmRect.x+mmRect.w+3&&py>=mmRect.y-3&&py<=mmRect.y+mmRect.h+3;}
 var pointers={}, lastPinch=0, dragMoved=0, dragStart=null;
 cv.addEventListener('pointerdown',function(e){cv.setPointerCapture(e.pointerId);
+  if(running&&inMinimap(e.clientX,e.clientY)){mmDrag=true;recenterFromMinimap(e.clientX,e.clientY);dragMoved=99;return;}
   pointers[e.pointerId]={x:e.clientX,y:e.clientY};dragMoved=0;dragStart={x:e.clientX,y:e.clientY};
   cursorTile=screenToTile(e.clientX,e.clientY);});
 cv.addEventListener('pointermove',function(e){
+  if(mmDrag){recenterFromMinimap(e.clientX,e.clientY);return;}
   if(!pointers[e.pointerId])return;
   var ids=Object.keys(pointers);
   if(ids.length>=2){ // pinch zoom
@@ -875,9 +1001,10 @@ cv.addEventListener('pointermove',function(e){
   pt.x=e.clientX;pt.y=e.clientY;cursorTile=screenToTile(e.clientX,e.clientY);
 });
 function endPointer(e){delete pointers[e.pointerId];if(Object.keys(pointers).length<2)lastPinch=0;
+  if(mmDrag){mmDrag=false;dragStart=null;return;}
   if(dragMoved<8&&dragStart){onTap(screenToTile(e.clientX,e.clientY));}dragStart=null;}
 cv.addEventListener('pointerup',endPointer);
-cv.addEventListener('pointercancel',function(e){delete pointers[e.pointerId];lastPinch=0;});
+cv.addEventListener('pointercancel',function(e){delete pointers[e.pointerId];lastPinch=0;mmDrag=false;});
 cv.addEventListener('wheel',function(e){e.preventDefault();var mx=e.clientX,my=e.clientY,wx=mx/cam.zoom+cam.x,wy=my/cam.zoom+cam.y;
   cam.zoom*=e.deltaY<0?1.15:0.87;clampCam();cam.x=wx-mx/cam.zoom;cam.y=wy-my/cam.zoom;clampCam();},{passive:false});
 
@@ -894,21 +1021,23 @@ function onTap(tile){
   if(o===ME){flash('Ta case. Utilise la barre du bas pour construire.');return;}
   if(o>0&&me.allies[o]){flash('🤝 Allié — impossible d\'attaquer.');return;}
   var troops=me.troops*(+document.getElementById('atkR').value/100);
-  if(troops<50){flash('Pas assez de troupes.');return;}
+  if(troops<50){flash('Pas assez de troupes.');sound('error');return;}
+  var aim={x:tile%MW+0.5,y:(tile/MW|0)+0.5};
   // as-tu un front terrestre vers cette cible ?
   if(hasFrontier(ME,o)){
     if(o>0){me.war[o]=1;players[o].war[ME]=1;}
-    launchAttack(ME,o,troops);
+    launchAttack(ME,o,troops,aim);sound(o>0?'place':'flip');vibrate(o>0?18:8);
   } else if(me.ports>0||hasCoast(ME)){
     // débarquement : bateau vers la case (ou la côte la plus proche)
     var land=coastNear(tile);if(land<0)land=tile;
     var from=nearestCoast(ME,land%MW,land/MW|0);
-    if(from<0){flash('Aucune côte pour lancer un bateau.');return;}
-    launchBoat(ME,from,land,troops);flash('⛵ Bateau en route.');
-  } else {flash('Zone hors de portée — construis un port pour débarquer.');}
+    if(from<0){flash('Aucune côte pour lancer un bateau.');sound('error');return;}
+    launchBoat(ME,from,land,troops);flash('⛵ Bateau en route.');sound('deal');vibrate(12);
+  } else {flash('Zone hors de portée — construis un port pour débarquer.');sound('error');}
 }
 function hasFrontier(id,tgt){
-  for(var i=0;i<N;i++){if(owner[i]!==id)continue;var nn=nb4(i);
+  var bl=borderTiles[id];if(!bl)return false;
+  for(var b=0;b<bl.length;b++){var i=bl[b];if(owner[i]!==id)continue;var nn=nb4(i);
     for(var k=0;k<nn.length;k++)if(capturable(nn[k],id,tgt))return true;}
   return false;
 }
@@ -919,15 +1048,14 @@ function tryBuild(tile,k){
   if(k==='port'&&!isCoast(tile)){flash('Un port doit être sur la côte.');return;}
   if(me.gold<b.c){flash('Pas assez d\'or.');return;}
   me.gold-=b.c;buildStruct(tile,k,ME);
-  if(k==='port'){/* rien */}
-  flash(b.e+' '+b.t+' construit.');
+  flash(b.e+' '+b.t+' construit.');sound('coin');vibrate(14);
 }
 function tryNuke(tile,kind){
   var me=players[ME];if(me.silos<1){flash('Il faut un silo 🚀.');return;}
   var b=BUILDS.filter(function(x){return x.k===kind;})[0];
   if(me.gold<b.c){flash('Pas assez d\'or.');return;}
   var silo=nearestStruct(ME,'silo',tile%MW,tile/MW|0);if(silo<0){flash('Aucun silo.');return;}
-  me.gold-=b.c;launchMissile(ME,silo,tile,kind);flash(b.e+' Missile lancé !');
+  me.gold-=b.c;launchMissile(ME,silo,tile,kind);flash(b.e+' Missile lancé !');sound('big');vibrate([20,30,20]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -979,6 +1107,10 @@ function flash(msg){var h=document.getElementById('hint');h.textContent=msg;h.cl
 function toast(kind,msg,ms){
   var t=document.getElementById('toasts'),el=document.createElement('div');el.className='toast '+(kind==='info'?'info':'');
   el.textContent=msg;t.appendChild(el);setTimeout(function(){el.remove();},ms||3000);
+}
+function warnInvasion(p){
+  if(invasionCd>0)return;invasionCd=6;
+  toast('info','⚠️ '+p.flag+' '+p.name+' envahit ton territoire !',2600);sound('error');vibrate([30,40,30]);
 }
 function pushAllianceToast(fromId){
   var from=players[fromId],t=document.getElementById('toasts'),el=document.createElement('div');el.className='toast';
@@ -1047,6 +1179,7 @@ document.getElementById('quitBtn').onclick=function(){running=false;show('start'
 // ═══════════════════════════════════════════════════════════════════════════
 function show(which){
   ['start','over','paused'].forEach(function(id){document.getElementById(id).classList.toggle('hidden',id!==which);});
+  if(which==='start'){var rl=document.getElementById('recLine');if(rl)rl.textContent=recLine();}
 }
 // sélecteurs de l'écran de démarrage
 function buildColorPick(){
@@ -1065,7 +1198,8 @@ buildColorPick();
 chipGroup('nationsPick','n','nations',function(v){return +v;});
 chipGroup('diffPick','d','diff');
 chipGroup('mapPick','m','map',function(v){return +v;});
-document.getElementById('playBtn').onclick=function(){startGame();};
+document.getElementById('playBtn').onclick=function(){startGame(false);};
+document.getElementById('dailyBtn').onclick=function(){startGame(true);};
 document.getElementById('replayBtn').onclick=function(){show('start');};
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1084,6 +1218,7 @@ function loop(ts){
   if(running)draw();
 }
 updateRatLabel();
+show('start');
 requestAnimationFrame(loop);
 })();
 </script>
