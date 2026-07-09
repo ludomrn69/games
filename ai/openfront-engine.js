@@ -70,6 +70,10 @@
     var meId = opts.meId || 0;
     var nationData = opts.nations || [];
     var nations = nationData.length || opts.nations || 6;
+    // Règles de partie (façon lobby) : départ + activation missiles / naval.
+    var startTroops = opts.startTroops != null ? opts.startTroops : 6000;
+    var startGold = opts.startGold != null ? opts.startGold : 1000;
+    var nukesOn = opts.nukes !== false, navalOn = opts.naval !== false;
 
     var terr = new Uint8Array(N), elev = new Uint8Array(N), owner = new Int16Array(N), defMap = new Uint8Array(N);
     var players = [null], attacks = [], attackKey = {}, units = [], structAt = {};
@@ -143,16 +147,20 @@
     function makePlayer(id, data) {
       return { id: id, name: data.name || ('IA ' + id), flag: data.flag || '⚑', rgb: data.rgb || [200, 200, 200],
         human: !!data.human, perso: data.perso || null, diff: data.diff || 'normal', trait: data.trait || 'none',
-        alive: true, gold: 1000, troops: 6000, tiles: 0, cities: 0, ports: 0, silos: 0, sams: 0, defenses: 0,
+        alive: true, gold: startGold, troops: startTroops, tiles: 0, cities: 0, ports: 0, silos: 0, sams: 0, defenses: 0,
         allies: {}, war: {}, traitor: false, seed: 0, capital: 0, ratio: 0.55, focus: 0, prevTiles: 0, aiCd: rng() * 1.5 };
     }
 
     // ── Économie (traits appliqués) — débits exposés au HUD ───────────────────
     var GOLD_MUL = 1.8;                                    // éco accélérée : villes/nukes atteignables
     function armyCap(p) { return 5000 + p.tiles * 120 + p.cities * 25000; }
-    function troopRate(p) { return ((armyCap(p) - p.troops) * 0.16 * (0.35 + p.ratio) + p.tiles * 2.2) * (p.trait === 'military' ? 1.2 : 1); }
+    function troopRate(p) { var cap = armyCap(p);
+      if (p.troops >= cap) return -p.troops * 0.02;   // surplus (départ Éclair, dons, capitale) : se résorbe doucement
+      return ((cap - p.troops) * 0.16 * (0.35 + p.ratio) + p.tiles * 2.2) * (p.trait === 'military' ? 1.2 : 1); }
     function goldRate(p) { return (p.tiles * 0.34 + p.ports * 11 + p.cities * 5 + 8) * (1.35 - p.ratio * 0.85) * (p.trait === 'economy' ? 1.3 : 1) * GOLD_MUL; }
-    function economy(p, dt) { if (!p.alive) return; p.troops = clamp(p.troops + troopRate(p) * dt, 0, armyCap(p)); p.gold += goldRate(p) * dt; }
+    function economy(p, dt) { if (!p.alive) return; var cap = armyCap(p), r = troopRate(p);
+      p.troops = r >= 0 ? Math.min(cap, p.troops + r * dt) : Math.max(0, p.troops + r * dt);
+      p.gold += goldRate(p) * dt; }
 
     // ── Expansion / guerre ───────────────────────────────────────────────────
     function capturable(i, atkId, tgt) {
@@ -246,6 +254,8 @@
     // Construction validée + facturée (renvoie true, ou une chaîne d'erreur).
     function build(i, k, ownerId) {
       var pl = players[ownerId], b = BUILD[k]; if (!b || !pl) return 'invalide';
+      if (!navalOn && k === 'port') return 'désactivé';
+      if (!nukesOn && (k === 'silo' || k === 'sam')) return 'désactivé';
       if (owner[i] !== ownerId) return 'territoire';
       if (structAt[i]) return 'occupé';
       if (b.need === 'coast' && !isCoast(i)) return 'côte';
@@ -258,16 +268,20 @@
 
     // ── Unités (bateaux / commerce / navires / missiles) ──────────────────────
     function launchBoat(ownerId, fromTile, toTile, troops) {
+      if (!navalOn) return;
       var mul = players[ownerId].trait === 'naval' ? 1.25 : 1;
       units.push({ type: 'boat', owner: ownerId, x: fromTile % MW + 0.5, y: (fromTile / MW | 0) + 0.5, tx: toTile % MW + 0.5, ty: (toTile / MW | 0) + 0.5, tgtTile: toTile, troops: troops * mul, spd: 11 });
     }
     function launchTrade(fromTile, toTile, ownerId, destOwner) {
+      if (!navalOn) return;
       units.push({ type: 'trade', owner: ownerId, dest: destOwner, x: fromTile % MW + 0.5, y: (fromTile / MW | 0) + 0.5, tx: toTile % MW + 0.5, ty: (toTile / MW | 0) + 0.5, tgtTile: toTile, gold: 900 + rng() * 700, spd: 8 });
     }
     function launchWarship(ownerId, atTile) {
+      if (!navalOn) return;
       units.push({ type: 'warship', owner: ownerId, x: atTile % MW + 0.5, y: (atTile / MW | 0) + 0.5, tx: atTile % MW + 0.5, ty: (atTile / MW | 0) + 0.5, home: atTile, spd: 9, cd: 0 });
     }
     function launchMissile(ownerId, fromTile, toTile, kind) {
+      if (!nukesOn) return;
       var b = BUILD[kind];
       units.push({ type: 'missile', owner: ownerId, x: fromTile % MW + 0.5, y: (fromTile / MW | 0) + 0.5, tx: toTile % MW + 0.5, ty: (toTile / MW | 0) + 0.5, tgtTile: toTile, r: b.r, warheads: b.warheads || 1, spd: 26, kind: kind });
     }
@@ -382,10 +396,10 @@
       var coast = hasCoast(p.id);
       if (underAtk && p.gold >= 2000 && rng() < 0.7) placeAIStruct(p, 'defense');
       else if (p.gold >= 5000 && p.tiles > 35 && rng() < 0.3 + 0.5 * skill) placeAIStruct(p, 'city');
-      if (coast && p.ports === 0 && p.gold >= buildCost('port', p.id)) placeAIStruct(p, 'port');
-      if (p.tiles > 90 && p.silos === 0 && p.gold >= 9000 && rng() < 0.4 + 0.4 * skill) placeAIStruct(p, 'silo');
-      if (p.sams === 0 && p.tiles > 110 && p.gold >= 7000 && rng() < 0.4) placeAIStruct(p, 'sam');
-      if (p.silos > 0 && p.gold >= 12000 && rng() < 0.4 * (0.5 + skill)) {
+      if (navalOn && coast && p.ports === 0 && p.gold >= buildCost('port', p.id)) placeAIStruct(p, 'port');
+      if (nukesOn && p.tiles > 90 && p.silos === 0 && p.gold >= 9000 && rng() < 0.4 + 0.4 * skill) placeAIStruct(p, 'silo');
+      if (nukesOn && p.sams === 0 && p.tiles > 110 && p.gold >= 7000 && rng() < 0.4) placeAIStruct(p, 'sam');
+      if (nukesOn && p.silos > 0 && p.gold >= 12000 && rng() < 0.4 * (0.5 + skill)) {
         var enemy = null; for (var n = 0; n < neigh.length; n++) { var e = neigh[n]; if (!p.allies[e.id] && (p.war[e.id] || e.tiles > p.tiles)) { enemy = e; break; } }
         if (enemy) { var tt = enemyRichTile(enemy.id); if (tt >= 0) { var silo = nearestStruct(p.id, 'silo', tt % MW, tt / MW | 0);
           if (silo >= 0) { var kind = p.gold >= 26000 ? 'hydro' : 'atom'; p.gold -= BUILD[kind].cost; launchMissile(p.id, silo, tt, kind); emit('nuke', { by: p.id, kind: kind }); } } }
@@ -436,10 +450,11 @@
         } else if (neutral && p.troops > reserve) launchAttack(p.id, 0, send);
       }
       // colonisation / débarquement outre-mer
-      if (p.ports > 0 && rng() < 0.35 && !neutral) { var from = nearestCoast(p.id, p.seed % MW, (p.seed / MW | 0));
+      if (navalOn && p.ports > 0 && rng() < 0.35 && !neutral) { var from = nearestCoast(p.id, p.seed % MW, (p.seed / MW | 0));
         if (from >= 0) { var tgt = findOverseasTarget(p.id, from); if (tgt >= 0) launchBoat(p.id, from, tgt, p.troops * 0.3); } }
     }
     function autoTrade() {
+      if (!navalOn) return;
       var ports = []; for (var idx in structAt) if (structAt[idx].k === 'port') ports.push({ i: +idx, o: structAt[idx].owner });
       if (ports.length < 2) return;
       for (var t = 0; t < ports.length; t++) { if (rng() > 0.4) continue; var src = ports[t];
@@ -481,6 +496,7 @@
       goldPerSec: function (id) { return players[id] ? goldRate(players[id]) : 0; },
       troopsPerSec: function (id) { return players[id] ? troopRate(players[id]) : 0; },
       dominationPct: dominationPct, onlyBlocLeft: onlyBlocLeft, giftGold: giftGold, giftTroops: giftTroops,
+      nukesOn: nukesOn, navalOn: navalOn,
       step: step, takeEvents: function () { var e = events; events = []; return e; },
       launchAttack: launchAttack, build: build, launchBoat: launchBoat, launchWarship: launchWarship, launchMissile: launchMissile,
       requestAlliance: requestAlliance, makeAlliance: makeAlliance, breakAlliance: breakAlliance,

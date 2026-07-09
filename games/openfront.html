@@ -146,6 +146,8 @@
   <h1><span class="em">🗺️</span> OpenFront</h1>
   <p>Conquiers la carte. Peins ton territoire sur le neutre, écrase tes voisins, construis villes, ports, silos et bombes. Le dernier debout gagne.</p>
   <div class="opt">
+    <div class="lab">Mode rapide (applique un jeu de règles)</div>
+    <div class="chips" id="modePick"></div>
     <div class="lab">Ta couleur</div><div class="colorpick" id="colorPick"></div>
     <div class="lab">Nombre de nations</div>
     <div class="chips" id="nationsPick">
@@ -165,6 +167,18 @@
     <div class="lab">Taille de carte</div>
     <div class="chips" id="sizePick">
       <div class="chip sel" data-s="0">Normale</div><div class="chip" data-s="1">Grande</div><div class="chip" data-s="2">Immense</div>
+    </div>
+    <div class="lab">Départ (troupes)</div>
+    <div class="chips" id="startPick">
+      <div class="chip" data-st="0">🐢 Survie</div><div class="chip sel" data-st="1">⚖️ Normal</div><div class="chip" data-st="2">⚡ Éclair</div>
+    </div>
+    <div class="lab">Missiles ☢️</div>
+    <div class="chips" id="nukePick">
+      <div class="chip sel" data-k="1">Activés</div><div class="chip" data-k="0">Désactivés</div>
+    </div>
+    <div class="lab">Naval ⚓ (ports & bateaux)</div>
+    <div class="chips" id="navalPick">
+      <div class="chip sel" data-k="1">Activé</div><div class="chip" data-k="0">Désactivé</div>
     </div>
     <div class="lab">Brouillard de guerre</div>
     <div class="chips" id="fogPick">
@@ -238,9 +252,19 @@ var BUILDS_UI=[
   {k:'mirv',e:'🌐',t:'MIRV',need:'nuke'}
 ];
 
-var settings={color:1, nations:6, diff:'normal', map:1, fog:false, trait:'none', size:0};
+var settings={color:1, nations:6, diff:'normal', map:1, fog:false, trait:'none', size:0, start:1, nukes:true, naval:true};
 // Tailles de carte (tuiles). Plus grand = plus de territoire à conquérir, parties plus longues.
 var SIZES=[{w:200,h:125,t:'Normale'},{w:320,h:200,t:'Grande'},{w:440,h:275,t:'Immense'}];
+// Départs (troupes / or de départ) — façon lobby OpenFront.
+var STARTS=[{t:'🐢 Survie',troops:2000,gold:600},{t:'⚖️ Normal',troops:6000,gold:1000},{t:'⚡ Éclair',troops:60000,gold:6000}];
+// Presets de mode : appliquent un jeu de réglages d'un coup.
+var MODES=[
+  {t:'⚔️ Classique', s:{start:1,nukes:true,naval:true}},
+  {t:'⚡ Blitz',      s:{start:2,nukes:true,naval:true,size:0,nations:8}},
+  {t:'☮️ Sans nukes', s:{start:1,nukes:false,naval:true}},
+  {t:'🏔️ Terrestre',  s:{start:1,nukes:true,naval:false,map:2}},
+  {t:'🐢 Marathon',   s:{start:0,nukes:true,naval:true,size:2}}
+];
 var cam={x:0,y:0,zoom:4}, mode=null, cursorTile=-1, mmRect=null, mmDrag=false;
 var discovered=new Uint8Array(N), pcol=[], pbord=[];
 var terrBmp, terrImg, terrBuf;
@@ -251,7 +275,7 @@ var Sfx=window.Sfx||{play:function(){}};
 function vibrate(m){try{if(navigator.vibrate)navigator.vibrate(m);}catch(e){}}
 function sound(n){try{Sfx.play(n);}catch(e){}}
 function clamp(v,a,b){return v<a?a:v>b?b:v;}
-function fmt(n){n=Math.round(n);if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e4)return(n/1e3).toFixed(0)+'k';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return''+n;}
+function fmt(n){var s=n<0?'-':'';n=Math.abs(Math.round(n));if(n>=1e6)return s+(n/1e6).toFixed(1)+'M';if(n>=1e4)return s+(n/1e3).toFixed(0)+'k';if(n>=1e3)return s+(n/1e3).toFixed(1)+'k';return s+n;}
 function packRGB(r,g,b){return ((255<<24)|((b&255)<<16)|((g&255)<<8)|(r&255))>>>0;}
 FOGCOL=packRGB(9,11,17);
 
@@ -298,7 +322,10 @@ function startGame(daily){
       trait:human?settings.trait:TRAITS_UI[1+((srng()*(TRAITS_UI.length-1))|0)].k});
   }
   var sz=DAILY?SIZES[0]:SIZES[settings.size]||SIZES[0];
-  E=ENG.createGame({seed:seed,mapType:mapType,meId:ME,nations:nd,w:sz.w,h:sz.h});
+  var st=DAILY?STARTS[1]:STARTS[settings.start]||STARTS[1];
+  var nukes=DAILY?true:settings.nukes, naval=DAILY?true:settings.naval;
+  E=ENG.createGame({seed:seed,mapType:mapType,meId:ME,nations:nd,w:sz.w,h:sz.h,
+    startTroops:st.troops,startGold:st.gold,nukes:nukes,naval:naval});
   MW=E.MW;MH=E.MH;N=E.N;
   discovered=new Uint8Array(N);discovered.fill(settings.fog?0:1);
   terrBmp=null;
@@ -495,7 +522,7 @@ addEventListener('keydown',function(e){
   if(e.metaKey||e.ctrlKey||e.altKey)return;
   var k=e.key;
   if(!running){ if(k==='Enter'){startGame(false);e.preventDefault();} return; }
-  if(k>='1'&&k<='9'){ var idx=+k-1; if(idx<BUILDS_UI.length){toggleBuild(BUILDS_UI[idx]);e.preventDefault();} return; }
+  if(k>='1'&&k<='9'){ var idx=+k-1; if(idx<activeBuilds.length){toggleBuild(activeBuilds[idx]);e.preventDefault();} return; }
   if(k==='Escape'){ if(mode)setMode(null); else {document.getElementById('board').classList.add('hidden');document.getElementById('diplo').classList.add('hidden');} return; }
   if(k===' '){ e.preventDefault(); if(paused){paused=false;show('none');} else {paused=true;show('paused');} return; }
   if(k==='d'||k==='D'){ togglePanel('diplo'); return; }
@@ -519,9 +546,9 @@ function onTap(tile){
   if(troops<50){flash('Pas assez de troupes.');sound('error');return;}
   var aim={x:tile%MW+0.5,y:(tile/MW|0)+0.5};
   if(E.hasFrontier(ME,o)){if(o>0){me.war[o]=1;E.players[o].war[ME]=1;}E.launchAttack(ME,o,troops,aim);sound(o>0?'place':'flip');vibrate(o>0?18:8);}
-  else if(me.ports>0||E.hasCoast(ME)){var land=E.coastNear(tile);if(land<0)land=tile;var from=E.nearestCoast(ME,land%MW,land/MW|0);
+  else if(settings.naval&&(me.ports>0||E.hasCoast(ME))){var land=E.coastNear(tile);if(land<0)land=tile;var from=E.nearestCoast(ME,land%MW,land/MW|0);
     if(from<0){flash('Aucune côte pour lancer un bateau.');sound('error');return;}E.launchBoat(ME,from,land,troops);flash('⛵ Bateau en route.');sound('deal');vibrate(12);}
-  else flash('Zone hors de portée — construis un port pour débarquer.');
+  else flash(settings.naval?'Zone hors de portée — construis un port pour débarquer.':'Hors de portée (mode terrestre : pas de bateaux).');
 }
 function tryBuild(tile,k){
   var r=E.build(tile,k,ME);
@@ -536,10 +563,14 @@ function tryNuke(tile,kind){
 }
 
 // ── UI : dock, sliders, toasts, panneaux ──────────────────────────────────────
-var dock=document.getElementById('dock');
+var dock=document.getElementById('dock'), activeBuilds=[];
 function buildDock(){
   dock.innerHTML='';
-  BUILDS_UI.forEach(function(b,i){var el=document.createElement('button');el.className='build';el.dataset.k=b.k;
+  activeBuilds=BUILDS_UI.filter(function(b){
+    if(!settings.nukes&&(b.k==='silo'||b.k==='sam'||b.k==='atom'||b.k==='hydro'||b.k==='mirv'))return false;
+    if(!settings.naval&&(b.k==='port'||b.k==='warship'))return false;
+    return true;});
+  activeBuilds.forEach(function(b,i){var el=document.createElement('button');el.className='build';el.dataset.k=b.k;
     el.innerHTML=(i<9?'<span class="kbd">'+(i+1)+'</span>':'')+'<span class="e">'+b.e+'</span><span class="t">'+b.t+'</span><span class="c">'+fmt(E.BUILD[b.k].cost)+'</span>';
     el.onclick=function(){toggleBuild(b);};dock.appendChild(el);});
 }
@@ -615,7 +646,7 @@ function refreshHUD(){if(!E)return;var me=E.players[ME];
   document.getElementById('sTroops').textContent=fmt(me.troops);
   document.getElementById('sGold').textContent=fmt(me.gold);
   document.getElementById('sLand').textContent=Math.round(me.tiles/Math.max(1,E.landTotal())*100)+'%';
-  document.getElementById('sTroopsL').textContent='⚔ +'+fmt(E.troopsPerSec(ME))+'/s';
+  var tr=E.troopsPerSec(ME);document.getElementById('sTroopsL').textContent='⚔ '+(tr>=0?'+':'')+fmt(tr)+'/s';
   document.getElementById('sGoldL').textContent='💰 +'+fmt(E.goldPerSec(ME))+'/s';}
 
 document.getElementById('btnSpeed').onclick=function(){speed=speed>=3?1:speed+1;this.textContent=speed+'×';};
@@ -635,12 +666,24 @@ function buildTraitPick(){var tp=document.getElementById('traitPick');tp.innerHT
 function chipGroup(id,attr,key,cast){var g=document.getElementById(id);
   [].forEach.call(g.children,function(c){c.onclick=function(){[].forEach.call(g.children,function(x){x.classList.remove('sel');});c.classList.add('sel');
     settings[key]=cast?cast(c.dataset[attr]):c.dataset[attr];};});}
-buildColorPick();buildTraitPick();
+function selectChip(gid,attr,val){var g=document.getElementById(gid);if(!g)return;[].forEach.call(g.children,function(c){c.classList.toggle('sel',c.dataset[attr]===String(val));});}
+function syncChips(){selectChip('nationsPick','n',settings.nations);selectChip('diffPick','d',settings.diff);
+  selectChip('mapPick','m',settings.map);selectChip('sizePick','s',settings.size);selectChip('startPick','st',settings.start);
+  selectChip('nukePick','k',settings.nukes?1:0);selectChip('navalPick','k',settings.naval?1:0);selectChip('fogPick','f',settings.fog?1:0);}
+function buildModePick(){var mp=document.getElementById('modePick');mp.innerHTML='';
+  MODES.forEach(function(m){var d=document.createElement('div');d.className='chip';d.innerHTML=m.t;
+    d.onclick=function(){for(var kk in m.s)settings[kk]=m.s[kk];syncChips();
+      [].forEach.call(mp.children,function(x){x.classList.remove('sel');});d.classList.add('sel');};
+    mp.appendChild(d);});}
+buildColorPick();buildTraitPick();buildModePick();
 chipGroup('nationsPick','n','nations',function(v){return +v;});
 chipGroup('diffPick','d','diff');
 chipGroup('mapPick','m','map',function(v){return +v;});
 chipGroup('fogPick','f','fog',function(v){return v==='1';});
 chipGroup('sizePick','s','size',function(v){return +v;});
+chipGroup('startPick','st','start',function(v){return +v;});
+chipGroup('nukePick','k','nukes',function(v){return v==='1';});
+chipGroup('navalPick','k','naval',function(v){return v==='1';});
 document.getElementById('playBtn').onclick=function(){startGame(false);};
 document.getElementById('dailyBtn').onclick=function(){startGame(true);};
 document.getElementById('replayBtn').onclick=function(){show('start');};
