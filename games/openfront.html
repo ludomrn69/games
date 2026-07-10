@@ -23,6 +23,8 @@
     padding:5px 10px;display:flex;flex-direction:column;line-height:1.05;min-width:64px}
   .stat .n{font-size:1.05rem;font-weight:800;white-space:nowrap}
   .stat .l{font-size:.56rem;text-transform:uppercase;letter-spacing:.7px;opacity:.6;font-weight:700}
+  .tbar{height:3px;background:rgba(255,255,255,.14);border-radius:2px;margin-top:3px;overflow:hidden}
+  .tbar i{display:block;height:100%;width:0;background:#4fd18b;transition:width .2s}
   .grow{flex:1}
   .iconbtn{border:none;background:rgba(18,22,32,.82);border:1px solid rgba(255,255,255,.08);color:#eaeaf0;
     width:42px;height:42px;border-radius:12px;font-size:1.15rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -144,7 +146,7 @@
 
 <div class="top">
   <a class="back" href="../index.html" aria-label="Retour">‹</a>
-  <div class="stat"><span class="n" id="sTroops">0</span><span class="l" id="sTroopsL">Troupes</span></div>
+  <div class="stat"><span class="n" id="sTroops">0</span><span class="l" id="sTroopsL">Troupes</span><div class="tbar"><i id="tbarFill"></i></div></div>
   <div class="stat"><span class="n" id="sGold">0</span><span class="l" id="sGoldL">Or</span></div>
   <div class="stat"><span class="n" id="sLand">0%</span><span class="l">Territoire</span></div>
   <div class="grow"></div>
@@ -402,7 +404,7 @@ function refreshLbbar(){
 document.getElementById('lbbar').onclick=function(){togglePanel('board');};
 
 // ── Alerte d'attaque + confettis + flash de capture ──────────────────────────
-var threat=null, prevOwner=null, flashes=[];
+var threat=null, prevOwner=null, flashes=[], warnedMissiles=new WeakSet();
 document.getElementById('alertBtn').onclick=function(){
   if(threat&&E&&E.centroid[threat.by]){centerOn((E.centroid[threat.by].y|0)*MW+(E.centroid[threat.by].x|0),Math.max(cam.zoom,6));}
   this.classList.remove('on');};
@@ -448,7 +450,7 @@ function startGame(daily){
   E=ENG.createGame({seed:seed,mapType:mapType,meId:ME,nations:nd,w:sz.w,h:sz.h,
     startTroops:st.troops,startGold:st.gold,nukes:nukes,naval:naval});
   MW=E.MW;MH=E.MH;N=E.N;
-  threat=null;flashes=[];prevOwner=null;
+  threat=null;flashes=[];prevOwner=null;warnedMissiles=new WeakSet();
   document.getElementById('alertBtn').classList.remove('on');document.getElementById('confetti').classList.add('hidden');
   gameStats={nukes:nukes,naval:naval,diff:diff,nations:nations,size:DAILY?0:settings.size,start:DAILY?1:settings.start,allied:false,daily:DAILY,time:0};
   discovered=new Uint8Array(N);discovered.fill(settings.fog?0:1);
@@ -582,8 +584,19 @@ function draw(){
     if(fx<-10||fy<-10||fx>VW+10||fy>VH+10)continue;var fa=1-fl.t/0.5,ss=z*(0.6+fl.t*2.2);
     ctx.fillStyle='rgba(255,255,235,'+(fa*0.55)+')';ctx.fillRect(fx-ss/2,fy-ss/2,ss,ss);}
   drawArrows(z);
-  if(mode&&cursorTile>=0){var cx=(cursorTile%MW+0.5-cam.x)*z,cy=((cursorTile/MW|0)+0.5-cam.y)*z;
-    ctx.strokeStyle=mode.build?'#f2b705':'#ff5a5a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,z*0.9,0,7);ctx.stroke();}
+  // missiles hostiles en approche de MON territoire → zone d'impact pulsante
+  var un2=E.units;for(var mu=0;mu<un2.length;mu++){var it2=un2[mu];if(it2.type!=='missile')continue;
+    if(it2.owner===ME||E.players[it2.owner].allies[ME]||E.owner[it2.tgtTile]!==ME)continue;
+    var ix=(it2.tgtTile%MW+0.5-cam.x)*z,iy=((it2.tgtTile/MW|0)+0.5-cam.y)*z,pr=0.55+0.45*Math.sin(E.elapsed*10);
+    ctx.beginPath();ctx.arc(ix,iy,(it2.r||6)*z,0,7);ctx.strokeStyle='rgba(255,50,40,'+pr+')';ctx.lineWidth=2.5;ctx.stroke();
+    ctx.fillStyle='rgba(255,40,30,.12)';ctx.fill();}
+  // curseur de pose : anneau de portée + fantôme de la construction/cible
+  if(mode&&cursorTile>=0){var cx=(cursorTile%MW+0.5-cam.x)*z,cy=((cursorTile/MW|0)+0.5-cam.y)*z,isB=!!mode.build,rad=0,ghost='';
+    if(isB){ghost={city:'🏙️',port:'⚓',defense:'🛡️',silo:'🚀',sam:'🛰️'}[mode.build]||'';rad=mode.build==='defense'?4:mode.build==='sam'?9:0;}
+    else if(mode.nuke){ghost={atom:'💥',hydro:'☢️',mirv:'🌐'}[mode.nuke]||'';rad=(E.BUILD[mode.nuke]||{}).r||0;}
+    if(rad>0){ctx.beginPath();ctx.arc(cx,cy,rad*z,0,7);ctx.setLineDash([6,5]);ctx.strokeStyle=isB?'rgba(242,183,5,.7)':'rgba(255,90,90,.85)';ctx.lineWidth=2;ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=isB?'rgba(242,183,5,.08)':'rgba(255,90,90,.1)';ctx.fill();}
+    if(ghost&&z>3){ctx.globalAlpha=.6;ctx.font=clamp(z*1.4,10,28)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(ghost,cx,cy);ctx.globalAlpha=1;}
+    ctx.strokeStyle=isB?'#f2b705':'#ff5a5a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,z*0.9,0,7);ctx.stroke();}
   if(z>2.2)drawLabels(z);
   drawMinimap();
 }
@@ -781,6 +794,9 @@ function refreshHUD(){if(!E)return;var me=E.players[ME];
   document.getElementById('sLand').textContent=Math.round(me.tiles/Math.max(1,E.landTotal())*100)+'%';
   var tr=E.troopsPerSec(ME);document.getElementById('sTroopsL').textContent='⚔ '+(tr>=0?'+':'')+fmt(tr)+'/s';
   document.getElementById('sGoldL').textContent='💰 +'+fmt(E.goldPerSec(ME))+'/s';
+  var cap=E.armyCap(me),fillEl=document.getElementById('tbarFill');   // barre de population (troupes / max)
+  fillEl.style.width=Math.min(100,me.troops/Math.max(1,cap)*100)+'%';
+  fillEl.style.background=me.troops>cap*1.01?'#f2b705':'#4fd18b';
   refreshLbbar();}
 
 document.getElementById('btnSpeed').onclick=function(){speed=speed>=3?1:speed+1;this.textContent=speed+'×';};
@@ -843,7 +859,10 @@ function loop(ts){
     // on ne reconstruit le fond de carte QUE quand la simulation a avancé (pas 60×/s) :
     // décisif pour la fluidité des grandes cartes.
     if(stepped){handleEvents();checkWin();detectCaptures();dirty=true;
-      if(threat&&(E.elapsed-threat.t>8)){threat=null;document.getElementById('alertBtn').classList.remove('on');}}
+      if(threat&&(E.elapsed-threat.t>8)){threat=null;document.getElementById('alertBtn').classList.remove('on');}
+      var un=E.units;for(var q=0;q<un.length;q++){var itm=un[q];
+        if(itm.type==='missile'&&itm.owner!==ME&&!E.players[itm.owner].allies[ME]&&E.owner[itm.tgtTile]===ME&&!warnedMissiles.has(itm)){
+          warnedMissiles.add(itm);toast('info','☢️ Missile en approche !',2800);sound('error');vibrate([50,40,50]);}}}
     revealFog();
     hudClock-=dt;if(hudClock<=0){hudClock=0.2;refreshHUD();refreshDock();
       if(!document.getElementById('board').classList.contains('hidden'))refreshBoard();}
