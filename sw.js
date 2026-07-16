@@ -19,7 +19,7 @@
 */
 // La version est estampillée automatiquement (empreinte du contenu mis en cache)
 // par `node tools/gen-sw-version.js` — vérifiée en CI. Ne pas éditer à la main.
-var CACHE = 'jeux-2bef66af4e';
+var CACHE = 'jeux-8d6513af52';
 var ASSETS = [
   './', 'index.html', 'fonts.css', 'game.css', 'theme.css', 'manifest.webmanifest',
   'fonts/caveat-latin-ext.woff2', 'fonts/caveat-latin.woff2', 'fonts/dmsans-latin-ext.woff2', 'fonts/dmsans-latin.woff2', 'fonts/pixelifysans-latin-ext.woff2', 'fonts/pixelifysans-latin.woff2', 'fonts/playfairdisplay-latin-ext.woff2', 'fonts/playfairdisplay-latin.woff2',

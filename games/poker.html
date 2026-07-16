@@ -655,7 +655,9 @@
         order.forEach(function (pid) {
           var rel = (order.indexOf(pid) - meIdx + order.length) % order.length;
           var a = Math.PI / 2 + (rel / order.length) * Math.PI * 2; // moi en bas, puis horaire
-          seatPos[pid] = { x: 50 + 41 * Math.cos(a), y: 46 + 39 * Math.sin(a) };
+          // Rayon vertical réduit pour MON siège : il reste au-dessus de la barre d'action.
+          var ry = rel === 0 ? 30 : 39;
+          seatPos[pid] = { x: 50 + 41 * Math.cos(a), y: 46 + ry * Math.sin(a) };
         });
       }
       setHTML('pk-seats', order.map(function (pid) {
