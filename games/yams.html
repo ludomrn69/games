@@ -70,6 +70,13 @@
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
     @media (min-width: 760px) { .ya-sheet, .ya-table { max-width: 520px; } }
+    /* PC large : table de dés et feuille de score CÔTE À CÔTE (fini le scroll). */
+    @media (min-width: 1020px) {
+      #s-playing { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 0 26px; }
+      #s-playing > .ya-head, #s-playing > .ya-opps, #s-playing > .ya-banner { flex-basis: 100%; }
+      .ya-table { position: sticky; top: 110px; width: 400px; }
+      .ya-sheet { width: 460px; margin: 6px 0; }
+    }
   </style>
 </head>
 <body>

@@ -24,7 +24,18 @@
 
     .dm-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.25rem; color: var(--terracotta); min-height: 28px; padding: 8px 12px 2px; }
     .dm-pathwrap { padding: 4px 10px; }
-    .dm-path { display: flex; gap: 6px; overflow-x: auto; padding: 6px 2px; scrollbar-width: thin; }
+    /* ── GALERIE DE MINE : les cartes révélées serpentent dans un boyau sombre
+       (rangées alternées gauche→droite puis droite→gauche, comme un chemin). ── */
+    .dm-path { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 6px; justify-items: center; align-items: center;
+      max-width: 480px; margin: 0 auto; padding: 12px 10px 14px;
+      background: radial-gradient(130% 110% at 50% 0, #4a3527, #251913);
+      border: 1px solid rgba(255,255,255,0.09); border-radius: 16px;
+      box-shadow: inset 0 2px 16px rgba(0,0,0,0.55), var(--shadow); }
+    .dm-entrance { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 8px;
+      color: #e8d3ae; font-family: 'Caveat', cursive; font-size: 1.05rem; }
+    .dm-floor { font-size: 0.85rem; letter-spacing: -2px; }
+    .dm-wait { grid-column: 1 / -1; color: rgba(255,255,255,0.65); font-family: 'Caveat', cursive; font-size: 1.1rem; text-align: center; padding: 10px 0; }
+    @media (min-width: 760px) { .dm-path { max-width: 620px; grid-template-columns: repeat(5, minmax(0, 1fr)); } }
     .dm-card { flex: 0 0 auto; width: 54px; height: 76px; border-radius: 10px; position: relative; overflow: hidden;
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-weight: 900;
       box-shadow: 0 3px 10px rgba(0,0,0,0.28); border: 2px solid rgba(255,255,255,0.55); }
@@ -402,8 +413,17 @@
       setText('dm-banner', state.banner || '');
 
       var path = state.path || [];
-      setHTML('dm-path', path.map(cardHTML).join('') || '<span class="dm-wait">La mine vous attend…</span>');
-      var scroll = document.getElementById('dm-path'); if (scroll) scroll.scrollLeft = scroll.scrollWidth;
+      // Serpentin : rangée paire → gauche→droite, rangée impaire → droite→gauche.
+      var COLS = window.matchMedia && window.matchMedia('(min-width: 760px)').matches ? 5 : 4;
+      var pot = state.pot || 0;
+      var entrance = '<div class="dm-entrance">⛺ Entrée de la mine' +
+        (pot > 0 ? ' · au sol <span class="dm-floor">' + '💎'.repeat(Math.min(pot, 8)) + (pot > 8 ? '…' : '') + '</span> ' + pot : '') + '</div>';
+      var cells = path.map(function (card, i) {
+        var row = Math.floor(i / COLS), col = row % 2 === 0 ? (i % COLS) + 1 : COLS - (i % COLS);
+        return cardHTML(card).replace('<div class="dm-card', '<div style="grid-row:' + (row + 2) + ';grid-column:' + col + '" class="dm-card');
+      });
+      setHTML('dm-path', entrance + (cells.join('') || '<span class="dm-wait">La mine vous attend…</span>'));
+      var mine = document.getElementById('dm-path');
       // Nouvelle carte révélée dans la galerie → flip + son (trésor ou danger).
       if (window._dmPathN !== undefined && path.length > window._dmPathN && path.length) {
         var lastCard = path[path.length - 1] || {};
@@ -411,8 +431,12 @@
         if (window.Fx) {
           Fx.sfx(isHaz ? 'error' : 'coin');
           if (isHaz) Fx.vib([20, 30, 40]);
-          var els = scroll ? scroll.children : null;
-          if (els && els.length) els[els.length - 1].classList.add('fx-flip');
+          var els = mine ? mine.children : null;
+          if (els && els.length) {
+            var lastEl = els[els.length - 1];
+            lastEl.classList.add('fx-flip');
+            if (lastEl.scrollIntoView) lastEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
         }
       }
       window._dmPathN = path.length;

@@ -44,8 +44,17 @@
     .lp-day.ev-rough { border-top-color: #e05a4e; } .lp-day.ev-start { border-top-color: var(--gold); }
     .lp-day.pay { background: linear-gradient(135deg, #f5d76e, #e0a92e); color: #3a2a05; border-top-color: #c98a1e; }
     .lp-day.pay .dn { color: #3a2a05; }
-    .lp-day .toks { position: absolute; bottom: 1px; right: 2px; font-size: 0.72rem; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
-    @media (min-width: 760px) { .lp-board { max-width: 560px; } .lp-day .de { font-size: 1.55rem; } }
+    .lp-day .toks { position: absolute; bottom: 1px; right: 1px; display: flex; gap: 1px; }
+    .lp-day .toks .pawn { width: 14px; height: 14px; font-size: 8px; }
+    .lp-day .dl { display: none; font-size: 0.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; color: rgba(44,37,32,0.55); line-height: 1; margin-top: 1px; }
+    /* Case du joueur ACTIF : elle ressort comme un pion posé sur le vrai plateau */
+    .lp-day.here { box-shadow: 0 0 0 3px var(--terracotta), 0 3px 10px rgba(216,74,58,0.45); transform: scale(1.07); z-index: 2; }
+    @media (min-width: 760px) {
+      .lp-board { max-width: 620px; }
+      .lp-day .de { font-size: 1.55rem; }
+      .lp-day .dl { display: block; }
+      .lp-day .toks .pawn { width: 17px; height: 17px; font-size: 10px; }
+    }
     .lp-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; margin-top: 8px; font-size: 0.68rem; color: var(--ink-light); }
     .lp-legend span { white-space: nowrap; }
     .lp-proj { background: var(--white); border-radius: 12px; box-shadow: var(--shadow); padding: 8px 12px; margin: 8px auto; max-width: 380px; text-align: left; font-size: 0.78rem; line-height: 1.5; }
@@ -325,23 +334,23 @@
       }
     }
 
-    // Projection au Jour de Paye (31) : ce que la dette coûtera (capital + 10 %)
-    // et les paliers d'épargne (5 % composés) pour bien voir où l'on va.
+    // Banque expliquée EN CLAIR : chaque ligne dit ce qui se passera au 31,
+    // en euros concrets — plus de calcul mental de pourcentages.
     function bankProjection(P) {
       var debt = P.debt || 0, sav = P.savings || 0;
       var loanInt = Math.round(debt * 0.1), saveInt = Math.round(sav * 0.05);
       var rows = '';
       if (debt > 0) {
-        rows += '<div class="lp-proj-row debt">💳 Dette <b>' + debt + ' €</b> → au <b>31</b> : à rembourser <b>' + (debt + loanInt) + ' €</b> (dont ' + loanInt + ' € d\'intérêts, 10 %)</div>';
+        rows += '<div class="lp-proj-row debt">💳 <b>Ton crédit : ' + debt + ' €.</b> Le 31, la banque prélève <b>' + loanInt + ' € d\'intérêts</b> (10 % de ta dette) — la dette, elle, reste à rembourser quand tu veux.</div>';
       } else {
-        rows += '<div class="lp-proj-row debt">💳 Aucune dette — un emprunt coûte <b>10 % d\'intérêts</b> prélevés au 31.</div>';
+        rows += '<div class="lp-proj-row debt">💳 <b>Pas de crédit.</b> Emprunter 1000 € = payer <b>100 €</b> d\'intérêts chaque Jour de Paye tant que tu n\'as pas remboursé.</div>';
       }
       if (sav > 0) {
-        var p1 = Math.round(sav * 1.05), p2 = Math.round(sav * Math.pow(1.05, 2)), p3 = Math.round(sav * Math.pow(1.05, 3));
-        rows += '<div class="lp-proj-row save">🏦 Épargne <b>' + sav + ' €</b> → au 31 : <b>+' + saveInt + ' €</b> (5 %). Paliers : 1 paye <b>' + p1 + '</b> · 2 <b>' + p2 + '</b> · 3 <b>' + p3 + '</b></div>';
+        rows += '<div class="lp-proj-row save">🏦 <b>Ton livret : ' + sav + ' €.</b> Le 31, il te rapporte <b>+' + saveInt + ' €</b> (5 %). Cet argent est à l\'abri : les factures ne le touchent pas.</div>';
       } else {
-        rows += '<div class="lp-proj-row save">🏦 Épargne 0 € — chaque tranche placée rapporte <b>+5 % au 31</b> (intérêts composés).</div>';
+        rows += '<div class="lp-proj-row save">🏦 <b>Livret vide.</b> Placer 500 € = gagner <b>+25 €</b> chaque Jour de Paye, à l\'abri des factures.</div>';
       }
+      rows += '<div class="lp-proj-row" style="color:var(--ink-light)">💡 Emprunte pour une <b>affaire</b> 🤝 qui rapporte plus que les intérêts — jamais pour dormir dessus.</div>';
       return '<div class="lp-proj">' + rows + '</div>';
     }
 
@@ -358,11 +367,19 @@
 
       // Calendrier du mois (position de chacun, en jour-du-mois)
       setText('lp-cagnotte', '💵 Paye ' + SALARY + ' €');
-      var toks = {};
-      order.forEach(function (pid) { var P = L(state, pid); if (P.done) return; var dim = P.pos === 0 ? 0 : ((P.pos - 1) % MONTH); (toks[dim] = toks[dim] || []).push(Room.emoji(pid)); });
+      var toks = {}, hereIdx = -1;
+      order.forEach(function (pid) {
+        var P = L(state, pid); if (P.done) return;
+        var dim = P.pos === 0 ? 0 : ((P.pos - 1) % MONTH);
+        (toks[dim] = toks[dim] || []).push('<span class="pawn" style="--pc:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>');
+        if (pid === state.turn) hereIdx = dim; // la case du joueur ACTIF ressort
+      });
+      var EV_LBL = { deal: 'Affaire', mail: 'Facture', lottery: 'Loterie', sweet: 'Chance', rough: 'Coup dur', pay: 'PAYE', start: 'Départ' };
       setHTML('lp-cal', DAYS.map(function (ev, i) {
         var t = (toks[i] || []).join('');
-        return '<div class="lp-day ev-' + ev.t + (ev.t === 'pay' ? ' pay' : '') + '"><span class="dn">' + (i + 1) + '</span><span class="de">' + ev.e + '</span>' + (t ? '<span class="toks">' + t + '</span>' : '') + '</div>';
+        return '<div class="lp-day ev-' + ev.t + (ev.t === 'pay' ? ' pay' : '') + (i === hereIdx ? ' here' : '') + '"><span class="dn">' + (i + 1) + '</span><span class="de">' + ev.e + '</span>' +
+          '<span class="dl">' + (EV_LBL[ev.t] || '') + '</span>' +
+          (t ? '<span class="toks">' + t + '</span>' : '') + '</div>';
       }).join(''));
 
       // Zone d'action
@@ -381,11 +398,12 @@
           '<div class="lp-btn-row"><button class="lp-btn go" onclick="decideDeal(\'' + me + '\',true)">Acheter</button><button class="lp-btn" onclick="decideDeal(\'' + me + '\',false)">Passer</button></div></div>';
       } else {
         var P = L(state, me);
+        // Boutons banque : la CONSÉQUENCE est écrite dessus (plus d'ambiguïté).
         var bank = '<div class="lp-bank-row">' +
-          '<button class="lp-bank" onclick="borrow(\'' + me + '\')">💳 Emprunter 1000</button>' +
-          (P.debt ? '<button class="lp-bank" onclick="repay(\'' + me + '\')">Rembourser 500</button>' : '') +
-          (P.cash >= 500 ? '<button class="lp-bank" onclick="deposit(\'' + me + '\')">🏦 Épargner 500</button>' : '') +
-          ((P.savings || 0) > 0 ? '<button class="lp-bank" onclick="withdraw(\'' + me + '\')">Retirer 500</button>' : '') +
+          '<button class="lp-bank" onclick="borrow(\'' + me + '\')" title="La dette reste due ; chaque 31, tu paies 10 % d\'intérêts dessus">💳 Emprunter 1000 € <small>(coût : 100 €/paye)</small></button>' +
+          (P.debt ? '<button class="lp-bank" onclick="repay(\'' + me + '\')" title="Réduit ta dette, donc les intérêts du 31">Rembourser 500 € <small>(−50 €/paye)</small></button>' : '') +
+          (P.cash >= 500 ? '<button class="lp-bank" onclick="deposit(\'' + me + '\')" title="À l\'abri des factures ; +5 % chaque 31">🏦 Placer 500 € <small>(+25 €/paye)</small></button>' : '') +
+          ((P.savings || 0) > 0 ? '<button class="lp-bank" onclick="withdraw(\'' + me + '\')">Retirer 500 €</button>' : '') +
           '</div>';
         var dieFresh = window._lpDie !== state.lastDie && state.lastDie;
         window._lpDie = state.lastDie;

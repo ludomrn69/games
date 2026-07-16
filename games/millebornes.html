@@ -79,6 +79,28 @@
 
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-km { font-weight: 800; color: var(--terracotta); }
 
+    /* Score cumulé (mode points) + réglages du salon */
+    .mb-pts { font-size: 0.66rem; font-weight: 800; color: var(--gold); background: rgba(198,152,90,0.14); border-radius: 20px; padding: 1px 7px; }
+    .mb-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .mb-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+    .mb-set-row { display: flex; gap: 8px; justify-content: center; }
+    .mb-set-btn { flex: 1; padding: 0.55rem 0.3rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+    .mb-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+
+    /* Overlay de fin de manche (décompte officiel) */
+    .mb-overlay { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 620; display: none; align-items: center; justify-content: center; padding: 24px; }
+    .mb-overlay.active { display: flex; }
+    .mb-ov-card { background: var(--white); border-radius: 22px; padding: 24px 20px; box-shadow: var(--shadow-hover); text-align: center; max-width: 430px; width: 100%; max-height: 86vh; overflow-y: auto; }
+    .mb-ov-emoji { font-size: 2.4rem; }
+    .mb-ov-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.25rem; margin: 6px 0 12px; }
+    .mb-ov-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .mb-ov-row { display: flex; align-items: center; gap: 8px; background: var(--cream); border-radius: 12px; padding: 7px 10px; text-align: left; }
+    .mb-ov-name { font-weight: 800; font-size: 0.85rem; flex-shrink: 0; }
+    .mb-ov-det { flex: 1; font-size: 0.7rem; color: var(--ink-light); line-height: 1.3; }
+    .mb-ov-pts { font-weight: 900; color: var(--terracotta); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mb-ov-pts small { color: var(--ink-light); font-weight: 700; }
+    .mb-ov-goal { font-size: 0.78rem; color: var(--ink-light); margin-bottom: 12px; }
+
     .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
     .modal.active { display: flex; }
     .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
@@ -113,6 +135,17 @@
       <div class="mb-hand" id="mb-hand"></div>
     </div>
 
+    <!-- ══ FIN DE MANCHE (mode points) ══ -->
+    <div class="mb-overlay" id="mb-overlay">
+      <div class="mb-ov-card">
+        <div class="mb-ov-emoji">🏁</div>
+        <div class="mb-ov-title" id="mb-ov-title">Fin de manche</div>
+        <div class="mb-ov-rows" id="mb-ov-rows"></div>
+        <div class="mb-ov-goal">Premier à <b>5000 pts</b></div>
+        <button class="btn-primary" id="mb-next-round" onclick="setNextReady()">Manche suivante →</button>
+      </div>
+    </div>
+
     <!-- ══ RESULTS ══ -->
     <div id="s-results" class="screen">
       <div class="res-emoji" id="res-emoji">🏁</div>
@@ -137,7 +170,9 @@
     <div class="modal-card">
       <div class="modal-title">🚗 Mille Bornes</div>
       <div class="modal-body">
-        <p>• Premier à parcourir <b>1000 km</b> ! Joue des cartes <b>distance</b> (25→200).</p>
+        <p>• Atteins <b>1000 km</b> ! Joue des cartes <b>distance</b> (25→200 — <b>max deux 200</b> par manche).</p>
+        <p style="margin-top:6px">• <b>Coup fourré</b> ⚡ : on t'attaque et tu as la <b>botte</b> correspondante <b>en main</b> ? Joue-la immédiatement : l'attaque est annulée, <b>+300 pts</b>, tu pioches et tu rejoues.</p>
+        <p style="margin-top:6px">• <b>Mode officiel</b> (par défaut) : on joue en <b>manches à points</b> — distance (1 pt/km), botte posée 100 (les 4 : +300), coup fourré 300, manche bouclée 400, voyage sans 200 +300, capot +500. Premier à <b>5000 pts</b>. Le mode <b>Course rapide</b> (au choix dans le salon) reste la course sèche à 1000 km.</p>
         <p style="margin-top:6px">• Il te faut un <b>Feu vert</b> 🟢 pour rouler. Une <b>attaque</b> (feu rouge, panne, crevaison, accident, limite) bloque un adversaire.</p>
         <p style="margin-top:6px">• La bonne <b>parade</b> te débloque ; une <b>botte</b> (carte spéciale) te rend immunisé.</p>
         <p style="margin-top:6px">• Chaque tour : pioche 1, puis joue ou défausse 1 carte. Tu ne peux pas dépasser 1000.</p>
@@ -172,34 +207,68 @@
 
     /* ━━ Enregistrement ━━ */
     var prevStatus = null, sel = -1, targeting = null;
+    // Botte qui contre chaque attaque (pour le COUP FOURRÉ : botte encore EN MAIN).
+    var CF_SAFE = { crash: 'sAce', gas: 'sTank', flat: 'sPunc', stop: 'sRoW', limit: 'sRoW' };
     GameRoom({
       gameKey: 'millebornes',
       name: 'Mille Bornes',
       emoji: '🚗',
-      tagline: 'Premier à 1000 km',
+      tagline: 'La course aux 1000 km',
       minPlayers: 2,
       maxPlayers: 4,
       rules: [
-        'Premier à 1000 km gagne — joue des cartes distance (25→200)',
-        'Feu vert pour rouler ; attaques pour bloquer un adversaire',
-        'Parades pour te débloquer ; bottes pour être immunisé',
-        'Chaque tour : pioche 1, puis joue ou défausse 1 carte'
+        'Atteins 1000 km — joue des cartes distance (25→200, max deux 200)',
+        'Feu vert pour rouler ; attaques pour bloquer ; parades pour repartir',
+        'Botte en main quand on t\'attaque = COUP FOURRÉ (+300, tu rejoues)',
+        'Mode officiel : manches à points, premier à 5000 pts'
       ],
       offline: { solo: true, local: true },
       bot: mbBot,
-      offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
+      offlineTurn: function (r) {
+        if (r.status === 'ended') return null;
+        if (r.status === 'roundEnd') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
+        if (r.cf) return r.cf.pid; // fenêtre coup fourré : c'est à la victime d'agir
+        return r.turn;
+      },
       offlineEnter: function () { sel = -1; targeting = null; if (window.room) render(window.room); },
+      offlineExtraSetup: function () {
+        return '<div class="off-set"><div class="off-set-label">Mode de jeu</div><div class="off-set-row" data-opt="mode">' +
+          '<button type="button" class="off-opt active" data-val="points">Officiel (5000 pts)</button>' +
+          '<button type="button" class="off-opt" data-val="course">Course rapide</button>' +
+        '</div></div>';
+      },
+      lobbyExtraHTML: lobbyExtraHTML,
       onState: onState,
       onStart: onStart
     });
 
-    function freshP() { return { hand: [], dist: 0, rolling: false, hazard: null, limited: false, safeties: [] }; }
-    function onStart(players, cur) {
-      var order = players.map(function (p) { return p.pid; });
+    function lobbyExtraHTML(room) {
+      var mode = (room && room.mode) || 'points';
+      var isHost = room && room.host === window.myPid;
+      function b(v, lb, ti) {
+        return '<button class="mb-set-btn' + (mode === v ? ' active' : '') + '" title="' + ti + '"' +
+          (isHost ? ' onclick="setMode(\'' + v + '\')"' : ' disabled') + '>' + lb + '</button>';
+      }
+      return '<div class="mb-settings"><div class="mb-settings-label">Mode de jeu' + (isHost ? '' : ' (réglé par l\'hôte)') + '</div><div class="mb-set-row">' +
+        b('points', 'Officiel (5000 pts)', 'Manches à points : distance + bottes 100 + coup fourré 300 + manche 400…') +
+        b('course', 'Course rapide', 'Une seule manche : premier à 1000 km') +
+      '</div></div>';
+    }
+    function setMode(v) { if (window.roomRef) window.roomRef.child('mode').set(v); }
+
+    function freshP() { return { hand: [], dist: 0, rolling: false, hazard: null, limited: false, safeties: [], used200: 0, cfCount: 0 }; }
+    function dealRound(cur, order) {
       var deck = buildDeck();
       order.forEach(function (p) { var P = freshP(); for (var i = 0; i < 6; i++) P.hand.push(deck.pop()); cur.players[p].mb = P; });
+      return deck;
+    }
+    function onStart(players, cur) {
+      var order = players.map(function (p) { return p.pid; });
+      var scores = {}; order.forEach(function (p) { scores[p] = 0; });
+      var deck = dealRound(cur, order);
       var starter = order[0];
-      var base = { deck: deck, discard: [], turn: starter, winner: null, banner: Room.name(starter) + ' commence', drewThisTurn: false };
+      var base = { deck: deck, discard: [], turn: starter, winner: null, banner: Room.name(starter) + ' commence', drewThisTurn: false,
+        mode: (cur && cur.mode) || 'points', scores: scores, roundNum: 1, cf: null, roundBreak: null, roundWinner: null };
       // le 1er joueur pioche
       drawForTurn(Object.assign({ order: order, players: cur.players }, base), starter);
       return base;
@@ -215,15 +284,52 @@
     function onState(snap) {
       var state = snap.val() || {};
       var status = state.status || 'waiting';
-      if (status === 'playing') { if (prevStatus !== 'playing') { sel = -1; targeting = null; showScreen('s-playing'); } render(state); }
-      else if (status === 'ended') showResults(state);
+      if (status === 'playing') {
+        if (prevStatus !== 'playing') { sel = -1; targeting = null; document.getElementById('mb-overlay').classList.remove('active'); showScreen('s-playing'); }
+        render(state);
+      } else if (status === 'roundEnd') {
+        if (!document.getElementById('s-playing').classList.contains('active')) showScreen('s-playing');
+        render(state);
+        showRoundEnd(state);
+      } else if (status === 'ended') {
+        document.getElementById('mb-overlay').classList.remove('active');
+        showResults(state);
+      }
       prevStatus = status;
+    }
+
+    /* ━━ Fin de manche (mode points) : décompte détaillé ━━ */
+    function showRoundEnd(state) {
+      var ord = state.order || [], brk = state.roundBreak || {}, scores = state.scores || {};
+      var win = state.roundWinner;
+      setText('mb-ov-title', win ? (win === window.myPid ? '🏁 Tu boucles la manche !' : '🏁 ' + Room.name(win) + ' boucle la manche') : 'Paquet épuisé — fin de manche');
+      setHTML('mb-ov-rows', ord.map(function (pid) {
+        var b = brk[pid] || {};
+        var det = [];
+        if (b.dist) det.push(b.dist + ' km');
+        if (b.bottes) det.push('bottes ' + b.bottes);
+        if (b.b4) det.push('4 bottes +300');
+        if (b.cf) det.push('coup fourré +' + b.cf);
+        if (b.win) det.push('manche +400');
+        if (b.safe) det.push('sans 200 +300');
+        if (b.capot) det.push('capot +500');
+        return '<div class="mb-ov-row"><span class="mb-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="mb-ov-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="mb-ov-det">' + (det.join(' · ') || '—') + '</span>' +
+          '<span class="mb-ov-pts">+' + (b.total || 0) + '<small> → ' + (scores[pid] || 0) + '</small></span></div>';
+      }).join(''));
+      var meReady = state.players && state.players[window.myPid] && state.players[window.myPid].nextReady;
+      var btn = document.getElementById('mb-next-round');
+      btn.disabled = !!meReady; btn.textContent = meReady ? 'En attente…' : 'Manche suivante →';
+      document.getElementById('mb-overlay').classList.add('active');
+      maybeNextRound(state);
     }
 
     // ── Validité d'un coup ────────────────────────────────────────────────────
     function canPlay(cur, pid, card, targetPid) {
       var c = CARD[card], P = P_(cur, pid);
-      if (c.t === 'dist') return P.rolling && !P.hazard && (!P.limited || c.km <= 50) && (P.dist + c.km <= 1000);
+      if (c.t === 'dist') return P.rolling && !P.hazard && (!P.limited || c.km <= 50) && (P.dist + c.km <= 1000) &&
+        !(c.km === 200 && (P.used200 || 0) >= 2); // règle officielle : max deux 200 km par manche
       if (c.t === 'rem') {
         if (c.rem === 'stop') return !P.rolling;
         return P.hazard === c.rem || (c.rem === 'limit' && P.limited);
@@ -249,12 +355,49 @@
       var h = P.hand.slice(); var idx = h.indexOf(card); if (idx < 0) return false;
       if (!(c.t === 'haz' ? canPlay(cur, pid, card, targetPid) : canPlay(cur, pid, card))) return false;
       h.splice(idx, 1); P.hand = h;
-      if (c.t === 'dist') { P.dist += c.km; cur.banner = Room.name(pid) + ' roule +' + c.km + ' (' + P.dist + ' km)'; }
+      if (c.t === 'dist') { P.dist += c.km; if (c.km === 200) P.used200 = (P.used200 || 0) + 1; cur.banner = Room.name(pid) + ' roule +' + c.km + ' (' + P.dist + ' km)'; }
       else if (c.t === 'rem') { if (c.rem === 'stop') P.rolling = true; else if (c.rem === 'limit') P.limited = false; else P.hazard = null; cur.banner = Room.name(pid) + ' : ' + c.lb; }
       else if (c.t === 'safe') { P.safeties = (P.safeties || []).concat([card]); if (c.safe === P.hazard) P.hazard = null; if (c.safe === 'row') { P.rolling = true; P.limited = false; } cur.banner = Room.name(pid) + ' pose une botte : ' + c.lb + ' !'; }
-      else if (c.t === 'haz') { var T = P_(cur, targetPid); if (c.haz === 'stop') T.rolling = false; else if (c.haz === 'limit') T.limited = true; else T.hazard = c.haz; cur.banner = Room.name(pid) + ' attaque ' + Room.name(targetPid) + ' : ' + c.lb + ' !'; }
-      if (P.dist >= 1000) { cur.winner = pid; cur.status = 'ended'; cur.banner = '🏁 ' + Room.name(pid) + ' atteint 1000 km !'; return true; }
+      else if (c.t === 'haz') {
+        var T = P_(cur, targetPid);
+        if (c.haz === 'stop') T.rolling = false; else if (c.haz === 'limit') T.limited = true; else T.hazard = c.haz;
+        cur.banner = Room.name(pid) + ' attaque ' + Room.name(targetPid) + ' : ' + c.lb + ' !';
+        // COUP FOURRÉ : la victime a la botte correspondante EN MAIN → fenêtre de
+        // réaction (jouer la botte = +300, l'attaque est annulée et elle rejoue).
+        var cfCard = CF_SAFE[c.haz];
+        if ((T.hand || []).indexOf(cfCard) >= 0) {
+          cur.cf = { pid: targetPid, by: pid, haz: c.haz, card: cfCard };
+          cur.banner += ' — ' + Room.name(targetPid) + ' peut répliquer…';
+          return true; // le tour est SUSPENDU jusqu'à la réponse de la victime
+        }
+      }
+      if (P.dist >= 1000) { endRound(cur, pid); return true; }
       endTurn(cur, pid); return true;
+    }
+    // Réponse à la fenêtre coup fourré (play=true : botte jouée en réaction).
+    function cfResolve(cur, pid, play) {
+      var cf = cur.cf; if (!cf || cf.pid !== pid) return false;
+      cur.cf = null;
+      if (play) {
+        var P = P_(cur, pid), h = (P.hand || []).slice(), idx = h.indexOf(cf.card);
+        if (idx >= 0) {
+          h.splice(idx, 1); P.hand = h;
+          P.safeties = (P.safeties || []).concat([cf.card]);
+          P.cfCount = (P.cfCount || 0) + 1;
+          // annule l'attaque + effets de la botte
+          if (cf.haz === 'stop') P.rolling = true;
+          else if (cf.haz === 'limit') P.limited = false;
+          else P.hazard = null;
+          if (CARD[cf.card].safe === 'row') { P.rolling = true; P.limited = false; }
+          cur.banner = '⚡ COUP FOURRÉ de ' + Room.name(pid) + ' ! (+300) — il/elle rejoue';
+          cur.turn = pid; cur.drewThisTurn = false;
+          drawForTurn(cur, pid); // pioche et rejoue immédiatement (règle officielle)
+          return true;
+        }
+      }
+      // refus (ou botte introuvable) : le jeu reprend après l'attaquant
+      endTurn(cur, cf.by);
+      return true;
     }
     function discardCard(cur, pid, card) {
       var P = P_(cur, pid), h = P.hand.slice(), idx = h.indexOf(card); if (idx < 0) return false;
@@ -263,10 +406,57 @@
       endTurn(cur, pid); return true;
     }
     function endTurn(cur, pid) {
-      var order = cur.order || [], i = order.indexOf(pid);
-      var nxt = order[(i + 1) % order.length];
-      cur.turn = nxt; cur.drewThisTurn = false;
-      drawForTurn(cur, nxt);
+      var order = cur.order || [];
+      var deckLeft = (cur.deck || []).length + (cur.discard || []).length;
+      var anyCards = order.some(function (p) { return (P_(cur, p).hand || []).length > 0; });
+      if (!deckLeft && !anyCards) { endRound(cur, null); return; } // paquet épuisé, mains vides
+      var i = order.indexOf(pid), n = order.length;
+      for (var k = 1; k <= n; k++) {
+        var nxt = order[(i + k) % n];
+        if ((P_(cur, nxt).hand || []).length > 0 || deckLeft > 0) {
+          cur.turn = nxt; cur.drewThisTurn = false;
+          drawForTurn(cur, nxt);
+          return;
+        }
+      }
+      endRound(cur, null);
+    }
+
+    // ── Fin de manche : décompte OFFICIEL ────────────────────────────────────
+    // distance (1 pt/km) + 100/botte (+300 si les 4) + 300/coup fourré
+    // + manche 400 + voyage sûr (sans 200) 300 + capot (adversaires à 0 km) 500.
+    function endRound(cur, winnerPid) {
+      var order = cur.order || [];
+      cur.scores = cur.scores || {};
+      if (!winnerPid && (cur.mode || 'points') === 'course') {
+        // course rapide sans vainqueur net : le plus loin gagne
+        winnerPid = order.slice().sort(function (a, b) { return P_(cur, b).dist - P_(cur, a).dist; })[0];
+      }
+      var brk = {};
+      order.forEach(function (p) {
+        var P = P_(cur, p);
+        var nb = (P.safeties || []).length;
+        var b = { dist: P.dist, bottes: nb * 100, b4: nb === 4 ? 300 : 0, cf: (P.cfCount || 0) * 300, win: 0, safe: 0, capot: 0 };
+        if (p === winnerPid && P.dist >= 1000) {
+          b.win = 400;
+          if (!(P.used200 || 0)) b.safe = 300;
+          var allZero = order.filter(function (q) { return q !== p; }).every(function (q) { return P_(cur, q).dist === 0; });
+          if (allZero && order.length > 1) b.capot = 500;
+        }
+        b.total = b.dist + b.bottes + b.b4 + b.cf + b.win + b.safe + b.capot;
+        cur.scores[p] = (cur.scores[p] || 0) + b.total;
+        brk[p] = b;
+      });
+      cur.roundBreak = brk; cur.roundWinner = winnerPid || null; cur.cf = null;
+      cur.banner = winnerPid ? ('🏁 ' + Room.name(winnerPid) + ' boucle les 1000 km !') : 'Paquet épuisé — fin de manche';
+      if ((cur.mode || 'points') === 'course') { cur.status = 'ended'; cur.winner = winnerPid; return; }
+      var best = null;
+      order.forEach(function (p) { if (best === null || (cur.scores[p] || 0) > (cur.scores[best] || 0)) best = p; });
+      if ((cur.scores[best] || 0) >= 5000) { cur.status = 'ended'; cur.winner = best; }
+      else {
+        cur.status = 'roundEnd';
+        order.forEach(function (p) { if (cur.players[p]) cur.players[p].nextReady = false; });
+      }
     }
 
     /* ━━ Actions joueur ━━ */
@@ -287,7 +477,7 @@
     function doPlay(card, targetPid) {
       if (window.Fx) { Fx.sfx('place'); Fx.vib(10); }
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || cur.cf) return cur;
         applyCard(cur, window.myPid, card, targetPid);
         return cur;
       }, function (err, committed) { if (committed) { sel = -1; targeting = null; } });
@@ -296,19 +486,63 @@
       if (sel < 0) { lbToast('Choisis une carte à défausser'); return; }
       var card = P_(window.room, window.myPid).hand[sel];
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || cur.cf) return cur;
         discardCard(cur, window.myPid, card);
         return cur;
       }, function (err, committed) { if (committed) { sel = -1; targeting = null; } });
+    }
+    // Réponse humaine à la fenêtre coup fourré.
+    function cfAnswer(play) {
+      if (play && window.Fx) { Fx.sfx('big'); Fx.vib([20, 30, 40]); }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.cf || cur.cf.pid !== window.myPid) return cur;
+        cfResolve(cur, window.myPid, !!play);
+        return cur;
+      });
+    }
+    function setNextReady() { rref().child('players/' + window.myPid + '/nextReady').set(true); }
+    function maybeNextRound(state) {
+      var ord = state.order || [];
+      var online = ord.filter(function (p) { return state.players[p] && state.players[p].online; });
+      if (!online.length || !online.every(function (p) { return state.players[p].nextReady; })) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'roundEnd') return cur;
+        var order = cur.order || [];
+        var o = order.filter(function (p) { return cur.players[p] && cur.players[p].online; });
+        if (!o.length || !o.every(function (p) { return cur.players[p].nextReady; })) return cur;
+        cur.roundNum = (cur.roundNum || 1) + 1;
+        cur.deck = dealRound(cur, order);
+        cur.discard = []; cur.cf = null; cur.roundBreak = null; cur.roundWinner = null;
+        var starter = order[(cur.roundNum - 1) % order.length];
+        cur.turn = starter; cur.drewThisTurn = false; cur.status = 'playing';
+        cur.banner = 'Manche ' + cur.roundNum + ' — ' + Room.name(starter) + ' commence';
+        order.forEach(function (p) { if (cur.players[p]) cur.players[p].nextReady = false; });
+        drawForTurn(cur, starter);
+        return cur;
+      });
     }
 
     /* ━━ IA ━━ Décision dans millebornes-ai.js (priorités finir/parer/rouler/
        attaquer/défausser ; partagée avec le banc). On lui passe une vue épurée du
        jeu et on exécute l'action. ━━ */
     function mbBot(state, pid) {
-      if (state.status !== 'playing' || state.turn !== pid) return;
+      if (state.status === 'roundEnd') {
+        if (!((state.players[pid] || {}).nextReady)) rref().child('players/' + pid + '/nextReady').set(true);
+        return;
+      }
+      if (state.status !== 'playing') return;
+      // Fenêtre coup fourré : toujours jouer la botte (strictement gagnant).
+      if (state.cf && state.cf.pid === pid) {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || !cur.cf || cur.cf.pid !== pid) return cur;
+          cfResolve(cur, pid, true);
+          return cur;
+        });
+        return;
+      }
+      if (state.turn !== pid) return;
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.turn !== pid) return cur;
+        if (!cur || cur.status !== 'playing' || cur.turn !== pid || cur.cf) return cur;
         var P = P_(cur, pid);
         var me = { dist: P.dist, rolling: P.rolling, hazard: P.hazard, limited: P.limited, safeties: P.safeties || [], hand: P.hand };
         var opponents = (cur.order || []).filter(function (p) { return p !== pid; }).map(function (p) {
@@ -344,7 +578,8 @@
         (isTarget ? ' onclick="chooseTarget(\'' + pid + '\')"' : '') + '>' +
         '<div class="mb-lane-info"><div class="mb-lane-id"><span class="mb-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
         '<span class="mb-pname">' + escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '</span></div>' +
-        '<div class="mb-lane-chips"><span class="mb-km">' + P.dist + ' km</span>' + battleChip + speedChip + bottes + '</div></div>' +
+        '<div class="mb-lane-chips"><span class="mb-km">' + P.dist + ' km</span>' + battleChip + speedChip + bottes +
+        ((state.mode || 'points') === 'points' ? '<span class="mb-pts">Σ ' + ((state.scores || {})[pid] || 0) + '</span>' : '') + '</div></div>' +
         road + '</div>';
     }
     function render(state) {
@@ -368,19 +603,28 @@
       });
       setText('mb-banner', state.banner || '');
 
-      var myTurn = (state.turn === me) && !state.winner;
+      var cf = state.cf;
+      var myTurn = (state.turn === me) && !state.winner && !cf;
       var P = P_(state, me) || { hand: [] };
       var canMove = myTurn && hasAnyMove(state, me);
       var statusTxt;
-      if (!myTurn) statusTxt = '⏳ En attente de ' + escapeHtml(Room.name(state.turn)) + '…';
+      if (cf) statusTxt = cf.pid === me ? '⚡ On t\'attaque… mais tu as la botte en main !' : '⏳ ' + escapeHtml(Room.name(cf.pid)) + ' peut jouer un coup fourré…';
+      else if (!myTurn) statusTxt = '⏳ En attente de ' + escapeHtml(Room.name(state.turn)) + '…';
       else if (targeting) statusTxt = 'Touche l\'adversaire à attaquer ↑';
       else if (!canMove) statusTxt = '🚫 Aucun coup possible — choisis une carte et défausse-la pour passer ton tour';
       else statusTxt = 'À toi (carte piochée) : joue une carte… ou défausse-en une';
       setText('mb-status', statusTxt);
-      setHTML('mb-actions', myTurn && !targeting ?
-        '<button class="mb-act play" onclick="play()"' + (sel < 0 || !canMove ? ' disabled' : '') + '>Jouer</button>' +
-        '<button class="mb-act' + (!canMove ? ' play' : '') + '" onclick="discard()"' + (sel < 0 ? ' disabled' : '') + '>Défausser</button>' :
-        (targeting ? '<button class="mb-act" onclick="cancelTarget()">Annuler</button>' : ''));
+      var actionsHTML;
+      if (cf && cf.pid === me) {
+        actionsHTML = '<button class="mb-act play" onclick="cfAnswer(true)">⚡ COUP FOURRÉ ! ' + CARD[cf.card].ic + ' ' + CARD[cf.card].lb + ' (+300)</button>' +
+          '<button class="mb-act" onclick="cfAnswer(false)">Non merci</button>';
+      } else if (myTurn && !targeting) {
+        actionsHTML = '<button class="mb-act play" onclick="play()"' + (sel < 0 || !canMove ? ' disabled' : '') + '>Jouer</button>' +
+          '<button class="mb-act' + (!canMove ? ' play' : '') + '" onclick="discard()"' + (sel < 0 ? ' disabled' : '') + '>Défausser</button>';
+      } else {
+        actionsHTML = targeting ? '<button class="mb-act" onclick="cancelTarget()">Annuler</button>' : '';
+      }
+      setHTML('mb-actions', actionsHTML);
       var handArr = P.hand || [];
       var grew = handArr.length > _prevHandLen && _prevHandLen >= 0; // carte fraîchement piochée
       _prevHandLen = handArr.length;
@@ -398,14 +642,19 @@
     /* ━━ Résultats ━━ */
     function showResults(state) {
       showScreen('s-results');
-      var order = (state.order || []).slice().sort(function (a, b) { return P_(state, b).dist - P_(state, a).dist; });
+      var pts = (state.mode || 'points') === 'points';
+      var scores = state.scores || {};
+      var order = (state.order || []).slice().sort(function (a, b) {
+        return pts ? ((scores[b] || 0) - (scores[a] || 0)) : (P_(state, b).dist - P_(state, a).dist);
+      });
       var winner = state.winner || order[0];
       setText('res-emoji', winner === window.myPid ? '🏆' : '🏁');
-      setText('res-title', winner === window.myPid ? 'Tu gagnes la course !' : Room.name(winner) + ' gagne');
+      setText('res-title', winner === window.myPid ? (pts ? 'Tu gagnes la partie !' : 'Tu gagnes la course !') : Room.name(winner) + ' gagne');
       setHTML('res-rank', order.map(function (pid, i) {
+        var sc = pts ? ((scores[pid] || 0) + ' pts') : (P_(state, pid).dist + ' km');
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span><span class="res-rank-km">' + P_(state, pid).dist + ' km</span></div>';
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + '</span><span class="res-rank-km">' + sc + '</span></div>';
       }).join(''));
     }
 

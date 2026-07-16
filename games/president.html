@@ -32,7 +32,9 @@
     .pr-banner.me { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; animation: turnPulse 1.6s ease-out infinite; }
 
     /* Le pli se joue sur un TAPIS bordeaux (feutre, cf. game.css). */
-    .pr-pile-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 12px 16px; margin: 6px auto 4px; width: min(94vw, 460px); }
+    /* Le tapis absorbe la hauteur libre de l'écran (mobile comme PC). */
+    #s-playing { display: flex; flex-direction: column; }
+    .pr-pile-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 12px 16px; margin: 6px auto 4px; width: min(94vw, 460px); flex: 1; min-height: 140px; }
     .pr-pile-label { font-family: 'Caveat', cursive; font-size: 0.9rem; color: rgba(255,255,255,0.78); }
     .pr-pile { display: flex; gap: 6px; min-height: 80px; align-items: center; justify-content: center; }
     .pr-pile-empty { font-family: 'Caveat', cursive; color: rgba(255,255,255,0.72); font-size: 1.1rem; }
@@ -431,6 +433,11 @@
         window._prPileSig = pileSig;
         pileEl.innerHTML = state.pile.cards.map(function (c) { return cardHTML(c); }).join('') +
           '<div class="pr-pile-label" style="align-self:flex-end">par ' + escapeHtml(Room.name(state.pile.by)) + '</div>';
+        // Pose « vraie table » : les cartes du pli se chevauchent, légèrement tournées.
+        pileEl.querySelectorAll('.card').forEach(function (el, i) {
+          el.style.transform = 'rotate(' + (window.Fx ? Fx.fanAngle(pileSig + '|' + i, 6) : 0) + 'deg)';
+          if (i > 0) el.style.marginLeft = '-16px';
+        });
         if (fresh) {
           pileEl.querySelectorAll('.card').forEach(function (el, i) { el.classList.add('card-in'); el.style.animationDelay = (i * 0.05) + 's'; });
           if (window.Fx) Fx.sfx('place'); // on entend chaque pose, la sienne comme celle des autres

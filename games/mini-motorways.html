@@ -70,7 +70,7 @@
 
     <div class="screen" id="start">
       <h1>🚗 Mini Motorways</h1>
-      <p>Relie chaque <b>maison 🏠</b> (toit pointu) à un <b>bâtiment</b> de la <b>même couleur</b> en traçant des routes. Une route posée à côté d'un bâtiment y crée une <b>entrée</b> (le petit bitume) : c'est par là que les voitures entrent et sortent. Un bâtiment cerclé de <b style="color:#e8582c">rouge clignotant</b> n'est relié à <b>aucune</b> route — branche-le vite&nbsp;! Chaque semaine tu débloques <b>ponts</b> 🌉, <b>autoroutes</b> 🛤️, <b>ronds-points</b> 🔄 et <b>feux</b> 🚦. Si un bâtiment sature trop longtemps, c'est fini&nbsp;!</p>
+      <p>Relie chaque <b>maison 🏠</b> (toit pointu) à un <b>bâtiment</b> de la <b>même couleur</b> en traçant des routes — <b>diagonales autorisées</b>, comme en vrai. Une route posée à côté d'un bâtiment y crée une <b>entrée</b> (le petit bitume) : c'est par là que les voitures entrent et sortent. Un bâtiment cerclé de <b style="color:#e8582c">rouge clignotant</b> n'est relié à <b>aucune</b> route — branche-le vite&nbsp;! Chaque semaine tu débloques <b>ponts</b> 🌉, <b>autoroutes</b> 🛤️, <b>ronds-points</b> 🔄 et <b>feux</b> 🚦. Si un bâtiment sature trop longtemps, c'est fini&nbsp;!</p>
       <button class="btn" id="startBtn">Jouer</button>
       <button class="btn" id="dailyBtn" style="background:linear-gradient(135deg,#2c7be5,#8b5cf6);box-shadow:0 8px 24px rgba(44,123,229,.4)">🗓️ Défi du jour</button>
       <div id="dailyInfo" style="font-size:.82rem;opacity:.72;max-width:300px"></div>
@@ -250,7 +250,8 @@
       if(cur.kind==='cell'&&goals[key(cur.r,cur.c)]){found=cur;break;}
       var nbrs=[];
       if(cur.kind==='cell'){
-        [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){var g=grid[key(cur.r+d[0],cur.c+d[1])];if(isRoad(g))nbrs.push(cnode(g.r,g.c));});
+        // 8 directions : les routes se connectent AUSSI en diagonale (comme le vrai jeu)
+        [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(d){var g=grid[key(cur.r+d[0],cur.c+d[1])];if(isRoad(g))nbrs.push(cnode(g.r,g.c));});
         motorways.forEach(function(m,mi){[['a',m.a],['b',m.b]].forEach(function(pr){if(Math.abs(pr[1].r-cur.r)+Math.abs(pr[1].c-cur.c)<=1)nbrs.push(enode(mi,pr[0]));});});
       } else {
         nbrs.push(enode(cur.mw,cur.side==='a'?'b':'a'));           // l'autre bout via l'autoroute
@@ -367,6 +368,10 @@
       [[0,1],[1,0]].forEach(function(d){var n=grid[key(g.r+d[0],g.c+d[1])];
         if(isRoad(n)){var x2=cx(n.c),y2=cy(n.r);
           if(d[1])rr(x,y-r,x2-x,w,4);else rr(x-r,y,w,y2-y,4);ctx.fill();}});
+      // Tronçons DIAGONAUX (le vrai jeu les autorise) : trait épais entre centres.
+      [[1,1],[1,-1]].forEach(function(d){var n=grid[key(g.r+d[0],g.c+d[1])];
+        if(isRoad(n)){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(cx(n.c),cy(n.r));
+          ctx.lineCap='round';ctx.lineWidth=w;ctx.strokeStyle=ctx.fillStyle;ctx.stroke();}});
     }
     [houses,dests].forEach(function(list){list.forEach(function(b){
       roadNeighborsOf(b).forEach(function(n){var x=cx(b.c),y=cy(b.r),x2=cx(n.c),y2=cy(n.r);

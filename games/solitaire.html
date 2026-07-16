@@ -32,6 +32,20 @@
     .so-card.down { background: linear-gradient(135deg, #6a4c93, #4a3270); border-color: #3a2860; }
     .so-card .rk { font-size: clamp(0.7rem, 3.3vw, 1.05rem); } .so-card .st { font-size: clamp(0.65rem, 3vw, 1rem); }
     .so-card.sel { box-shadow: 0 0 0 3px var(--terracotta); }
+    /* Défausse en pioche-3 : mini-éventail (seule la carte du dessus se joue) */
+    .so-wfan { position: relative; width: 100%; aspect-ratio: 0.7; }
+    .so-wcard { position: absolute; top: 0; width: 100%; }
+    .so-wcard .so-card.under { pointer-events: none; filter: brightness(0.94); }
+    /* Bouton de fin automatique (plus rien de caché) */
+    .so-finish { border: none; border-radius: 30px; padding: 0.5rem 1.4rem; font-family: 'DM Sans', sans-serif; font-weight: 800; cursor: pointer; background: linear-gradient(135deg, var(--sage), #6f9e5e); color: #fff; box-shadow: var(--shadow); animation: turnPulse 1.6s ease-out infinite; }
+    /* Réglages du salon */
+    .so-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .so-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+    .so-set-row { display: flex; gap: 8px; justify-content: center; }
+    .so-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .so-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    /* PC : le tapis s'élargit */
+    @media (min-width: 900px) { .so-board { max-width: 780px; } }
     .so-col .so-card { position: absolute; left: 0; right: 0; }
     .so-stack { position: relative; }
 
@@ -97,7 +111,7 @@
       <div class="modal-body">
         <p>• Remonte les 4 familles de l'<b>As au Roi</b> (en haut à droite) pour gagner.</p>
         <p style="margin-top:6px">• Dans les colonnes : empile en <b>descendant</b> et en <b>alternant les couleurs</b> (rouge/noir).</p>
-        <p style="margin-top:6px">• Touche une carte pour la sélectionner, puis touche sa destination. Touche la pioche pour retourner une carte. <b>⬆️ Tout monter</b> envoie tout ce qui peut l'être vers les familles.</p>
+        <p style="margin-top:6px">• Touche une carte pour la sélectionner, puis touche sa destination. Touche la pioche pour retourner une carte (réglage <b>1 ou 3 cartes</b> dans le salon). <b>⬆️ Tout monter</b> envoie tout ce qui peut l'être vers les familles ; quand plus rien n'est caché, <b>🏁 Terminer</b> finit la partie tout seul.</p>
         <p style="margin-top:6px">• <b>Solo</b> : bats ton chrono ⏱. <b>Salon</b> : même donne pour tous, le plus rapide gagne !</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
@@ -137,14 +151,30 @@
       offline: { solo: true, soloMinBots: 0, soloNoBots: true },
       bot: function () {}, offlineTurn: function () { return null; },
       offlineEnter: function () { if (window.room) render(window.room); },
+      offlineExtraSetup: function () {
+        return '<div class="off-set"><div class="off-set-label">Pioche</div><div class="off-set-row" data-opt="drawN">' +
+          '<button type="button" class="off-opt active" data-val="1">1 carte</button>' +
+          '<button type="button" class="off-opt" data-val="3">3 cartes</button>' +
+        '</div></div>';
+      },
+      lobbyExtraHTML: function (room) {
+        var n = (room && room.drawN) || 1;
+        var isHost = room && room.host === window.myPid;
+        function b(v) {
+          return '<button class="so-set-btn' + (n === v ? ' active' : '') + '"' +
+            (isHost ? ' onclick="setDrawN(' + v + ')"' : ' disabled') + '>' + v + ' carte' + (v > 1 ? 's' : '') + '</button>';
+        }
+        return '<div class="so-settings"><div class="so-settings-label">Pioche' + (isHost ? '' : ' (réglée par l\'hôte)') + '</div><div class="so-set-row">' + b(1) + b(3) + '</div></div>';
+      },
       onState: onState, onStart: onStart
     });
+    function setDrawN(v) { if (window.roomRef) window.roomRef.child('drawN').set(v); }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
       var seed = Puzzle.seed();
       order.forEach(function (p) { cur.players[p].g = deal(seed); cur.players[p].finishedAt = null; });
-      return { seed: seed, startedAt: Date.now(), banner: 'Remonte les familles le plus vite possible !', winner: null };
+      return { seed: seed, drawN: (cur && cur.drawN) || 1, startedAt: Date.now(), banner: 'Remonte les familles le plus vite possible !', winner: null };
     }
 
     function onState(snap) {
@@ -211,7 +241,24 @@
       updateUndoBtn();
     }
     function updateUndoBtn() { var b = document.getElementById('so-undo'); if (b) b.disabled = !undoStack.length; }
-    function drawStock() { sel = null; withG(function (g) { if (g.stock.length) { g.waste.push(g.stock.pop()); } else if (g.waste.length) { g.stock = g.waste.reverse(); g.waste = []; } else return false; return true; }); }
+    function drawStock() {
+      sel = null;
+      withG(function (g) {
+        var n = (window.room && window.room.drawN) || 1; // pioche 1 ou 3 (réglage du salon)
+        if (g.stock.length) { for (var i = 0; i < n && g.stock.length; i++) g.waste.push(g.stock.pop()); }
+        else if (g.waste.length) { g.stock = g.waste.reverse(); g.waste = []; }
+        else return false;
+        return true;
+      });
+    }
+    // Fin de partie « acquise » : plus rien de caché ni en pioche → tout peut monter.
+    function canAutoFinish(g) {
+      if (!g || won(g)) return false;
+      if (g.stock.length || g.waste.length) return false;
+      for (var c = 0; c < 7; c++) if (g.t[c].d.length) return false;
+      return true;
+    }
+    function autoFinish() { if (window.Fx) Fx.sfx('big'); autoFound(); }
     function flipIfNeeded(col) { if (!col.u.length && col.d.length) col.u.push(col.d.pop()); }
 
     function tapWaste() {
@@ -270,7 +317,7 @@
         for (var c = 0; c < 7; c++) { var u = g.t[c].u; if (u.length) { var card = u[u.length - 1]; if (canFound(g, card)) { (function (col) { withG(function (gg) { gg.f[suitOf(card)].push(gg.t[col].u.pop()); flipIfNeeded(gg.t[col]); return true; }); })(c); return true; } } }
         return false;
       }
-      var guard = 0; while (once() && guard++ < 60) {} sel = null;
+      var guard = 0; while (once() && guard++ < 130) {} sel = null;
     }
 
     /* ── Indice : cherche le meilleur coup, l'annonce et présélectionne la carte ──
@@ -313,7 +360,20 @@
       var top = '';
       top += g.stock.length ? '<div class="so-card down" onclick="drawStock()"></div>' : '<div class="so-slot" onclick="drawStock()">↺</div>';
       var wsel = sel && sel.from === 'waste' ? ' sel' : '';
-      top += g.waste.length ? cardHTML(g.waste[g.waste.length - 1], wsel, 'tapWaste()') : '<div class="so-slot"></div>';
+      // Défausse : en pioche-3 on voit les 3 dernières cartes en petit éventail.
+      if (g.waste.length) {
+        var wn = Math.min((state.drawN || 1) === 3 ? 3 : 1, g.waste.length);
+        if (wn === 1) top += cardHTML(g.waste[g.waste.length - 1], wsel, 'tapWaste()');
+        else {
+          var fan = '<div class="so-wfan">';
+          for (var wk = 0; wk < wn; wk++) {
+            var wi = g.waste.length - wn + wk, isTop = wk === wn - 1;
+            fan += '<div class="so-wcard" style="left:' + (wk * 11) + 'px">' +
+              cardHTML(g.waste[wi], isTop ? wsel : ' under', isTop ? 'tapWaste()' : null) + '</div>';
+          }
+          top += fan + '</div>';
+        }
+      } else top += '<div class="so-slot"></div>';
       top += '<div class="so-slot"></div>'; // espace
       SUITS.forEach(function (s) { var f = g.f[s]; top += f.length ? cardHTML(f[f.length - 1], '', 'tapFound(\'' + s + '\')') : '<div class="so-slot" onclick="tapFound(\'' + s + '\')">' + SUIT_GLYPH[s] + '</div>'; });
       setHTML('so-top', top);
@@ -329,6 +389,8 @@
         tab += '</div>';
       }
       setHTML('so-tab', tab);
+      // Plus rien de caché → on propose de terminer d'un geste.
+      if (canAutoFinish(g)) setHTML('so-banner', '<button class="so-finish" onclick="autoFinish()">🏁 Terminer la partie</button>');
     }
     function tapColEmpty(c, e) { tapCol(c); }
 

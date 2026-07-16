@@ -25,19 +25,26 @@
 
     .lu-board-wrap { display: flex; justify-content: center; padding: 6px 8px; }
     .lu-board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(15, minmax(0, 1fr)); width: min(94vw, 420px, 62vh); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
-    .lu-cell { aspect-ratio: 1; border: 0.5px solid rgba(120,110,100,0.12); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1px; position: relative; }
+    /* ── Plateau façon VRAI Ludo : piste blanche bien détourée, départs pleins
+       fléchés, escaliers numérotés, écuries en quart de plateau coloré. ── */
+    .lu-cell { aspect-ratio: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1px; position: relative; }
     .lu-cell.blank { border-color: transparent; }
-    .lu-cell.track { background: #fbf6ec; }
-    html[data-theme="dark"] .lu-cell.track { background: #241e2e; }
-    html[data-theme="dark"] .lu-cell.track { background: #2a2336; }
-    .lu-cell.yR { background: rgba(224,90,78,0.16); } .lu-cell.yB { background: rgba(62,124,177,0.16); }
-    .lu-cell.yG { background: rgba(52,168,83,0.16); } .lu-cell.yY { background: rgba(230,184,0,0.18); }
-    .lu-cell.slot { box-shadow: inset 0 0 0 2px rgba(120,110,100,0.35); border-radius: 50%; }
+    .lu-cell.track { background: #fff; border: 1px solid rgba(90,80,70,0.4); border-radius: 12%; }
+    html[data-theme="dark"] .lu-cell.track { background: #3a3346; border-color: rgba(255,255,255,0.25); }
+    /* Écuries : quart de plateau bien coloré + 4 stalles blanches cerclées couleur */
+    .lu-cell.yR { background: rgba(224,90,78,0.3); color: var(--lu-R); } .lu-cell.yB { background: rgba(62,124,177,0.3); color: var(--lu-B); }
+    .lu-cell.yG { background: rgba(52,168,83,0.3); color: var(--lu-G); } .lu-cell.yY { background: rgba(230,184,0,0.32); color: #b8930a; }
+    .lu-cell.slot { background: #fff; box-shadow: inset 0 0 0 2.5px currentColor, 0 1px 3px rgba(0,0,0,0.18); border-radius: 50%; margin: 8%; }
+    html[data-theme="dark"] .lu-cell.slot { background: #241e2e; }
+    /* Départs (case pleine couleur + flèche du sens de la course) & escaliers */
     .lu-cell.hR, .lu-cell.sR { background: var(--lu-R); } .lu-cell.hB, .lu-cell.sB { background: var(--lu-B); }
     .lu-cell.hG, .lu-cell.sG { background: var(--lu-G); } .lu-cell.hY, .lu-cell.sY { background: var(--lu-Y); }
-    .lu-cell.hR, .lu-cell.hB, .lu-cell.hG, .lu-cell.hY { opacity: 0.78; }
+    .lu-cell.sR, .lu-cell.sB, .lu-cell.sG, .lu-cell.sY { border-radius: 12%; border: 1px solid rgba(0,0,0,0.25); }
+    .lu-arrow { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: clamp(0.65rem, 2.6vw, 1rem); font-weight: 900; text-shadow: 0 1px 2px rgba(0,0,0,0.45); pointer-events: none; }
+    .lu-cell.hR, .lu-cell.hB, .lu-cell.hG, .lu-cell.hY { opacity: 0.85; border-radius: 12%; border: 1px solid rgba(0,0,0,0.18); }
+    .lu-step { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.85); font-size: clamp(0.5rem, 2vw, 0.8rem); font-weight: 900; text-shadow: 0 1px 1px rgba(0,0,0,0.4); pointer-events: none; }
     .lu-cell.center { background: linear-gradient(135deg, var(--gold-light), var(--gold)); }
-    .lu-cell.center-mark { font-size: clamp(0.7rem, 3vw, 1.1rem); }
+    .lu-cell.center-mark { font-size: clamp(0.7rem, 3vw, 1.1rem); background: conic-gradient(from 45deg, var(--lu-B) 0 25%, var(--lu-G) 0 50%, var(--lu-Y) 0 75%, var(--lu-R) 0 100%); border-radius: 50%; margin: 4%; box-shadow: 0 1px 4px rgba(0,0,0,0.3), inset 0 0 0 2px #fff; }
 
     .lu-token { width: 70%; height: 70%; min-width: 10px; min-height: 10px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.9);
       background-image: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.55), rgba(255,255,255,0) 55%);
@@ -304,11 +311,26 @@
         if (r <= 5 && c <= 5) return 'R'; if (r <= 5 && c >= 9) return 'B';
         if (r >= 9 && c >= 9) return 'G'; if (r >= 9 && c <= 5) return 'Y'; return null;
       }
+      // Flèche du sens de course sur chaque case DÉPART (rouge → droite, bleu → bas,
+      // vert → gauche, jaune → haut) + numéros 1-6 sur les escaliers d'arrivée.
+      var ARROW = { R: '➜', B: '➜', G: '➜', Y: '➜' };
+      var ARROW_ROT = { R: 0, B: 90, G: 180, Y: 270 };
+      var homeStep = {};
+      Object.keys(COLOR_INFO).forEach(function (col) {
+        COLOR_INFO[col].home.forEach(function (cc, i) { homeStep[cc[0] + '-' + cc[1]] = i + 1; });
+      });
       var html = '';
       for (var r = 0; r < 15; r++) for (var c = 0; c < 15; c++) {
         var key = r + '-' + c, cls = 'lu-cell', mark = '';
-        if (homeAt[key]) cls += ' h' + homeAt[key];
-        else if (loopIdx[key] != null) { cls += ' track'; if (SAFE[loopIdx[key]] != null) cls += ' s' + colorOfStart(loopIdx[key]); }
+        if (homeAt[key]) { cls += ' h' + homeAt[key]; mark = '<span class="lu-step">' + homeStep[key] + '</span>'; }
+        else if (loopIdx[key] != null) {
+          cls += ' track';
+          if (SAFE[loopIdx[key]] != null) {
+            var sc = colorOfStart(loopIdx[key]);
+            cls = cls.replace(' track', '') + ' s' + sc;
+            mark = '<span class="lu-arrow" style="transform:rotate(' + ARROW_ROT[sc] + 'deg)">' + ARROW[sc] + '</span>';
+          }
+        }
         else if (r >= 6 && r <= 8 && c >= 6 && c <= 8) { if (r === 7 && c === 7) { cls += ' center center-mark'; mark = '🏁'; } else cls += ' center'; }
         else { var yc = yardColor(r, c); if (yc) { cls += ' y' + yc; if (slotAt[key]) cls += ' slot'; } else cls += ' blank'; }
         html += '<div class="' + cls + '" id="cell-' + r + '-' + c + '">' + mark + '</div>';

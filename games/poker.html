@@ -31,6 +31,30 @@
 
     .pk-seats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     @media (max-width: 480px) { .pk-seats { grid-template-columns: 1fr; } }
+
+    /* Jetons de casino : 100 noir · 25 vert · 10 bleu · 5 rouge · 1 blanc */
+    .pk-chips { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; }
+    .pk-chip { display: inline-block; width: 15px; height: 15px; border-radius: 50%; border: 2.5px dashed rgba(255,255,255,0.85); box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 0 0 1.5px rgba(0,0,0,0.12); box-sizing: border-box; }
+    .pk-chip.c1 { background: #e8e4da; border-color: rgba(120,120,120,0.55); }
+    .pk-chip.c5 { background: #cf4335; }
+    .pk-chip.c10 { background: #2f6fd0; }
+    .pk-chip.c25 { background: #2f8a4e; }
+    .pk-chip.c100 { background: #23242b; }
+    .pk-chip-x { font-size: 0.62rem; font-weight: 800; margin-right: 3px; }
+    .pk-potchips { min-height: 18px; margin-bottom: 6px; }
+    .pk-potchips .pk-chip { width: 17px; height: 17px; }
+    .pk-potchips .pk-chip-x { color: #ffe9a8; }
+
+    /* ══ PC : VRAIE TABLE OVALE — sièges disposés en couronne autour du tapis
+       (positions % posées par le rendu), rebord bois, moi en bas. ══ */
+    @media (min-width: 860px) {
+      .pk-felt.ring { position: relative; max-width: 1040px; height: calc(100vh - 240px); min-height: 560px; padding: 0 12px 150px; }
+      .pk-felt.ring .pk-board { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); width: min(58%, 560px); margin: 0;
+        border-radius: 45% / 40%; padding: 42px 34px; border: 12px solid #5d4030;
+        box-shadow: inset 0 4px 22px rgba(0,0,0,0.45), 0 12px 34px rgba(0,0,0,0.3), inset 0 0 0 3px rgba(255,255,255,0.12); }
+      .pk-felt.ring .pk-seats { display: contents; }
+      .pk-felt.ring .pk-seat { position: absolute; width: 208px; transform: translate(-50%, -50%); z-index: 2; }
+    }
     .pk-seat { background: var(--white); border: 1.5px solid var(--gold-light); border-radius: 16px; padding: 10px 12px; box-shadow: var(--shadow); position: relative; }
     .pk-seat.me { border-color: var(--terracotta); }
     .pk-seat.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-light), var(--shadow); }
@@ -100,6 +124,7 @@
       <div class="pk-felt">
         <div class="pk-board">
           <div class="pk-pot" id="pk-pot"></div>
+          <div class="pk-potchips" id="pk-potchips"></div>
           <div class="pk-community" id="pk-community"></div>
           <div class="pk-banner" id="pk-banner"></div>
         </div>
@@ -203,6 +228,36 @@
     function firstN(distinct, excl, n) { var out = []; for (var i = 0; i < distinct.length && out.length < n; i++) if (excl.indexOf(distinct[i]) < 0) out.push(distinct[i]); return out; }
     function cmpRank(a, b) { var n = Math.max(a.length, b.length); for (var i = 0; i < n; i++) { var x = a[i] || 0, y = b[i] || 0; if (x !== y) return x - y; } return 0; }
     var COMBO_NAME = ['Carte haute', 'Paire', 'Deux paires', 'Brelan', 'Suite', 'Couleur', 'Full', 'Carré', 'Quinte flush'];
+    // Étiquette parlante de la main : « Paire de 9 », « Suite au Roi »…
+    function comboLabel(rk) {
+      function R(v) { return RANK_LBL[v - 2] || '?'; }
+      var cat = rk[0];
+      if (cat === 1 || cat === 3 || cat === 7) return COMBO_NAME[cat] + ' de ' + R(rk[1]);
+      if (cat === 2) return 'Deux paires (' + R(rk[1]) + ' & ' + R(rk[2]) + ')';
+      if (cat === 6) return 'Full : ' + R(rk[1]) + ' par les ' + R(rk[2]);
+      if (cat === 4 || cat === 8) return COMBO_NAME[cat] + ' au ' + R(rk[1]);
+      if (cat === 5) return 'Couleur (' + R(rk[1]) + ' haut)';
+      return 'Carte haute ' + R(rk[1]);
+    }
+    // Ma meilleure combinaison ACTUELLE (2 fermées + cartes communes visibles).
+    function myComboNow(s) {
+      var hc = s.hole && s.hole[window.myPid];
+      if (!hc || (s.inHand && s.inHand[window.myPid] === false)) return null;
+      var board = (s.board || []).filter(function (c) { return c != null; });
+      return comboLabel(handRank(hc.concat(board)));
+    }
+    // Jetons colorés façon casino : 100 noir · 25 vert · 10 bleu · 5 rouge · 1 blanc.
+    var CHIP_DENOMS = [[100, 'c100'], [25, 'c25'], [10, 'c10'], [5, 'c5'], [1, 'c1']];
+    function chipsHTML(amount, max) {
+      if (!amount || amount <= 0) return '';
+      var out = '', left = amount, n = 0;
+      for (var i = 0; i < CHIP_DENOMS.length && n < (max || 5); i++) {
+        var d = CHIP_DENOMS[i][0], cls = CHIP_DENOMS[i][1];
+        var k = Math.floor(left / d);
+        if (k > 0) { out += '<i class="pk-chip ' + cls + '"></i>' + (k > 1 ? '<b class="pk-chip-x">×' + k + '</b>' : ''); left -= k * d; n++; }
+      }
+      return '<span class="pk-chips" aria-hidden="true">' + out + '</span>';
+    }
 
     /* ── État de jeu ────────────────────────────────────────────────────── */
     var prevStatus = null, nextHandTimer = null, raiseVal = null;
@@ -567,13 +622,16 @@
     function render(s) {
       var me = window.myPid, order = s.order || [];
       setText('pk-phase', phaseLabel(s.phase) + ' · donne ' + (s.handNo || 1));
-      // Le pot GRIMPE (compteur animé) au lieu de sauter d'un coup.
+      // Le pot GRIMPE (compteur animé) au lieu de sauter d'un coup, et des JETONS
+      // volent de la mise du joueur vers le pot quand il augmente.
       var pot = totalPot(s), potPrev = window._pkPot;
       var potEl = document.getElementById('pk-pot');
       if (window.Fx && potEl && potPrev !== undefined && potPrev !== pot) {
         Fx.count(potEl, potPrev, pot, { ms: 480, fmt: function (v) { return '💰 Pot : ' + v; } });
+        if (pot > potPrev) Fx.flyTo('pk-seats', 'pk-pot', '<i class="pk-chip c5" style="display:block"></i>', { ms: 480, rotate: 200, scale: 0.8, fade: false });
       } else setText('pk-pot', '💰 Pot : ' + pot);
       window._pkPot = pot;
+      setHTML('pk-potchips', chipsHTML(pot, 5));
       setText('pk-banner', s.banner || '');
       // cartes communes (5 emplacements) — les nouvelles se RETOURNENT (flop/turn/river)
       var boardN = (s.board || []).filter(function (c) { return c != null; }).length;
@@ -588,6 +646,18 @@
       setHTML('pk-community', comm);
 
       var reveal = (s.results && s.results.reveal) || {};
+      // PC : sièges en COURONNE autour du tapis ovale (moi en bas, sens horaire).
+      var ring = window.matchMedia && window.matchMedia('(min-width: 860px)').matches && order.length >= 2;
+      document.querySelector('.pk-felt').classList.toggle('ring', !!ring);
+      var seatPos = {};
+      if (ring) {
+        var meIdx = Math.max(0, order.indexOf(me));
+        order.forEach(function (pid) {
+          var rel = (order.indexOf(pid) - meIdx + order.length) % order.length;
+          var a = Math.PI / 2 + (rel / order.length) * Math.PI * 2; // moi en bas, puis horaire
+          seatPos[pid] = { x: 50 + 41 * Math.cos(a), y: 46 + 39 * Math.sin(a) };
+        });
+      }
       setHTML('pk-seats', order.map(function (pid) {
         var out = (s.stacks[pid] || 0) <= 0 && !s.inHand[pid];
         var folded = s.inHand && s.inHand[pid] === false && (s.stacks[pid] || 0) > 0;
@@ -603,10 +673,16 @@
           var showCards = (pid === me) || (s.showAll && reveal[pid]);
           holeHTML = '<div class="pk-hole">' + hc.map(function (c) { return cardHTML(showCards ? c : null, 'sm' + (isWinnerCard(s, pid) ? ' win' : '')); }).join('') + '</div>';
         } else if (!out) { holeHTML = '<div class="pk-hole"><div class="pk-card back sm" style="opacity:.3"></div><div class="pk-card back sm" style="opacity:.3"></div></div>'; }
-        var betLine = (s.bet && s.bet[pid]) ? '<div class="pk-bet">mise : ' + s.bet[pid] + '</div>' : '<div class="pk-bet"></div>';
+        var betLine = (s.bet && s.bet[pid]) ? '<div class="pk-bet">' + chipsHTML(s.bet[pid], 3) + ' ' + s.bet[pid] + '</div>' : '<div class="pk-bet"></div>';
         var lastLine = (s.lastAct && s.lastAct[pid] && !folded) ? '<div class="pk-lastact">' + escapeHtml(s.lastAct[pid]) + '</div>' : (folded ? '<div class="pk-lastact">couché</div>' : '');
         var comboLine = (s.showAll && reveal[pid]) ? '<div class="pk-combo">' + reveal[pid].combo + '</div>' : '';
-        return '<div class="pk-seat' + (pid === me ? ' me' : '') + (active ? ' active' : '') + (folded ? ' folded' : '') + (out ? ' out' : '') + '">' +
+        // MA main en direct : « tu as actuellement… » (personne d'autre ne la voit)
+        if (pid === me && !s.showAll && !folded && !out) {
+          var mc = myComboNow(s);
+          if (mc) comboLine = '<div class="pk-combo">✋ ' + mc + '</div>';
+        }
+        var posStyle = seatPos[pid] ? ' style="left:' + seatPos[pid].x.toFixed(1) + '%;top:' + seatPos[pid].y.toFixed(1) + '%"' : '';
+        return '<div class="pk-seat' + (pid === me ? ' me' : '') + (active ? ' active' : '') + (folded ? ' folded' : '') + (out ? ' out' : '') + '"' + posStyle + '>' +
           '<div class="pk-seat-top"><span class="pk-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           '<span class="pk-name">' + escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '</span>' + badges + '</div>' +
           '<div class="pk-seat-mid"><div>' + holeHTML + comboLine + betLine + lastLine + '</div>' +
@@ -617,6 +693,8 @@
       renderBar(s);
     }
     function isWinnerCard(s, pid) { return !!(s.results && !s.results.uncontested && s.results.pots && s.results.pots.some(function (pt) { return pt.winners.indexOf(pid) >= 0; })); }
+    // La couronne dépend de la largeur d'écran : on re-rend au redimensionnement.
+    window.addEventListener('resize', function () { if (window.room && window.room.status === 'playing') render(window.room); });
 
     function renderBar(s) {
       var me = window.myPid, bar = document.getElementById('pk-bar');
@@ -635,8 +713,10 @@
       var callLbl = toCall <= 0 ? 'Check' : (toCall >= stack ? 'Tapis (' + stack + ')' : 'Suivre ' + toCall);
       var minTo = s.curBet + s.minRaise, maxTo = (s.bet[me] || 0) + stack;
       var canRaise = maxTo > s.curBet && stack > 0;
+      var comboNow = myComboNow(s);
       var html = '<div class="pk-bar-inner">';
-      html += '<div class="pk-bar-info">Pot ' + pot + ' · ' + (toCall > 0 ? 'à suivre : ' + toCall : 'personne n\'a misé') + ' · tes jetons : ' + stack + '</div>';
+      html += '<div class="pk-bar-info">Pot ' + pot + ' · ' + (toCall > 0 ? 'à suivre : ' + toCall : 'personne n\'a misé') + ' · tes jetons : ' + stack +
+        (comboNow ? ' · <b style="color:var(--sage)">✋ ' + comboNow + '</b>' : '') + '</div>';
       if (canRaise) {
         if (raiseVal == null || raiseVal < minTo || raiseVal > maxTo) raiseVal = Math.min(maxTo, Math.max(minTo, s.curBet + Math.max(s.bb, Math.round(pot / 2))));
         html += '<div class="pk-quick">' +

@@ -151,6 +151,7 @@
       <div class="modal-title">🐺 Loup-Garou</div>
       <div class="modal-body">
         <p>• Le village cache des <b>loups-garous</b>. La <b>nuit</b>, les loups dévorent un villageois ; la <b>voyante</b> sonde l'identité d'un joueur.</p>
+        <p style="margin-top:6px">• <b>Cupidon</b> 💘 (dès 6 joueurs) : la première nuit, il lie <b>2 amoureux</b> (lui compris s'il veut). Si l'un meurt, l'autre <b>meurt de chagrin</b>. S'ils finissent seuls survivants — même loup + villageois ! — <b>ils gagnent ensemble</b>.</p>
         <p style="margin-top:6px">• Le <b>jour</b>, tout le monde <b>vote</b> pour éliminer un suspect. On révèle son rôle.</p>
         <p style="margin-top:6px">• Les <b>villageois</b> gagnent s'ils éliminent tous les loups ; les <b>loups</b> gagnent s'ils égalent les villageois.</p>
         <p style="margin-top:6px">• La voyante peut <b>accuser publiquement</b> pour rallier les votes !</p>
@@ -165,7 +166,9 @@
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
     function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-    var ROLE_INFO = { loup: { ic: '🐺', nm: 'Loup-Garou' }, voyante: { ic: '🔮', nm: 'Voyante' }, sorciere: { ic: '🧪', nm: 'Sorcière' }, chasseur: { ic: '🔫', nm: 'Chasseur' }, villageois: { ic: '🧑‍🌾', nm: 'Villageois' } };
+    var ROLE_INFO = { loup: { ic: '🐺', nm: 'Loup-Garou' }, voyante: { ic: '🔮', nm: 'Voyante' }, sorciere: { ic: '🧪', nm: 'Sorcière' }, chasseur: { ic: '🔫', nm: 'Chasseur' }, cupidon: { ic: '💘', nm: 'Cupidon' }, villageois: { ic: '🧑‍🌾', nm: 'Villageois' } };
+    function aliveCupid(s) { return aliveList(s).filter(function (p) { return roleOf(s, p) === 'cupidon'; })[0] || null; }
+    function loverOf(s, pid) { var L = s.lovers || null; if (!L) return null; return L[0] === pid ? L[1] : (L[1] === pid ? L[0] : null); }
 
     function P(s, pid) { return s.players[pid] || {}; }
     function isBot(s, pid) { return !!P(s, pid).isBot; }
@@ -207,16 +210,20 @@
       roles.push('voyante');
       if (n >= 5) roles.push('sorciere');
       if (n >= 6) roles.push('chasseur');
+      if (n >= 6) roles.push('cupidon');
       while (roles.length < n) roles.push('villageois');
       shuffle(roles);
       order.forEach(function (p, i) { cur.players[p].role = roles[i]; cur.players[p].alive = true; cur.players[p].knows = {}; });
-      return { phase: 'wolves', day: 1, wolfVotes: {}, seerCheck: null, dayVotes: {}, claims: {},
+      var hasCupid = roles.indexOf('cupidon') >= 0;
+      return { phase: hasCupid ? 'cupid' : 'wolves', day: 1, wolfVotes: {}, seerCheck: null, dayVotes: {}, claims: {},
         witchHealUsed: false, witchPoisonUsed: false, witchSave: false, witchKill: null, hunterPid: null, afterHunter: null,
-        banner: '🌙 La nuit tombe sur le village…', winner: null };
+        lovers: null, cupidPick: null,
+        banner: hasCupid ? '🌙 La nuit tombe… 💘 Cupidon décoche ses flèches' : '🌙 La nuit tombe sur le village…', winner: null };
     }
 
     function offlineTurn(r) {
       if (!r || r.status === 'ended') return null;
+      if (r.phase === 'cupid') { var cu = aliveCupid(r); return (cu && isBot(r, cu)) ? cu : null; }
       if (r.phase === 'wolves') { var wv = r.wolfVotes || {}; return aliveWolves(r).filter(function (p) { return !(p in wv) && isBot(r, p); })[0] || null; }
       if (r.phase === 'seer') { var s = aliveSeer(r); return (s && isBot(r, s) && !r.seerCheck) ? s : null; }
       if (r.phase === 'witch') { var w = aliveWitch(r); return (w && isBot(r, w)) ? w : null; }
@@ -259,10 +266,30 @@
 
     /* ━━ Transitions ━━ */
     function checkWin(cur) {
+      // Les AMOUREUX gagnent ensemble s'ils sont les 2 derniers survivants
+      // (le cas savoureux : un loup et un villageois liés par Cupidon).
+      var alive = aliveList(cur);
+      if (cur.lovers && alive.length === 2 &&
+          alive.indexOf(cur.lovers[0]) >= 0 && alive.indexOf(cur.lovers[1]) >= 0) {
+        cur.winner = 'amoureux'; cur.status = 'ended'; return true;
+      }
       var w = aliveWolves(cur).length, v = aliveVillagers(cur).length;
       if (w === 0) { cur.winner = 'village'; cur.status = 'ended'; return true; }
       if (w >= v) { cur.winner = 'loups'; cur.status = 'ended'; return true; }
       return false;
+    }
+    // Tue `pid` et enchaîne la MORT DE CHAGRIN de son amoureux (règle Cupidon).
+    // Renvoie la liste des morts effectifs (utile pour le chasseur, la bannière…).
+    function slay(cur, pid, deads) {
+      deads = deads || [];
+      if (!pid || !P(cur, pid).alive) return deads;
+      cur.players[pid].alive = false; deads.push(pid);
+      var lov = loverOf(cur, pid);
+      if (lov && P(cur, lov).alive) {
+        cur.players[lov].alive = false; deads.push(lov);
+        cur.loverGrief = lov; // pour la bannière
+      }
+      return deads;
     }
     function resolveWolves(cur) {
       // victime = cible majoritaire des loups
@@ -281,12 +308,14 @@
     }
     function resolveNight(cur) {
       var deads = [];
+      cur.loverGrief = null;
       var v = cur.nightVictim;
-      if (v && P(cur, v).alive && !cur.witchSave) { cur.players[v].alive = false; cur.lastNightDead = v; deads.push(v); }
+      if (v && P(cur, v).alive && !cur.witchSave) { cur.lastNightDead = v; slay(cur, v, deads); }
       var pk = cur.witchKill;
-      if (pk && P(cur, pk).alive) { cur.players[pk].alive = false; deads.push(pk); }
+      if (pk && P(cur, pk).alive) slay(cur, pk, deads);
       if (deads.length) {
-        cur.banner = '🌅 ' + deads.map(function (p) { return Room.name(p) + ' (' + ROLE_INFO[roleOf(cur, p)].nm + ')'; }).join(' et ') + (deads.length > 1 ? ' sont morts' : ' est mort·e') + ' cette nuit';
+        cur.banner = '🌅 ' + deads.map(function (p) { return Room.name(p) + ' (' + ROLE_INFO[roleOf(cur, p)].nm + ')'; }).join(' et ') + (deads.length > 1 ? ' sont morts' : ' est mort·e') + ' cette nuit' +
+          (cur.loverGrief ? ' — 💔 ' + Room.name(cur.loverGrief) + ' meurt de chagrin !' : '');
       } else {
         cur.banner = cur.witchSave ? '🌅 Personne n\'est mort — la sorcière a agi 💚' : '🌅 Personne n\'est mort cette nuit';
       }
@@ -308,10 +337,13 @@
       var top = null, best = -1, tie = false;
       Object.keys(tally).forEach(function (t) { if (tally[t] > best) { best = tally[t]; top = t; tie = false; } else if (tally[t] === best) { tie = true; } });
       if (top && !tie) {
-        cur.players[top].alive = false; cur.lastDayDead = top;
-        cur.banner = '⚖️ Le village élimine ' + Room.name(top) + ' — c\'était un ' + ROLE_INFO[roleOf(cur, top)].nm + ' !';
+        cur.loverGrief = null;
+        var dayDeads = slay(cur, top, []); cur.lastDayDead = top;
+        cur.banner = '⚖️ Le village élimine ' + Room.name(top) + ' — c\'était un ' + ROLE_INFO[roleOf(cur, top)].nm + ' !' +
+          (cur.loverGrief ? ' 💔 ' + Room.name(cur.loverGrief) + ' meurt de chagrin.' : '');
         if (checkWin(cur)) return;
-        if (roleOf(cur, top) === 'chasseur') { cur.phase = 'hunter'; cur.hunterPid = top; cur.afterHunter = 'night'; cur.dayVotes = {}; cur.banner += ' 🔫 Il tire une dernière balle !'; return; }
+        var dayHunter = dayDeads.filter(function (p) { return roleOf(cur, p) === 'chasseur'; })[0];
+        if (dayHunter) { cur.phase = 'hunter'; cur.hunterPid = dayHunter; cur.afterHunter = 'night'; cur.dayVotes = {}; cur.banner += ' 🔫 Le Chasseur tire une dernière balle !'; return; }
       } else {
         cur.banner = top ? '⚖️ Égalité des votes — personne n\'est éliminé' : '⚖️ Aucun vote — personne n\'est éliminé';
         if (checkWin(cur)) return;
@@ -320,11 +352,16 @@
     }
     // Dernière balle du chasseur, puis la partie reprend (jour ou nuit suivante).
     function hunterShoot(cur, target) {
-      cur.players[target].alive = false;
-      cur.banner = '🔫 Le Chasseur emporte ' + Room.name(target) + ' (' + ROLE_INFO[roleOf(cur, target)].nm + ') dans la tombe !';
+      cur.loverGrief = null;
+      var deads = slay(cur, target, []);
+      cur.banner = '🔫 Le Chasseur emporte ' + Room.name(target) + ' (' + ROLE_INFO[roleOf(cur, target)].nm + ') dans la tombe !' +
+        (cur.loverGrief ? ' 💔 ' + Room.name(cur.loverGrief) + ' meurt de chagrin.' : '');
       var after = cur.afterHunter;
       cur.hunterPid = null; cur.afterHunter = null;
       if (checkWin(cur)) return;
+      // L'amoureux mort de chagrin était AUSSI chasseur → il tire à son tour.
+      var chained = deads.filter(function (p) { return p !== target && roleOf(cur, p) === 'chasseur'; })[0];
+      if (chained) { cur.phase = 'hunter'; cur.hunterPid = chained; cur.afterHunter = after; cur.banner += ' 🔫 Et il était Chasseur !'; return; }
       if (after === 'day') { cur.phase = 'day'; cur.dayVotes = {}; }
       else startNight(cur);
     }
@@ -333,6 +370,23 @@
     function actWolf(target) { submit('wolves', target); }
     function actSeer(target) { submit('seer', target); }
     function actVote(target) { submit('day', target); }
+    // Cupidon désigne ses 2 amoureux (deux touches successives, lui compris).
+    function actCupid(target) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'cupid') return cur;
+        var me = window.myPid;
+        if (roleOf(cur, me) !== 'cupidon' || !P(cur, me).alive) return cur;
+        if (!P(cur, target).alive) return cur;
+        var pick = cur.cupidPick || [];
+        if (pick.indexOf(target) >= 0) return cur;
+        pick = pick.concat([target]);
+        if (pick.length < 2) { cur.cupidPick = pick; return cur; }
+        cur.lovers = pick; cur.cupidPick = null;
+        cur.phase = 'wolves';
+        cur.banner = '💘 Les flèches de Cupidon ont frappé… 🌙 les loups rôdent';
+        return cur;
+      });
+    }
     function submit(phase, target) {
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== phase) return cur;
@@ -405,6 +459,16 @@
     function lgBot(state, pid) {
       if (state.status !== 'playing') return;
       var level = window.Bots ? window.Bots.level(state) : 'normal';
+      // Cupidon (nuit 1) : lie deux joueurs au hasard (parfois lui-même — piquant).
+      if (state.phase === 'cupid' && roleOf(state, pid) === 'cupidon') {
+        window.myPid = pid;
+        var pool = aliveList(state).slice();
+        var pick = (state.cupidPick || []);
+        var cand = pool.filter(function (p) { return pick.indexOf(p) < 0; });
+        var t = cand[Math.floor(Math.random() * cand.length)];
+        if (t) actCupid(t);
+        return;
+      }
       // Chasseur (il vient de mourir : il joue quand même sa dernière balle)
       if (state.phase === 'hunter' && state.hunterPid === pid) {
         window.myPid = pid;
@@ -477,10 +541,12 @@
     // Séquenceur de la nuit : Loups → Voyante → Sorcière (n'affiche que les rôles
     // présents/actifs), avec l'étape en cours mise en avant.
     function nightStepsHTML(state) {
-      var steps = [{ k: 'wolves', ic: '🐺', nm: 'Loups' }];
+      var steps = [];
+      if (state.phase === 'cupid') steps.push({ k: 'cupid', ic: '💘', nm: 'Cupidon' });
+      steps.push({ k: 'wolves', ic: '🐺', nm: 'Loups' });
       if (aliveSeer(state)) steps.push({ k: 'seer', ic: '🔮', nm: 'Voyante' });
       if (aliveWitch(state) && (!state.witchHealUsed || !state.witchPoisonUsed)) steps.push({ k: 'witch', ic: '🧪', nm: 'Sorcière' });
-      var order = ['wolves', 'seer', 'witch'];
+      var order = ['cupid', 'wolves', 'seer', 'witch'];
       var curIx = order.indexOf(state.phase);
       return '<div class="lg-steps">' + steps.map(function (s, i) {
         var six = order.indexOf(s.k);
@@ -491,13 +557,19 @@
     }
     function render(state) {
       var me = window.myPid, myRole = roleOf(state, me), iAmAlive = P(state, me).alive;
-      var night = (state.phase === 'wolves' || state.phase === 'seer' || state.phase === 'witch');
+      var night = (state.phase === 'cupid' || state.phase === 'wolves' || state.phase === 'seer' || state.phase === 'witch');
       applyNightMood(night);
       var ph = document.getElementById('lg-phase');
       ph.className = 'lg-phase' + (night ? ' lg-phase-night' : '');
+      // Les amoureux (et Cupidon) savent qui est lié à qui — les autres non.
+      var myLover = loverOf(state, me);
+      var loverLine = '';
+      if (myLover) loverLine = '<div class="lg-role" style="color:#e8909c">💘 Tu es amoureux·se de <b>' + escapeHtml(Room.name(myLover)) + '</b> — s\'il/elle meurt, tu meurs</div>';
+      else if (myRole === 'cupidon' && state.lovers) loverLine = '<div class="lg-role" style="color:#e8909c">💘 Tu as lié ' + escapeHtml(Room.name(state.lovers[0])) + ' et ' + escapeHtml(Room.name(state.lovers[1])) + '</div>';
       ph.innerHTML = '<div class="lg-phase-icon">' + (night ? '🌙' : '☀️') + '</div>' +
         '<div class="lg-phase-title">' + (night ? 'Nuit ' + (state.day || 1) : 'Jour ' + (state.day || 1)) + '</div>' +
         '<div class="lg-role">Ton rôle : ' + ROLE_INFO[myRole].ic + ' ' + ROLE_INFO[myRole].nm + (iAmAlive ? '' : ' (mort)') + '</div>' +
+        loverLine +
         (night ? nightStepsHTML(state) : '');
       setText('lg-banner', state.banner || '');
 
@@ -517,6 +589,13 @@
             (!state.witchPoisonUsed ? ' Touche un joueur pour l\'<b>empoisonner</b> ☠️, ou termine la nuit.' : '');
           if (!state.witchPoisonUsed) { pickFn = 'actWitchPoison'; canPick = function (p) { return p !== me; }; }
         } else instruct = '😴 La sorcière prépare ses potions…';
+      }
+      else if (state.phase === 'cupid') {
+        if (myRole === 'cupidon') {
+          var picked = (state.cupidPick || []).length;
+          instruct = '💘 <b>Cupidon :</b> touche ' + (picked ? 'le 2ᵉ amoureux' : 'les 2 joueurs à lier') + ' (toi compris si tu veux).';
+          pickFn = 'actCupid'; canPick = function (p) { return (state.cupidPick || []).indexOf(p) < 0; };
+        } else instruct = '😴 Cupidon décoche ses flèches…';
       }
       else if (state.phase === 'wolves') {
         if (myRole === 'loup') {
@@ -577,15 +656,23 @@
     function showResults(state) {
       showScreen('s-results');
       var win = state.winner;
-      var iWon = (win === 'loups' && roleOf(state, window.myPid) === 'loup') || (win === 'village' && roleOf(state, window.myPid) !== 'loup');
-      setText('res-emoji', win === 'loups' ? '🐺' : '🎉');
-      setText('res-title', win === 'loups' ? 'Les loups l\'emportent !' : 'Le village est sauvé !');
-      setText('res-sub', iWon ? 'Bravo, ton camp gagne !' : 'Ton camp a perdu… revanche ?');
+      var lovers = state.lovers || [];
+      var iWon = (win === 'loups' && roleOf(state, window.myPid) === 'loup') ||
+        (win === 'village' && roleOf(state, window.myPid) !== 'loup') ||
+        (win === 'amoureux' && lovers.indexOf(window.myPid) >= 0);
+      setText('res-emoji', win === 'loups' ? '🐺' : win === 'amoureux' ? '💘' : '🎉');
+      setText('res-title', win === 'loups' ? 'Les loups l\'emportent !'
+        : win === 'amoureux' ? 'Les amoureux triomphent !'
+        : 'Le village est sauvé !');
+      setText('res-sub', win === 'amoureux'
+        ? (escapeHtml(Room.name(lovers[0]) || '') + ' et ' + escapeHtml(Room.name(lovers[1]) || '') + ' survivent ensemble, envers et contre tous 💞')
+        : (iWon ? 'Bravo, ton camp gagne !' : 'Ton camp a perdu… revanche ?'));
       setHTML('lg-reveal', (state.order || []).map(function (pid) {
         var r = roleOf(state, pid);
+        var heart = lovers.indexOf(pid) >= 0 ? ' 💘' : '';
         return '<div class="lg-reveal-row"><span class="lg-reveal-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
           '<span class="lg-reveal-name">' + escapeHtml(Room.name(pid)) + '</span>' +
-          '<span>' + ROLE_INFO[r].ic + ' ' + ROLE_INFO[r].nm + (P(state, pid).alive ? '' : ' ☠️') + '</span></div>';
+          '<span>' + ROLE_INFO[r].ic + ' ' + ROLE_INFO[r].nm + heart + (P(state, pid).alive ? '' : ' ☠️') + '</span></div>';
       }).join(''));
     }
 

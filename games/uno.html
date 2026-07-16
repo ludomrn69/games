@@ -15,8 +15,13 @@
     .uno-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
     .uno-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
     .uno-set-row { display: flex; gap: 8px; justify-content: center; }
-    .uno-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
+    .uno-set-row + .uno-set-row { margin-top: 8px; }
+    .uno-set-btn { flex: 1; padding: 0.55rem 0.2rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; font-size: 0.82rem; }
     .uno-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
+    .uno-set-hint { font-size: 0.72rem; color: var(--ink-light); margin-top: 8px; text-align: center; line-height: 1.4; }
+    /* Chips de variantes du setup HORS-LIGNE (multi-sélection, gérées par la page). */
+    .uno-vtog { border: 1.5px solid var(--gold-light); border-radius: 20px; padding: 0.4rem 0.75rem; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+    .uno-vtog.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
 
     #s-playing { min-height: calc(100vh - 52px); }
     .uno-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
@@ -35,8 +40,10 @@
     .uno-opp-chip .cnt { background: var(--ink); color: var(--cream); border-radius: 20px; padding: 0 6px; font-weight: 800; font-size: 0.75rem; }
     .uno-opp-chip .unobadge { color: var(--terracotta); font-weight: 800; }
 
-    /* La zone centrale devient une vraie TABLE (feutre marine, cf. game.css). */
-    .uno-center { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 16px 14px 18px; margin: 4px auto 8px; width: min(94vw, 430px); }
+    /* La zone centrale devient une vraie TABLE (feutre marine, cf. game.css).
+       flex:1 → la table absorbe la hauteur libre de l'écran (fini le vide sous
+       la main sur mobile ; sur PC elle respire). */
+    .uno-center { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 16px 14px 18px; margin: 4px auto 8px; width: min(94vw, 430px); flex: 1; min-height: 150px; }
     .uno-pile-col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
     .uno-pile-label { font-family: 'Caveat', cursive; font-size: 0.85rem; color: rgba(255,255,255,0.78); }
     .uno-card { width: 52px; height: 78px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.3rem; color: #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.18); position: relative; flex-shrink: 0; }
@@ -44,8 +51,31 @@
     .uno-card.color-R { background: var(--uno-r); } .uno-card.color-Y { background: var(--uno-y); color: #2C2520; }
     .uno-card.color-G { background: var(--uno-g); } .uno-card.color-B { background: var(--uno-b); }
     .uno-card.color-W { background: conic-gradient(from 45deg, var(--uno-r) 0deg 90deg, var(--uno-y) 90deg 180deg, var(--uno-g) 180deg 270deg, var(--uno-b) 270deg 360deg); }
-    .uno-card.color-W .badge { background: rgba(0,0,0,0.55); border-radius: 6px; padding: 2px 5px; }
+    .uno-card.color-W .badge { background: rgba(0,0,0,0.55); border-radius: 6px; padding: 2px 5px; position: relative; z-index: 1; }
     .uno-card .symbol.small { font-size: 0.78em; }
+    /* Anatomie d'une vraie carte : ellipse inclinée en fond + valeur dans 2 coins. */
+    .uno-card::before { content: ''; position: absolute; inset: 8% 13%; border-radius: 50%; transform: rotate(-34deg); background: rgba(255,255,255,0.16); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6); pointer-events: none; }
+    .uno-card.color-Y::before { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.85); }
+    .uno-card.color-W::before { background: rgba(0,0,0,0.42); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.6); }
+    .uno-card.uno-draw-pile::before { content: none; }
+    .uno-card .symbol { position: relative; z-index: 1; text-shadow: 0 1px 0 rgba(0,0,0,0.18); }
+    .uno-card.color-Y .symbol { text-shadow: none; }
+    .uno-card .symbol svg { width: 1em; height: 1em; display: block; }
+    .uno-card .cidx { position: absolute; top: 4%; left: 8%; font-size: 0.44em; font-weight: 900; line-height: 1; z-index: 1; letter-spacing: -0.5px; }
+    .uno-card .cidx.b { top: auto; left: auto; bottom: 4%; right: 8%; transform: rotate(180deg); }
+    .uno-card.color-W .cidx { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+    /* Défausse en éventail : les 3 dernières cartes restent visibles, tournées. */
+    #uno-discard.fanpile > .uno-card { box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    /* Grands écrans / écrans hauts : cartes plus charnues, la table s'étale. */
+    @media (min-height: 780px) {
+      .uno-card { width: 58px; height: 87px; }
+      .uno-card.lg { width: 72px; height: 108px; }
+    }
+    @media (min-width: 900px) {
+      .uno-card { width: 64px; height: 96px; font-size: 1.5rem; }
+      .uno-card.lg { width: 82px; height: 123px; font-size: 1.9rem; }
+      .uno-center { width: min(60vw, 560px); gap: 44px; }
+    }
     /* Dos de pioche : vrai dos de carte tissé + liseré (fini le glyphe 🂠 aléatoire selon l'appareil). */
     .uno-draw-pile {
       background-color: #b3402c;
@@ -163,6 +193,7 @@
         <button class="uno-action-btn" id="btn-pass" onclick="passTurn()">Passer</button>
         <button class="uno-action-btn uno-call" onclick="callUno()">UNO !</button>
         <button class="uno-action-btn" onclick="callCounterUno()">Contre-UNO</button>
+        <button class="uno-action-btn" id="btn-challenge" style="display:none" onclick="challengeDraw4()">⚖️ Défier le +4</button>
       </div>
     </div>
 
@@ -232,7 +263,10 @@
         <p>Pose une carte de la même <b>couleur</b> ou du même <b>chiffre/symbole</b> que celle du dessus.</p>
         <p style="margin-top:10px">⊘ saute le joueur suivant · ↺ inverse le sens · +2 / +4 font piocher le suivant · Joker change la couleur.</p>
         <p style="margin-top:10px">Quand il te reste 1 carte, clique <b>UNO !</b> sinon un autre peut te pénaliser (Contre-UNO). Premier à vider sa main gagne la manche.</p>
-        <p style="margin-top:10px"><b>Règles maison</b> (activables dans le salon) : <b>Cumul +4</b> — un +4 se contre avec un +4, le perdant pioche tout · <b>7-0</b> — un 7 échange ta main avec un joueur de ton choix, un 0 fait tourner toutes les mains · <b>Jump-in</b> — la carte strictement identique au dessus se pose même hors tour.</p>
+        <p style="margin-top:10px"><b>Variantes</b> (réglées dans le salon — tout désactivé = règles officielles) :</p>
+        <p style="margin-top:6px">• <b>Cumul +2</b> : un +2 se contre avec un +2, le perdant pioche tout · <b>Cumul +4</b> : pareil entre +4 · <b>Croisé</b> : +2 et +4 se répondent entre eux (active les deux cumuls).</p>
+        <p style="margin-top:6px">• <b>Défi +4</b> (règle officielle) : quand tu subis un +4, tu peux <b>défier</b> — si le poseur avait encore la couleur en main, c'est LUI qui pioche ; sinon tu pioches 6. (Les ordis ne défient pas.)</p>
+        <p style="margin-top:6px">• <b>7-0</b> : un 7 échange ta main avec un joueur de ton choix, un 0 fait tourner toutes les mains · <b>Jump-in</b> : la carte strictement identique au dessus se pose même hors tour · <b>Pioche continue</b> : on pioche jusqu'à tomber sur une carte jouable.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -303,6 +337,7 @@
         return r.turn;
       },
       offlineEnter: function () { pendingWildCard = null; closeModal('modal-color'); if (window.room) renderPlaying(window.room); },
+      offlineExtraSetup: offlineExtraSetup,
       lobbyExtraHTML: lobbyExtraHTML, onState: onState, onStart: onStart
     });
 
@@ -323,13 +358,16 @@
       var hand = (((state.players[pid] || {}).hand) || []).slice();
       if (!hand.length) return;
       if (hand.length === 1 && !((state.players[pid] || {}).unoCalled)) { callUno(); return; }
-      // Cumul +4 (règle maison) : contrer avec un +4 si possible, sinon tout piocher.
-      if ((state.pendingDraw || 0) > 0 && state.pendingType === 'W4') {
-        if (hand.indexOf('W4') >= 0) {
-          var cnt = { R: 0, Y: 0, G: 0, B: 0 };
-          hand.forEach(function (c2) { var pc = parseCard(c2); if (pc && !pc.wild) cnt[pc.color]++; });
-          var bestCol = 'R'; ['Y', 'G', 'B'].forEach(function (c3) { if (cnt[c3] > cnt[bestCol]) bestCol = c3; });
-          unoBotPlay(hand, 'W4', bestCol);
+      // Pioche en attente (+2/+4 selon variantes) : contrer si possible, sinon subir.
+      // (Les ordis ne défient jamais un +4 — assumé dans les règles.)
+      if ((state.pendingDraw || 0) > 0) {
+        var answers = hand.filter(function (c) { return pendAnswer(state, c); });
+        if (answers.length) {
+          // Préférer un +2 (garder les +4), sinon +4 avec la couleur dominante.
+          answers.sort(function (a, b) { return (a === 'W4' ? 1 : 0) - (b === 'W4' ? 1 : 0); });
+          var ans = answers[0], pa = parseCard(ans);
+          var col = pa.wild ? window.UnoAI.bestColor(hand) : pa.color;
+          unoBotPlay(hand, ans, col);
         } else drawCard();
         return;
       }
@@ -349,29 +387,75 @@
       if (willBeOne) callUno();
     }
 
+    // ── Catalogue des VARIANTES : une entrée = un réglage du salon qui change la
+    //    mécanique. Tout désactivé = règles officielles du Uno.
+    var VARIANTS = [
+      { k: 'stackD2', lb: 'Cumul +2', ti: 'Un +2 se contre avec un autre +2 — le perdant pioche tout le cumul' },
+      { k: 'stack4', lb: 'Cumul +4', ti: 'Un +4 se contre avec un autre +4 — le perdant pioche tout le cumul' },
+      { k: 'stackMix', lb: 'Croisé', ti: '+2 et +4 se répondent entre eux (active les deux cumuls)' },
+      { k: 'challenge', lb: 'Défi +4', ti: 'Règle officielle : défie un +4 — si le poseur avait la couleur, il pioche à ta place ; sinon tu pioches 6' },
+      { k: 'seven0', lb: '7-0', ti: '7 : échange ta main avec un joueur · 0 : toutes les mains tournent' },
+      { k: 'jumpin', lb: 'Jump-in', ti: 'La carte STRICTEMENT identique au dessus se pose même hors tour' },
+      { k: 'drawMatch', lb: 'Pioche continue', ti: 'On pioche jusqu\'à tomber sur une carte jouable (au lieu d\'une seule)' }
+    ];
     function lobbyExtraHTML(room) {
       var sel = (room && room.maxWins) || 2;
       var btns = [1, 2, 3].map(function (n) { return '<button class="uno-set-btn' + (n === sel ? ' active' : '') + '" onclick="setMaxWins(' + n + ')">' + n + '</button>'; }).join('');
-      // Règles MAISON (réglées par l'hôte) : celles qu'on se dispute à chaque partie.
+      // Variantes (réglées par l'hôte) : celles qu'on se dispute à chaque partie.
       var o = (room && room.opts) || {};
       var isHost = room && room.host === window.myPid;
-      function tog(k, label, title) {
-        return '<button class="uno-set-btn' + (o[k] ? ' active' : '') + '" title="' + title + '"' +
-          (isHost ? ' onclick="setOpt(\'' + k + '\')"' : ' disabled') + '>' + label + '</button>';
+      function tog(v) {
+        return '<button class="uno-set-btn' + (o[v.k] ? ' active' : '') + '" title="' + v.ti + '"' +
+          (isHost ? ' onclick="setOpt(\'' + v.k + '\')"' : ' disabled') + '>' + v.lb + '</button>';
       }
       return '<div class="uno-settings"><div class="uno-settings-label">Manches gagnantes</div><div class="uno-set-row">' + btns + '</div></div>' +
-        '<div class="uno-settings"><div class="uno-settings-label">Règles maison' + (isHost ? '' : ' (réglées par l\'hôte)') + '</div><div class="uno-set-row">' +
-          tog('stack4', 'Cumul +4', 'Un +4 se contre avec un autre +4 (le malheureux suivant pioche tout)') +
-          tog('seven0', '7-0', '7 : échange ta main avec un joueur · 0 : toutes les mains tournent') +
-          tog('jumpin', 'Jump-in', 'La carte STRICTEMENT identique au dessus se pose hors tour') +
-        '</div></div>';
+        '<div class="uno-settings"><div class="uno-settings-label">Variantes' + (isHost ? '' : ' (réglées par l\'hôte)') + '</div>' +
+          '<div class="uno-set-row">' + VARIANTS.slice(0, 3).map(tog).join('') + '</div>' +
+          '<div class="uno-set-row">' + VARIANTS.slice(3, 5).map(tog).join('') + '</div>' +
+          '<div class="uno-set-row">' + VARIANTS.slice(5).map(tog).join('') + '</div>' +
+          '<div class="uno-set-hint">Tout désactivé = règles officielles. Survole un bouton pour le détail.</div>' +
+        '</div>';
     }
     function setMaxWins(n) { if (window.roomRef) window.roomRef.child('maxWins').set(n); }
     function setOpt(k) {
       var o = (window.room && window.room.opts) || {};
       if (window.roomRef) window.roomRef.child('opts/' + k).set(!o[k]);
     }
-    function opts(st) { return (st && st.opts) || {}; }
+    function opts(st) {
+      var o = (st && st.opts) || {};
+      // Croisé implique les deux cumuls (une seule vérité pour toute la logique).
+      if (o.stackMix && (!o.stackD2 || !o.stack4)) { o = Object.assign({}, o, { stackD2: true, stack4: true }); }
+      return o;
+    }
+    // Peut-on RÉPONDRE au cumul en cours avec cette carte ? (sinon : piocher/défier)
+    function pendAnswer(st, card) {
+      var o = opts(st), p = parseCard(card); if (!p) return false;
+      if (st.pendingType === 'X') return p.action === 'D' || !!p.draw4;
+      if (st.pendingType === 'W4') return !!p.draw4 && o.stack4;
+      if (st.pendingType === 'D') return p.action === 'D' && o.stackD2;
+      return false;
+    }
+
+    // ── Variantes en HORS-LIGNE : chips multi-sélection dans l'écran de setup
+    //    (le mécanisme data-opt d'offline.js est mono-choix par rangée). ──
+    function offlineExtraSetup() {
+      var mw = [1, 2, 3].map(function (n) {
+        return '<button type="button" class="off-opt' + (n === 2 ? ' active' : '') + '" data-val="' + n + '">' + n + '</button>';
+      }).join('');
+      return '<div class="off-set"><div class="off-set-label">Manches gagnantes</div><div class="off-set-row" data-opt="maxWins">' + mw + '</div></div>' +
+        '<div class="off-set"><div class="off-set-label">Variantes (tout éteint = officiel)</div><div class="off-set-row" style="flex-wrap:wrap;max-width:340px">' +
+        VARIANTS.map(function (v) { return '<button type="button" class="uno-vtog" data-k="' + v.k + '" title="' + v.ti + '">' + v.lb + '</button>'; }).join('') +
+        '</div></div>';
+    }
+    document.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest && e.target.closest('.uno-vtog');
+      if (b) b.classList.toggle('active');
+    });
+    function readOfflineOpts() {
+      var o = {};
+      document.querySelectorAll('.uno-vtog.active').forEach(function (b) { o[b.dataset.k] = true; });
+      return o;
+    }
 
     function newRoundSetup(order, firstPid) {
       var deck = shuffle(buildDeck());
@@ -395,6 +479,8 @@
       });
       return {
         maxWins: (cur && cur.maxWins) || 2, scores: scores, round: 1, winner: null,
+        // En ligne : opts posées par l'hôte dans le salon. Hors-ligne : chips du setup.
+        opts: (cur && cur.opts) || readOfflineOpts(),
         turn: setup.turn, dir: 1, drawPile: setup.drawPile, discardPile: setup.discardPile,
         currentColor: setup.currentColor, pendingDraw: 0, drewThisTurn: false,
         log: ['<i style="color:var(--ink-light)">Nouvelle partie · ' + escapeHtml(Room.name(firstPid)) + ' commence</i>']
@@ -417,19 +503,36 @@
     }
 
     /* ━━ Rendu ━━ */
+    // Symboles d'action DESSINÉS (SVG) : identiques sur tous les appareils,
+    // contrairement aux glyphes ⊘/↺ dont le rendu varie selon la police système.
+    function symSvg(kind) {
+      if (kind === 'S') return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="2.6"/><line x1="6.6" y1="17.4" x2="17.4" y2="6.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+      if (kind === 'V') return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 9.2h10.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M13 5.6l3.6 3.6-3.6 3.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 14.8H8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M11 11.2l-3.6 3.6L11 18.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      if (kind === 'D') return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.2" y="4.6" width="9.6" height="13.6" rx="1.8" fill="currentColor" opacity="0.55" transform="rotate(-9 9 11.4)"/><rect x="10" y="5.8" width="9.6" height="13.6" rx="1.8" fill="currentColor" transform="rotate(9 14.8 12.6)"/></svg>';
+      return '';
+    }
     function buildCardEl(card, opts) {
       opts = opts || {};
       var el = document.createElement('div');
       el.className = 'uno-card' + (opts.lg ? ' lg' : '') + (opts.inHand ? ' in-hand' : '');
       var p = parseCard(card); if (!p) return el;
-      if (p.wild) { el.classList.add('color-W'); var b = document.createElement('span'); b.className = 'badge'; b.textContent = p.draw4 ? '+4' : '★'; el.appendChild(b); }
-      else {
+      var short; // valeur affichée dans les 2 coins (anatomie d'une vraie carte)
+      if (p.wild) {
+        el.classList.add('color-W');
+        short = p.draw4 ? '+4' : '★';
+        var b = document.createElement('span'); b.className = 'badge'; b.textContent = short; el.appendChild(b);
+      } else {
         el.classList.add('color-' + p.color);
+        short = p.action === 'S' ? '⊘' : p.action === 'V' ? '↺' : p.action === 'D' ? '+2' : String(p.number);
         var s = document.createElement('span'); s.className = 'symbol';
-        if (p.action === 'S') s.textContent = '⊘'; else if (p.action === 'V') s.textContent = '↺';
-        else if (p.action === 'D') { s.textContent = '+2'; s.classList.add('small'); } else s.textContent = String(p.number);
+        if (p.action === 'S' || p.action === 'V') s.innerHTML = symSvg(p.action);
+        else if (p.action === 'D') { s.innerHTML = symSvg('D'); s.classList.add('small'); }
+        else s.textContent = String(p.number);
         el.appendChild(s);
       }
+      var c1 = document.createElement('span'); c1.className = 'cidx'; c1.textContent = short;
+      var c2 = document.createElement('span'); c2.className = 'cidx b'; c2.textContent = short;
+      el.appendChild(c1); el.appendChild(c2);
       return el;
     }
 
@@ -457,20 +560,31 @@
       }).join('');
 
       var dirArrow = (state.dir === -1 ? '↺' : '↻');
-      setText('uno-turn-banner', (isMyTurn ? 'À toi de jouer !' : 'Au tour de ' + Room.name(turn)) + '  ' + dirArrow + (state.pendingDraw > 0 ? '  · cumul +' + state.pendingDraw : ''));
+      var pendLbl = state.pendingDraw > 0 ? ('  · ' + (state.pendingDraw > (state.pendingType === 'W4' ? 4 : 2) ? 'cumul ' : '') + '+' + state.pendingDraw + ' à subir') : '';
+      setText('uno-turn-banner', (isMyTurn ? 'À toi de jouer !' : 'Au tour de ' + Room.name(turn)) + '  ' + dirArrow + pendLbl);
       document.getElementById('uno-turn-banner').classList.toggle('me', isMyTurn);
 
       setText('uno-pile-count', (state.drawPile || []).length);
-      var discardEl = document.getElementById('uno-discard'); discardEl.innerHTML = '';
+      // Défausse VIVANTE : les 3 dernières cartes en éventail (angle stable par
+      // position de pile → rien ne bouge tant qu'on ne pose pas).
+      var discardEl = document.getElementById('uno-discard');
+      discardEl.classList.add('fanpile');
+      discardEl.innerHTML = '';
       if (top) {
-        var el = buildCardEl(top, { lg: true });
-        var sig = JSON.stringify(top);
+        var lastCards = discard.slice(-3);
+        lastCards.forEach(function (c, k) {
+          var absIdx = discard.length - lastCards.length + k;
+          var cardEl = buildCardEl(c, { lg: true });
+          var ang = window.Fx ? Fx.fanAngle(absIdx + '|' + c, 8) : 0;
+          cardEl.style.setProperty('--fr', ang + 'deg');
+          discardEl.appendChild(cardEl);
+        });
+        var sig = discard.length + '|' + JSON.stringify(top);
         if (window._unoTopSig !== undefined && window._unoTopSig !== sig) {
-          el.classList.add('card-in'); // carte fraîchement posée
+          discardEl.lastChild.classList.add('card-in'); // carte fraîchement posée
           if (window.Fx) Fx.sfx('place'); // on ENTEND chaque pose (la sienne comme celle des autres)
         }
         window._unoTopSig = sig;
-        discardEl.appendChild(el);
       }
       document.getElementById('uno-current-color').className = 'uno-current-color' + (currentColor ? ' ' + currentColor : '');
       var drawEl = document.getElementById('uno-draw-pile');
@@ -486,7 +600,7 @@
       hand.classList.toggle('fx-dealwave', window._unoDealSig !== dealSig);
       window._unoDealSig = dealSig;
       myHand.slice().sort(cardSort).forEach(function (card) {
-        var pendOk = !(state.pendingDraw > 0) || (state.pendingType === 'W4' ? parseCard(card).draw4 : parseCard(card).action === 'D');
+        var pendOk = !(state.pendingDraw > 0) || pendAnswer(state, card);
         var playable = (isMyTurn && !state.await7 && canPlay(card, top, currentColor) && pendOk) || canJumpIn(state, card);
         var el = buildCardEl(card, { inHand: true });
         if (!playable) el.classList.add('unplayable');
@@ -500,6 +614,9 @@
 
       var passBtn = document.getElementById('btn-pass');
       passBtn.disabled = !(isMyTurn && state.drewThisTurn);
+      // Défi du +4 : proposé à la victime tant que le cumul n'est pas résolu.
+      var chBtn = document.getElementById('btn-challenge');
+      chBtn.style.display = (opts(state).challenge && isMyTurn && state.pendingDraw > 0 && state.pend4) ? '' : 'none';
 
       var log = state.log || [];
       var badge = document.getElementById('uno-hist-badge');
@@ -531,9 +648,10 @@
       }
       if (st.await7) { lbToast('Choisis d\'abord avec qui échanger ta main (7)'); return; }
       var pend = st.pendingDraw || 0;
-      if (pend > 0) {
-        var p0 = parseCard(card);
-        if (st.pendingType === 'W4' ? !p0.draw4 : p0.action !== 'D') { lbToast('Cumul +' + pend + ' : pose un ' + (st.pendingType === 'W4' ? '+4' : '+2') + ' ou pioche !'); if (window.Fx) Fx.sfx('error'); return; }
+      if (pend > 0 && !pendAnswer(st, card)) {
+        var can = st.pendingType === 'X' ? 'un +2 ou un +4' : st.pendingType === 'D' ? 'un +2' : (opts(st).stack4 ? 'un +4' : 'rien');
+        lbToast('+' + pend + ' à subir : ' + (can === 'rien' ? 'pioche' + (opts(st).challenge ? ' ou défie' : '') : 'pose ' + can + ' ou pioche') + ' !');
+        if (window.Fx) Fx.sfx('error'); return;
       }
       var top = (st.discardPile || []).slice(-1)[0];
       if (!canPlay(card, top, st.currentColor)) { lbToast('Carte non jouable'); if (window.Fx) Fx.sfx('error'); return; }
@@ -569,10 +687,8 @@
         var idx = hand.indexOf(card); if (idx < 0) return cur;
         var top = (cur.discardPile || []).slice(-1)[0];
         if (!canPlay(card, top, cur.currentColor)) return cur;
-        if ((cur.pendingDraw || 0) > 0) {
-          var pp = parseCard(card);
-          if (cur.pendingType === 'W4' ? !pp.draw4 : pp.action !== 'D') return cur;
-        }
+        if ((cur.pendingDraw || 0) > 0 && !pendAnswer(cur, card)) return cur;
+        var prevColor = cur.currentColor; // couleur AVANT le coup (défi du +4)
         hand.splice(idx, 1);
         cur.players[me].hand = hand;
         cur.discardPile = (cur.discardPile || []).concat([card]);
@@ -595,26 +711,39 @@
         var p = parseCard(card);
         var pile = (cur.drawPile || []).slice(), discard = cur.discardPile;
         var o = opts(cur);
-        if (p.wild && p.draw4 && o.stack4) {
-          // Règle maison : le +4 se CUMULE — le suivant contre avec un +4 ou pioche tout.
+        // Pioche immédiate de `n` cartes pour `pid` (rembobine la défausse au besoin).
+        function drawInto(pid, n) {
+          var hh = (cur.players[pid].hand || []).slice();
+          for (var i = 0; i < n; i++) { if (!pile.length) { var rr = reshuffleInto(pile, discard); pile = rr.pile; discard = rr.discard; } if (pile.length) hh.push(pile.pop()); }
+          cur.players[pid].hand = hh;
+          if (hh.length !== 1) cur.players[pid].unoCalled = false;
+        }
+        if (p.wild && p.draw4 && (o.stack4 || o.challenge)) {
+          // Le +4 reste EN ATTENTE : la victime contre (cumul), défie (règle
+          // officielle) ou pioche. pend4 mémorise le poseur + la couleur d'avant.
           cur.pendingDraw = (cur.pendingDraw || 0) + 4;
-          cur.pendingType = 'W4';
-          logEntry(cur, me, 'pose un +4 (cumul : ' + cur.pendingDraw + ')');
+          cur.pendingType = o.stackMix ? 'X' : 'W4';
+          cur.pend4 = { by: me, prev: prevColor || null };
+          logEntry(cur, me, 'pose un +4' + (cur.pendingDraw > 4 ? ' (cumul : ' + cur.pendingDraw + ')' : ''));
           cur.turn = step(order, me, dir, 1);
         } else if (p.wild && p.draw4) {
           var nxt = step(order, me, dir, 1);
-          var r = reshuffleInto(pile, discard); pile = r.pile; discard = r.discard;
-          var nh = (cur.players[nxt].hand || []).slice();
-          for (var i = 0; i < 4 && (pile.length || discard.length > 1); i++) { if (!pile.length) { var rr = reshuffleInto(pile, discard); pile = rr.pile; discard = rr.discard; } if (pile.length) nh.push(pile.pop()); }
-          cur.players[nxt].hand = nh;
-          if (nh.length !== 1) cur.players[nxt].unoCalled = false;
+          drawInto(nxt, 4);
           logEntry(cur, nxt, 'pioche 4 (Joker +4) et passe son tour');
           cur.turn = step(order, me, dir, 2);
-        } else if (p.action === 'D') {
+        } else if (p.action === 'D' && (o.stackD2 || o.stackMix)) {
+          // Variante : le +2 se CUMULE — le suivant contre ou pioche tout.
           cur.pendingDraw = (cur.pendingDraw || 0) + 2;
-          cur.pendingType = 'D';
+          cur.pendingType = o.stackMix ? 'X' : 'D';
+          cur.pend4 = null;
           logEntry(cur, me, 'pose un +2 (cumul : ' + cur.pendingDraw + ')');
           cur.turn = step(order, me, dir, 1);
+        } else if (p.action === 'D') {
+          // Règle officielle : le suivant pioche 2 et passe son tour.
+          var nx2 = step(order, me, dir, 1);
+          drawInto(nx2, 2);
+          logEntry(cur, nx2, 'pioche 2 (+2) et passe son tour');
+          cur.turn = step(order, me, dir, 2);
         } else if (p.action === 'S') {
           var skipped = step(order, me, dir, 1);
           logEntry(cur, skipped, 'est sauté·e ⊘');
@@ -689,9 +818,24 @@
           for (var k = 0; k < n; k++) { if (!pile.length) { var r = reshuffleInto(pile, discard); pile = r.pile; discard = r.discard; if (!pile.length) break; } h.push(pile.pop()); }
           cur.players[me].hand = h;
           if (h.length !== 1) cur.players[me].unoCalled = false;
-          cur.drawPile = pile; cur.discardPile = discard; cur.pendingDraw = 0; cur.pendingType = null; cur.drewThisTurn = false;
+          cur.drawPile = pile; cur.discardPile = discard; cur.pendingDraw = 0; cur.pendingType = null; cur.pend4 = null; cur.drewThisTurn = false;
           cur.turn = step(order, me, dir, 1);
           logEntry(cur, me, 'pioche ' + n + ' (cumul)');
+          return cur;
+        }
+        if (opts(cur).drawMatch) {
+          // Variante « pioche continue » : on pioche jusqu'à une carte JOUABLE.
+          var topD = (discard || []).slice(-1)[0], got = 0, cD = null;
+          for (var kk = 0; kk < 60; kk++) {
+            if (!pile.length) { var r3 = reshuffleInto(pile, discard); pile = r3.pile; discard = r3.discard; if (!pile.length) break; }
+            cD = pile.pop(); h.push(cD); got++;
+            if (canPlay(cD, topD, cur.currentColor)) break;
+          }
+          if (!got) return cur;
+          cur.players[me].hand = h;
+          cur.drawPile = pile; cur.discardPile = discard; cur.drewThisTurn = true;
+          if (h.length !== 1) cur.players[me].unoCalled = false;
+          logEntry(cur, me, 'pioche ' + got + ' carte' + (got > 1 ? 's' : '') + ' (jusqu\'à jouable)');
           return cur;
         }
         if (!pile.length) { var r2 = reshuffleInto(pile, discard); pile = r2.pile; discard = r2.discard; if (!pile.length) return cur; }
@@ -700,6 +844,47 @@
         cur.drawPile = pile; cur.discardPile = discard; cur.drewThisTurn = true;
         if (h.length !== 1) cur.players[me].unoCalled = false;
         logEntry(cur, me, 'pioche une carte');
+        return cur;
+      });
+    }
+
+    // ── Défi du +4 (règle officielle, option `challenge`) ────────────────────────
+    // La victime d'un +4 peut défier : si le poseur avait ENCORE une carte de la
+    // couleur active avant son +4, il est coupable et pioche le cumul à ta place ;
+    // sinon tu pioches le cumul + 2. Dans les deux cas le défi consomme ton tour
+    // (si le poseur est coupable, tu rejoues normalement — comme au vrai Uno).
+    function challengeDraw4() {
+      var st = window.room || {};
+      if (st.status !== 'playing' || st.turn !== window.myPid) return;
+      if (!(st.pendingDraw > 0) || !st.pend4 || !opts(st).challenge) return;
+      if (window.Fx) { Fx.sfx('flip'); Fx.vib([10, 20, 10]); }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid) return cur;
+        if (!(cur.pendingDraw > 0) || !cur.pend4 || !opts(cur).challenge) return cur;
+        var me = window.myPid, order = cur.order || [], dir = cur.dir || 1;
+        var poser = cur.pend4.by, prev = cur.pend4.prev;
+        var pile = (cur.drawPile || []).slice(), discard = (cur.discardPile || []).slice();
+        function drawN(pid, n) {
+          var hh = ((cur.players[pid] || {}).hand || []).slice();
+          for (var i = 0; i < n; i++) { if (!pile.length) { var r = reshuffleInto(pile, discard); pile = r.pile; discard = r.discard; if (!pile.length) break; } hh.push(pile.pop()); }
+          cur.players[pid].hand = hh;
+          if (hh.length !== 1) cur.players[pid].unoCalled = false;
+        }
+        var guilty = !!prev && ((cur.players[poser] || {}).hand || []).some(function (c) {
+          var pc = parseCard(c); return pc && !pc.wild && pc.color === prev;
+        });
+        var n = cur.pendingDraw;
+        if (guilty) {
+          drawN(poser, n);
+          logEntry(cur, me, '⚖️ <b>défi gagné !</b> ' + escapeHtml((cur.players[poser] || {}).name || '?') + ' avait la couleur → il/elle pioche ' + n);
+          cur.turn = me; // je joue mon tour normalement
+        } else {
+          drawN(me, n + 2);
+          logEntry(cur, me, '⚖️ défi perdu → pioche ' + (n + 2));
+          cur.turn = step(order, me, dir, 1);
+        }
+        cur.drawPile = pile; cur.discardPile = discard;
+        cur.pendingDraw = 0; cur.pendingType = null; cur.pend4 = null; cur.drewThisTurn = false;
         return cur;
       });
     }
@@ -780,7 +965,7 @@
         var setup = newRoundSetup(order, firstPid);
         cur.round = (cur.round || 1) + 1; cur.winner = null; cur.roundWinner = null; cur.status = 'playing';
         cur.turn = setup.turn; cur.dir = 1; cur.drawPile = setup.drawPile; cur.discardPile = setup.discardPile;
-        cur.currentColor = setup.currentColor; cur.pendingDraw = 0; cur.drewThisTurn = false;
+        cur.currentColor = setup.currentColor; cur.pendingDraw = 0; cur.pendingType = null; cur.pend4 = null; cur.drewThisTurn = false;
         order.forEach(function (pid) { if (cur.players[pid]) { cur.players[pid].hand = setup.hands[pid]; cur.players[pid].nextReady = false; cur.players[pid].unoCalled = false; } });
         logEntry(cur, firstPid, 'commence la manche ' + cur.round);
         return cur;
