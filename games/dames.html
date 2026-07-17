@@ -19,6 +19,15 @@
     .dm-score-chip { display: inline-flex; align-items: center; gap: 5px; }
     .dm-mini { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
     .dm-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+    /* Mobile : les scores « Toi X · Ordi Y » + 3 boutons ne tiennent pas sur une
+       ligne (les scores chevauchaient les boutons). On passe sur 2 lignes :
+       tour + actions, puis scores centrés en dessous. */
+    @media (max-width: 560px) {
+      .dm-header { grid-template-columns: minmax(0,1fr) auto; }
+      .dm-turn { grid-column: 1; grid-row: 1; }
+      .dm-actions { grid-column: 2; grid-row: 1; }
+      .dm-scores { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
+    }
 
     .dm-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 14px; width: 100%; }
     .dm-frame { display: grid; grid-template-columns: repeat(8, 1fr); width: min(88vw, 460px); aspect-ratio: 1; border: 5px solid #5a3a26; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
