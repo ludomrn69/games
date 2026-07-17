@@ -58,6 +58,8 @@
     .cl-room .cl-secret { position: relative; z-index: 2; font-size: clamp(6.5px, 1.6vw, 8.5px); font-weight: 700; color: #ffe6b8; line-height: 1.1; margin: 1px 0 2px; background: rgba(30,24,18,0.6); border-radius: 3px; padding: 0 3px; }
     .cl-room .rtok { position: absolute; top: 3px; left: 3px; right: 3px; z-index: 2; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1px; }
     .cl-wep { font-size: clamp(10px, 2.6vw, 14px); background: rgba(255,255,255,0.85); border: 1px solid rgba(43,34,26,0.35); border-radius: 5px; padding: 0 2px; line-height: 1.25; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+    .cl-wep svg { width: clamp(11px, 2.8vw, 15px); height: clamp(11px, 2.8vw, 15px); display: block; margin: 1px auto; }
+    .cl-chip svg { width: 15px; height: 15px; vertical-align: -3px; }
     .cl-tok { width: clamp(14px, 3.6vw, 20px); height: clamp(14px, 3.6vw, 20px); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: clamp(9px, 2.4vw, 13px); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.45); background: var(--gold); }
     .cl-sus { width: clamp(11px, 3vw, 16px); height: clamp(11px, 3vw, 16px); border-radius: 50% 50% 42% 42%; display: inline-flex; align-items: center; justify-content: center; font-size: clamp(7px, 1.9vw, 10px); font-weight: 900; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.5); border: 1.2px solid rgba(255,255,255,0.85); box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
     .cl-adjoin { z-index: 3; display: flex; align-items: center; justify-content: center; pointer-events: none; }
@@ -174,6 +176,17 @@
     var escapeHtml = window.esc;
     var SUS_COLOR = { Moutarde: '#d8b13a', Rose: '#d65b9a', Violet: '#7e57c2', Leblanc: '#c9c4bd', Olive: '#5c9e5c', Pervenche: '#4f7fc0' };
     var WEP_EMOJI = { Poignard: '🗡️', Chandelier: '🕯️', Revolver: '🔫', Corde: '🪢', Clé: '🔧', Matraque: '🏏' };
+    // Silhouettes d'armes DESSINÉES (SVG) : rendu identique sur tous les appareils,
+    // à la place des émojis qui changent de style selon l'OS.
+    var WEP_PIC = {
+      Poignard: '<svg viewBox="0 0 24 24"><path d="M12 2l2.2 8.8L12 13l-2.2-2.2z" fill="#aeb6c2" stroke="#4a5160" stroke-width="1"/><rect x="8.6" y="12.6" width="6.8" height="1.9" rx="0.9" fill="#7a5a34"/><rect x="11" y="14.4" width="2" height="5.6" rx="1" fill="#5a3c1e"/></svg>',
+      Chandelier: '<svg viewBox="0 0 24 24"><path d="M11 3q2.4 1.8 1 3.6L11 8z" fill="#e8963c"/><rect x="10" y="8" width="4" height="2" rx="1" fill="#c9a23a"/><rect x="11" y="10" width="2" height="7" fill="#c9a23a"/><path d="M7 20c0-1.6 2.2-2.6 5-2.6s5 1 5 2.6z" fill="#c9a23a" stroke="#8a6a1e" stroke-width="0.8"/></svg>',
+      Revolver: '<svg viewBox="0 0 24 24"><path d="M3 8h16.5a1.5 1.5 0 0 1 0 3H12l-1.6 4.6a1.6 1.6 0 0 1-1.5 1.1H6.6a1 1 0 0 1-1-1.4L7 11H3z" fill="#5a6170" stroke="#333842" stroke-width="1"/><rect x="3" y="8" width="4.5" height="3" fill="#333842"/></svg>',
+      Corde: '<svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="6.2" fill="none" stroke="#b98a4e" stroke-width="3.4"/><circle cx="12" cy="10" r="6.2" fill="none" stroke="#8a5f2e" stroke-width="3.4" stroke-dasharray="2.4 2.4"/><path d="M12 16.4q-1.4 3 .6 5.2" fill="none" stroke="#8a5f2e" stroke-width="2.2" stroke-linecap="round"/></svg>',
+      Clé: '<svg viewBox="0 0 24 24"><path d="M7.8 4.5a3.6 3.6 0 0 1 4.9 3.3L18 13a3.6 3.6 0 0 1-2.8 2.8L9.9 10.5A3.6 3.6 0 0 1 7.8 4.5z" fill="none" stroke="#7e8794" stroke-width="2.2" transform="rotate(8 12 10)"/><path d="M5 21l5-5" stroke="#7e8794" stroke-width="2.6" stroke-linecap="round"/></svg>',
+      Matraque: '<svg viewBox="0 0 24 24"><path d="M13.6 2.6c3.2.6 5.4 3 6 6.2L8.4 20a2.6 2.6 0 0 1-4.4-2.4z" fill="#a06a3a" stroke="#6a4522" stroke-width="1"/><path d="M15.5 4.2l3.4 3.4" stroke="#c98a52" stroke-width="1" opacity="0.7"/></svg>'
+    };
+    function wepPic(name) { return WEP_PIC[name] || WEP_EMOJI[name] || '🔪'; }
     /* ━━ Pièces illustrées (SVG vu de dessus, comme sur le vrai plateau) ━━ */
     function svgWrap(inner) { return '<svg class="rsvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + inner + '</svg>'; }
     function parquet(base, line) { var s = '<rect width="100" height="100" fill="' + base + '"/>'; for (var y = 12; y < 100; y += 12) s += '<line x1="0" y1="' + y + '" x2="100" y2="' + y + '" stroke="' + line + '" stroke-width="1"/>'; return s; }
@@ -316,7 +329,7 @@
       var me = window.myPid;
       var canMove = (s.phase === 'move' && s.turn === me && s.reach);
       var toks = {}; s.order.forEach(function (p) { var n = s.pos[p]; (toks[n] = toks[n] || []).push(p); });
-      var wtoks = {}; var wp = s.weaponPos || {}; Object.keys(wp).forEach(function (w) { (wtoks[wp[w]] = wtoks[wp[w]] || []).push(WEP_EMOJI[w] || '🔪'); });
+      var wtoks = {}; var wp = s.weaponPos || {}; Object.keys(wp).forEach(function (w) { (wtoks[wp[w]] = wtoks[wp[w]] || []).push('<span title="' + w + '">' + wepPic(w) + '</span>'); });
       // pions des suspects NON incarnés par un joueur (déplacés par les suggestions)
       var stoks = {}; var incarnated = {}; var so = s.suspectOf || {};
       Object.keys(so).forEach(function (p) { incarnated[so[p]] = true; });
@@ -378,7 +391,11 @@
         : (s.phase === 'disprove' ? '<b>' + escapeHtml(Room.name(a)) + '</b> doit réfuter…'
           : 'Au tour de <b>' + escapeHtml(Room.name(s.turn)) + '</b>' + (s.turn === window.myPid ? ' (toi)' : ''));
       document.getElementById('cl-turn').innerHTML = txt;
-      document.getElementById('cl-die').textContent = s.dice || '·';
+      // Dé À POINTS (pips), secoué quand la valeur vient de tomber.
+      var dieEl = document.getElementById('cl-die');
+      var dieFresh = s.dice && window._clPrevDie !== s.dice;
+      window._clPrevDie = s.dice;
+      dieEl.innerHTML = s.dice ? (window.Fx ? Fx.die(s.dice, 22, dieFresh ? 'roll' : '') : s.dice) : '·';
     }
 
     function renderHand(s) {
@@ -389,7 +406,7 @@
         '<span style="font-size:.78rem;color:var(--ink-light);align-self:center">Tes cartes :</span>' +
         hand.map(function (c) {
           var col = CE.catOf(c) === 'suspect' ? SUS_COLOR[c] : CE.catOf(c) === 'arme' ? '#8d6e63' : '#7e9bbf';
-          var ic = CE.catOf(c) === 'arme' ? (WEP_EMOJI[c] + ' ') : '';
+          var ic = CE.catOf(c) === 'arme' ? (wepPic(c) + ' ') : '';
           return '<span class="cl-card"><span class="dot" style="background:' + col + '"></span>' + ic + escapeHtml(c) + '</span>';
         }).join('');
     }
@@ -452,7 +469,7 @@
       document.getElementById('suggest-card').innerHTML = '<div class="modal-title">💭 Suggestion</div>' +
         '<div style="text-align:center;font-size:.85rem;color:var(--ink-light);margin-bottom:6px">Dans la <b>' + room + '</b></div>' +
         '<div class="cl-pick-grp"><h4>Suspect</h4><div class="cl-chips" id="sg-sus">' + CE.SUSPECTS.map(function (c) { return chip(c, 'sus', '<span class="dot" style="background:' + SUS_COLOR[c] + '"></span>'); }).join('') + '</div></div>' +
-        '<div class="cl-pick-grp"><h4>Arme</h4><div class="cl-chips" id="sg-wep">' + CE.WEAPONS.map(function (c) { return chip(c, 'wep', (WEP_EMOJI[c] || '')); }).join('') + '</div></div>' +
+        '<div class="cl-pick-grp"><h4>Arme</h4><div class="cl-chips" id="sg-wep">' + CE.WEAPONS.map(function (c) { return chip(c, 'wep', wepPic(c)); }).join('') + '</div></div>' +
         '<div class="modal-btns"><button class="btn-link" onclick="closeModal(\'modal-suggest\')">Annuler</button>' +
         '<button class="btn-primary" style="width:auto;padding:.6rem 1.3rem" onclick="doSuggest()">Suggérer</button></div>';
       openModal('modal-suggest');
@@ -487,7 +504,7 @@
       document.getElementById('accuse-card').innerHTML = '<div class="modal-title">🔍 Accusation finale</div>' +
         '<div style="text-align:center;font-size:.82rem;color:var(--terracotta);margin-bottom:6px">Attention : si tu te trompes, tu es éliminé !</div>' +
         '<div class="cl-pick-grp"><h4>Suspect</h4><div class="cl-chips" id="ac-sus">' + CE.SUSPECTS.map(function (c) { return achip(c, 'sus', '<span class="dot" style="background:' + SUS_COLOR[c] + '"></span>'); }).join('') + '</div></div>' +
-        '<div class="cl-pick-grp"><h4>Arme</h4><div class="cl-chips" id="ac-wep">' + CE.WEAPONS.map(function (c) { return achip(c, 'wep', (WEP_EMOJI[c] || '')); }).join('') + '</div></div>' +
+        '<div class="cl-pick-grp"><h4>Arme</h4><div class="cl-chips" id="ac-wep">' + CE.WEAPONS.map(function (c) { return achip(c, 'wep', wepPic(c)); }).join('') + '</div></div>' +
         '<div class="cl-pick-grp"><h4>Pièce</h4><div class="cl-chips" id="ac-room">' + CE.ROOMS.map(function (c) { return achip(c, 'room', ''); }).join('') + '</div></div>' +
         '<div class="modal-btns"><button class="btn-link" onclick="closeModal(\'modal-accuse\')">Annuler</button>' +
         '<button class="btn-primary" style="width:auto;padding:.6rem 1.3rem" onclick="doAccuse()">Accuser !</button></div>';

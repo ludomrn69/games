@@ -43,7 +43,19 @@
     .mo-cell.corner .ce { font-size: 1.7em; line-height: 1; }
     .mo-cell.corner .cl { font-size: 0.92em; font-weight: 800; text-align: center; line-height: 1.05; word-break: break-word; }
     .mo-cell .own { position: absolute; top: 0px; right: 0px; min-width: 13px; height: 13px; border-radius: 7px; border: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; line-height: 1; }
-    .mo-cell .hh { position: absolute; bottom: 1px; right: 1px; font-size: 7px; }
+    /* Maisons vertes / hôtel rouge DESSINÉS (petits blocs à toit, comme les pièces
+       du jeu) — rendu identique sur tous les appareils, fini l'émoji qui bave à 7px. */
+    .mo-cell .hh { position: absolute; bottom: 1px; right: 1px; display: flex; gap: 1px; align-items: flex-end; }
+    .mo-house { display: inline-block; width: 6px; height: 6px; background: linear-gradient(#3ab066, #1f7a42); clip-path: polygon(50% 0, 100% 38%, 100% 100%, 0 100%, 0 38%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
+    .mo-hotel { display: inline-block; width: 10px; height: 8px; background: linear-gradient(#e0604e, #b73528); clip-path: polygon(50% 0, 100% 34%, 100% 100%, 0 100%, 0 34%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
+    /* Icônes de cases spéciales (gare, compagnies, Chance, Caisse, taxes) : petits
+       SVG maison au trait — l'iconographie qui fait « vrai plateau ». */
+    .mo-cell .cic { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; color: #6b6156; }
+    html[data-theme="dark"] .mo-cell .cic { color: #b9ab97; }
+    .mo-cell .cic svg { width: clamp(10px, 2.6vw, 20px); height: clamp(10px, 2.6vw, 20px); }
+    .mo-cell .cic.q { color: #d84a3a; font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(11px, 2.8vw, 22px); line-height: 1; }
+    .mo-cell .cic.chest { color: #3e7cb1; }
+    .mo-cell.side-l .cic svg, .mo-cell.side-r .cic svg { width: clamp(9px, 2.2vw, 16px); height: clamp(9px, 2.2vw, 16px); }
     .mo-cell.mo-cell-me { box-shadow: inset 0 0 0 3px var(--terracotta); animation: moMePulse 1s ease-in-out infinite alternate; z-index: 2; }
     @keyframes moMePulse { from { box-shadow: inset 0 0 0 2px var(--terracotta); } to { box-shadow: inset 0 0 0 3px var(--gold); } }
     /* Après le lancer de dés : ma case actuelle RESSORT fort (halo + premier plan +
@@ -303,6 +315,24 @@
     // on ne coupe que les noms vraiment hors-normes, par sécurité.
     function abbr(n) { return n.length > 26 ? n.slice(0, 25) + '…' : n; }
 
+    // Icônes de cases dessinées (SVG au trait, couleur héritée) — gare, ampoule,
+    // goutte d'eau, coffre, taxes. Chance reste un grand « ? » typographique.
+    var CIC_SVG = {
+      rail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2z"/><path d="M5 9h14"/><circle cx="9" cy="13" r="0.8" fill="currentColor" stroke="none"/><circle cx="15" cy="13" r="0.8" fill="currentColor" stroke="none"/><path d="M8 16l-2.5 5M16 16l2.5 5M6.5 20h11"/></svg>',
+      elec: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.8.6 1 1.4 1 2.3h6c0-.9.2-1.7 1-2.3A7 7 0 0 0 12 2z"/></svg>',
+      eau: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10 12 3 12 3z"/></svg>',
+      chest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3H4z"/><path d="M4 11h16v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M10 11h4v3h-4z"/></svg>',
+      tax: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15 8.5a4.5 4.5 0 1 0 0 7M8 10.5h5M8 13.5h5"/></svg>'
+    };
+    function cellIcon(sp) {
+      if (sp.t === 'rail') return '<div class="cic">' + CIC_SVG.rail + '</div>';
+      if (sp.t === 'util') return '<div class="cic">' + (sp.n.indexOf('Élec') === 0 ? CIC_SVG.elec : CIC_SVG.eau) + '</div>';
+      if (sp.t === 'chance') return '<div class="cic q">?</div>';
+      if (sp.t === 'chest') return '<div class="cic chest">' + CIC_SVG.chest + '</div>';
+      if (sp.t === 'tax') return '<div class="cic">' + CIC_SVG.tax + '</div>';
+      return '';
+    }
+
     function renderBoard(s) {
       var toks = {}, hopAt = {}; // pos -> [pion HTML] ; cases où un pion vient d'arriver
       window._moPrevPos = window._moPrevPos || {};
@@ -334,14 +364,15 @@
           var cor = i === 0 ? ['🏁', 'Départ'] : i === 10 ? ['⛓', 'Prison'] : i === 20 ? ['🅿️', 'Parc gratuit'] : ['🚓', 'En prison !'];
           inner += '<div class="cor"><span class="ce">' + cor[0] + '</span><span class="cl">' + cor[1] + '</span></div>';
         } else {
-          var body = '<div class="nm">' + abbr(sp.n) + '</div>';
+          var body = '<div class="nm">' + abbr(sp.n) + '</div>' + cellIcon(sp);
           var prc = (sp.t === 'prop' || sp.t === 'rail' || sp.t === 'util');
           if (prc && s.owners[i] == null) body += '<div class="pr">' + sp.p + '</div>';
           inner += '<div class="cbody">' + body + '</div>';
           // Propriétaire : pastille à l'émoji du joueur (plus lisible qu'une couleur).
           if (s.owners[i] != null) inner += '<div class="own" style="background:' + Room.color(s.owners[i]) + '">' + Room.emoji(s.owners[i]) + '</div>';
           var h = s.houses[i] || 0;
-          if (h === 5) inner += '<div class="hh">🏨</div>'; else if (h > 0) inner += '<div class="hh">' + '🏠'.repeat(Math.min(h, 4)) + '</div>';
+          if (h === 5) inner += '<div class="hh"><i class="mo-hotel"></i></div>';
+          else if (h > 0) inner += '<div class="hh">' + new Array(Math.min(h, 4) + 1).join('<i class="mo-house"></i>') + '</div>';
         }
         if (toks[i]) inner += '<div class="mo-toks">' + toks[i].map(function (e) { return '<span class="mo-tok' + (hopAt[i] ? ' hop' : '') + '">' + e + '</span>'; }).join('') + '</div>';
         if (toks[i] && hopAt[i] && window.Fx) Fx.sfx('place'); // un pion vient d'arriver ici

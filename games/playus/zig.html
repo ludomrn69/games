@@ -76,8 +76,11 @@
     path.forEach(function(t){var p=proj(t.x,t.y);if(p.y<-tileW||p.y>H+tileW)return;
       ctx.save();ctx.translate(p.x,p.y);ctx.beginPath();ctx.moveTo(0,-tileW*0.4);ctx.lineTo(tileW*0.7,0);ctx.lineTo(0,tileW*0.4);ctx.lineTo(-tileW*0.7,0);ctx.closePath();
       ctx.fillStyle='#ffb020';ctx.fill();ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(-tileW*0.7,0,tileW*1.4,tileW*0.4);ctx.restore();});
-    var bp=proj(ballWX,ballWY);ctx.beginPath();ctx.arc(bp.x,bp.y-10,Math.max(9,tileW*0.28),0,7);
-    var grd=ctx.createRadialGradient(bp.x-4,bp.y-14,3,bp.x,bp.y-10,tileW*0.28);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#e8524a');ctx.fillStyle=grd;ctx.fill();
+    var bp=proj(ballWX,ballWY);
+    if(isFinite(bp.x)&&isFinite(bp.y)&&isFinite(tileW)){ // rien à dessiner avant la 1re partie
+      ctx.beginPath();ctx.arc(bp.x,bp.y-10,Math.max(9,tileW*0.28),0,7);
+      var grd=ctx.createRadialGradient(bp.x-4,bp.y-14,3,bp.x,bp.y-10,tileW*0.28);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#e8524a');ctx.fillStyle=grd;ctx.fill();
+    }
   }
   resize();frame();
 })();

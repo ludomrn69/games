@@ -71,7 +71,13 @@
     .mb-card:hover { transform: translateY(-6px); }
     .mb-card.sel { border-color: var(--terracotta); box-shadow: 0 0 0 3px rgba(196,116,90,0.3); transform: translateY(-6px); }
     .mb-card.dim { opacity: 0.4; }
-    .mb-card .ic { font-size: 1.5rem; line-height: 1; } .mb-card .lb { font-size: 0.62rem; font-weight: 700; line-height: 1.05; }
+    /* Pictos SVG « signalisation » (feux, bornes, panneaux) : la signature visuelle
+       du jeu, dessinée à la main → rendu identique sur tous les appareils. */
+    .mb-card .ic { font-size: 1.5rem; line-height: 0; } .mb-card .lb { font-size: 0.62rem; font-weight: 700; line-height: 1.05; }
+    .mb-card .ic svg { width: 34px; height: 40px; display: block; margin: 0 auto; }
+    .mb-botte svg { width: 13px; height: 15px; display: block; }
+    .mb-chip svg { width: 11px; height: 13px; vertical-align: -2px; }
+    .mb-act svg { width: 15px; height: 17px; vertical-align: -3px; }
     .mb-card .km { font-size: 1.1rem; font-weight: 900; }
     .mb-actions { display: flex; gap: 8px; justify-content: center; padding: 0 12px 8px; }
     .mb-act { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
@@ -202,6 +208,44 @@
     // Deck : centralisé dans millebornes-ai.js (partagé avec le banc).
     var buildDeck = window.MilleBornesAI.buildDeck;
     function hasSafe(P, kind) { return (P.safeties || []).some(function (s) { return CARD[s].safe === kind || (kind !== 'limit' && CARD[s].safe === 'row' && kind === 'stop') ; }); }
+
+    /* ━━ Pictos dessinés (SVG inline, aucune dépendance) ━━ */
+    var SIGN = {
+      borne: function (km) {
+        var cap = km === 200 ? '#3e7cb1' : '#d84a3a';
+        return '<svg viewBox="0 0 24 30"><path d="M3.2 12a8.8 8.8 0 0 1 17.6 0v14.6H3.2z" fill="#fdfaf3" stroke="#2c2f36" stroke-width="1.6"/><path d="M3.4 12a8.6 8.6 0 0 1 17.2 0v2.4H3.4z" fill="' + cap + '" stroke="#2c2f36" stroke-width="1.4"/><text x="12" y="24.5" text-anchor="middle" font-size="9" font-weight="900" fill="#2c2f36" font-family="DM Sans, sans-serif">' + km + '</text></svg>';
+      },
+      feu: function (on) {
+        return '<svg viewBox="0 0 24 30"><rect x="6.5" y="1.5" width="11" height="27" rx="3.5" fill="#2c2f36"/><circle cx="12" cy="9" r="3.6" fill="' + (on === 'R' ? '#e8453b' : '#4a2a26') + '"' + (on === 'R' ? ' stroke="#ffb3a8" stroke-width="0.8"' : '') + '/><circle cx="12" cy="21" r="3.6" fill="' + (on === 'G' ? '#3fc464' : '#1e3a28') + '"' + (on === 'G' ? ' stroke="#b8f0c8" stroke-width="0.8"' : '') + '/></svg>';
+      },
+      pompe: function (panne) {
+        var body = panne ? '#8a8f98' : '#e05a4e';
+        return '<svg viewBox="0 0 24 30"><rect x="3.5" y="5" width="12" height="22" rx="2" fill="' + body + '" stroke="#2c2f36" stroke-width="1.5"/><rect x="6" y="8" width="7" height="5.5" rx="1" fill="#fdfaf3" stroke="#2c2f36" stroke-width="1"/>' + (panne ? '<path d="M6.5 13 L12.5 8.5" stroke="#d84a3a" stroke-width="1.6"/>' : '') + '<path d="M15.5 11h2.6l2.7 3.6v6.9a2 2 0 0 1-4 0" fill="none" stroke="#2c2f36" stroke-width="1.7" stroke-linecap="round"/></svg>';
+      },
+      roue: function (flat) {
+        return flat
+          ? '<svg viewBox="0 0 24 30"><path d="M3 17.5a9 7.6 0 1 1 18 0c0 2-4.1 3.4-9 3.4s-9-1.4-9-3.4z" fill="#2c2f36"/><ellipse cx="12" cy="16.6" rx="4.4" ry="3.6" fill="#e8e2d6"/><path d="M16 8.5l3.4-3.2M19.4 8.3l0-3 -3 0" stroke="#d84a3a" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>'
+          : '<svg viewBox="0 0 24 30"><circle cx="12" cy="15" r="9.4" fill="#2c2f36"/><circle cx="12" cy="15" r="4.6" fill="#e8e2d6"/><circle cx="12" cy="15" r="1.7" fill="#2c2f36"/><path d="M12 5.6v4.8M12 19.6v4.8M2.6 15h4.8M16.6 15h4.8" stroke="#5a5f68" stroke-width="1.6"/></svg>';
+      },
+      crash: '<svg viewBox="0 0 24 30"><path d="M12 2.5 14.4 9l6-3.4-2.9 6.2 6 2.2-6.3 2.3 3.4 6-6.4-2.6L12 27.5l-2.2-7.8-6.4 2.6 3.4-6L.5 14l6-2.2L3.6 5.6l6 3.4z" fill="#e8862e" stroke="#b3402c" stroke-width="1.4" stroke-linejoin="round"/><text x="12" y="18" text-anchor="middle" font-size="8" font-weight="900" fill="#7a2418">!</text></svg>',
+      limite: function (fin) {
+        return fin
+          ? '<svg viewBox="0 0 24 30"><circle cx="12" cy="15" r="10" fill="#fdfaf3" stroke="#8a8f98" stroke-width="2.4"/><text x="12" y="18.6" text-anchor="middle" font-size="9.5" font-weight="900" fill="#8a8f98" font-family="DM Sans, sans-serif">50</text><path d="M5 22 L19 8M7.6 23.8 L21.6 9.8" stroke="#8a8f98" stroke-width="1.6"/></svg>'
+          : '<svg viewBox="0 0 24 30"><circle cx="12" cy="15" r="10" fill="#fdfaf3" stroke="#d84a3a" stroke-width="3"/><text x="12" y="18.6" text-anchor="middle" font-size="9.5" font-weight="900" fill="#2c2f36" font-family="DM Sans, sans-serif">50</text></svg>';
+      },
+      cle: '<svg viewBox="0 0 24 30"><path d="M8.2 6.2a4.6 4.6 0 0 1 6.4 4.2l5.2 5.2a4.6 4.6 0 0 1-4.2 4.2 4.6 4.6 0 0 1-4.2-4.2L6.2 10.4a4.6 4.6 0 0 1 2-4.2z" fill="none" stroke="#2c2f36" stroke-width="1.8" transform="rotate(45 12 13)"/><path d="M4.5 25.5 L11 19" stroke="#2c2f36" stroke-width="2.6" stroke-linecap="round"/></svg>',
+      volant: '<svg viewBox="0 0 24 30"><circle cx="12" cy="15" r="9.6" fill="none" stroke="#2c2f36" stroke-width="2.6"/><circle cx="12" cy="15" r="2.4" fill="#2c2f36"/><path d="M3.4 13.2c3-1.6 14.2-1.6 17.2 0M12 17.4V24" stroke="#2c2f36" stroke-width="2" fill="none"/></svg>',
+      citerne: '<svg viewBox="0 0 24 30"><rect x="2.5" y="8" width="19" height="14" rx="7" fill="#c98a1e" stroke="#8a5f14" stroke-width="1.6"/><path d="M7.5 8v14M16.5 8v14" stroke="#8a5f14" stroke-width="1.3"/><rect x="9.5" y="4.5" width="5" height="3.5" rx="1" fill="#8a5f14"/></svg>',
+      bouclier: '<svg viewBox="0 0 24 30"><path d="M12 2.5c3 1.8 6.2 2.6 8.8 2.8v9.4c0 6-3.8 9.8-8.8 12.4-5-2.6-8.8-6.4-8.8-12.4V5.3c2.6-.2 5.8-1 8.8-2.8z" fill="#5a8f6a" stroke="#2f5d3a" stroke-width="1.6"/><circle cx="12" cy="13.5" r="4.6" fill="#e8e2d6"/><circle cx="12" cy="13.5" r="1.7" fill="#2f5d3a"/></svg>',
+      prioritaire: '<svg viewBox="0 0 24 30"><rect x="4" y="7" width="16" height="16" rx="3" transform="rotate(45 12 15)" fill="#f0c04e" stroke="#b3402c" stroke-width="1.6"/><rect x="7.6" y="10.6" width="8.8" height="8.8" rx="1.6" transform="rotate(45 12 15)" fill="#fdfaf3"/></svg>'
+    };
+    var MB_PIC = {
+      d25: SIGN.borne(25), d50: SIGN.borne(50), d75: SIGN.borne(75), d100: SIGN.borne(100), d200: SIGN.borne(200),
+      hStop: SIGN.feu('R'), hGas: SIGN.pompe(true), hFlat: SIGN.roue(true), hCrash: SIGN.crash, hLimit: SIGN.limite(false),
+      rGo: SIGN.feu('G'), rGas: SIGN.pompe(false), rFlat: SIGN.roue(false), rRepair: SIGN.cle, rLimit: SIGN.limite(true),
+      sAce: SIGN.volant, sTank: SIGN.citerne, sPunc: SIGN.bouclier, sRoW: SIGN.prioritaire
+    };
+    function mbPic(card) { return MB_PIC[card] || (CARD[card] && CARD[card].ic) || ''; }
     // Immunité (bottes) : centralisé dans millebornes-ai.js.
     var immune = window.MilleBornesAI.immune;
 
@@ -563,11 +607,11 @@
       var isTarget = targeting && pid !== me && canPlay(state, me, targeting, pid) && state.turn === me;
       // Pastilles d'état : bataille (feu rouge / roule / attaque), limite de vitesse, bottes.
       var battleChip;
-      if (P.hazard) { var hz = CARD['h' + ({ gas: 'Gas', flat: 'Flat', crash: 'Crash' }[P.hazard])]; battleChip = '<span class="mb-chip stop">' + hz.ic + ' ' + hz.lb + '</span>'; }
-      else if (!P.rolling) battleChip = '<span class="mb-chip stop">🔴 Feu rouge</span>';
-      else battleChip = '<span class="mb-chip go">🟢 Roule</span>';
-      var speedChip = P.limited ? '<span class="mb-chip limit">🚸 Limite 50</span>' : '';
-      var bottes = (P.safeties || []).map(function (s) { return '<span class="mb-botte" title="' + CARD[s].lb + '">' + CARD[s].ic + '</span>'; }).join('');
+      if (P.hazard) { var hzId = 'h' + ({ gas: 'Gas', flat: 'Flat', crash: 'Crash' }[P.hazard]); battleChip = '<span class="mb-chip stop">' + mbPic(hzId) + ' ' + CARD[hzId].lb + '</span>'; }
+      else if (!P.rolling) battleChip = '<span class="mb-chip stop">' + SIGN.feu('R') + ' Feu rouge</span>';
+      else battleChip = '<span class="mb-chip go">' + SIGN.feu('G') + ' Roule</span>';
+      var speedChip = P.limited ? '<span class="mb-chip limit">' + SIGN.limite(false) + ' Limite 50</span>' : '';
+      var bottes = (P.safeties || []).map(function (s) { return '<span class="mb-botte" title="' + CARD[s].lb + '">' + mbPic(s) + '</span>'; }).join('');
       // La voiture glisse de son ancienne position (%) vers la nouvelle (dist/10).
       var to = P.dist / 10, from = (_carPos[pid] != null) ? _carPos[pid] : to;
       var miles = [250, 500, 750].map(function (km) { return '<span class="mb-mile" style="left:' + (km / 10) + '%"><span>' + km + '</span></span>'; }).join('');
@@ -616,7 +660,7 @@
       setText('mb-status', statusTxt);
       var actionsHTML;
       if (cf && cf.pid === me) {
-        actionsHTML = '<button class="mb-act play" onclick="cfAnswer(true)">⚡ COUP FOURRÉ ! ' + CARD[cf.card].ic + ' ' + CARD[cf.card].lb + ' (+300)</button>' +
+        actionsHTML = '<button class="mb-act play" onclick="cfAnswer(true)">⚡ COUP FOURRÉ ! ' + mbPic(cf.card) + ' ' + CARD[cf.card].lb + ' (+300)</button>' +
           '<button class="mb-act" onclick="cfAnswer(false)">Non merci</button>';
       } else if (myTurn && !targeting) {
         actionsHTML = '<button class="mb-act play" onclick="play()"' + (sel < 0 || !canMove ? ' disabled' : '') + '>Jouer</button>' +
@@ -631,7 +675,7 @@
       setHTML('mb-hand', handArr.map(function (card, i) {
         var c = CARD[card];
         var playable = myTurn && (c.t === 'haz' ? anyTarget(state, me, card) : canPlay(state, me, card));
-        var inner = '<span class="ic">' + c.ic + '</span>' + (c.t === 'dist' ? '<span class="km">' + c.km + '</span>' : '<span class="lb">' + c.lb + '</span>');
+        var inner = '<span class="ic">' + mbPic(card) + '</span>' + (c.t === 'dist' ? '' : '<span class="lb">' + c.lb + '</span>');
         var fresh = grew && i === handArr.length - 1;
         return '<div class="mb-card' + (sel === i ? ' sel' : '') + (myTurn && !playable ? ' dim' : '') + (fresh ? ' in' : '') + '" onclick="pickCard(' + i + ')">' + inner + '</div>';
       }).join(''));

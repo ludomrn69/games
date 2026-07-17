@@ -21,12 +21,17 @@
     .tw-opp-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
     .tw-opp .mt { color: var(--terracotta); }
 
-    .tw-scorebar { display: flex; justify-content: center; gap: 14px; padding: 6px; font-weight: 800; }
-    .tw-scorebar .sc { background: var(--white); border-radius: 10px; padding: 4px 14px; box-shadow: var(--shadow); }
+    /* Palette CLASSIQUE du jeu : cadre brun-beige, cases creuses claires,
+       compteurs de score en blocs bruns à chiffre blanc. */
+    .tw-scorebar { display: flex; justify-content: center; gap: 10px; padding: 6px; font-weight: 800; }
+    .tw-scorebar .sc { background: #bbada0; border-radius: 8px; padding: 4px 16px; color: #fff; box-shadow: var(--shadow); text-align: center; }
+    html[data-theme="dark"] .tw-scorebar .sc { background: #5a5148; }
     .tw-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 8px 12px; }
-    .tw-grid { position: relative; width: min(88vw, 380px); aspect-ratio: 1; background: #b9a988; border-radius: 12px; padding: 8px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 8px; touch-action: none; }
-    .tw-cellbg { background: rgba(255,255,255,0.28); border-radius: 8px; }
-    .tw-tile { border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-family: 'DM Sans', sans-serif; font-size: clamp(1.1rem, 6vw, 1.9rem); color: #2C2520; }
+    .tw-grid { position: relative; width: min(88vw, 380px); aspect-ratio: 1; background: #bbada0; border-radius: 10px; padding: 8px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 8px; touch-action: none; box-shadow: var(--shadow); }
+    html[data-theme="dark"] .tw-grid { background: #57504a; }
+    .tw-cellbg { background: rgba(238,228,218,0.35); border-radius: 6px; }
+    html[data-theme="dark"] .tw-cellbg { background: rgba(238,228,218,0.14); }
+    .tw-tile { border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-family: 'DM Sans', sans-serif; font-size: clamp(1.1rem, 6vw, 1.9rem); color: #776e65; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
     .tw-banner { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; text-align: center; }
     .tw-arrows { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(2, 44px); gap: 6px; justify-content: center; margin-top: 4px; }
     .tw-arrow { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 12px; font-size: 1.3rem; cursor: pointer; }
@@ -115,7 +120,7 @@
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
     var TILE_BG = { 0: 'rgba(255,255,255,0.28)', 2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563', 32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61', 512: '#edc850', 1024: '#edc53f', 2048: '#edc22e' };
     function tileColor(v) { return TILE_BG[v] || '#3c3a32'; }
-    function tileInk(v) { return v >= 8 ? '#fff' : '#2C2520'; }
+    function tileInk(v) { return v >= 8 ? '#f9f6f2' : '#776e65'; } // encres classiques du jeu
 
     /* ━━ Moteur 2048 (pur) ━━ dir : 0=haut 1=droite 2=bas 3=gauche ━━ */
     function emptyCells(b) { var a = []; for (var i = 0; i < 16; i++) if (!b[i]) a.push(i); return a; }

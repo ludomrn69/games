@@ -25,13 +25,18 @@
     .st-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--terracotta); min-height: 24px; padding: 2px 12px; }
 
     .st-stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 6px 10px; }
-    .st-grid { display: grid; gap: 5px; }
+    /* Grille sur PANNEAU BLEU NUIT (l'ambiance du jeu télé) : cases bleu ardoise,
+       lettres blanches, carré rouge = bien placé, ROND jaune = mal placé. */
+    .st-grid { display: grid; gap: 5px; background: linear-gradient(160deg, #16405c, #0d2a40); padding: 10px; border-radius: 14px; box-shadow: inset 0 2px 10px rgba(0,0,0,0.45), var(--shadow); }
     .st-row { display: grid; gap: 5px; }
-    .st-tile { width: clamp(30px, 11vw, 48px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(1.1rem, 5.5vw, 1.7rem); border-radius: 8px; background: var(--white); border: 2px solid var(--gold-light); color: var(--ink); text-transform: uppercase; }
-    .st-tile.correct { background: #e05a4e; color: #fff; border-color: #e05a4e; }
-    .st-tile.present { background: #e8b84b; color: #2C2520; border-color: #e8b84b; border-radius: 50%; }
-    .st-tile.absent { background: #5b6b86; color: #fff; border-color: #5b6b86; }
-    .st-tile.cur { border-color: var(--terracotta); }
+    .st-tile { width: clamp(30px, 11vw, 48px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(1.1rem, 5.5vw, 1.7rem); border-radius: 6px; background: #23577a; border: 1.5px solid rgba(255,255,255,0.22); color: #f2f6fa; text-transform: uppercase; }
+    .st-tile.correct { background: #e0392a; color: #fff; border-color: #b32619; }
+    .st-tile.present { background: #f0c330; color: #4a3800; border-color: #c79c14; border-radius: 50%; }
+    .st-tile.absent { background: #1a4059; color: rgba(242,246,250,0.55); border-color: rgba(255,255,255,0.12); }
+    .st-tile.cur { border-color: #f0c330; box-shadow: 0 0 0 2px rgba(240,195,48,0.35); }
+    /* Révélation BALAYÉE lettre par lettre sur la rangée fraîchement validée. */
+    .st-row.rev .st-tile { animation: stSweep 0.34s cubic-bezier(0.34, 1.3, 0.64, 1) both; animation-delay: calc(var(--i) * 0.13s); }
+    @keyframes stSweep { 0% { transform: rotateX(85deg); filter: brightness(1.8); } 100% { transform: rotateX(0); filter: none; } }
 
     .st-kb { display: flex; flex-direction: column; gap: 6px; width: min(96vw, 480px); margin-top: 4px; }
     .st-kbrow { display: flex; gap: 4px; justify-content: center; }
@@ -195,14 +200,17 @@
       setText('st-banner', state.banner || '');
 
       var guesses = P.guesses || [], done = doneOf(state, me), html = '';
+      // La rangée qui vient d'être validée se révèle lettre par lettre (balayage).
+      var freshRow = (window._stPrevGuessN != null && guesses.length > window._stPrevGuessN) ? guesses.length - 1 : -1;
+      window._stPrevGuessN = guesses.length;
       for (var r = 0; r < MAX; r++) {
-        html += '<div class="st-row" style="grid-template-columns:repeat(' + len + ',1fr)">';
+        html += '<div class="st-row' + (r === freshRow ? ' rev' : '') + '" style="grid-template-columns:repeat(' + len + ',1fr)">';
         var g = guesses[r], fb = g ? feedback(g, secret) : null;
         var typing = (!done && r === guesses.length);
         for (var c = 0; c < len; c++) {
           var ch = g ? g[c] : (typing ? (cur[c] || '') : '');
           var cls = 'st-tile' + (fb ? ' ' + fb[c] : (typing && c === cur.length ? ' cur' : ''));
-          html += '<div class="' + cls + '">' + ch + '</div>';
+          html += '<div class="' + cls + '" style="--i:' + c + '">' + ch + '</div>';
         }
         html += '</div>';
       }

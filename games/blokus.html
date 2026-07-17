@@ -28,14 +28,22 @@
     .swatch.R, .bk-piece-cell.R { background: var(--bk-red); } .swatch.G, .bk-piece-cell.G { background: var(--bk-green); }
 
     .bk-board-wrap { display: flex; justify-content: center; padding: 6px 8px; }
-    .bk-board { display: grid; grid-template-columns: repeat(20, 1fr); width: min(96vw, 460px); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 8px; overflow: hidden; touch-action: none; }
-    .bk-cell { aspect-ratio: 1; border: 0.5px solid rgba(120,110,100,0.18); }
-    .bk-cell.dot { background: rgba(120,110,100,0.12); }
+    /* Plateau ANTHRACITE à grille fine + pièces BRILLANTES translucides (reflet
+       glossy + relief) : le rendu du vrai matériel, en clair comme en sombre. */
+    .bk-board { display: grid; grid-template-columns: repeat(20, 1fr); width: min(96vw, 460px); aspect-ratio: 1; background: linear-gradient(155deg, #3a3f47, #23262c); border: 3px solid #171a1f; border-radius: 10px; overflow: hidden; touch-action: none; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5), var(--shadow); padding: 2px; }
+    .bk-cell { aspect-ratio: 1; border: 0.5px solid rgba(255,255,255,0.09); border-radius: 1px; }
+    .bk-cell.dot { background: rgba(255,255,255,0.07); }
     .bk-cell.B { background: var(--bk-blue); } .bk-cell.Y { background: var(--bk-yellow); }
     .bk-cell.R { background: var(--bk-red); } .bk-cell.G { background: var(--bk-green); }
-    .bk-cell.ghost-B { background: rgba(47,111,208,0.5); } .bk-cell.ghost-Y { background: rgba(230,184,0,0.5); }
-    .bk-cell.ghost-R { background: rgba(224,90,78,0.5); } .bk-cell.ghost-G { background: rgba(52,168,83,0.5); }
-    .bk-cell.ghost-bad { background: rgba(120,120,120,0.4); }
+    .bk-cell.B, .bk-cell.Y, .bk-cell.R, .bk-cell.G {
+      background-image: radial-gradient(circle at 32% 26%, rgba(255,255,255,0.55), rgba(255,255,255,0.08) 46%, rgba(0,0,0,0.18) 100%);
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), inset 0 -1px 2px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.4);
+      border: 0.5px solid rgba(0,0,0,0.3); border-radius: 2px;
+    }
+    .bk-cell.ghost-B { background: rgba(87,141,228,0.55); } .bk-cell.ghost-Y { background: rgba(240,204,40,0.55); }
+    .bk-cell.ghost-R { background: rgba(234,110,98,0.55); } .bk-cell.ghost-G { background: rgba(82,198,113,0.55); }
+    .bk-cell.ghost-B, .bk-cell.ghost-Y, .bk-cell.ghost-R, .bk-cell.ghost-G { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.65); border-radius: 2px; }
+    .bk-cell.ghost-bad { background: rgba(160,160,160,0.45); box-shadow: inset 0 0 0 1.5px rgba(255,80,60,0.8); }
     .bk-cell.corner-hint { box-shadow: inset 0 0 0 2px currentColor; }
     .bk-cell.corner-B { color: var(--bk-blue); } .bk-cell.corner-Y { color: var(--bk-yellow); }
     .bk-cell.corner-R { color: var(--bk-red); } .bk-cell.corner-G { color: var(--bk-green); }
@@ -57,8 +65,9 @@
     .bk-piece-btn.disabled { opacity: 0.25; pointer-events: none; }
     .bk-piece-btn.selected { border-color: var(--terracotta); box-shadow: 0 0 0 2px rgba(196,116,90,0.3); }
     .bk-piece-grid { display: grid; gap: 1px; }
-    .bk-piece-cell { width: 9px; height: 9px; border-radius: 1px; }
-    .bk-piece-cell.empty { background: transparent; }
+    .bk-piece-cell { width: 9px; height: 9px; border-radius: 1.5px; }
+    .bk-piece-cell:not(.empty) { background-image: radial-gradient(circle at 32% 26%, rgba(255,255,255,0.5), rgba(255,255,255,0.05) 55%); box-shadow: inset 0 0.5px 0.5px rgba(255,255,255,0.5), inset 0 -0.5px 1px rgba(0,0,0,0.3); }
+    .bk-piece-cell.empty { background: transparent; box-shadow: none; }
     .bk-pass-btn { display: block; margin: 6px auto 0; border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.5rem 1.2rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
     .bk-wait { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--ink-light); padding: 20px; }
 

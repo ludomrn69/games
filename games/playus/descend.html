@@ -69,9 +69,11 @@
     ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=3;
     ctx.beginPath();for(var y2=0;y2<=H;y2+=8){var wy=scroll+(H-y2);var c2=centerFor(wy),w2=widthFor(dist-(y2-by));ctx.lineTo(c2-w2/2,y2);}ctx.stroke();
     ctx.beginPath();for(var y3=0;y3<=H;y3+=8){var wy3=scroll+(H-y3);var c3=centerFor(wy3),w3=widthFor(dist-(y3-by));ctx.lineTo(c3+w3/2,y3);}ctx.stroke();
-    // bille
-    ctx.beginPath();ctx.arc(bx,by,r,0,7);var grd=ctx.createRadialGradient(bx-r*0.3,by-r*0.3,r*0.2,bx,by,r);
-    grd.addColorStop(0,'#dff');grd.addColorStop(1,'#3f8fd6');ctx.fillStyle=grd;ctx.fill();
+    // bille (position inconnue sur l'écran d'accueil → on ne la dessine pas)
+    if(isFinite(bx)){
+      ctx.beginPath();ctx.arc(bx,by,r,0,7);var grd=ctx.createRadialGradient(bx-r*0.3,by-r*0.3,r*0.2,bx,by,r);
+      grd.addColorStop(0,'#dff');grd.addColorStop(1,'#3f8fd6');ctx.fillStyle=grd;ctx.fill();
+    }
   }
   resize();frame();
 })();
