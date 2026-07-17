@@ -57,6 +57,9 @@
     .lg-phase-icon { font-size: 2rem; } .lg-phase-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.2rem; }
     .lg-role { display: inline-flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 4px 14px; box-shadow: var(--shadow); font-weight: 700; margin-top: 6px; }
     html[data-theme="dark"] .lg-role { background: #2a2333; }
+    /* Chips de rôles (setup solo) : toggle multi-sélection, grisé = éteint. */
+    .lg-roff { min-width: 46px; padding: .5rem .8rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; opacity: .5; transition: opacity .15s, background .15s; }
+    .lg-roff.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; opacity: 1; }
     /* Séquenceur de nuit : montre clairement qui agit et l'ordre des rôles. */
     .lg-steps { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
     .lg-step { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 800; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); border: 1.5px solid transparent; }
@@ -155,6 +158,7 @@
         <p style="margin-top:6px">• Le <b>jour</b>, tout le monde <b>vote</b> pour éliminer un suspect. On révèle son rôle.</p>
         <p style="margin-top:6px">• Les <b>villageois</b> gagnent s'ils éliminent tous les loups ; les <b>loups</b> gagnent s'ils égalent les villageois.</p>
         <p style="margin-top:6px">• La voyante peut <b>accuser publiquement</b> pour rallier les votes !</p>
+        <p style="margin-top:6px">• <b>Composition réglable</b> : dans le salon (ou l'écran solo), l'hôte choisit le <b>nombre de loups</b> et quels <b>rôles spéciaux</b> entrent en jeu (Voyante, Sorcière, Chasseur, Cupidon). Les rôles non choisis deviennent des villageois. « Auto » = composition classique selon le nombre de joueurs.</p>
       </div>
       <div class="modal-btns" style="margin-top:16px"><button class="btn-primary" style="width:auto;padding:0.6rem 1.6rem" onclick="closeModal('modal-rules')">Compris</button></div>
     </div>
@@ -198,27 +202,136 @@
       bot: lgBot,
       offlineTurn: offlineTurn,
       offlineEnter: function () { if (window.room) render(window.room); },
+      lobbyExtraHTML: lobbyExtraHTML,
+      offlineExtraSetup: offlineExtraSetup,
       onState: onState,
       onStart: onStart
     });
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
-      var n = order.length, nW = Math.max(1, Math.floor(n / 4));
-      var roles = [];
-      for (var i = 0; i < nW; i++) roles.push('loup');
-      roles.push('voyante');
-      if (n >= 5) roles.push('sorciere');
-      if (n >= 6) roles.push('chasseur');
-      if (n >= 6) roles.push('cupidon');
-      while (roles.length < n) roles.push('villageois');
-      shuffle(roles);
+      // Composition des rôles : réglée par l'hôte (cur.opts) ou, à défaut, choisie
+      // automatiquement selon le nombre de joueurs. En solo hors-ligne, on lit les
+      // réglages posés à l'écran de setup (chips), faute d'objet opts dans le salon.
+      var opts = cur.opts;
+      if (!opts || typeof opts.voyante !== 'boolean') { var off = readLgOfflineOpts(); if (off) opts = off; }
+      var roles = buildRoles(order.length, opts);
       order.forEach(function (p, i) { cur.players[p].role = roles[i]; cur.players[p].alive = true; cur.players[p].knows = {}; });
       var hasCupid = roles.indexOf('cupidon') >= 0;
       return { phase: hasCupid ? 'cupid' : 'wolves', day: 1, wolfVotes: {}, seerCheck: null, dayVotes: {}, claims: {},
         witchHealUsed: false, witchPoisonUsed: false, witchSave: false, witchKill: null, hunterPid: null, afterHunter: null,
         lovers: null, cupidPick: null,
         banner: hasCupid ? '🌙 La nuit tombe… 💘 Cupidon décoche ses flèches' : '🌙 La nuit tombe sur le village…', winner: null };
+    }
+
+    // ══ Composition des rôles ═══════════════════════════════════════════════════
+    // Rôles spéciaux RÉGLABLES : uniquement ceux dont le moteur gère déjà toute la
+    // mécanique (nuit, mort, etc.). La machine à phases saute proprement un rôle
+    // absent (voir resolveWolves/gotoWitch), donc toute combinaison est jouable.
+    var LG_SPECIALS = ['voyante', 'sorciere', 'chasseur', 'cupidon'];
+    var LG_ROLE_LABELS = { voyante: '🔮 Voyante', sorciere: '🧪 Sorcière', chasseur: '🔫 Chasseur', cupidon: '💘 Cupidon' };
+    var LG_ROLE_HINTS = {
+      voyante: 'Chaque nuit, sonde secrètement un joueur pour connaître son camp',
+      sorciere: 'Une potion de vie (sauver la victime) et une de mort (empoisonner)',
+      chasseur: 'En mourant, il emporte aussitôt un joueur de son choix',
+      cupidon: 'La 1re nuit, lie 2 amoureux : si l’un meurt, l’autre meurt de chagrin'
+    };
+    function autoWolves(n) { return Math.max(1, Math.floor(n / 4)); }
+    // Composition automatique « classique » selon le nombre de joueurs.
+    function autoOpts(n) { return { wolves: 0, voyante: true, sorciere: n >= 5, chasseur: n >= 6, cupidon: n >= 6 }; }
+    function lgPlayerCount(room) { return (room && room.players) ? Object.keys(room.players).length : 0; }
+    // Réglages EFFECTIFS (affichés/appliqués) : ceux de l'hôte s'ils existent,
+    // sinon la composition auto pour le nombre de joueurs courant.
+    function effLgOpts(room) {
+      var o = room && room.opts;
+      if (o && typeof o.voyante === 'boolean') {
+        return { wolves: +o.wolves || 0, voyante: !!o.voyante, sorciere: !!o.sorciere, chasseur: !!o.chasseur, cupidon: !!o.cupidon };
+      }
+      return autoOpts(lgPlayerCount(room));
+    }
+    // Construit la liste des rôles (1 par joueur) à partir des réglages.
+    function buildRoles(n, opts) {
+      var explicit = opts && typeof opts.voyante === 'boolean';
+      var nW, specials = [];
+      if (explicit) {
+        nW = opts.wolves ? +opts.wolves : autoWolves(n);
+        LG_SPECIALS.forEach(function (r) { if (opts[r]) specials.push(r); });
+      } else {
+        nW = autoWolves(n);
+        specials.push('voyante');
+        if (n >= 5) specials.push('sorciere');
+        if (n >= 6) specials.push('chasseur');
+        if (n >= 6) specials.push('cupidon');
+      }
+      nW = Math.max(1, Math.min(nW, n - 1)); // toujours ≥1 loup ET ≥1 non-loup
+      var roles = [];
+      for (var i = 0; i < nW; i++) roles.push('loup');
+      for (var j = 0; j < specials.length && roles.length < n; j++) roles.push(specials[j]);
+      while (roles.length < n) roles.push('villageois');
+      shuffle(roles);
+      return roles;
+    }
+
+    // ── Réglages du SALON en ligne : composition des rôles (hôte) ──────────────
+    function lobbyExtraHTML(room) {
+      var isHost = room && room.host === window.myPid;
+      var n = lgPlayerCount(room);
+      var o = effLgOpts(room);
+      var maxW = Math.max(1, Math.min(4, n - 1));
+      var wBtns = '<button type="button" class="lb-set-btn' + (!o.wolves ? ' active' : '') + '"' +
+        (isHost ? ' onclick="setLgWolves(0)"' : ' disabled') + '>Auto (' + autoWolves(n) + ')</button>';
+      for (var w = 1; w <= maxW; w++) {
+        wBtns += '<button type="button" class="lb-set-btn' + (o.wolves === w ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setLgWolves(' + w + ')"' : ' disabled') + '>' + w + '</button>';
+      }
+      var rBtns = LG_SPECIALS.map(function (r) {
+        return '<button type="button" class="lb-set-btn' + (o[r] ? ' active' : '') + '" title="' + LG_ROLE_HINTS[r] + '"' +
+          (isHost ? ' onclick="setLgRole(\'' + r + '\')"' : ' disabled') + '>' + LG_ROLE_LABELS[r] + '</button>';
+      }).join('');
+      var hint = isHost
+        ? '<div class="lb-set-hint">Rôles non cochés = villageois. Selon le nombre de joueurs, un rôle en trop peut ne pas apparaître.</div>'
+        : '<div class="lb-set-hint">Composition réglée par l’hôte</div>';
+      return '<div class="lb-botset">' +
+        '<div class="lb-set"><div class="lb-set-label">🐺 Loups</div><div class="lb-set-row">' + wBtns + '</div></div>' +
+        '<div class="lb-set"><div class="lb-set-label">Rôles spéciaux</div><div class="lb-set-row">' + rBtns + '</div></div>' +
+        hint + '</div>';
+    }
+    function setLgWolves(w) {
+      if (!window.roomRef) return;
+      var o = effLgOpts(window.room); o.wolves = w;
+      window.roomRef.child('opts').set(o);
+    }
+    function setLgRole(r) {
+      if (!window.roomRef) return;
+      var o = effLgOpts(window.room); o[r] = !o[r];
+      window.roomRef.child('opts').set(o);
+    }
+
+    // ── Réglages en SOLO hors-ligne : mêmes rôles, sous forme de chips ────────
+    function offlineExtraSetup() {
+      var wDefs = [['Auto', 0], ['1', 1], ['2', 2], ['3', 3]];
+      var wBtns = wDefs.map(function (d, i) {
+        return '<button type="button" class="off-opt lg-woff' + (i === 0 ? ' active' : '') + '" data-w="' + d[1] + '">' + d[0] + '</button>';
+      }).join('');
+      var rBtns = LG_SPECIALS.map(function (r) {
+        return '<button type="button" class="lg-roff active" data-r="' + r + '" title="' + LG_ROLE_HINTS[r] + '">' + LG_ROLE_LABELS[r] + '</button>';
+      }).join('');
+      return '<div class="off-set"><div class="off-set-label">🐺 Loups</div><div class="off-set-row" style="flex-wrap:wrap">' + wBtns + '</div></div>' +
+        '<div class="off-set"><div class="off-set-label">Rôles spéciaux (clique pour activer)</div>' +
+        '<div class="off-set-row" style="flex-wrap:wrap;max-width:320px">' + rBtns + '</div></div>';
+    }
+    // Chips de rôles en solo = multi-sélection (le sélecteur générique d'offline.js
+    // ne gère que le mono-choix par rangée).
+    document.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest && e.target.closest('.lg-roff');
+      if (b) b.classList.toggle('active');
+    });
+    function readLgOfflineOpts() {
+      var wEl = document.querySelector('.lg-woff.active');
+      if (!wEl) return null; // pas en mode solo (chips absentes) → composition auto
+      var o = { wolves: +wEl.dataset.w || 0, voyante: false, sorciere: false, chasseur: false, cupidon: false };
+      document.querySelectorAll('.lg-roff.active').forEach(function (b) { o[b.dataset.r] = true; });
+      return o;
     }
 
     function offlineTurn(r) {

@@ -274,21 +274,109 @@
         'Tours de mise : pré-flop, flop, turn, river',
         'Se coucher / suivre / relancer · blinds tournantes',
         "Meilleure main de 5 cartes à l'abattage",
-        'Plus de jetons = éliminé, le dernier debout gagne'
+        'Plus de jetons = éliminé, le dernier debout gagne',
+        'Réglable dans le salon : cave, blindes, et montée façon tournoi'
       ],
       offline: { solo: true, local: true },
       bot: pokerBot,
       offlineTurn: function (room) { return actor(room); },
+      lobbyExtraHTML: lobbyExtraHTML,
+      offlineExtraSetup: offlineExtraSetup,
       onState: onState,
       onStart: onStart
     });
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
-      var stacks = {}; order.forEach(function (p) { stacks[p] = START_STACK; });
-      var base = { order: order, stacks: stacks, sb: SB, bb: BB, handNo: 0, buttonPid: order[order.length - 1] };
+      var o = readPkOpts(cur);
+      var stacks = {}; order.forEach(function (p) { stacks[p] = o.stack; });
+      // baseSb/baseBb = blindes de départ (référence pour la « montée ») ;
+      // blindUp = nombre de donnes entre chaque doublement (0 = blindes fixes).
+      var base = { order: order, stacks: stacks, sb: o.sb, bb: o.bb, baseSb: o.sb, baseBb: o.bb,
+        blindUp: o.blindUp, startStack: o.stack, handNo: 0, buttonPid: order[order.length - 1] };
       startHand(base);
       return base;
+    }
+
+    // ══ Réglages du salon : cave / blindes / montée (tournoi) ════════════════════
+    var PK_STACKS = [500, 1000, 2000, 5000];
+    var PK_BLINDS = [[5, 10], [10, 20], [25, 50], [50, 100]];
+    var PK_BLINDUP = [0, 5, 8, 12]; // donnes entre deux montées ; 0 = fixes
+    // Réglages effectifs : ceux du salon (room.opts) ou les valeurs par défaut.
+    function effPkOpts(room) {
+      var o = room && room.opts;
+      return {
+        stack: (o && +o.stack) || START_STACK,
+        sb: (o && +o.sb) || SB,
+        bb: (o && +o.bb) || BB,
+        blindUp: (o && o.blindUp != null) ? +o.blindUp : 0
+      };
+    }
+    // Réglages appliqués au démarrage : room.opts (en ligne) ou chips de setup (solo).
+    function readPkOpts(cur) {
+      if (cur && cur.opts && typeof cur.opts.stack !== 'undefined') return effPkOpts(cur);
+      var off = readPkOfflineOpts();
+      if (off) return off;
+      return { stack: START_STACK, sb: SB, bb: BB, blindUp: 0 };
+    }
+    function lobbyExtraHTML(room) {
+      var isHost = room && room.host === window.myPid;
+      var o = effPkOpts(room);
+      var stackBtns = PK_STACKS.map(function (s) {
+        return '<button type="button" class="lb-set-btn' + (o.stack === s ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setPkStack(' + s + ')"' : ' disabled') + '>' + s + '</button>';
+      }).join('');
+      var blindBtns = PK_BLINDS.map(function (b) {
+        var on = (o.sb === b[0] && o.bb === b[1]);
+        return '<button type="button" class="lb-set-btn' + (on ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setPkBlinds(' + b[0] + ',' + b[1] + ')"' : ' disabled') + '>' + b[0] + '/' + b[1] + '</button>';
+      }).join('');
+      var upBtns = PK_BLINDUP.map(function (u) {
+        var lbl = u === 0 ? 'Fixes' : ('/' + u + ' donnes');
+        return '<button type="button" class="lb-set-btn' + (o.blindUp === u ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setPkBlindUp(' + u + ')"' : ' disabled') + '>' + lbl + '</button>';
+      }).join('');
+      var hint = isHost
+        ? '<div class="lb-set-hint">Cave = jetons de départ. « Montée » double les blindes toutes les N donnes (façon tournoi).</div>'
+        : '<div class="lb-set-hint">Réglé par l’hôte</div>';
+      return '<div class="lb-botset">' +
+        '<div class="lb-set"><div class="lb-set-label">💰 Cave (jetons)</div><div class="lb-set-row">' + stackBtns + '</div></div>' +
+        '<div class="lb-set"><div class="lb-set-label">Blindes (SB/BB)</div><div class="lb-set-row">' + blindBtns + '</div></div>' +
+        '<div class="lb-set"><div class="lb-set-label">⬆ Montée des blindes</div><div class="lb-set-row">' + upBtns + '</div></div>' +
+        hint + '</div>';
+    }
+    function writePkOpts(o) { if (window.roomRef) window.roomRef.child('opts').set({ stack: o.stack, sb: o.sb, bb: o.bb, blindUp: o.blindUp }); }
+    function setPkStack(s) { var o = effPkOpts(window.room); o.stack = s; writePkOpts(o); }
+    function setPkBlinds(sb, bb) { var o = effPkOpts(window.room); o.sb = sb; o.bb = bb; writePkOpts(o); }
+    function setPkBlindUp(u) { var o = effPkOpts(window.room); o.blindUp = u; writePkOpts(o); }
+
+    // ── Réglages en SOLO / LOCAL hors-ligne : mêmes options, sous forme de chips ─
+    function offlineExtraSetup() {
+      var stackBtns = PK_STACKS.map(function (s) {
+        return '<button type="button" class="off-opt pk-stackoff' + (s === START_STACK ? ' active' : '') + '" data-stack="' + s + '">' + s + '</button>';
+      }).join('');
+      var blindBtns = PK_BLINDS.map(function (b) {
+        var on = (b[0] === SB && b[1] === BB);
+        return '<button type="button" class="off-opt pk-blindoff' + (on ? ' active' : '') + '" data-sb="' + b[0] + '" data-bb="' + b[1] + '">' + b[0] + '/' + b[1] + '</button>';
+      }).join('');
+      var upBtns = PK_BLINDUP.map(function (u) {
+        return '<button type="button" class="off-opt pk-upoff' + (u === 0 ? ' active' : '') + '" data-up="' + u + '">' + (u === 0 ? 'Fixes' : '/' + u) + '</button>';
+      }).join('');
+      return '<div class="off-set"><div class="off-set-label">💰 Cave (jetons)</div><div class="off-set-row">' + stackBtns + '</div></div>' +
+        '<div class="off-set"><div class="off-set-label">Blindes (SB/BB)</div><div class="off-set-row">' + blindBtns + '</div></div>' +
+        '<div class="off-set"><div class="off-set-label">⬆ Montée des blindes (donnes)</div><div class="off-set-row">' + upBtns + '</div></div>';
+    }
+    function readPkOfflineOpts() {
+      var st = document.querySelector('.pk-stackoff.active');
+      if (!st) return null; // chips absentes → pas en mode solo
+      var bl = document.querySelector('.pk-blindoff.active');
+      var up = document.querySelector('.pk-upoff.active');
+      return {
+        stack: +st.dataset.stack || START_STACK,
+        sb: bl ? +bl.dataset.sb : SB,
+        bb: bl ? +bl.dataset.bb : BB,
+        blindUp: up ? +up.dataset.up : 0
+      };
     }
 
     // Joueurs encore en lice dans la PARTIE (jetons > 0 ou déjà engagés cette main)
@@ -309,6 +397,15 @@
       var live = liveInGame(cur);
       if (live.length <= 1) { cur.winner = live[0] || null; cur.status = 'ended'; return; }
       cur.handNo = (cur.handNo || 0) + 1;
+      // Montée des blindes (façon tournoi) : double toutes les cur.blindUp donnes.
+      var leveledUp = false;
+      if (cur.blindUp > 0) {
+        var lvl = Math.min(8, Math.floor((cur.handNo - 1) / cur.blindUp));
+        var mult = Math.pow(2, lvl);
+        var newBb = (cur.baseBb || cur.bb) * mult;
+        leveledUp = (newBb !== cur.bb);
+        cur.sb = (cur.baseSb || cur.sb) * mult; cur.bb = newBb;
+      }
       // bouton : prochain joueur avec des jetons
       cur.buttonPid = nextWithChips(cur, cur.buttonPid);
       cur.deck = shuffledDeck(); cur.pos = 0;
@@ -331,7 +428,7 @@
       cur.turn = firstAct;
       // la blind postée n'est pas une action volontaire → ces joueurs doivent encore parler
       cur.acted[sbPid] = false; cur.acted[bbPid] = false;
-      cur.banner = 'Nouvelle donne — blinds ' + cur.sb + '/' + cur.bb;
+      cur.banner = (leveledUp ? '⬆ Blindes montées à ' : 'Nouvelle donne — blinds ') + cur.sb + '/' + cur.bb;
       // Si un blind est déjà tapis, ajuster : passer directement si personne ne peut agir
       skipToActable(cur);
     }
