@@ -24,11 +24,24 @@
     .uno-vtog.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
 
     #s-playing { min-height: calc(100vh - 52px); }
-    .uno-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
+    /* En-tête : 4 zones (tour · manche · scores · actions). Grand écran = une
+       seule ligne (4 colonnes) ; mobile = 2 lignes propres (tour+actions, puis
+       manche+scores) pour ne JAMAIS rogner les boutons hors de l'écran.
+       Avant : 4 enfants dans une grille à 3 colonnes → les actions passaient à la
+       ligne, mal alignées (et rognées à gauche sur mobile). */
+    .uno-header { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto auto auto; align-items: center; gap: 8px 10px; }
     html[data-theme="dark"] .uno-header { background: rgba(20,16,28,0.97); }
-    .uno-round-label { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--gold); white-space: nowrap; justify-self: center; }
-    .uno-header-actions { justify-self: end; }
-    .uno-header-actions { display: flex; gap: 6px; }
+    .uno-turn-banner { grid-column: 1; }
+    .uno-round-label { grid-column: 2; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--gold); white-space: nowrap; justify-self: center; }
+    .uno-scores { grid-column: 3; justify-self: end; }
+    .uno-header-actions { grid-column: 4; justify-self: end; display: flex; gap: 6px; }
+    @media (max-width: 560px) {
+      .uno-header { grid-template-columns: minmax(0,1fr) auto; }
+      .uno-turn-banner { grid-column: 1; grid-row: 1; }
+      .uno-header-actions { grid-column: 2; grid-row: 1; }
+      .uno-round-label { grid-column: 1; grid-row: 2; justify-self: start; }
+      .uno-scores { grid-column: 2; grid-row: 2; justify-self: end; }
+    }
     .uno-hist-btn { position: relative; border: 1.5px solid var(--gold-light); background: var(--cream); border-radius: 30px; padding: 4px 9px; font-size: 0.78rem; cursor: pointer; }
     .uno-hist-btn .badge { position: absolute; top: -6px; right: -6px; background: var(--terracotta); color: #fff; border-radius: 20px; font-size: 0.7rem; padding: 1px 5px; }
 
