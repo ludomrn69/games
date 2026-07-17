@@ -670,7 +670,11 @@
       }
       setHTML('mb-actions', actionsHTML);
       var handArr = P.hand || [];
-      var grew = handArr.length > _prevHandLen && _prevHandLen >= 0; // carte fraîchement piochée
+      // Nouvelle manche → toute la main s'égrène (distribution en éventail) ; sinon,
+      // seule la carte piochée joue l'animation « in ». On ne cumule pas les deux.
+      var dealSig = (state.roundNum || 1) + '|' + me;
+      var freshDeal = window._mbDealSig !== dealSig;
+      var grew = !freshDeal && handArr.length > _prevHandLen && _prevHandLen >= 0; // carte fraîchement piochée
       _prevHandLen = handArr.length;
       setHTML('mb-hand', handArr.map(function (card, i) {
         var c = CARD[card];
@@ -679,6 +683,9 @@
         var fresh = grew && i === handArr.length - 1;
         return '<div class="mb-card' + (sel === i ? ' sel' : '') + (myTurn && !playable ? ' dim' : '') + (fresh ? ' in' : '') + '" onclick="pickCard(' + i + ')">' + inner + '</div>';
       }).join(''));
+      var mbHand = document.getElementById('mb-hand');
+      if (mbHand) mbHand.classList.toggle('fx-dealwave', freshDeal);
+      window._mbDealSig = dealSig;
     }
     function pickCard(i) { sel = (sel === i ? -1 : i); targeting = null; render(window.room); }
     function cancelTarget() { targeting = null; render(window.room); }

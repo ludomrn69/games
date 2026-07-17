@@ -523,6 +523,11 @@
           return cardHTML(c, state.papSuit, (ok ? ' playable' : (myTurn ? ' dim' : ''))).replace('<div class="card', '<div' + click + ' class="card');
         }).join(''));
       }
+      // Distribution en éventail : la main s'égrène uniquement à une NOUVELLE donne
+      // (signature = n° de donne + joueur), pas à chaque carte jouée du même pli.
+      var pHand = document.getElementById('pa-hand');
+      var dealSig = (state.deal || 1) + '|' + me;
+      if (pHand) { pHand.classList.toggle('fx-dealwave', window._paDealSig !== dealSig); window._paDealSig = dealSig; }
 
       maybeAbsent(state);
     }
