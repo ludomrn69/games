@@ -777,7 +777,7 @@
         '<p class="lb-kicker">Salle d’attente</p>' +
         '<h1 class="lb-title" style="font-size:clamp(1.6rem,6vw,2.2rem)">' + esc(c.name || 'Jeu') + '</h1>' +
         '<div class="lb-code-card"><div class="lb-code-label">Code du salon</div><div class="lb-code">' + esc(window.roomCode || '') + '</div>' +
-          '<div class="lb-code-actions"><button class="lb-btn small ghost" onclick="Lobby.shareRoom()">Partager le lien</button></div></div>' +
+          '<div class="lb-code-actions"><button class="lb-btn small ghost" onclick="Lobby.showRoomQR()">📷 QR code</button><button class="lb-btn small ghost" onclick="Lobby.shareRoom()">Partager le lien</button></div></div>' +
         winHistoryHTML(room) +
         '<div class="lb-players">' + rows + '</div>' +
         botCtl +
@@ -1234,6 +1234,44 @@
     lbToast(url);
   }
 
+  // ── QR code du salon (scanner pour rejoindre, 100 % hors-ligne) ───────────
+  // L'encodeur (qrcode.js) est chargé À LA DEMANDE (léger, rarement utilisé) et
+  // précaché par le service worker → marche aussi sans réseau. Le QR encode le
+  // lien du salon : les copains le scannent pour rejoindre sans taper le code.
+  function ensureQR(cb) {
+    if (window.QR) return cb();
+    var s = document.createElement('script');
+    s.src = '/qrcode.js';
+    s.onload = function () { cb(); };
+    s.onerror = function () { lbToast('QR indisponible'); };
+    document.head.appendChild(s);
+  }
+  function showRoomQR() {
+    if (!window.roomCode) return;
+    var url = location.origin + location.pathname + '?room=' + window.roomCode;
+    ensureQR(function () {
+      var modal = document.getElementById('lb-qr-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'lb-qr-modal'; modal.className = 'lb-modal';
+        modal.innerHTML = '<div class="lb-qr-card">' +
+          '<div class="lb-qr-title">Scanne pour rejoindre</div>' +
+          '<div class="lb-qr-img" id="lb-qr-img"></div>' +
+          '<div class="lb-qr-code" id="lb-qr-code"></div>' +
+          '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+            '<button class="lb-btn small ghost" onclick="Lobby.shareRoom()">Partager le lien</button>' +
+            '<button class="lb-btn small" onclick="closeModal(\'lb-qr-modal\')">Fermer</button></div>' +
+          '</div>';
+        modal.addEventListener('click', function (e) { if (e.target === modal) closeModal('lb-qr-modal'); });
+        document.body.appendChild(modal);
+      }
+      try { document.getElementById('lb-qr-img').innerHTML = QR.svg(url, { ecl: 'M', border: 3 }); }
+      catch (e) { lbToast('QR indisponible'); return; }
+      document.getElementById('lb-qr-code').textContent = window.roomCode;
+      openModal('lb-qr-modal');
+    });
+  }
+
   // ── Changer d'identité / quitter ──────────────────────────────────────────
   function changeIdentity() { window._changingIdentity = true; renderIdentity(true); }
   function cancelChange() { window._changingIdentity = false; window.showScreen('s-lobby'); }
@@ -1365,6 +1403,7 @@
     refreshBotSpeedUI: refreshBotSpeedUI,
     refreshGameStatsUI: refreshGameStatsUI,
     shareRoom: shareRoom,
+    showRoomQR: showRoomQR,
     changeIdentity: changeIdentity,
     cancelChange: cancelChange,
     leaveRoom: leaveRoom,

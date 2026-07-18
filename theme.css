@@ -240,6 +240,23 @@ html[data-theme="dark"] .game-restart-btn {
 .lb-rules-recall ul { list-style: none; margin-top: 8px; display: flex; flex-direction: column;
   gap: 6px; font-size: 0.84rem; color: var(--ink-light); }
 
+/* Modale QR du salon. Overlay AUTONOME (indépendant des .modal propres à chaque
+   jeu) pour être identique partout. La carte reste BLANCHE en thème sombre : un
+   QR doit rester noir-sur-blanc pour être scannable. */
+.lb-modal { position: fixed; inset: 0; z-index: 9000; display: none; align-items: center;
+  justify-content: center; padding: 20px; background: rgba(20,16,28,0.62);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.lb-modal.active { display: flex; animation: fadeUp 0.22s ease both; }
+.lb-qr-card { background: #fff; border-radius: 20px; padding: 22px 20px; max-width: 320px;
+  width: 100%; text-align: center; box-shadow: var(--shadow-hover); }
+.lb-qr-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.25rem;
+  color: #2C2520; margin-bottom: 14px; }
+.lb-qr-img { width: 232px; height: 232px; margin: 0 auto 12px; padding: 10px; background: #fff;
+  border: 1px solid #eadfce; border-radius: 12px; }
+.lb-qr-img svg { display: block; width: 100%; height: 100%; }
+.lb-qr-code { font-family: 'Playfair Display', serif; font-weight: 900; letter-spacing: 0.22em;
+  font-size: 1.5rem; color: var(--terracotta); margin-bottom: 14px; }
+
 .lb-wait-msg { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); min-height: 22px; margin: 4px 0 14px; }
 
 /* Réglages « ordis » (ajouter des bots + difficulté) dans la salle d'attente */
