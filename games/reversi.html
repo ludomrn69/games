@@ -19,6 +19,14 @@
     .ot-score-chip { display: inline-flex; align-items: center; gap: 5px; }
     .ot-mini { width: 15px; height: 15px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
     .ot-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+    /* Mobile étroit : en-tête sur 2 rangées (tour + boutons en haut, scores
+       centrés dessous) pour ne plus tronquer le libellé de tour. */
+    @media (max-width: 470px) {
+      .ot-header { grid-template-columns: 1fr auto; grid-template-areas: 'turn actions' 'scores scores'; row-gap: 3px; }
+      .ot-turn { grid-area: turn; }
+      .ot-actions { grid-area: actions; }
+      .ot-scores { grid-area: scores; justify-self: center; }
+    }
 
     .ot-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 14px; width: 100%; }
     .ot-frame { display: grid; grid-template-columns: repeat(8, 1fr); gap: clamp(2px, 0.9vw, 5px); width: min(94vw, 460px); aspect-ratio: 1; background: linear-gradient(160deg, #1f7a4d, #176039); border: 4px solid #0e4427; border-radius: 14px; padding: clamp(5px, 1.6vw, 9px); box-shadow: var(--shadow); }

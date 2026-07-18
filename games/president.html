@@ -56,9 +56,19 @@
       .pr-hand { gap: 8px; }
       .pr-pile { min-height: 100px; }
     }
+    /* Grand écran (ordi) : table et cartes plus grandes, main étalée sur la largeur. */
+    @media (min-width: 1000px) {
+      .pr-opps, .pr-pile-wrap, .pr-hand { max-width: 1120px; }
+      .pr-pile-wrap { width: min(52vw, 560px); }
+      .card { width: 74px; height: 106px; }
+      .card .cnr .rk { font-size: 1rem; } .card .mid { font-size: 1.7rem; }
+      .pr-hand { gap: 10px; }
+      .pr-pile { min-height: 120px; }
+    }
     .pr-hand .card { cursor: pointer; transition: transform 0.15s; }
     .pr-hand .card.sel { transform: translateY(-12px); box-shadow: 0 8px 18px rgba(196,116,90,0.4); border-color: var(--terracotta); }
-    .pr-hand .card.dim { opacity: 0.4; }
+    .pr-hand .card.dim { filter: grayscale(0.55) brightness(0.96); opacity: 0.55; }
+    html[data-theme="dark"] .pr-hand .card.dim { filter: grayscale(0.5) brightness(0.86); opacity: 0.62; }
     .pr-actions { display: flex; gap: 8px; padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); justify-content: center; }
     .pr-act-btn { border: 1.5px solid var(--gold-light); background: var(--white); border-radius: 30px; padding: 0.6rem 1.4rem; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.95rem; cursor: pointer; }
     .pr-act-btn.play { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border: none; }

@@ -568,6 +568,13 @@
     var status = room.status || 'waiting';
     var skipRender = shouldSkipGameRender(room);
 
+    // Exclu par l'hôte : mon pid est marqué dans room.kicked et je ne suis plus
+    // dans la liste → je quitte proprement (les vrais ordis n'ont pas de client).
+    if (room.kicked && room.kicked[window.myPid] && room.host !== window.myPid && !window.isSpectator) {
+      handleKicked();
+      return;
+    }
+
     // Mode SPECTATEUR : on regarde une partie en cours sans y participer. Dès
     // que le salon repasse en attente (rejouer), on devient un vrai joueur.
     if (window.isSpectator) {
@@ -719,6 +726,15 @@
     });
   }
 
+  // Rappel des « Règles rapides » DANS la salle d'attente (repliable). Les
+  // retardataires qui rejoignent par lien ne voient jamais l'écran d'accueil ;
+  // ils ont donc les règles sous la main ici aussi.
+  function rulesRecallHTML(c) {
+    if (!c.rules || !c.rules.length) return '';
+    var items = c.rules.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
+    return '<details class="lb-rules-recall"><summary>📖 Règles rapides</summary><ul>' + items + '</ul></details>';
+  }
+
   // ── Rendu de la salle d'attente ───────────────────────────────────────────
   function renderLobby(room) {
     var host = document.getElementById('s-lobby');
@@ -731,13 +747,19 @@
     var me = window.Room.me();
     var iReady = me && me.ready;
 
+    var isHost = me && room.host === window.myPid;
     var rows = players.map(function (p) {
       var st = !p.online ? '<span class="lb-dot"></span>Hors ligne'
         : p.ready ? '<span class="lb-dot ready"></span>Prêt·e'
         : '<span class="lb-dot online"></span>Connecté·e';
+      // L'hôte peut retirer un AUTRE joueur humain (petit ✕). Les ordis se gèrent
+      // avec le compteur « Ordis » plus bas.
+      var canKick = isHost && p.pid !== window.myPid && !p.isBot;
       return '<div class="lb-player">' + window.Room.avatarHTML(p.pid, 42) +
         '<span class="lb-player-name">' + esc(p.name) + (p.pid === window.myPid ? ' <span class="lb-player-tag">(toi)</span>' : '') + '</span>' +
-        '<span class="lb-player-status">' + st + '</span></div>';
+        '<span class="lb-player-status">' + st + '</span>' +
+        (canKick ? '<button class="lb-kick" title="Retirer ' + esc(p.name) + ' du salon" aria-label="Retirer ' + esc(p.name) + ' du salon" onclick="Lobby.kickPlayer(\'' + p.pid + '\')">✕</button>' : '') +
+        '</div>';
     }).join('');
 
     var waitMsg = onlineCount < min
@@ -763,6 +785,12 @@
         '<div class="lb-wait-msg">' + esc(waitMsg) + '</div>' +
         '<button class="lb-btn" id="lb-ready-btn" onclick="Lobby.toggleReady()"' + (onlineCount < min ? ' disabled' : '') + '>' +
           (iReady ? 'Annuler' : 'Je suis prêt·e ✓') + '</button>' +
+        // Hôte : « Lancer maintenant » quand le minimum est là mais que tout le
+        // monde n'a pas encore cliqué Prêt (sinon le démarrage auto s'en charge).
+        ((isHost && onlineCount >= min && onlineReady < onlineCount)
+          ? '<button class="lb-btn ghost small" style="margin-top:10px" onclick="Lobby.forceStart()">▶ Lancer maintenant (' + onlineReady + '/' + onlineCount + ' prêts)</button>'
+          : '') +
+        rulesRecallHTML(c) +
         '<button class="lb-link" onclick="Lobby.changeIdentity()">Changer de nom / émoji</button>' +
         '<button class="lb-link" onclick="Lobby.leaveRoom()">Quitter le salon</button>' +
       '</div>';
@@ -1122,6 +1150,56 @@
     });
   }
 
+  // ── « Lancer maintenant » (hôte) ──────────────────────────────────────────
+  // Démarre la partie sans attendre que TOUT le monde ait cliqué « Prêt » (utile
+  // quand un copain traîne / est AFK). Même logique que maybeAutoStart, sans la
+  // condition « tous prêts ». Le minimum de joueurs reste requis.
+  function forceStart() {
+    var c = cfg(), min = c.minPlayers || 2;
+    if (!window.roomRef) return;
+    window.roomRef.transaction(function (cur) {
+      if (!cur || cur.status !== 'waiting' || !cur.players) return cur;
+      if (cur.host !== window.myPid) return cur;            // seul l'hôte force
+      var on = Object.keys(cur.players).map(function (k) { return Object.assign({ pid: k }, cur.players[k]); })
+        .filter(function (p) { return p.online; });
+      if (on.length < min) return cur;                       // minimum toujours requis
+      on.sort(function (a, b) { return (a.seat || 0) - (b.seat || 0); });
+      cur.order = on.map(function (p) { return p.pid; });
+      cur.status = 'playing';
+      on.forEach(function (p) { cur.players[p.pid].ready = false; });
+      if (c.onStart) {
+        var extra = c.onStart(on, cur);
+        if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) cur[k] = extra[k];
+      }
+      return cur;
+    });
+  }
+
+  // ── Exclure un joueur (hôte) ──────────────────────────────────────────────
+  // Retire un joueur du salon. Pour un HUMAIN, on pose aussi un drapeau
+  // rooms/<code>/kicked/<pid> : son client le détecte (masterOnState) et quitte —
+  // et il ne peut pas se rajouter en boucle depuis le même appareil. Pour un ordi,
+  // simple retrait (ils sont pilotés par l'hôte, aucun client à prévenir).
+  function kickPlayer(pid) {
+    if (!window.roomRef || !pid) return;
+    var room = window.room || {};
+    if (room.host !== window.myPid || pid === window.myPid) return; // hôte, pas soi-même
+    var p = room.players && room.players[pid];
+    if (!p) return;
+    if (p.isBot) { window.roomRef.child('players/' + pid).remove(); return; }
+    window.roomRef.child('kicked/' + pid).set(Date.now());
+    window.roomRef.child('players/' + pid).remove();
+    lbToast(esc(p.name) + ' a été retiré du salon');
+  }
+  // Côté joueur exclu : on coupe l'écoute et on rentre à l'accueil.
+  function handleKicked() {
+    if (window.listenersOn) { try { window.roomRef.off('value', masterOnState); } catch (e) {} window.listenersOn = false; }
+    try { disarmReactions(); } catch (e) {}
+    if (window.GamePresence) try { GamePresence.stop(); } catch (e) {}
+    try { lbToast('Tu as été retiré du salon par l’hôte'); } catch (e) {}
+    setTimeout(function () { location.href = '/index.html'; }, 1500);
+  }
+
   // ── Retour à la salle d'attente (rejouer) — appelé par les jeux ───────────
   // keep : tableau de clés de players/<pid> à conserver (ex. ['wins','score']).
   function resetToLobby(keep) {
@@ -1277,6 +1355,8 @@
     joinFromInput: joinFromInput,
     submitIdentity: submitIdentity,
     toggleReady: toggleReady,
+    forceStart: forceStart,
+    kickPlayer: kickPlayer,
     setBotCount: setBotCount,
     setDifficulty: setDifficulty,
     setBotSpeed: setBotSpeed,

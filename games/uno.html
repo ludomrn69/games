@@ -79,9 +79,27 @@
       .uno-center { gap: 34px; }
       .uno-my-hand { gap: 9px; }
     }
+    /* Grand écran (ordi) : la table et les cartes GRANDISSENT pour remplir l'espace
+       — fini la colonne mobile perdue au milieu du vide. Vraie table de jeu. */
+    @media (min-width: 1000px) {
+      .uno-opps { max-width: 1120px; gap: 10px; }
+      .uno-opp-chip { font-size: 0.95rem; padding: 6px 15px 6px 6px; }
+      .uno-opp-av { width: 28px; height: 28px; font-size: 1rem; }
+      .uno-center { width: min(64vw, 620px); gap: 56px; padding: 30px 26px; border-radius: 26px; }
+      .uno-card.lg { width: 88px; height: 132px; font-size: 2.2rem; border-radius: 14px; }
+      .uno-my-hand { gap: 12px; max-width: 1120px; }
+      .uno-my-hand .uno-card.in-hand { width: 70px; height: 106px; font-size: 1.75rem; border-radius: 13px; }
+      .uno-my-label { font-size: 1.15rem; }
+      .uno-action-btn { font-size: 0.98rem; padding: 0.6rem 1.3rem; }
+    }
     .uno-card.in-hand { cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; }
     .uno-card.in-hand:hover { transform: translateY(-6px); box-shadow: 0 8px 18px rgba(0,0,0,0.22); }
-    .uno-card.in-hand.unplayable { opacity: 0.45; cursor: not-allowed; }
+    /* Carte injouable : on la DÉSATURE (filtre, opaque) au lieu de la rendre
+       translucide — l'opacité laissait passer le fond, et sur fond sombre les
+       cartes viraient au bordeaux/olive. Le filtre garde la couleur mais l'atténue,
+       identiquement en clair et en sombre. */
+    .uno-card.in-hand.unplayable { filter: grayscale(0.55) brightness(0.92); cursor: not-allowed; }
+    html[data-theme="dark"] .uno-card.in-hand.unplayable { filter: grayscale(0.5) brightness(0.72); }
     /* Jump-in (règle maison) : la carte identique au dessus scintille hors tour. */
     .uno-card.in-hand.jumpable { animation: unoJump 0.9s ease-in-out infinite alternate; box-shadow: 0 0 0 3px var(--gold), 0 6px 14px rgba(198,152,90,0.45); }
     @keyframes unoJump { from { transform: translateY(0); } to { transform: translateY(-8px); } }

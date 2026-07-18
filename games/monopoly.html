@@ -49,7 +49,11 @@
     .mo-rem-chip { font-size: 0.72rem; background: var(--cream); border-radius: 8px; padding: 2px 7px; cursor: pointer; white-space: nowrap; }
     .mo-rem-chip b { color: var(--terracotta); }
     html[data-theme="dark"] .mo-rem-chip { background: #2a2433; }
-    .mo-cell.corner { font-size: 1.15em; align-items: center; justify-content: center; text-align: center; padding: 2px; }
+    .mo-cell.corner { align-items: center; justify-content: center; text-align: center; padding: 1px; gap: 1px; }
+    /* Coins : émoji au-dessus, libellé compact dessous (le texte inline
+       « 🚓 Prison ! » débordait/était rogné sur mobile → « riso! »). */
+    .mo-cell.corner .mo-corner-ic { font-size: 1.9em; line-height: 1; }
+    .mo-cell.corner .mo-corner-lb { font-weight: 800; color: var(--ink); line-height: 1; font-size: 0.95em; }
     .mo-cell.mortg { opacity: .55; }
     .mo-toks { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0; pointer-events: none; }
     .mo-tok { font-size: 11px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
@@ -315,7 +319,8 @@
         else if (sp.t === 'rail') inner += '<div class="bar" style="background:#2C2520"></div>';
         else if (sp.t === 'util') inner += '<div class="bar" style="background:#7e9bbf"></div>';
         if (corner) {
-          inner += '<div>' + (i === 0 ? '🏁 Départ' : i === 10 ? '⛓ Prison' : i === 20 ? '🅿️ Parc' : '🚓 Prison !') + '</div>';
+          var cc = i === 0 ? ['🏁', 'Départ'] : i === 10 ? ['⛓', 'Prison'] : i === 20 ? ['🅿️', 'Parc'] : ['🚓', 'En prison'];
+          inner += '<div class="mo-corner-ic">' + cc[0] + '</div><div class="mo-corner-lb">' + cc[1] + '</div>';
         } else {
           inner += '<div class="nm">' + abbr(sp.n) + '</div>';
           var prc = (sp.t === 'prop' || sp.t === 'rail' || sp.t === 'util');

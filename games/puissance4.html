@@ -19,6 +19,15 @@
     .p4-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; }
     .p4-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
     .p4-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+    /* Mobile étroit : l'en-tête tenait sur une ligne et tronquait « À toi de
+       jouer ». On passe sur 2 rangées (tour + boutons en haut, scores centrés
+       dessous) → le libellé de tour a toute la largeur. */
+    @media (max-width: 470px) {
+      .p4-header { grid-template-columns: 1fr auto; grid-template-areas: 'turn actions' 'scores scores'; row-gap: 3px; }
+      .p4-turn { grid-area: turn; }
+      .p4-actions { grid-area: actions; }
+      .p4-scores { grid-area: scores; justify-self: center; }
+    }
 
     .p4-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; width: 100%; }
     /* Look classique « Connect 4 » : plateau BLEU, trous crème, jetons rouge/jaune

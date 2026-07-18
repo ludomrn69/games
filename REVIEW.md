@@ -8,6 +8,34 @@
 
 ---
 
+## ✅ Déjà corrigé dans cette passe (juillet 2026)
+
+1. **Cartes injouables en mode sombre** — remplacé l'`opacity` (qui laissait passer
+   le fond noir et rendait les cartes ternes/bordeaux) par une **désaturation opaque**
+   (`filter: grayscale`) : les couleurs restent identiques en clair et en sombre,
+   les cartes jouables ressortent. Fait sur **Uno**, **Mille Bornes**, **Président**.
+   (Skyjo : ses couleurs étaient déjà fixées par tranche de valeur — rien à changer.)
+2. **En-têtes mobiles tronqués** — **Puissance 4** et **Reversi** passent sur 2 rangées
+   sous 470 px (tour en haut, scores centrés dessous) → « À toi de jouer » ne se coupe plus.
+3. **Coins du Monopoly illisibles sur mobile** — émoji au-dessus + libellé compact
+   dessous (Départ / Prison / Parc / En prison) au lieu du texte inline rogné (« riso! »).
+4. **Layout PC des jeux de cartes** — **Uno**, **Skyjo** et **Président** exploitent
+   maintenant la largeur sur grand écran : adversaires étalés en haut, table agrandie,
+   main de cartes plus grande répartie sur toute la largeur (fini la colonne mobile
+   perdue dans le vide).
+5. **Salle d'attente enrichie** (tous les jeux, via `lobby.js`) :
+   **▶ Lancer maintenant** (l'hôte démarre sans attendre les retardataires),
+   **✕ retirer un joueur** (l'hôte exclut un squatteur — le joueur exclu est ramené
+   à l'accueil), et un **rappel repliable des « Règles rapides »** pour ceux qui
+   rejoignent par lien sans passer par l'écran d'accueil.
+
+Vérifié en jouant : captures mobile + PC, clair + sombre, et **0 erreur JS** sur les
+7 jeux modifiés. Reste à faire : QR code du salon, réordonnancement des sièges,
+options de fidélité (flotte navale classique, dames 10×10, enchères Monopoly, rôles
+Loup-Garou), et l'extension du layout PC aux autres jeux de cartes.
+
+---
+
 ## Verdict global
 
 Le projet est **impressionnant** : 49 jeux + 42 mini-jeux Playus, une coquille commune
