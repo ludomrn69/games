@@ -28,13 +28,24 @@
 
     .pa-banner { text-align: center; font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--terracotta); min-height: 26px; padding: 4px 12px; }
 
-    .pa-trick-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 12px 12px; }
+    /* Le tapis absorbe la hauteur libre (mobile comme PC). */
+    #s-playing { display: flex; flex-direction: column; }
+    .pa-trick-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px 12px; flex: 1; min-height: 150px; }
+    /* Roulette du dé de couleur (nouvelle donne) */
+    .pa-die-roll { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 3000; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 92vw; animation: fxPopIn 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+    .pa-die-face { width: 84px; height: 84px; border-radius: 20px; background: linear-gradient(145deg, #fff, #ece6da);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 -3px 5px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-size: 2.6rem; }
+    .pa-die-roll.landed .pa-die-face { animation: resPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    .pa-die-lbl { background: var(--white); color: var(--ink); font-weight: 800; font-size: 0.9rem; border-radius: 30px; padding: 5px 14px; box-shadow: var(--shadow-hover); text-align: center; max-width: min(88vw, 340px); }
+    .pa-die-roll.out { transition: opacity 0.35s; opacity: 0; }
     .pa-trick-label { font-family: 'Caveat', cursive; font-size: 0.9rem; color: var(--ink-light); }
     .pa-trick { display: flex; gap: 6px; min-height: 92px; align-items: center; justify-content: center; flex-wrap: wrap; }
     .pa-trick-empty { font-family: 'Caveat', cursive; color: var(--ink-light); font-size: 1.1rem; }
     /* Sur le tapis (feutre), les étiquettes passent en clair. */
     .pa-trick-wrap.felt .pa-trick-empty, .pa-trick-wrap.felt .pa-trick-who { color: rgba(255,255,255,0.78); }
     .pa-trick-card { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .pa-trick-past { opacity: 0.72; }
     .pa-trick-who { font-size: 0.66rem; color: var(--ink-light); max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .card { width: 50px; height: 72px; border-radius: 9px; background: #fff; border: 1.5px solid #d8c8a8; box-shadow: 0 2px 8px rgba(0,0,0,0.16); display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0; position: relative; }
@@ -401,17 +412,50 @@
       return '<div class="card' + (payoo ? ' payoo' : '') + (isPap ? ' pap' : '') + (extra || '') + '">' + ptsBadge +
         '<span class="rk">' + v + '</span><span class="st">' + SUIT_EMOJI[s] + '</span></div>';
     }
+    // ── « Dé » de couleur : roulette animée à chaque nouvelle donne ────────────
+    function paSuitRoll(suit) {
+      if (!document.body || !suit) return;
+      var old = document.getElementById('pa-die-roll'); if (old) old.remove();
+      var el = document.createElement('div');
+      el.className = 'pa-die-roll'; el.id = 'pa-die-roll'; el.setAttribute('aria-hidden', 'true');
+      el.innerHTML = '<div class="pa-die-face">🎲</div><div class="pa-die-lbl">On lance le dé…</div>';
+      document.body.appendChild(el);
+      if (window.Fx) Fx.sfx('flip');
+      var faces = SUITS.slice(), i = 0, hops = 12;
+      var iv = setInterval(function () {
+        i++;
+        var f = (i >= hops) ? suit : faces[i % faces.length];
+        el.querySelector('.pa-die-face').textContent = SUIT_EMOJI[f];
+        if (i >= hops) {
+          clearInterval(iv);
+          el.querySelector('.pa-die-lbl').textContent = 'Papayoo : le 7 ' + SUIT_NAME[suit] + ' vaut 40 pts !';
+          el.classList.add('landed');
+          if (window.Fx) { Fx.sfx('big'); Fx.vib([15, 25, 15]); }
+          setTimeout(function () { el.classList.add('out'); setTimeout(function () { try { el.remove(); } catch (e) {} }, 380); }, 1500);
+        }
+      }, 95);
+    }
+
     function render(state) {
       var order = state.order || [], me = window.myPid;
       setHTML('pa-info', 'Donne ' + (state.deal || 1) + ' · seuil ' + (state.target || 250) +
         ' · <span class="pa-pap">Papayoo : ' + SUIT_EMOJI[state.papSuit] + ' 7 ' + SUIT_NAME[state.papSuit] + ' = 40</span>');
+      // Nouvelle donne → petite roulette du dé de couleur (une seule fois par donne).
+      var dealSig = (state.deal || 1) + '|' + (state.papSuit || '');
+      if (state.papSuit && window._paDealSig !== dealSig) {
+        if (window._paDealSig !== undefined || (state.deal || 1) === 1) paSuitRoll(state.papSuit);
+        window._paDealSig = dealSig;
+      }
 
-      // Adversaires (tous sauf moi)
+      // Adversaires (tous sauf moi). Pendant la passe (simultanée), un ✅/⏳ montre
+      // qui a déjà donné ses cartes et qui on attend encore.
+      var isPassing = (state.phase === 'passing');
       var opps = order.filter(function (p) { return p !== me; }).map(function (pid) {
         var on = (state.turn === pid) ? ' turn' : '';
-        return '<div class="pa-opp' + on + '">' +
+        var wait = isPassing ? (' <span title="' + ((state.passSel && state.passSel[pid]) ? 'A passé ses cartes' : 'Doit encore passer') + '">' + ((state.passSel && state.passSel[pid]) ? '✅' : '⏳') + '</span>') : '';
+        return '<div class="pa-opp' + on + '" id="pa-opp-' + pid + '">' +
           '<span class="pa-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + ' <span class="cnt">' + handOf(state, pid).length + '</span> <span class="sc">' + totalOf(state, pid) + '</span></div>';
+          escapeHtml(Room.name(pid)) + ' <span class="cnt">' + handOf(state, pid).length + '</span> <span class="sc">' + totalOf(state, pid) + '</span>' + wait + '</div>';
       }).join('');
       setHTML('pa-opps', opps);
       setText('pa-banner', state.banner || '');
@@ -432,11 +476,32 @@
         var winNow = trick.length ? trickWinner(trick, state.ledSuit) : null;
         var grew = window._paTrickLen !== undefined && trick.length > window._paTrickLen;
         window._paTrickLen = trick.length;
-        setHTML('pa-trick', trick.length ? trick.map(function (t, i) {
-          var fresh = grew && i === trick.length - 1; // dernière carte posée sur le pli
-          return '<div class="pa-trick-card' + (fresh ? ' card-in' : '') + '">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
-            '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
-        }).join('') : '<span class="pa-trick-empty">— en attente —</span>');
+        if (trick.length) {
+          setHTML('pa-trick', trick.map(function (t, i) {
+            var fresh = grew && i === trick.length - 1; // dernière carte posée sur le pli
+            return '<div class="pa-trick-card' + (fresh ? ' card-in' : '') + '">' + cardHTML(t.card, state.papSuit, (t.by === winNow) ? ' win' : '') +
+              '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + '</span></div>';
+          }).join(''));
+        } else if (state.lastTrick && state.lastTrick.length) {
+          // Entre deux plis : on GARDE le pli qui vient d'être ramassé bien visible
+          // (façon vrai jeu de cartes) — chiffres lisibles + qui a ramassé.
+          var lastWin = trickWinner(state.lastTrick, suitOf(state.lastTrick[0].card));
+          setHTML('pa-trick', state.lastTrick.map(function (t) {
+            return '<div class="pa-trick-card pa-trick-past">' + cardHTML(t.card, state.papSuit, (t.by === lastWin) ? ' win' : '') +
+              '<span class="pa-trick-who">' + escapeHtml(Room.name(t.by)) + (t.by === lastWin ? ' ✋' : '') + '</span></div>';
+          }).join(''));
+          // Le pli VOLE vers son ramasseur (une seule fois par pli).
+          var ltSig = state.lastTrick.map(function (t) { return t.card; }).join(',');
+          if (window._paLtSig !== undefined && window._paLtSig !== ltSig && window.Fx) {
+            var flyTarget = (lastWin === me) ? document.getElementById('pa-my-count') : document.getElementById('pa-opp-' + lastWin);
+            if (flyTarget) state.lastTrick.forEach(function (t, i) {
+              Fx.flyTo('pa-trick', flyTarget, cardHTML(t.card, state.papSuit), { delay: 200 + i * 80, ms: 600, rotate: 24 + i * 8, scale: 0.4 });
+            });
+          }
+          window._paLtSig = ltSig;
+        } else {
+          setHTML('pa-trick', '<span class="pa-trick-empty">— en attente —</span>');
+        }
       }
 
       // Ma main
@@ -458,6 +523,11 @@
           return cardHTML(c, state.papSuit, (ok ? ' playable' : (myTurn ? ' dim' : ''))).replace('<div class="card', '<div' + click + ' class="card');
         }).join(''));
       }
+      // Distribution en éventail : la main s'égrène uniquement à une NOUVELLE donne
+      // (signature = n° de donne + joueur), pas à chaque carte jouée du même pli.
+      var pHand = document.getElementById('pa-hand');
+      var dealSig = (state.deal || 1) + '|' + me;
+      if (pHand) { pHand.classList.toggle('fx-dealwave', window._paDealSig !== dealSig); window._paDealSig = dealSig; }
 
       maybeAbsent(state);
     }

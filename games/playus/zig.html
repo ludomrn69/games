@@ -48,7 +48,8 @@
     for(var i=0;i<2+Math.floor(Math.random()*3);i++){last={x:last.x+(last.dir>0?1:0),y:last.y+(last.dir>0?0:1),dir:last.dir};path.push(last);}
     last={x:last.x,y:last.y,dir:-last.dir};path.push(last);
   }
-  function start(){resize();score=0;tileW=Math.max(30,W*0.10);speed=Math.max(1.4,W*0.004);dir=1;
+  var baseSpeed;
+  function start(){resize();score=0;tileW=Math.max(30,W*0.10);baseSpeed=Math.max(1.4,W*0.004);speed=baseSpeed;dir=1;
     path=[{x:0,y:0,dir:1}];for(var i=0;i<40;i++)extendPath();
     ballWX=0.5;ballWY=0.5;state='play';scoreEl.textContent='0';startScr.classList.add('hidden');overScr.classList.add('hidden');}
   function end(){state='over';document.getElementById('finalScore').textContent=score;
@@ -61,8 +62,11 @@
     return path.some(function(t){return t.x===bx&&t.y===by;});
   }
   function frame(){requestAnimationFrame(frame);ctx.clearRect(0,0,W,H);
-    if(state==='play'){if(dir>0)ballWX+=speed/tileW;else ballWY+=speed/tileW;
-      var s=Math.floor(ballWX)+Math.floor(ballWY);if(s>score){score=s;scoreEl.textContent=score;}
+    if(state==='play'){
+      // Accélération progressive : +80 % de vitesse sur les 60 premiers points, puis ça continue de grimper doucement.
+      speed=baseSpeed*(1+Math.min(score,60)*0.013+Math.max(0,score-60)*0.004);
+      if(dir>0)ballWX+=speed/tileW;else ballWY+=speed/tileW;
+      var s=Math.floor(ballWX)+Math.floor(ballWY);if(s>score){score=s;scoreEl.textContent=score;if(window.Sfx&&s%5===0)try{Sfx.play('coin');}catch(e){}}
       if(!onPath())end();
       if(path.length-Math.floor(ballWX)-Math.floor(ballWY)<25)for(var k=0;k<10;k++)extendPath();
     }
@@ -72,8 +76,11 @@
     path.forEach(function(t){var p=proj(t.x,t.y);if(p.y<-tileW||p.y>H+tileW)return;
       ctx.save();ctx.translate(p.x,p.y);ctx.beginPath();ctx.moveTo(0,-tileW*0.4);ctx.lineTo(tileW*0.7,0);ctx.lineTo(0,tileW*0.4);ctx.lineTo(-tileW*0.7,0);ctx.closePath();
       ctx.fillStyle='#ffb020';ctx.fill();ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(-tileW*0.7,0,tileW*1.4,tileW*0.4);ctx.restore();});
-    var bp=proj(ballWX,ballWY);ctx.beginPath();ctx.arc(bp.x,bp.y-10,Math.max(9,tileW*0.28),0,7);
-    var grd=ctx.createRadialGradient(bp.x-4,bp.y-14,3,bp.x,bp.y-10,tileW*0.28);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#e8524a');ctx.fillStyle=grd;ctx.fill();
+    var bp=proj(ballWX,ballWY);
+    if(isFinite(bp.x)&&isFinite(bp.y)&&isFinite(tileW)){ // rien à dessiner avant la 1re partie
+      ctx.beginPath();ctx.arc(bp.x,bp.y-10,Math.max(9,tileW*0.28),0,7);
+      var grd=ctx.createRadialGradient(bp.x-4,bp.y-14,3,bp.x,bp.y-10,tileW*0.28);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#e8524a');ctx.fillStyle=grd;ctx.fill();
+    }
   }
   resize();frame();
 })();

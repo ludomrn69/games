@@ -119,6 +119,9 @@
 
   <script>
     var escapeHtml = window.esc, N = 6;
+    // Anti-« rouge trop tôt » : on n'affiche les conflits en rouge que 3 s après
+    // le dernier clic, le temps d'enchaîner vide→☀️→🌙 sans flash rouge intempestif.
+    var RED_DELAY = 3000, lastEditAt = 0, redTimer = null;
     function rref() { return window.roomRef; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
@@ -126,7 +129,7 @@
     // lune = croissant bleu. La forme lune est un chemin « lune » (deux arcs).
     var SYM = [
       '<svg class="tg-sym" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="31" fill="#f4b23e" stroke="#c9760f" stroke-width="5"/></svg>',
-      '<svg class="tg-sym" viewBox="0 0 100 100" aria-hidden="true"><path d="M60 12 A40 40 0 1 0 60 88 A30 30 0 1 1 60 12 Z" fill="#3f78c4" stroke="#1f4f8f" stroke-width="5" stroke-linejoin="round"/></svg>'
+      '<svg class="tg-sym" viewBox="0 0 100 100" aria-hidden="true"><path d="M64 10 A42 42 0 1 0 64 90 A34 34 0 1 1 64 10 Z" fill="#3f78c4" stroke="#1f4f8f" stroke-width="7" stroke-linejoin="round"/></svg>'
     ];
 
     /* ━━ Générateur ━━ Solution valide (3/3 par ligne/colonne, jamais 3 à la suite),
@@ -232,6 +235,7 @@
     function tapCell(idx) {
       var pid = window.myPid, s = window.room;
       if ((s.givens || [])[idx] >= 0) return;             // case-indice : verrouillée
+      lastEditAt = Date.now();                             // repousse l'affichage du rouge
       if (assist && s.status === 'playing' && !doneOf(s, pid)) assist.record();
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || doneOf(cur, pid)) return cur;
@@ -297,11 +301,14 @@
       setText('tg-diff', diffLabel(state));
 
       var res = analyze(eff, state.cons), html = '';
+      var sinceEdit = Date.now() - lastEditAt, showBad = sinceEdit >= RED_DELAY;
       for (var i = 0; i < N * N; i++) {
         var v = eff[i], given = giv[i] >= 0;
-        var cls = 'tg-cell' + (given ? ' given' : '') + (res.conflict[i] ? ' bad' : '');
+        var cls = 'tg-cell' + (given ? ' given' : '') + (res.conflict[i] && showBad ? ' bad' : '');
         html += '<div class="' + cls + '" onclick="tapCell(' + i + ')">' + (v >= 0 ? SYM[v] : '') + '</div>';
       }
+      // Si on masque encore le rouge, on programme un re-rendu pour le révéler à échéance.
+      if (!showBad) { clearTimeout(redTimer); redTimer = setTimeout(function () { if (window.room) render(window.room); }, RED_DELAY - sinceEdit + 30); }
       var grid = document.getElementById('tg-grid');
       grid.style.gridTemplateColumns = 'repeat(' + N + ', 1fr)';
       grid.style.gridTemplateRows = 'repeat(' + N + ', 1fr)';

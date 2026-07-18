@@ -81,11 +81,11 @@ la synchro temps réel.
 | 💰 La Bonne Paye | 2–6 | ✈️ | gestion / cartes |
 | 💎 Diamants | 2–8 | ✈️ | stop-ou-encore |
 | 🎲 Perudo | 2–6 | ✈️ | dés / bluff |
-| 🚂 Aventuriers du Rail | 2–5 | ✈️ | plateau / réseau |
 | 🚇 Mini Métro | 1 | ✈️ | gestion / réseau (solo) |
 | 🚗 Mini Motorways | 1 | ✈️ | gestion / routes (solo) |
 | 🙅 No Thanks! | 2–7 | ✈️ | stop-ou-encore |
 | 🎲 Yam's | 1–6 | ✈️ | dés / combinaisons |
+| 🗺️ OpenFront | 1 | ✈️ | stratégie / conquête (solo vs IA) |
 
 <!-- GAMES:END -->
 

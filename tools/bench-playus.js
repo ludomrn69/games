@@ -286,7 +286,9 @@ function runGame(file) {
   return { pre: preErr, post: postErr, started: started };
 }
 
-var files = fs.readdirSync(DIR).filter(function (f) { return f.endsWith('.html'); }).sort();
+// arena.html est le HUB du salon (page GameRoom qui embarque les mini-jeux), pas
+// un mini-jeu autonome : on l'exclut du smoke test des mini-jeux.
+var files = fs.readdirSync(DIR).filter(function (f) { return f.endsWith('.html') && f !== 'arena.html'; }).sort();
 var clean = [], menuGlitch = [], broken = [];
 files.forEach(function (f) {
   var r;

@@ -58,9 +58,11 @@
       if(y>H+r)end();}
     // sol
     ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(0,H-6,W,6);
-    ctx.beginPath();ctx.arc(x,y,r,0,7);
-    var grd=ctx.createRadialGradient(x-r*0.3,y-r*0.3,r*0.2,x,y,r);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#c94b9e');
-    ctx.fillStyle=grd;ctx.fill();
+    if(isFinite(x)&&isFinite(y)){ // pas de balle avant la 1re partie
+      ctx.beginPath();ctx.arc(x,y,r,0,7);
+      var grd=ctx.createRadialGradient(x-r*0.3,y-r*0.3,r*0.2,x,y,r);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#c94b9e');
+      ctx.fillStyle=grd;ctx.fill();
+    }
   }
   resize();frame();
 })();

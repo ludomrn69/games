@@ -20,6 +20,8 @@
     .db-card-label.center { color: var(--terracotta); font-weight: 700; }
     .db-card-label.mine { color: var(--gold); font-weight: 700; }
     .db-card { width: min(64vw, 230px); height: min(64vw, 230px); border-radius: 50%; background: var(--white); box-shadow: 0 6px 28px rgba(44,37,32,0.13); position: relative; border: 3px solid var(--gold-light); flex-shrink: 0; }
+    @media (min-width: 900px) { .db-card { width: min(34vh, 300px); height: min(34vh, 300px); } }
+    @media (min-height: 800px) and (max-width: 899px) { .db-card { width: min(70vw, 280px); height: min(70vw, 280px); } }
     .db-card.center { border-color: var(--terracotta); box-shadow: 0 0 0 4px rgba(196,116,90,0.16), 0 6px 28px rgba(44,37,32,0.13); }
     .db-card.mine { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(198,152,90,0.18), 0 6px 28px rgba(44,37,32,0.13); }
     html[data-theme="dark"] .db-card { background: #f4efe7; }

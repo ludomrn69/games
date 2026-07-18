@@ -69,10 +69,13 @@
     // obstacles
     obs.forEach(function(o){ctx.fillStyle='#e8524a';var ox=laneX(o.l);ctx.fillRect(ox-24,o.y-18,48,36);
       ctx.fillStyle='#a51f1f';ctx.fillRect(ox-24,o.y-18,48,6);});
-    // bille
-    var bx=laneX(lane);ctx.beginPath();ctx.arc(bx,by,r,0,7);
-    var grd=ctx.createRadialGradient(bx-r*0.3,by-r*0.3,r*0.2,bx,by,r);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#ffb020');
-    ctx.fillStyle=grd;ctx.fill();
+    // bille (pas de voie choisie sur l'écran d'accueil → on ne la dessine pas)
+    var bx=laneX(lane);
+    if(isFinite(bx)){
+      ctx.beginPath();ctx.arc(bx,by,r,0,7);
+      var grd=ctx.createRadialGradient(bx-r*0.3,by-r*0.3,r*0.2,bx,by,r);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#ffb020');
+      ctx.fillStyle=grd;ctx.fill();
+    }
   }
   resize();frame();
 })();

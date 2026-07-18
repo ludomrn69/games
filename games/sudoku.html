@@ -32,7 +32,9 @@
     html[data-theme="dark"] .su-cell.given { color: #fff; }
     .su-cell.mine { color: #2a6fd6; }
     /* Case sélectionnée : un contour net, SANS teinter les autres cases. */
-    .su-cell.sel { background: rgba(198,152,90,0.28); box-shadow: inset 0 0 0 3px var(--terracotta); position: relative; z-index: 1; }
+    .su-cell.peer { background: rgba(198,152,90,0.15); }
+    html[data-theme="dark"] .su-cell.peer { background: rgba(198,152,90,0.14); }
+    .su-cell.sel { box-shadow: inset 0 0 0 3px var(--terracotta); position: relative; z-index: 1; }
     .su-cell.bad { color: #e05a4e; background: rgba(224,90,78,0.18); }
     /* Petites notes (candidats) : mini-grille de chiffres dans la case. */
     .su-notes { display: grid; width: 100%; height: 100%; }
@@ -295,11 +297,15 @@
       }).join(''));
       setText('su-banner', state.banner || '');
 
+      var selR = sel >= 0 ? (sel / n | 0) : -1, selC = sel >= 0 ? (sel % n) : -1;
+      var selBR = selR >= 0 ? (selR / bh | 0) : -1, selBC = selC >= 0 ? (selC / bw | 0) : -1;
       var html = '';
       for (var i = 0; i < cells; i++) {
         var r = i / n | 0, c = i % n, v = g[i], given = puzzle[i] !== 0;
         var cls = 'su-cell';
         if (given) cls += ' given'; else if (v) cls += ' mine';
+        // Surbrillance de la ligne / colonne / bloc de la case choisie (sans masquer les notes).
+        if (sel >= 0 && i !== sel && (r === selR || c === selC || ((r / bh | 0) === selBR && (c / bw | 0) === selBC))) cls += ' peer';
         if (i === sel) cls += ' sel';                              // seule la case choisie est mise en avant
         if (v && !given && !validDisplay(g, i, v, n, bh, bw)) cls += ' bad';
         if (c % bw === bw - 1 && c !== n - 1) cls += ' br';

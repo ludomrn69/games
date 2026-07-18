@@ -31,8 +31,10 @@
     .sk-mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
     .sk-mini-cell { width: 16px; height: 22px; border-radius: 3px; font-size: 0.6rem; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 
-    /* Les piles vivent sur un TAPIS sarcelle (feutre, cf. game.css). */
-    .sk-center { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 14px 12px 16px; margin: 4px auto 6px; width: min(94vw, 380px); }
+    /* Les piles vivent sur un TAPIS sarcelle (feutre, cf. game.css).
+       flex:1 → le tapis absorbe la hauteur libre (plus de vide sous la grille). */
+    #s-playing { display: flex; flex-direction: column; }
+    .sk-center { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 14px 12px 16px; margin: 4px auto 6px; width: min(94vw, 380px); flex: 1; min-height: 118px; }
     .sk-pile-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .sk-pile-label { font-family: 'Caveat', cursive; font-size: 0.8rem; color: rgba(255,255,255,0.78); }
     .sk-card { width: 46px; height: 64px; border-radius: 8px; font-weight: 900; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
@@ -48,8 +50,19 @@
     }
     .sk-card.back { cursor: pointer; }
     .sk-card.candidate { box-shadow: 0 0 0 3px var(--terracotta); }
-    .v-neg { background: #5b8dd6; color: #fff; } .v-zero { background: #c9c2b8; color: #2C2520; }
-    .v-low { background: #6ab04c; color: #fff; } .v-mid { background: #f0c419; color: #2C2520; } .v-high { background: #e05a4e; color: #fff; }
+    /* Code couleur par VALEUR (celui qu'on connaît en vrai) : négatifs bleu nuit,
+       0 bleu clair, 1-4 vert, 5-8 jaune, 9-12 rouge — et le chiffre vit sur une
+       PASTILLE BLANCHE centrale, la signature visuelle du jeu. */
+    .v-neg { background: linear-gradient(150deg, #4a5cb8, #34418f); color: #fff; --skd: #34418f; }
+    .v-zero { background: linear-gradient(150deg, #8fd4ec, #5fb6d8); color: #10465c; --skd: #1d7ba3; }
+    .v-low { background: linear-gradient(150deg, #74c163, #4d9c40); color: #fff; --skd: #3c7d31; }
+    .v-mid { background: linear-gradient(150deg, #f6d34a, #e5b511); color: #4a3a00; --skd: #8f7100; }
+    .v-high { background: linear-gradient(150deg, #ea6d5c, #cf4335); color: #fff; --skd: #b03325; }
+    /* Pastille blanche + valeur rappelée dans 2 coins (anatomie de la vraie carte). */
+    .sk-card, .sk-cell { position: relative; }
+    .skv { position: relative; z-index: 1; background: #fff; color: var(--skd, #2C2520); border-radius: 26%; width: 64%; height: 54%; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.22), inset 0 0 0 1.5px rgba(0,0,0,0.05); }
+    .skc { position: absolute; top: 4%; left: 9%; font-size: 0.44em; font-weight: 900; line-height: 1; letter-spacing: -0.5px; opacity: 0.95; }
+    .skc.b { top: auto; left: auto; bottom: 4%; right: 9%; transform: rotate(180deg); }
     .sk-empty { background: transparent; border: 2px dashed var(--gold-light); box-shadow: none; }
 
     /* Consigne du tour : GRAS lisible, pulse quand c'est à toi d'agir. */
@@ -64,13 +77,18 @@
     .sk-cell.tappable:hover { transform: translateY(-3px); }
     .sk-cell.back { color: rgba(255,255,255,0.9); }
     @media (max-width: 380px) { .sk-cell { width: 48px; height: 66px; font-size: 1.2rem; } }
+    /* Écrans hauts (mobiles récents) : cartes plus charnues, rien ne déborde. */
+    @media (min-height: 800px) {
+      .sk-cell { width: 64px; height: 88px; font-size: 1.55rem; }
+      .sk-card { width: 52px; height: 72px; }
+    }
     /* Tablette / ordi : on exploite la largeur — piles plus grandes, grille plus généreuse, adversaires en ligne. */
     @media (min-width: 760px) {
       .sk-opps { gap: 14px; max-width: 900px; margin: 0 auto; }
-      .sk-center { gap: 28px; padding: 12px; }
-      .sk-card { width: 60px; height: 84px; font-size: 1.5rem; }
-      .sk-cell { width: 72px; height: 98px; font-size: 1.7rem; }
-      .sk-my-grid { gap: 9px; }
+      .sk-center { gap: 28px; padding: 12px; width: min(60vw, 470px); }
+      .sk-card { width: 64px; height: 90px; font-size: 1.5rem; }
+      .sk-cell { width: 80px; height: 110px; font-size: 1.8rem; }
+      .sk-my-grid { gap: 10px; }
     }
     /* Grand écran (ordi) : table et grilles plus grandes, adversaires bien étalés. */
     @media (min-width: 1000px) {
@@ -191,6 +209,8 @@
     var buildDeck = window.SkyjoAI.buildDeck;
     function shuffle(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
     function valueClass(v) { if (v < 0) return 'v-neg'; if (v === 0) return 'v-zero'; if (v <= 4) return 'v-low'; if (v <= 8) return 'v-mid'; return 'v-high'; }
+    // Recto d'une carte : valeur sur pastille blanche + rappel dans 2 coins.
+    function skFace(v) { return '<span class="skc">' + v + '</span><span class="skv">' + v + '</span><span class="skc b">' + v + '</span>'; }
     function fillArray(n, v) { var a = []; for (var i = 0; i < n; i++) a.push(v); return a; }
     function hasDrawn(state) { return state.drawnCard !== null && state.drawnCard !== undefined; }
     function step(order, fromPid, count) { var n = order.length, i = order.indexOf(fromPid); return order[(((i + count) % n) + n) % n]; }
@@ -342,10 +362,13 @@
       });
       window._skTot = tPrev;
 
-      // Adversaires
+      // Adversaires. Pendant la révélation initiale (flip2, simultanée), un ✅/⏳
+      // montre qui a déjà retourné ses 2 cartes et qui on attend.
+      var flipping = (state.phase === 'flip2');
       document.getElementById('sk-opps').innerHTML = ord.filter(function (p) { return p !== window.myPid; }).map(function (pid) {
         var p = state.players[pid] || {};
-        return '<div class="sk-opp' + (state.turn === pid ? ' turn' : '') + '"><div class="sk-opp-name"><span class="sk-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' · ' + sumVisible(p) + '</div><div class="sk-mini-grid">' + miniGrid(p) + '</div></div>';
+        var wait = flipping ? (' <span title="' + (flippedCount(p) >= 2 ? 'Cartes révélées' : 'Doit retourner 2 cartes') + '">' + (flippedCount(p) >= 2 ? '✅' : '⏳') + '</span>') : '';
+        return '<div class="sk-opp' + (state.turn === pid ? ' turn' : '') + '"><div class="sk-opp-name"><span class="sk-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' · ' + sumVisible(p) + wait + '</div><div class="sk-mini-grid">' + miniGrid(p) + '</div></div>';
       }).join('');
 
       // Piles
@@ -353,14 +376,27 @@
       var isMyTurn = state.turn === window.myPid;
       var drew = hasDrawn(state);
       var dw = document.getElementById('sk-discard-wrap'); dw.innerHTML = '';
+      dw.classList.add('fanpile');
       var discard = state.discardPile || [];
       // Carte affichée sur la défausse : si j'ai pris une carte, c'est la candidate (mise en avant), sinon le dessus.
       var showCandidate = drew && isMyTurn;
       var topVal = showCandidate ? state.drawnCard : (discard.length ? discard[discard.length - 1] : null);
       if (topVal !== null && topVal !== undefined) {
+        // Défausse vivante : les 2 cartes du dessous restent visibles, tournées.
+        if (!showCandidate && discard.length > 1) {
+          discard.slice(-3, -1).forEach(function (v, k) {
+            var under = document.createElement('div');
+            var abs = discard.length - Math.min(3, discard.length) + k;
+            under.className = 'sk-card ' + valueClass(v);
+            under.innerHTML = skFace(v);
+            under.style.setProperty('--fr', (window.Fx ? Fx.fanAngle(abs + '|' + v, 7) : 0) + 'deg');
+            dw.appendChild(under);
+          });
+        }
         var c = document.createElement('div');
         c.className = 'sk-card ' + valueClass(topVal) + (showCandidate ? ' candidate' : '');
-        c.textContent = topVal;
+        c.innerHTML = skFace(topVal);
+        if (!showCandidate && discard.length > 1) c.style.setProperty('--fr', (window.Fx ? Fx.fanAngle((discard.length - 1) + '|' + topVal, 7) : 0) + 'deg');
         if (isMyTurn && !drew) c.onclick = takeFromDiscard;
         dw.appendChild(c);
       } else {
@@ -391,7 +427,7 @@
           var faceUp = fl[i];
           var fresh = faceUp && (prevFl[i] !== true || prevG[i] !== g[i]) && prevFl.length;
           cell.className = 'sk-cell ' + (faceUp ? valueClass(g[i]) : 'back') + (fresh ? ' fx-flip' : '');
-          cell.textContent = faceUp ? g[i] : '';
+          cell.innerHTML = faceUp ? skFace(g[i]) : '';
           // Interactivité
           var tappable = false;
           if (state.phase === 'flip2' && !faceUp && flippedCount(me) < 2) { tappable = true; cell.onclick = function () { initialFlip(i); }; }

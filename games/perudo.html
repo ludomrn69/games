@@ -37,7 +37,8 @@
     .pd-die { font-size: 1.5rem; line-height: 1; color: var(--ink); }
     .pd-die.hit { color: var(--terracotta); }
 
-    .pd-myzone { max-width: 460px; margin: 8px auto 0; padding: 0 14px calc(18px + env(safe-area-inset-bottom)); text-align: center; }
+    /* Ancré en bas : le centre (enchère, reveal) respire sur toute la hauteur. */
+    .pd-myzone { max-width: 460px; margin: auto auto 0; padding: 0 14px calc(18px + env(safe-area-inset-bottom)); text-align: center; width: 100%; }
     .pd-mylabel { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); margin-bottom: 4px; }
     /* Mes dés reposent sur un petit TAPIS bois (le gobelet du Perudo). */
     .pd-myhand { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; padding: 12px 14px; }
@@ -45,6 +46,29 @@
     /* Dé « touché » par l'enchère en cours : cerclé terracotta, points rouges. */
     .pipdie.hit { box-shadow: 0 0 0 2.5px var(--terracotta), 0 2px 5px rgba(0,0,0,0.28); }
     .pipdie.hit i.on { background: #c0392b; }
+    /* Gobelet en cuir (CSS pur) : secoue les dés puis se soulève. */
+    .pd-cup { position: fixed; z-index: 2500; transform: translate(-50%, -58%); pointer-events: none;
+      animation: pdCupShake 0.65s ease-in-out; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.45)); }
+    .pd-cup-body { width: 96px; height: 100px; background: linear-gradient(160deg, #8a4b2e, #5d3320);
+      clip-path: polygon(15% 0, 85% 0, 100% 91%, 0 91%); border-radius: 10px; position: relative; }
+    .pd-cup-body::after { content: ''; position: absolute; left: -3%; right: -3%; bottom: 0; height: 17px;
+      background: linear-gradient(#3f2114, #6b3b21); border-radius: 50%; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5); }
+    .pd-cup-body i { position: absolute; left: 18%; right: 18%; top: 26%; height: 8px; background: rgba(255,225,170,0.28); border-radius: 5px; box-shadow: 0 14px 0 rgba(255,225,170,0.18); }
+    .pd-cup.lift { transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.3, 1), opacity 0.5s; transform: translate(-50%, -58%) translateY(-95px) rotate(-16deg); opacity: 0; }
+    @keyframes pdCupShake {
+      0%, 100% { transform: translate(-50%, -58%) rotate(0); }
+      15% { transform: translate(-53%, -62%) rotate(-8deg); }
+      35% { transform: translate(-47%, -55%) rotate(7deg); }
+      55% { transform: translate(-53%, -61%) rotate(-6deg); }
+      75% { transform: translate(-48%, -56%) rotate(5deg); }
+    }
+    /* Le Paco 🦜 compte aussi comme joker : on l'entoure comme un dé touché au reveal. */
+    .pd-paco.hit { border-radius: 8px; box-shadow: 0 0 0 2.5px var(--terracotta), 0 2px 5px rgba(0,0,0,0.28); background: rgba(196,116,90,0.14); }
+    /* Ligne de révélation : indicateur « a cliqué Suivant ? » */
+    .pd-reveal-ack { margin-left: auto; font-size: 0.9rem; flex: 0 0 auto; }
+    .pd-reveal-ack.waiting { opacity: 0.5; }
+    .pd-bid-recap { text-align: center; font-size: 0.86rem; font-weight: 700; color: var(--ink-light); padding: 2px 12px 6px; }
+    .pd-bid-recap b { color: var(--terracotta); }
     .pd-picker { background: var(--white); border-radius: 18px; padding: 12px; box-shadow: var(--shadow); margin-bottom: 10px; }
     .pd-qty { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px; }
     .pd-qty button { width: 42px; height: 42px; border-radius: 12px; border: 1.5px solid var(--gold-light); background: var(--cream); font-size: 1.4rem; font-weight: 800; cursor: pointer; color: var(--ink); }
@@ -400,10 +424,20 @@
       var rev = document.getElementById('pd-reveal');
       if (state.phase === 'reveal' && state.reveal) {
         var R = state.reveal;
-        rev.innerHTML = '<div class="pd-reveal">' + activePids0(state).map(function (pid) {
+        // Rappel de l'enchère contestée + résultat du comptage (on la perdait de vue au reveal).
+        var recap = '<div class="pd-bid-recap">' +
+          (R.kind === 'calza' ? '☝️ Calza de ' : '🗣️ Dudo de ') + escapeHtml(Room.name(R.challenger)) +
+          ' sur l\'enchère de ' + escapeHtml(Room.name(R.bidder)) + ' : <b>' + R.qty + ' × ' + faceHTML(R.face) + '</b>' +
+          ' → compté <b>' + R.count + '</b> (Paco 🦜 inclus)</div>';
+        var acks = (R.ack || {});
+        rev.innerHTML = recap + '<div class="pd-reveal">' + activePids0(state).map(function (pid) {
           var d = (R.dice || {})[pid] || [];
+          var isBot = (state.players[pid] || {}).isBot;
+          // Indicateur « a validé Suivant ? » — les ordis sont toujours prêts (✓).
+          var ready = isBot || acks[pid];
+          var ackIc = '<span class="pd-reveal-ack' + (ready ? '' : ' waiting') + '" title="' + (ready ? 'Prêt' : 'Doit encore appuyer sur Suivant') + '">' + (ready ? '✅' : '⏳') + '</span>';
           return '<div class="pd-reveal-row"><span class="pd-reveal-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-            '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face, state.palifico) + '</span></div>';
+            '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face, state.palifico) + '</span>' + ackIc + '</div>';
         }).join('') + '</div>';
       } else rev.innerHTML = '';
 
@@ -413,6 +447,24 @@
     function activePids0(state) {
       var R = state.reveal || {}; var dice = R.dice || {};
       return (state.order || []).filter(function (p) { return dice[p]; });
+    }
+
+    // Gobelet de dés (dessiné en CSS) : posé sur mes dés, il SECOUE puis se
+    // SOULÈVE — en position fixe, il survit aux re-rendus de la zone.
+    function pdCupAnim() {
+      var zone = document.querySelector('#pd-myzone .pd-myhand');
+      if (!zone) return;
+      var r = zone.getBoundingClientRect();
+      if (!r.width) return;
+      var old = document.getElementById('pd-cup'); if (old) old.remove();
+      var el = document.createElement('div');
+      el.className = 'pd-cup'; el.id = 'pd-cup'; el.setAttribute('aria-hidden', 'true');
+      el.style.left = (r.left + r.width / 2) + 'px';
+      el.style.top = (r.top + r.height / 2) + 'px';
+      el.innerHTML = '<div class="pd-cup-body"><i></i></div>';
+      document.body.appendChild(el);
+      setTimeout(function () { el.classList.add('lift'); if (window.Fx) Fx.sfx('flip'); }, 700);
+      setTimeout(function () { try { el.remove(); } catch (e) {} }, 1350);
     }
 
     function renderMyZone(state) {
@@ -435,9 +487,13 @@
       }
       // Phase enchères
       var myTurn = state.turn === me && myAlive;
-      // Mes dés viennent d'être relancés (nouvelle manche) → petit bruit de gobelet.
+      // Mes dés viennent d'être relancés (nouvelle manche) → GOBELET : il secoue
+      // les dés puis se soulève pour les révéler (+ bruit).
       var diceSig = myDice.join(',');
-      if (window._pdDiceSig !== undefined && window._pdDiceSig !== diceSig && myDice.length && window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
+      if (window._pdDiceSig !== undefined && window._pdDiceSig !== diceSig && myDice.length && window.Fx) {
+        Fx.sfx('deal'); Fx.vib([15, 30, 15]);
+        setTimeout(pdCupAnim, 30); // après le rendu de la main (même tick JS)
+      }
       window._pdDiceSig = diceSig;
       var handHTML = myAlive
         ? '<div class="pd-mylabel">Tes dés (cachés des autres)</div><div class="pd-myhand felt felt-wood">' + (myDice.length ? diceRow(myDice, myTurn && pick ? pick.face : 0, state.palifico, 38) : '—') + '</div>'

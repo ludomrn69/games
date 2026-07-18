@@ -408,6 +408,53 @@
     setTimeout(function () { try { el.remove(); } catch (e) {} }, 2600);
   }
 
+  // ── Vol d'un élément (carte, jeton, billet…) d'un point A à un point B ──────
+  // Fx.flyTo(from, to, html, opts) : pose un clone visuel en position fixe sur
+  // `from` puis le fait GLISSER jusqu'à `to` (éléments ou ids). Le jeu reste
+  // maître de son état : c'est purement décoratif (retiré tout seul).
+  // opts : { ms, scale, rotate, fade, delay, onDone }
+  function flyTo(from, to, html, opts) {
+    if (!doc || !doc.body || typeof requestAnimationFrame !== 'function') return;
+    from = elOf(from); to = elOf(to);
+    if (!from || !to) return;
+    opts = opts || {};
+    var a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    if ((!a.width && !a.height) || (!b.width && !b.height)) return; // élément caché
+    var el = doc.createElement('div');
+    el.className = 'fx-fly';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = html;
+    el.style.left = (a.left + a.width / 2) + 'px';
+    el.style.top = (a.top + a.height / 2) + 'px';
+    var dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+    var dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+    var ms = opts.ms || 620;
+    el.style.transition = 'transform ' + ms + 'ms cubic-bezier(0.25, 0.7, 0.3, 1), opacity ' + ms + 'ms ease-in';
+    function go() {
+      doc.body.appendChild(el);
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        el.style.transform = 'translate(-50%, -50%) translate(' + dx + 'px, ' + dy + 'px) ' +
+          'rotate(' + (opts.rotate != null ? opts.rotate : 18) + 'deg) scale(' + (opts.scale != null ? opts.scale : 0.55) + ')';
+        if (opts.fade !== false) el.style.opacity = '0.1';
+      }); });
+      setTimeout(function () {
+        try { el.remove(); } catch (e) {}
+        if (opts.onDone) { try { opts.onDone(); } catch (e) {} }
+      }, ms + 80);
+    }
+    if (opts.delay) setTimeout(go, opts.delay); else go();
+  }
+
+  // Angle stable pour une carte de défausse : pseudo-aléa DÉTERMINISTE dérivé
+  // d'une clé (id de carte…) — l'éventail ne « refrétille » pas à chaque rendu.
+  function fanAngle(key, max) {
+    var h = 0, s = String(key);
+    for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    var r = ((h % 1000) + 1000) % 1000 / 1000; // 0..1 stable
+    var m = max || 7;
+    return Math.round((r * 2 - 1) * m * 10) / 10; // -max..+max, 0.1° près
+  }
+
   // ── Dé à points (HTML) ──────────────────────────────────────────────────────
   // Position des points allumés (grille 3×3, indices 0..8) pour chaque valeur.
   var PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
@@ -427,6 +474,8 @@
     shake: function (el) { replay(el, 'fx-shake'); },
     replay: replay,
     float: float,
+    flyTo: flyTo,
+    fanAngle: fanAngle,
     die: die
   };
 })(typeof window !== 'undefined' ? window : this);
@@ -2419,6 +2468,10 @@
   function startGame(savedKeep) {
     endFx = false; // ré-arme le son/confetti de fin pour cette nouvelle partie
     statsRecorded = false;
+    // Nettoie un éventuel encart « Défi du jour réussi » resté d'une partie précédente
+    // (position:fixed → il flottait sinon par-dessus la nouvelle grille = faux « gagné »).
+    dailyRecorded = false;
+    var _od = document.getElementById('off-daily'); if (_od) _od.remove();
     var id0 = readIdentity();
     var pmap = {}, ids = [];
     players = [];

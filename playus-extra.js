@@ -57,6 +57,31 @@
       return (m ? m + ' ' : '') + 'Plus que ' + need + ' pour ' + EMOJI[next];
     }
   };
+
+  /* ══ JEU DU JOUR ═══════════════════════════════════════════════════════════
+     Le même mini-jeu pour tout le monde chaque jour (tiré selon la date sur
+     l'accueil). Ici on suit, 100 % en local : le meilleur score du jour et la
+     SÉRIE de jours consécutifs joués. Aucune requête réseau. */
+  function ymd(d) { d = d || new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  root.PlayusDaily = {
+    KEY: 'playus.daily.v1',
+    read: function () { try { return JSON.parse(localStorage.getItem(root.PlayusDaily.KEY)) || {}; } catch (e) { return {}; } },
+    write: function (v) { try { localStorage.setItem(root.PlayusDaily.KEY, JSON.stringify(v)); } catch (e) {} },
+    state: function () { var s = root.PlayusDaily.read(), t = ymd(); return { streak: s.streak || 0, doneToday: s.last === t, best: (s.scores && s.scores[t]) || 0 }; },
+    // À appeler à la fin d'une partie « jeu du jour ». Série += 1 au 1er jeu du
+    // jour (remise à 1 si un jour a été sauté), et on garde le meilleur score.
+    record: function (score) {
+      var s = root.PlayusDaily.read(), t = ymd();
+      if (s.last !== t) {
+        var y = new Date(); y.setDate(y.getDate() - 1);
+        s.streak = (s.last === ymd(y)) ? (s.streak || 0) + 1 : 1;
+        s.last = t;
+      }
+      s.scores = s.scores || {};
+      if (!s.scores[t] || score > s.scores[t]) s.scores[t] = score;
+      root.PlayusDaily.write(s); return root.PlayusDaily.state();
+    }
+  };
 })(typeof window !== 'undefined' ? window : this);
 
 (function () {
@@ -78,6 +103,9 @@
   var finalEl = document.getElementById('finalScore');
   var replayBtn = document.getElementById('replayBtn');
   var startBtn = document.getElementById('startBtn');
+  var isDaily = /[?&]daily=1/.test(location.search);
+  // « Embarqué » = le mini-jeu tourne dans l'iframe d'une page arène (salon).
+  function inArena() { try { return window.parent && window.parent !== window; } catch (e) { return true; } }
 
   // ── Tick sonore quand le score bouge (borné : pas plus d'un tick / 70 ms) ──
   if (scoreEl) {
@@ -94,7 +122,7 @@
   var slug = (location.pathname.match(/playus\/([a-z0-9-]+)\.html/) || [])[1] || '';
   function showMedalProgress() {
     if (!window.PlayusMedals || !finalEl || !overMsg) return;
-    if (/[?&]duel=1/.test(location.search)) return; // en duel, le panneau duel suffit
+    if (inArena()) return; // en salon (iframe), l'arène affiche son propre classement
     var score = parseInt((finalEl.textContent || '0').replace(/\D/g, ''), 10) || 0;
     var txt = window.PlayusMedals.progressText(slug, score);
     if (!txt) return;
@@ -126,51 +154,21 @@
     if (e.target && e.target.closest && e.target.closest('.btn')) sfx('click');
   }, true);
 
-  /* ══ MODE DUEL (?duel=1) : Joueur 1 puis Joueur 2, même appareil ══ */
-  var duel = /[?&]duel=1/.test(location.search);
-  if (!duel || !overEl || !finalEl || !replayBtn) { window._puDuel = null; return; }
-
-  var D = { attempt: 1, s: [null, null] };
-  var panel = document.createElement('div');
-  panel.style.cssText = 'position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-    'gap:14px;text-align:center;padding:24px;background:rgba(12,10,30,0.88);backdrop-filter:blur(6px);color:#fff;' +
-    'font-family:system-ui,-apple-system,"Segoe UI",sans-serif';
-  function btnHTML(label) {
-    return '<button style="border:none;border-radius:16px;padding:14px 36px;font-size:1.1rem;font-weight:800;cursor:pointer;color:#fff;' +
-      'background:linear-gradient(135deg,#ffb020,#ff7a3d);box-shadow:0 8px 24px rgba(255,122,61,.45);font-family:inherit">' + label + '</button>';
-  }
-  function show(title, sub, label, action) {
-    panel.innerHTML = '<div style="font-size:2rem;font-weight:900">' + title + '</div>' +
-      (sub ? '<div style="color:#cbbdf5;max-width:300px;line-height:1.4">' + sub + '</div>' : '') + btnHTML(label);
-    panel.querySelector('button').onclick = function () { panel.remove(); action(); };
-    document.body.appendChild(panel);
-  }
+  /* ══ FIN DE PARTIE : jeu du jour (local) + salon (remontée du score) ══
+     Plus de « duel local à 2 sur le même appareil » : la compétition passe par
+     le SALON en ligne (page arène, mini-jeu embarqué en iframe). Ici on ne fait
+     que capturer le score final et le router au bon endroit. */
+  function currentScore() { return parseInt((finalEl && finalEl.textContent || '0').replace(/\D/g, ''), 10) || 0; }
   function onGameOver() {
-    if (!duel || !D || !finalEl) return; // hors duel : la fin de partie ne fait que sonner
-    var sc = parseInt((finalEl.textContent || '0').replace(/\D/g, ''), 10) || 0;
-    if (D.attempt === 1) {
-      D.s[0] = sc;
-      setTimeout(function () {
-        show('⚔️ Joueur 1 : ' + sc, 'Passe l\'appareil — à toi Joueur 2 !', '▶ Joueur 2, joue !', function () {
-          D.attempt = 2; replayBtn.click();
-        });
-      }, 700);
-    } else {
-      D.s[1] = sc;
-      var t = D.s[0] === D.s[1] ? '🤝 Égalité ' + D.s[0] + ' – ' + D.s[1]
-        : (D.s[0] > D.s[1] ? '🏆 Joueur 1 gagne ' + D.s[0] + ' – ' + D.s[1] : '🏆 Joueur 2 gagne ' + D.s[1] + ' – ' + D.s[0]);
-      setTimeout(function () {
-        show(t, 'Meilleur score en un essai chacun.', '↻ Revanche', function () {
-          D.attempt = 1; D.s = [null, null]; replayBtn.click();
-        });
-      }, 700);
+    var sc = currentScore();
+    // Jeu du jour (?daily=1) : meilleur score du jour + série, affichés sur l'écran de fin.
+    if (isDaily && window.PlayusDaily && overMsg) {
+      var st = window.PlayusDaily.record(sc);
+      var line = document.getElementById('pu-daily-line');
+      if (!line) { line = document.createElement('div'); line.id = 'pu-daily-line'; line.style.cssText = 'margin-top:4px;font-weight:800;color:#ffd45e'; overMsg.parentNode.insertBefore(line, overMsg.nextSibling); }
+      line.textContent = '🗓️ Jeu du jour · record ' + (st.best || sc) + (st.streak ? ' · série ' + st.streak + ' 🔥' : '');
     }
+    // Salon (iframe) : on remonte le score à la page arène parente.
+    if (inArena()) { try { window.parent.postMessage({ type: 'playus-score', slug: slug, score: sc }, '*'); } catch (e) {} }
   }
-  // Écran d'accueil du duel : J1 commence.
-  if (startBtn) {
-    show('⚔️ Duel', 'Un essai chacun, meilleur score gagne.<br>Joueur 1 commence !', '▶ Joueur 1, joue !', function () {
-      startBtn.click();
-    });
-  }
-  window._puDuel = D;
 })();

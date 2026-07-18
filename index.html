@@ -91,6 +91,23 @@
     .card.playus .name { color: #fff; }
     .card.playus .players { color: #c9b8ef; }
     .card.playus .off-badge { filter: grayscale(0.2); }
+    /* Trois modes Playus : Solo entraînement · Salon (compétition) · Jeu du jour. */
+    .playus-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    .pu-mode { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; text-decoration: none;
+      background: linear-gradient(160deg, #3a2a5e, #241a3c); border: 1px solid #4a3a6e; color: #fff; transition: transform .14s, border-color .14s, box-shadow .14s; }
+    .pu-mode:hover { transform: translateY(-2px); border-color: rgba(245,199,126,0.5); box-shadow: 0 12px 26px rgba(90,63,138,0.38); }
+    .pu-mode .pm-emoji { font-size: 1.9rem; line-height: 1; flex: 0 0 auto; }
+    .pu-mode .pm-title { font-weight: 800; font-size: 1rem; color: #f5c77e; }
+    .pu-mode .pm-sub { font-size: 0.76rem; color: #c9b8ef; margin-top: 2px; }
+    .pu-daily { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-radius: 18px; text-decoration: none;
+      background: radial-gradient(130% 120% at 0 0, #6a4a9e, #2c1f47); border: 1.5px solid rgba(245,199,126,0.45); color: #fff; transition: transform .14s, box-shadow .14s; }
+    .pu-daily:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(90,63,138,0.45); }
+    .pu-daily .pd-badge { font-size: 0.66rem; font-weight: 900; letter-spacing: 1px; background: linear-gradient(135deg,#ffb020,#ff7a3d); color: #fff; border-radius: 20px; padding: 3px 10px; }
+    .pu-daily .pd-emoji { font-size: 2.3rem; line-height: 1; }
+    .pu-daily .pd-name { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.15rem; }
+    .pu-daily .pd-sub { font-size: 0.78rem; color: #d8c9f5; margin-top: 2px; }
+    .pu-daily .pd-go { margin-left: auto; font-weight: 800; background: rgba(255,255,255,0.14); border-radius: 30px; padding: 8px 16px; white-space: nowrap; }
+    @media (max-width: 560px) { .playus-modes { grid-template-columns: 1fr; } .pu-daily .pd-go { display: none; } }
     .duel-btn { display: inline-block; margin-top: 4px; border: 1px solid rgba(245,199,126,0.4); background: rgba(255,255,255,0.06); color: #f5c77e;
       border-radius: 20px; padding: 3px 10px; font-size: 0.72rem; font-weight: 800; cursor: pointer; font-family: 'DM Sans', sans-serif;
       transition: background .15s; }
@@ -124,9 +141,20 @@
       <div class="playus-banner">
         <span class="pb-emoji">🕹️</span>
         <div>
-          <div class="pb-title">Mode Playus Arena</div>
-          <div class="pb-sub">Mini-jeux de réflexes façon appli mobile · solo · hors-ligne · une partie = quelques secondes</div>
+          <div class="pb-title">Playus Arena</div>
+          <div class="pb-sub">Compétition de mini-jeux de réflexes façon appli mobile</div>
         </div>
+      </div>
+      <div class="playus-modes">
+        <a class="pu-mode" href="#playus-grid">
+          <span class="pm-emoji">🎯</span>
+          <span><span class="pm-title">Solo entraînement</span><span class="pm-sub">Joue seul, bats ton record, décroche les médailles</span></span>
+        </a>
+        <a class="pu-mode" href="games/playus/arena.html">
+          <span class="pm-emoji">⚔️</span>
+          <span><span class="pm-title">Salon — compétition</span><span class="pm-sub">Crée ou rejoins une partie en ligne, à plusieurs</span></span>
+        </a>
+        <a class="pu-daily" id="pu-daily" href="#"></a>
       </div>
       <div class="grid" id="playus-grid"></div>
     </section>
@@ -190,11 +218,11 @@
       { key: 'lapaye',          name: 'La Bonne Paye',   emoji: '💰', players: '2–6',  on: true, offline: true, type: 'gestion / cartes' },
       { key: 'diamants',        name: 'Diamants',        emoji: '💎', players: '2–8',  on: true, offline: true, type: 'stop-ou-encore' },
       { key: 'perudo',          name: 'Perudo',          emoji: '🎲', players: '2–6',  on: true, offline: true, type: 'dés / bluff' },
-      { key: 'aventuriers-du-rail', name: 'Aventuriers du Rail', emoji: '🚂', players: '2–5', on: true, offline: true, type: 'plateau / réseau' },
       { key: 'mini-metro',      name: 'Mini Métro',      emoji: '🚇', players: '1',    on: true, offline: true, type: 'gestion / réseau (solo)' },
       { key: 'mini-motorways',  name: 'Mini Motorways',  emoji: '🚗', players: '1',    on: true, offline: true, type: 'gestion / routes (solo)' },
       { key: 'nothanks',        name: 'No Thanks!',       emoji: '🙅', players: '2–7',  on: true, offline: true, type: 'stop-ou-encore' },
-      { key: 'yams',            name: "Yam's",           emoji: '🎲', players: '1–6',  on: true, offline: true, type: 'dés / combinaisons' }
+      { key: 'yams',            name: "Yam's",           emoji: '🎲', players: '1–6',  on: true, offline: true, type: 'dés / combinaisons' },
+      { key: 'openfront',       name: 'OpenFront',       emoji: '🗺️', players: '1',    on: true, offline: true, type: 'stratégie / conquête (solo vs IA)' }
     ];
     // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
     // défini ici). Un jeu non rangé tombe automatiquement dans « Autres ».
@@ -204,8 +232,8 @@
       { title: 'Déduction & bluff',   emoji: '🕵️', keys: ['undercover', 'loupgarou', 'codenames', 'cluedo', 'juste-prix', 'bataille-navale', 'diamants', 'perudo'] },
       { title: 'Mots & dessin',       emoji: '✏️', keys: ['petit-bac', 'sutom', 'crack-list', 'pictionary', 'telephone-dessine'] },
       { title: 'Observation & ambiance', emoji: '⚡', keys: ['dobble-emoji', 'lynx', 'timesup', 'themind'] },
-      { title: 'Gestion & réseau',    emoji: '🚦', keys: ['mini-metro', 'mini-motorways'] },
-      { title: 'Plateau',             emoji: '🎲', keys: ['monopoly', 'ludo', 'blokus', 'aventuriers-du-rail'] },
+      { title: 'Gestion & réseau',    emoji: '🚦', keys: ['openfront', 'mini-metro', 'mini-motorways'] },
+      { title: 'Plateau',             emoji: '🎲', keys: ['monopoly', 'ludo', 'blokus'] },
       // « Soirée & tournoi » volontairement en dernier (rangé tout en bas de l'accueil).
       { title: 'Soirée & tournoi',    emoji: '🎉', keys: ['soiree'] }
     ];
@@ -328,24 +356,25 @@
           playusMedal(g.s) +
           '<div class="emoji" aria-hidden="true">' + g.emoji + '</div>' +
           '<div class="name">' + g.name + '</div>' +
-          '<div class="players">' + g.tag + '</div>' +
-          '<span class="duel-btn" role="button" tabindex="0" data-duel="' + g.s + '" title="Duel : 2 joueurs, un essai chacun" aria-label="Duel à deux joueurs — ' + g.name + '">⚔️ Duel</span></a>';
+          '<div class="players">' + g.tag + '</div></a>';
       }).join('');
-      // Bouton Duel : ouvre le jeu en mode 2 joueurs SANS suivre le lien de la carte.
-      function goDuel(b) { location.href = 'games/playus/' + b.getAttribute('data-duel') + '.html?duel=1'; }
-      pg.addEventListener('click', function (e) {
-        var b = e.target.closest('.duel-btn');
-        if (!b) return;
-        e.preventDefault(); e.stopPropagation();
-        goDuel(b);
-      });
-      pg.addEventListener('keydown', function (e) {
-        var b = e.target.closest('.duel-btn');
-        if (!b || (e.key !== 'Enter' && e.key !== ' ')) return;
-        e.preventDefault(); e.stopPropagation();
-        goDuel(b);
-      });
     }
+    // ── Jeu commun du jour : le MÊME mini-jeu pour tout le monde (tiré selon la
+    // date), à jouer en solo pour battre le score du jour + garder sa série. ──
+    (function renderDaily() {
+      var el = document.getElementById('pu-daily');
+      if (!el || !PLAYUS.length) return;
+      var idx = (window.Daily ? Daily.seed('playus-daily') : (new Date().getFullYear() * 372 + new Date().getMonth() * 31 + new Date().getDate())) % PLAYUS.length;
+      var g = PLAYUS[idx];
+      var st = window.PlayusDaily ? PlayusDaily.state() : { streak: 0, doneToday: false, best: 0 };
+      el.href = 'games/playus/' + g.s + '.html?daily=1';
+      el.innerHTML = '<span class="pd-emoji">' + g.emoji + '</span>' +
+        '<span><span class="pd-badge">🗓️ JEU DU JOUR</span>' +
+        '<div class="pd-name">' + g.name + '</div>' +
+        '<div class="pd-sub">' + (st.doneToday ? 'Fait aujourd\'hui ✓ · record du jour ' + st.best : 'Même jeu pour tous aujourd\'hui — bats le score !') +
+        (st.streak ? ' · série ' + st.streak + ' 🔥' : '') + '</div></span>' +
+        '<span class="pd-go">' + (st.doneToday ? '↻ Rejouer' : '▶ Jouer') + '</span>';
+    })();
 
     // ── Recherche de jeu ──────────────────────────────────────────────────────
     // Filtre en direct les cartes (jeux classiques + Playus Arena) par nom.

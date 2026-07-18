@@ -122,6 +122,13 @@
   var BEST='mini_metro_best',best=+localStorage.getItem(BEST)||0;
 
   var state,stations,lines,pool,score,gt,week,nextStationT,spawnT,trainCap,shapesN;
+  // Interchange 🏛️ : la station tolère 2× plus d'attente avant de saturer.
+  function capOf(st){ return st.inter ? effCap*2 : effCap; }
+  function upgradeInterchange(){
+    var best=null;
+    stations.forEach(function(st){ if(st.inter) return; if(!best || st.pax.length>best.pax.length) best=st; });
+    if(best){ best.inter=true; best.over=0; }
+  }
   var effCap,speedMul,spawnMul;            // modulés par le défi du jour
   var DAILY=false,dayIdx=0,dayTwist=null,rnd=Math.random;
   var drag=null; // {from:station, x,y}
@@ -273,7 +280,7 @@
     // saturation des stations
     for(var i=0;i<stations.length;i++){
       var st=stations[i];
-      if(st.pax.length>effCap){ st.over+=dt; if(st.over>=OVER_LIMIT){ gameOver(); return; } }
+      if(st.pax.length>capOf(st)){ st.over+=dt; if(st.over>=OVER_LIMIT){ gameOver(); return; } }
       else st.over=Math.max(0, st.over - dt*2);
     }
     updateHud();
@@ -384,13 +391,17 @@
         ctx.arc(st.x,st.y,18,-Math.PI/2,-Math.PI/2+f*7);ctx.stroke();}
       ctx.save();
       ctx.shadowColor='rgba(0,0,0,.16)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
-      ctx.fillStyle=white;shapePath(st.x,st.y,11,st.shape);ctx.fill();
-      ctx.shadowColor='transparent';ctx.strokeStyle=ink;ctx.lineWidth=2.6;ctx.stroke();
+      var srad=st.inter?13.5:11;
+      ctx.fillStyle=white;shapePath(st.x,st.y,srad,st.shape);ctx.fill();
+      ctx.shadowColor='transparent';ctx.strokeStyle=ink;ctx.lineWidth=st.inter?3.4:2.6;ctx.stroke();
+      if(st.inter){ // double contour = interchange (grande capacité)
+        ctx.strokeStyle=ink;ctx.lineWidth=1.4;ctx.beginPath();shapePath(st.x,st.y,srad+4,st.shape);ctx.stroke();
+      }
       ctx.restore();
       for(var p=0;p<st.pax.length;p++){
-        var a=-Math.PI/2 + p*0.5, rr2=17+ (p>7?7:0);
+        var a=-Math.PI/2 + p*0.5, rr2=(st.inter?20:17)+ (p>7?7:0);
         var px=st.x+Math.cos(a)*rr2, py=st.y+Math.sin(a)*rr2;
-        ctx.fillStyle=st.pax.length>effCap?'#e8582c':ink;
+        ctx.fillStyle=st.pax.length>capOf(st)?'#e8582c':ink;
         shapePath(px,py,3,st.pax[p]);ctx.fill();
       }
     });
@@ -428,7 +439,11 @@
   }
 
   // ── Entrées (souris + tactile) ──────────────────────────────────────────────
-  function pt(e){var r=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return {x:t.clientX-r.left,y:t.clientY-r.top};}
+  function pt(e){var r=cv.getBoundingClientRect();
+    // À `touchend`, e.touches est VIDE (le doigt est levé) → il faut lire
+    // changedTouches, sinon le tracé de ligne échouait tout le temps sur mobile.
+    var t=(e.touches&&e.touches.length)?e.touches[0]:((e.changedTouches&&e.changedTouches.length)?e.changedTouches[0]:e);
+    return {x:t.clientX-r.left,y:t.clientY-r.top};}
   function stationAt(p){var best=null,bd=30;stations.forEach(function(s){var d=dist(p,s);if(d<bd){bd=d;best=s;}});return best;}
   function down(e){if(state!=='play')return;var p=pt(e);var s=stationAt(p);if(s){drag={from:s,x:p.x,y:p.y};e.preventDefault();}}
   function move(e){if(!drag)return;var p=pt(e);drag.x=p.x;drag.y=p.y;e.preventDefault();}
@@ -442,7 +457,8 @@
     var opts=[
       {e:'🛤️',t:'+1 Ligne',s:'nouvelle ligne',fn:function(){pool++;}},
       {e:'🚆',t:'+1 Train',s:'plus de débit',fn:function(){addTrain();}},
-      {e:'🚃',t:'+ Wagon',s:'trains +2 places',fn:function(){trainCap+=2;}}
+      {e:'🚃',t:'+ Wagon',s:'trains +2 places',fn:function(){trainCap+=2;}},
+      {e:'🏛️',t:'Interchange',s:'la station la plus chargée ×2 capacité',fn:upgradeInterchange}
     ];
     document.getElementById('weekTitle').textContent='Semaine '+week+' 🎉';
     document.getElementById('weekChoices').innerHTML=opts.map(function(o,i){

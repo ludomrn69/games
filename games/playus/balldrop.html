@@ -88,9 +88,11 @@
         ctx.strokeStyle=r.danger?'#e8524a':'#7ac94b';ctx.stroke();
       }
     });
-    // balle
-    ctx.beginPath();ctx.arc(bx,by,12,0,7);var grd=ctx.createRadialGradient(bx-4,by-4,3,bx,by,12);
-    grd.addColorStop(0,'#fff');grd.addColorStop(1,'#ffd45e');ctx.fillStyle=grd;ctx.fill();
+    // balle (pas encore de position sur l'écran d'accueil → on ne la dessine pas)
+    if(isFinite(by)){
+      ctx.beginPath();ctx.arc(bx,by,12,0,7);var grd=ctx.createRadialGradient(bx-4,by-4,3,bx,by,12);
+      grd.addColorStop(0,'#fff');grd.addColorStop(1,'#ffd45e');ctx.fillStyle=grd;ctx.fill();
+    }
   }
   resize();frame();
 })();

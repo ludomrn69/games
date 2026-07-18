@@ -11,7 +11,7 @@
     html { scroll-behavior: smooth; }
 
     #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
-    .dm-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    .dm-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
     html[data-theme="dark"] .dm-header { background: rgba(20,16,28,0.97); }
     .dm-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
     .dm-turn-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
@@ -19,9 +19,25 @@
     .dm-score-chip { display: inline-flex; align-items: center; gap: 5px; }
     .dm-mini { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
     .dm-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
+    /* Mobile : les scores « Toi X · Ordi Y » + 3 boutons ne tiennent pas sur une
+       ligne (les scores chevauchaient les boutons). On passe sur 2 lignes :
+       tour + actions, puis scores centrés en dessous. */
+    @media (max-width: 560px) {
+      .dm-header { grid-template-columns: minmax(0,1fr) auto; }
+      .dm-turn { grid-column: 1; grid-row: 1; }
+      .dm-actions { grid-column: 2; grid-row: 1; }
+      .dm-scores { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
+    }
 
     .dm-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 14px; width: 100%; }
     .dm-frame { display: grid; grid-template-columns: repeat(8, 1fr); width: min(88vw, 460px); aspect-ratio: 1; border: 5px solid #5a3a26; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+    @media (min-width: 900px) { .dm-frame { width: min(66vh, 560px); } }
+    /* Réglage de variante (salon) */
+    .dm-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
+    .dm-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
+    .dm-set-row { display: flex; gap: 8px; justify-content: center; }
+    .dm-set-btn { flex: 1; padding: 0.55rem 0.2rem; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
+    .dm-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
     .dm-cell { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
     .dm-cell.light { background: #ecd9b6; }
     .dm-cell.dark { background: #9c6b3f; cursor: pointer; }
@@ -132,6 +148,15 @@
     function sideOf(state, pid) { return (state.order || []).indexOf(pid) === 0 ? 'w' : 'b'; }
     function seatColor(seat) { return seat === 0 ? '#ece3d2' : '#23262e'; }
 
+    // Configure le moteur selon la variante du salon — à appeler AVANT tout
+    // appel à DamesAI (les deux clients lisent la même valeur du salon).
+    function cfgVariant(state) {
+      window.DamesAI.configure((state && state.variant) || readSetupVariant() || 'en8');
+    }
+    function readSetupVariant() {
+      var b = document.querySelector('.off-set-row[data-opt="variant"] .off-opt.active');
+      return b ? b.dataset.val : null;
+    }
     GameRoom({
       gameKey: 'dames',
       name: 'Dames',
@@ -143,16 +168,37 @@
         'Les pions avancent en diagonale ; on capture en sautant par-dessus',
         'La prise est obligatoire, et les rafles s\'enchaînent',
         'Atteindre la dernière rangée transforme un pion en dame 👑',
+        '10×10 international (au choix) : pions prennent aussi en arrière, dames volantes, prise majoritaire',
         'On gagne en capturant tous les pions adverses'
       ],
       offline: { solo: true, local: true },
       bot: damesBot,
+      offlineExtraSetup: function () {
+        return '<div class="off-set"><div class="off-set-label">Variante</div><div class="off-set-row" data-opt="variant">' +
+          '<button type="button" class="off-opt active" data-val="en8">8×8 anglaises</button>' +
+          '<button type="button" class="off-opt" data-val="int10">10×10 internationales</button>' +
+        '</div></div>';
+      },
+      lobbyExtraHTML: function (room) {
+        var v = (room && room.variant) || 'en8';
+        var isHost = room && room.host === window.myPid;
+        function b(val, lb, ti) {
+          return '<button class="dm-set-btn' + (v === val ? ' active' : '') + '" title="' + ti + '"' +
+            (isHost ? ' onclick="setVariant(\'' + val + '\')"' : ' disabled') + '>' + lb + '</button>';
+        }
+        return '<div class="dm-settings"><div class="dm-settings-label">Variante' + (isHost ? '' : ' (réglée par l\'hôte)') + '</div><div class="dm-set-row">' +
+          b('en8', '8×8 anglaises', 'Le damier 8×8 des apps : pions prennent vers l\'avant, dame = 1 pas') +
+          b('int10', '10×10 internationales', 'Les dames françaises : 20 pions, prise arrière, dames volantes, prise majoritaire') +
+        '</div></div>';
+      },
       onState: onState,
       onStart: onStart
     });
+    function setVariant(v) { if (window.roomRef) window.roomRef.child('variant').set(v); }
 
     /* ━━ IA : recherche pure dans dames-ai.js. Profondeur selon la difficulté. ━━ */
     function damesBot(state, pid) {
+      cfgVariant(state);
       var b = state.board || window.DamesAI.startBoard();
       var me = sideOf(state, pid), opp = window.DamesAI.other(me);
       var legal = window.DamesAI.legalMoves(b, me);
@@ -170,7 +216,8 @@
     // les yeux (prise immédiate en face) s'il a une alternative — mais il reste
     // aveugle aux combinaisons à deux coups. Prises obligatoires : au hasard.
     function plausibleWeak(b, me, legal) {
-      var isCapture = function (mvs) { return mvs.length > 0 && Math.abs(((mvs[0][1] / 8) | 0) - ((mvs[0][0] / 8) | 0)) === 2; };
+      var n = window.DamesAI.size();
+      var isCapture = function (mvs) { return !!mvs._caps || (mvs.length > 0 && Math.abs(((mvs[0][1] / n) | 0) - ((mvs[0][0] / n) | 0)) === 2); };
       if (isCapture(legal)) return legal[Math.floor(Math.random() * legal.length)];
       var opp = window.DamesAI.other(me);
       var safe = legal.filter(function (mv) {
@@ -181,9 +228,11 @@
       return pool[Math.floor(Math.random() * pool.length)];
     }
 
-    function onStart(players) {
+    function onStart(players, cur) {
+      var variant = (cur && cur.variant) || readSetupVariant() || 'en8';
+      window.DamesAI.configure(variant);
       var starter = players[0].pid; // siège 0 = blanc commence
-      return { board: window.DamesAI.startBoard(), turn: starter, starter: starter, winner: null, lastFrom: -1, lastTo: -1 };
+      return { variant: variant, board: window.DamesAI.startBoard(), turn: starter, starter: starter, winner: null, lastFrom: -1, lastTo: -1 };
     }
 
     function onState(snap) {
@@ -207,6 +256,7 @@
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner) return cur;
         if (cur.turn !== window.myPid) return cur;
+        cfgVariant(cur);
         var order = cur.order || [];
         var me = order.indexOf(window.myPid) === 0 ? 'w' : 'b', opp = AI.other(me);
         var b = cur.board || AI.startBoard();
@@ -235,6 +285,7 @@
     function startPlayingScreen(state) { selPath = []; selMoves = []; hideResult(); showScreen('s-playing'); renderPlaying(state); }
 
     function scoresHTML(state) {
+      cfgVariant(state);
       var b = state.board || window.DamesAI.startBoard(), ord = state.order || [];
       var c = window.DamesAI.counts(b);
       return ord.map(function (pid, seat) {
@@ -246,6 +297,7 @@
 
     function renderPlaying(state) {
       var AI = window.DamesAI;
+      cfgVariant(state);
       var b = state.board || AI.startBoard();
       var ord = state.order || [];
       setHTML('dm-scores', scoresHTML(state));
@@ -288,9 +340,11 @@
       });
 
       var board = document.getElementById('dm-board');
+      var N = AI.size();
+      board.style.gridTemplateColumns = 'repeat(' + N + ', 1fr)';
       var cells = [];
-      for (var i = 0; i < 64; i++) {
-        var r = Math.floor(i / 8), col = i % 8, dark = (r + col) % 2 === 1;
+      for (var i = 0; i < N * N; i++) {
+        var r = Math.floor(i / N), col = i % N, dark = (r + col) % 2 === 1;
         var cls = 'dm-cell ' + (dark ? 'dark' : 'light');
         if (i === selHead) cls += ' sel';
         else if (pathSet[i]) cls += ' pathstep';
@@ -344,6 +398,7 @@
         var i = +cell.dataset.i;
         var AI = window.DamesAI, state = window.room || {};
         if (state.status !== 'playing' || state.winner || state.turn !== window.myPid) return;
+        cfgVariant(state);
         var me = state.order && state.order.indexOf(window.myPid) === 0 ? 'w' : 'b';
         var b = state.board || AI.startBoard();
         var legal = AI.legalMoves(b, me);

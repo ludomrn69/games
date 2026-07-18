@@ -63,8 +63,11 @@
     ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
     ctx.fillStyle='#ffb020';ctx.fillRect(-beamLen/2,-10,beamLen,16);
     ctx.fillStyle='rgba(255,255,255,.4)';ctx.fillRect(-2,-16,4,10);// repère centre
-    var bx=ballPos,r=Math.max(14,W*0.04);ctx.beginPath();ctx.arc(bx,-10-r,r,0,7);
-    var grd=ctx.createRadialGradient(bx-4,-14-r,3,bx,-10-r,r);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#e8524a');ctx.fillStyle=grd;ctx.fill();
+    var bx=ballPos,r=Math.max(14,W*0.04);
+    if(isFinite(bx)){ // pas de bille avant la 1re partie
+      ctx.beginPath();ctx.arc(bx,-10-r,r,0,7);
+      var grd=ctx.createRadialGradient(bx-4,-14-r,3,bx,-10-r,r);grd.addColorStop(0,'#fff');grd.addColorStop(1,'#e8524a');ctx.fillStyle=grd;ctx.fill();
+    }
     ctx.restore();
   }
   resize();frame();

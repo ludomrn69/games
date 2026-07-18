@@ -19,6 +19,7 @@
     .sn-opps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 6px 12px 4px; }
     .sn-opp { display: flex; align-items: center; gap: 5px; background: var(--white); border-radius: 30px; padding: 4px 11px 4px 5px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 600; border: 2px solid transparent; }
     .sn-opp.picked { border-color: var(--sage); }
+    .sn-opp-me { box-shadow: 0 0 0 2px var(--gold), var(--shadow); }
     .sn-opp-av { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
     .sn-opp .pen { color: var(--terracotta); font-weight: 800; }
     .sn-opp .ok { color: var(--sage); font-weight: 800; }
@@ -28,23 +29,37 @@
     /* Cartes révélées de la manche (qui a joué quoi) — visibles pendant la résolution. */
     .sn-plays { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 2px 10px 6px; max-width: 480px; margin: 0 auto; }
     .sn-plays:empty { display: none; }
+    .sn-plays-label { flex-basis: 100%; text-align: center; font-family: 'Caveat', cursive; font-size: 0.92rem; color: var(--ink-light); margin-bottom: -2px; }
     .sn-play { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     .sn-play-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; }
     .sn-play .ncard { width: 34px; height: 46px; font-size: 0.95rem; cursor: default; }
     .sn-play.done { opacity: 0.4; }
     .sn-play.now .ncard { outline: 3px solid var(--terracotta); }
-    .sn-rows { display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 10px; max-width: 460px; margin: 0 auto; }
+    /* Les 4 rangées vivent sur un tapis feutré, qui absorbe la hauteur libre. */
+    #s-playing { display: flex; flex-direction: column; }
+    .sn-rows { display: flex; flex-direction: column; gap: 6px; padding: 12px 10px; max-width: 480px; margin: 4px auto 6px; width: min(94vw, 480px); flex: 1; justify-content: center; }
     .sn-row { display: flex; align-items: center; gap: 4px; background: var(--white); border-radius: 12px; padding: 5px 8px; box-shadow: var(--shadow); border: 2px solid transparent; }
+    @media (min-width: 760px) {
+      .sn-rows { max-width: 620px; width: min(70vw, 620px); }
+      .sn-hand .ncard { min-width: 56px; height: 76px; font-size: 1.4rem; }
+      .sn-hand { max-width: 900px; margin-inline: auto; }
+    }
     .sn-row.pickable { cursor: pointer; border-color: var(--terracotta); }
     .sn-row.pickable:hover { background: rgba(196,116,90,0.08); }
     .sn-row-cards { display: flex; gap: 3px; flex: 1; flex-wrap: wrap; }
     .sn-row-heads { font-size: 0.72rem; font-weight: 800; color: var(--terracotta); white-space: nowrap; }
 
-    .ncard { min-width: 34px; height: 46px; border-radius: 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; font-size: 0.95rem; box-shadow: 0 2px 6px rgba(0,0,0,0.16); position: relative; flex-shrink: 0; background: #fff; color: #2C2520; }
+    .ncard { min-width: 34px; height: 46px; border-radius: 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-weight: 900; font-size: 0.95rem; box-shadow: 0 2px 6px rgba(0,0,0,0.16); position: relative; flex-shrink: 0; background: #fdfaf3; color: #2C2520; }
     html[data-theme="dark"] .ncard { background: #f4efe7; }
-    .ncard .bh { font-size: 0.56rem; font-weight: 700; line-height: 1; opacity: 0.8; }
-    .ncard.h1 { background: #eef3ee; } .ncard.h2 { background: #d7e8c8; } .ncard.h3 { background: #f3e4b3; }
-    .ncard.h5 { background: #f0c9a8; } .ncard.h7 { background: #e8a9a0; }
+    /* Rangée de TÊTES DE BŒUF en haut de carte (énumération visuelle = la
+       signature du jeu), colorées par palier comme en vrai : 1 brun · 2 bleu ·
+       3 doré · 5 rouge · 7 violet. Le fond garde une teinte assortie discrète. */
+    .ncard .bh { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; max-width: 94%; line-height: 0; min-height: 7px; }
+    .ncard .bh svg { width: 9px; height: 8px; display: block; }
+    .sn-hand .ncard .bh svg { width: 11px; height: 10px; }
+    .ncard .nv { line-height: 1; }
+    .ncard.h1 { --bhc: #8a7a68; background: #fdfaf3; } .ncard.h2 { --bhc: #3e7cb1; background: #eaf2f8; } .ncard.h3 { --bhc: #d8912e; background: #faf0dc; }
+    .ncard.h5 { --bhc: #cf4335; background: #fbe9e5; } .ncard.h7 { --bhc: #8352c0; background: #f1e9fa; }
     .ncard.slot6 { outline: 3px dashed var(--terracotta); }
 
     .sn-my-label { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); text-align: center; margin: 4px 0; }
@@ -94,7 +109,7 @@
       <div class="sn-opps" id="sn-opps"></div>
       <div class="sn-banner" id="sn-banner"></div>
       <div class="sn-plays" id="sn-plays"></div>
-      <div class="sn-rows" id="sn-rows"></div>
+      <div class="sn-rows felt felt-green" id="sn-rows"></div>
       <div class="sn-my-label">Tes cartes <span id="sn-my-count"></span></div>
       <div class="sn-hand" id="sn-hand"></div>
     </div>
@@ -198,7 +213,7 @@
       var deck = []; for (var i = 1; i <= 104; i++) deck.push(i); shuffle(deck);
       order.forEach(function (p, i) { cur.players[p].hand = deck.slice(i * 10, i * 10 + 10).sort(function (a, b) { return a - b; }); cur.players[p].heads = 0; });
       var rows = []; for (var r = 0; r < 4; r++) rows.push([deck[order.length * 10 + r]]);
-      cur.rows = rows; cur.picks = {}; cur.phase = 'select'; cur.resolveQueue = null; cur.pendingLow = null;
+      cur.rows = rows; cur.picks = {}; cur.phase = 'select'; cur.resolveQueue = null; cur.pendingLow = null; cur.lastPlays = null;
       cur.banner = 'Choisissez une carte (face cachée)';
     }
 
@@ -275,7 +290,7 @@
       finishRound(cur);
     }
     function finishRound(cur) {
-      cur.picks = {}; cur.phase = 'select'; cur.pendingLow = null; cur.lastPlays = null;
+      cur.picks = {}; cur.phase = 'select'; cur.pendingLow = null; // lastPlays gardé : visible au tour suivant
       var anyLeft = (cur.order || []).some(function (p) { return handOf(cur, p).length > 0; });
       if (!anyLeft) endDeal(cur); else cur.banner = 'Choisissez une carte (face cachée)';
     }
@@ -332,26 +347,33 @@
     }
 
     /* ━━ Rendu ━━ */
+    // Tête de bœuf (SVG maison : deux cornes + mufle) — colorée via --bhc.
+    function bullIco() {
+      return '<svg viewBox="0 0 20 16" aria-hidden="true"><path d="M2.2 1.6c2.2.5 3.4 1.7 3.8 3.6M17.8 1.6c-2.2.5-3.4 1.7-3.8 3.6" stroke="var(--bhc,#8a7a68)" stroke-width="2.6" fill="none" stroke-linecap="round"/><ellipse cx="10" cy="9.8" rx="5.4" ry="5.8" fill="var(--bhc,#8a7a68)"/></svg>';
+    }
     function ncard(val, extra) {
-      var h = heads(val);
-      return '<div class="ncard h' + h + (extra || '') + '">' + val + '<span class="bh">' + h + '🐮</span></div>';
+      var h = heads(val), ic = '';
+      for (var i = 0; i < h; i++) ic += bullIco();
+      return '<div class="ncard h' + h + (extra || '') + '"><span class="bh" aria-label="' + h + ' tête' + (h > 1 ? 's' : '') + ' de bœuf">' + ic + '</span><span class="nv">' + val + '</span></div>';
     }
     function render(state) {
       var order = state.order || [], me = window.myPid;
       setHTML('sn-info', 'Donne ' + (state.deal || 1) + ' · seuil ' + (state.target || 66) + ' têtes · manche : tête de bœuf = pénalité');
 
-      // Adversaires
-      setHTML('sn-opps', order.filter(function (p) { return p !== me; }).map(function (pid) {
+      // Moi + adversaires : on affiche AUSSI mon propre total de têtes (avant, on ne
+      // voyait que celui des autres) — chip « Toi » mis en avant en tête de liste.
+      function chip(pid, isMe) {
         var hasPicked = state.picks && (pid in state.picks);
         // Têtes ramassées PENDANT la manche en cours (remis à 0 à chaque manche) :
         // affichées en direct à côté du total, pour suivre qui prend cher ce tour-ci.
         var rh = headsOf(state, pid);
-        return '<div class="sn-opp' + (hasPicked ? ' picked' : '') + '">' +
+        return '<div class="sn-opp' + (isMe ? ' sn-opp-me' : '') + (hasPicked ? ' picked' : '') + '">' +
           '<span class="sn-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
+          (isMe ? 'Toi' : escapeHtml(Room.name(pid))) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
           (rh > 0 ? ' <span class="sn-row-heads">+' + rh + '🐮</span>' : '') +
-          (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✓</span>' : ' …') : '') + '</div>';
-      }).join(''));
+          (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✅</span>' : ' <span title="Doit encore choisir sa carte">⏳</span>') : '') + '</div>';
+      }
+      setHTML('sn-opps', chip(me, true) + order.filter(function (p) { return p !== me; }).map(function (pid) { return chip(pid, false); }).join(''));
       setText('sn-banner', state.banner || '');
 
       // Cartes révélées de la manche : on montre ce que CHACUN a joué pendant la
@@ -360,10 +382,18 @@
       var plays = state.lastPlays || [], queue = state.resolveQueue || [];
       var pendingVal = queue.length ? queue[0].val : null, remainingVals = {};
       queue.forEach(function (x) { remainingVals[x.val] = true; });
-      setHTML('sn-plays', (state.phase === 'resolve' || state.phase === 'chooseRow') ? plays.map(function (pl) {
-        return '<div class="sn-play' + (!remainingVals[pl.val] ? ' done' : '') + (pl.val === pendingVal ? ' now' : '') + '">' +
-          '<span class="sn-play-av" style="background:' + Room.color(pl.pid) + '">' + Room.emoji(pl.pid) + '</span>' + ncard(pl.val) + '</div>';
-      }).join('') : '');
+      var resolving = (state.phase === 'resolve' || state.phase === 'chooseRow');
+      // On garde les cartes du tour visibles PENDANT la résolution ET après (au début
+      // de la sélection suivante) → on voit ce que tout le monde a joué, pas juste un
+      // flash. Un intitulé rappelle si c'est le tour en cours ou le précédent.
+      var showPlays = resolving || (state.phase === 'select' && plays.length);
+      setHTML('sn-plays', showPlays
+        ? '<div class="sn-plays-label">' + (resolving ? 'Cartes révélées' : 'Tour précédent') + '</div>' +
+          plays.map(function (pl) {
+            return '<div class="sn-play' + (resolving && !remainingVals[pl.val] ? ' done' : '') + (pl.val === pendingVal ? ' now' : '') + (!resolving ? ' done' : '') + '">' +
+              '<span class="sn-play-av" style="background:' + Room.color(pl.pid) + '">' + Room.emoji(pl.pid) + '</span>' + ncard(pl.val) + '</div>';
+          }).join('')
+        : '');
 
       // 4 rangées — un petit son quand elles bougent (résolution des cartes posées)
       var rowsSig = JSON.stringify(state.rows || []);
