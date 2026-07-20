@@ -41,9 +41,15 @@
   function app(bb, mk, m) { var a = bb.split(''); if (m.f != null) { a[m.f] = '.'; a[m.t] = mk; } else a[m.i] = mk; return a.join(''); }
   function mvKey(m) { return m.i != null ? 'p' + m.i : 'm' + m.f + '_' + m.t; } // clé d'un coup (pose / déplacement) pour le tri par TT
 
-  function bestMove(board, me, opp, maxDepth) {
+  // classic=true : morpion CLASSIQUE (on ne fait que POSER jusqu'à remplir la
+  // grille, match nul possible). Sinon : variante « 3 pions » (pose puis déplace).
+  function bestMove(board, me, opp, maxDepth, classic) {
     var b = board || '.........';
     maxDepth = maxDepth || 6;
+    function genMoves(bb, mk) {
+      if (classic) { var mv = []; PLACE_ORDER.forEach(function (p) { if (bb[p] === '.') mv.push({ i: p }); }); return mv; }
+      return gen(bb, mk);
+    }
     function evalH(bb) {
       var s = 0;
       for (var x = 0; x < LINES.length; x++) {
@@ -63,7 +69,7 @@
         if (tt.flag < 0) { if (tt.val < beta) beta = tt.val; } else { if (tt.val > alpha) alpha = tt.val; }
         if (alpha >= beta) return tt.val;
       }
-      var omk = mk === me ? opp : me, mv = gen(bb, mk); if (!mv.length) return 0;
+      var omk = mk === me ? opp : me, mv = genMoves(bb, mk); if (!mv.length) return 0;
       // Coup de la TT d'abord → coupures α-β plus précoces (recherche plus profonde).
       if (ttMv) { for (var t = 0; t < mv.length; t++) { if (mvKey(mv[t]) === ttMv) { mv.unshift(mv.splice(t, 1)[0]); break; } } }
       var best = -1e9, bestMv = mv[0];
@@ -82,7 +88,7 @@
       if (!aborted) TT[key] = { d: depth, val: best, mv: mvKey(bestMv), flag: best <= a0 ? -1 : best >= beta ? 1 : 0 };
       return best;
     }
-    var moves = gen(b, me); if (!moves.length) return null;
+    var moves = genMoves(b, me); if (!moves.length) return null;
     // Gain immédiat → on le prend tout de suite.
     for (var w = 0; w < moves.length; w++) { if (winLineFor(app(b, me, moves[w]), me)) return moves[w]; }
     var best = moves[0], bestV = -1e18;

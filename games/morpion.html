@@ -156,20 +156,46 @@
       gameKey: 'morpion',
       name: 'Morpion',
       emoji: '⭕',
-      tagline: '3 pions, puis on déplace',
+      tagline: 'Classique ou « 3 pions »',
       minPlayers: 2,
       maxPlayers: 2,
       rules: [
-        'Chacun a 3 pions, on les pose à tour de rôle',
-        'Une fois tes 3 pions posés, déplace-en un sur une case libre',
-        'Aligne tes 3 pions (ligne, colonne ou diagonale)',
-        'Le premier à aligner gagne la manche · le score est gardé'
+        'Classique : pose un pion à tour de rôle, aligne-en 3 (grille pleine = nul)',
+        '« 3 pions » : chacun pose 3 pions, puis on en déplace un par tour',
+        'Aligne 3 pions (ligne, colonne ou diagonale) pour gagner la manche',
+        'Le mode se choisit dans le salon · le score est gardé'
       ],
       offline: { solo: true, local: true },
       bot: morpionBot,
       onState: onState,
-      onStart: onStart
+      onStart: onStart,
+      lobbyExtraHTML: lobbyExtraHTML,
+      offlineExtraSetup: offlineExtraSetup
     });
+
+    // ── Mode de jeu (réglage du salon) : 'classic' (vrai morpion) ou 'move' (3
+    //    pions puis déplacement). Défaut 'move' (le mode historique de la page).
+    function isClassic(state) { return (state && state.variant) === 'classic'; }
+    function lobbyExtraHTML(room) {
+      var v = (room && room.variant) || 'move';
+      var isHost = room && room.host === window.myPid;
+      function btn(val, label, title) {
+        return '<button type="button" class="lb-set-btn' + (v === val ? ' active' : '') + '" title="' + title + '"' +
+          (isHost ? ' onclick="setVariant(\'' + val + '\')"' : ' disabled') + '>' + label + '</button>';
+      }
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">🎮 Mode' + (isHost ? '' : ' (réglé par l\'hôte)') + '</div><div class="lb-set-row">' +
+        btn('classic', 'Classique', 'Le vrai morpion : on remplit la grille, match nul possible') +
+        btn('move', '3 pions', 'Chacun 3 pions puis on les déplace (pas de match nul)') +
+        '</div></div></div>';
+    }
+    function setVariant(v) { if (v !== 'move' && v !== 'classic') return; if (window.roomRef) window.roomRef.child('variant').set(v); }
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">Mode</div>' +
+        '<div class="off-set-row" data-opt="variant">' +
+        '<button type="button" class="off-opt active" data-val="classic">Classique</button>' +
+        '<button type="button" class="off-opt" data-val="move">3 pions</button>' +
+        '</div></div>';
+    }
 
     /* ━━ IA (mode solo / ordis en ligne) ━━ Recherche pure dans morpion-ai.js
        (négamax α-β bornée + détection de répétition + table de transposition).
@@ -177,29 +203,30 @@
        difficile 10. Voir morpion-ai.js pour pourquoi ce n'est pas « parfait ». ━━ */
     function morpionBot(state, pid) {
       var order = state.order, b = state.board || emptyBoard();
+      var classic = isClassic(state);
       var meN = order.indexOf(pid), me = String(meN), opp = String(1 - meN);
       // Facile : erreur PLAUSIBLE — il voit sa victoire immédiate (comme tout
       // débutant), sinon coup légal au hasard. Battable, mais plus crédible.
       if (window.Bots && window.Bots.shouldBlunder(state)) {
-        var rnd = winningMove(b, me) || randomMove(b, me);
+        var rnd = winningMove(b, me, classic) || randomMove(b, me, classic);
         if (rnd) { if (rnd.f != null) doMove(rnd.f, rnd.t); else doPlace(rnd.i); } return;
       }
       var depth = (window.Bots ? window.Bots.pick(state, { easy: 2, normal: 6, hard: 10 }) : 6);
-      var best = window.MorpionAI.bestMove(b, me, opp, depth);
+      var best = window.MorpionAI.bestMove(b, me, opp, depth, classic);
       if (!best) return;
       if (best.f != null) doMove(best.f, best.t); else doPlace(best.i);
     }
-    // Coup légal aléatoire (pour le niveau facile).
-    function randomMove(b, mk) {
+    // Coup légal aléatoire (pour le niveau facile). En classique, on ne fait que POSER.
+    function randomMove(b, mk, classic) {
       var emp = [], i; for (i = 0; i < 9; i++) if (b[i] === '.') emp.push(i);
-      if (countMark(b, mk) < 3) { return emp.length ? { i: emp[Math.floor(Math.random() * emp.length)] } : null; }
+      if (classic || countMark(b, mk) < 3) { return emp.length ? { i: emp[Math.floor(Math.random() * emp.length)] } : null; }
       var own = []; for (i = 0; i < 9; i++) if (b[i] === mk) own.push(i);
       if (!own.length || !emp.length) return null;
       return { f: own[Math.floor(Math.random() * own.length)], t: emp[Math.floor(Math.random() * emp.length)] };
     }
     // Premier coup légal qui GAGNE tout de suite (l'erreur « plausible » ne rate
     // pas une victoire sous ses yeux), sinon null.
-    function winningMove(b, mk) {
+    function winningMove(b, mk, classic) {
       var emp = [], own = [], i, j;
       for (i = 0; i < 9; i++) { if (b[i] === '.') emp.push(i); else if (b[i] === mk) own.push(i); }
       function wins(mv) {
@@ -207,7 +234,7 @@
         if (mv.f != null) { a[mv.f] = '.'; a[mv.t] = mk; } else a[mv.i] = mk;
         return !!window.MorpionAI.winLineFor(a.join(''), mk);
       }
-      if (countMark(b, mk) < 3) {
+      if (classic || countMark(b, mk) < 3) {
         for (i = 0; i < emp.length; i++) if (wins({ i: emp[i] })) return { i: emp[i] };
         return null;
       }
@@ -217,9 +244,10 @@
       return null;
     }
 
-    function onStart(players) {
+    function onStart(players, cur) {
       var starter = players[Math.random() < 0.5 ? 0 : 1].pid;
-      return { board: emptyBoard(), turn: starter, starter: starter, phase: 'placing', winner: null, winLine: null };
+      var variant = (cur && cur.variant === 'classic') ? 'classic' : 'move';
+      return { board: emptyBoard(), turn: starter, starter: starter, phase: 'placing', variant: variant, winner: null, winLine: null };
     }
 
     function onState(snap) {
@@ -242,6 +270,14 @@
       if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
       var b = state.board || emptyBoard();
       var mark = myMark(state);
+
+      // Classique : on pose simplement sur une case libre (pas de limite, pas de
+      // phase de déplacement).
+      if (isClassic(state)) {
+        if (b[i] !== '.') { lbToast('Case occupée'); return; }
+        doPlace(i);
+        return;
+      }
 
       if (state.phase === 'placing') {
         if (b[i] !== '.') { lbToast('Case occupée'); return; }
@@ -273,15 +309,22 @@
       if (window.Fx) { Fx.sfx('place'); Fx.vib(10); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid || cur.phase !== 'placing') return cur;
+        var classic = (cur.variant === 'classic');
         var mark = String((cur.order || []).indexOf(window.myPid));
         var b = (cur.board || emptyBoard()).split('');
-        if (b[i] !== '.' || countMark(b.join(''), mark) >= 3) return cur;
+        if (b[i] !== '.') return cur;
+        if (!classic && countMark(b.join(''), mark) >= 3) return cur;
         b[i] = mark; cur.board = b.join('');
-        // les deux joueurs ont posé leurs 3 pions ? → phase déplacement
-        var order = cur.order || [];
-        var allPlaced = order.every(function (pid) { return countMark(cur.board, String(order.indexOf(pid))) >= 3; });
         applyWinOrTurn(cur, mark);
-        if (!cur.winner && allPlaced) cur.phase = 'moving';
+        if (classic) {
+          // Classique : grille pleine sans vainqueur = match nul.
+          if (!cur.winner && cur.board.indexOf('.') < 0) cur.winner = 'draw';
+        } else {
+          // les deux joueurs ont posé leurs 3 pions ? → phase déplacement
+          var order = cur.order || [];
+          var allPlaced = order.every(function (pid) { return countMark(cur.board, String(order.indexOf(pid))) >= 3; });
+          if (!cur.winner && allPlaced) cur.phase = 'moving';
+        }
         return cur;
       });
     }
@@ -318,7 +361,9 @@
         var t = state.turn;
         ti.innerHTML = '<span class="mp-turn-dot" style="background:' + mpColor(ord.indexOf(t)) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
         var hint;
-        if (state.phase === 'placing') {
+        if (isClassic(state)) {
+          hint = (t === window.myPid) ? 'Pose un pion pour aligner 3 cases' : ('En attente de ' + Room.name(t) + '…');
+        } else if (state.phase === 'placing') {
           var left = 3 - countMark(b, mark);
           hint = (t === window.myPid) ? ('Pose un pion (' + left + ' restant' + (left > 1 ? 's' : '') + ')') : ('En attente de ' + Room.name(t) + '…');
         } else {
@@ -349,7 +394,8 @@
     function showResult(state) {
       var emoji = document.getElementById('mp-ov-emoji');
       var title = document.getElementById('mp-ov-title');
-      if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Match nul !'; }
+      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
       setHTML('mp-ov-scores', scoresHTML(state));
       document.getElementById('mp-overlay').classList.add('active');
