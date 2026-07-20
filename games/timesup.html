@@ -146,19 +146,50 @@
         '2 équipes, 3 manches (parle librement / un seul mot / mime)',
         'Fais deviner un max de cartes à ton équipe avant la fin du chrono',
         'Même paquet de cartes aux 3 manches — la mémoire aide !',
-        'La difficulté règle le chrono et les indices'
+        'Chrono par tour et taille du paquet réglables dans le salon'
       ],
       offline: { local: true },
       bot: function () {},
       offlineTurn: function (r) { return (r.status === 'ended' || r.solo) ? null : r.turn; },
       offlineEnter: function () { if (window.room) render(window.room); },
       onState: onState,
-      onStart: onStart
+      onStart: onStart,
+      lobbyExtraHTML: lobbyExtraHTML, offlineExtraSetup: offlineExtraSetup
     });
+
+    // ── Réglages du salon : chrono par tour + taille du paquet (mode équipes) ──
+    function secsOf(s) { var n = s && +s.turnSecs; return (n === 30 || n === 40 || n === 60) ? n : 40; }
+    function deckOf(s) { var n = s && +s.deckSize; return (n === 16 || n === 24 || n === 32) ? n : 24; }
+    function lobbyExtraHTML(room) {
+      var isHost = room && room.host === window.myPid;
+      function pickRow(label, setter, cur, opts) {
+        var btns = opts.map(function (o) {
+          return '<button type="button" class="lb-set-btn' + (o.v === cur ? ' active' : '') + '"' +
+            (isHost ? ' onclick="' + setter + '(' + o.v + ')"' : ' disabled') + '>' + o.l + '</button>';
+        }).join('');
+        return '<div class="lb-set"><div class="lb-set-label">' + label + '</div><div class="lb-set-row">' + btns + '</div></div>';
+      }
+      return '<div class="lb-botset">' +
+        pickRow('⏱ Chrono par tour', 'setTurnSecs', secsOf(room), [{ v: 30, l: '30 s' }, { v: 40, l: '40 s' }, { v: 60, l: '60 s' }]) +
+        pickRow('🃏 Cartes', 'setDeckSize', deckOf(room), [{ v: 16, l: '16' }, { v: 24, l: '24' }, { v: 32, l: '32' }]) +
+        (isHost ? '' : '<div class="lb-set-hint">Réglé par l\'hôte</div>') + '</div>';
+    }
+    function setTurnSecs(n) { if (window.roomRef) window.roomRef.child('turnSecs').set(n); }
+    function setDeckSize(n) { if (window.roomRef) window.roomRef.child('deckSize').set(n); }
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">Chrono par tour</div>' +
+        '<div class="off-set-row" data-opt="turnSecs">' +
+        [30, 40, 60].map(function (n) { return '<button type="button" class="off-opt' + (n === 40 ? ' active' : '') + '" data-val="' + n + '">' + n + ' s</button>'; }).join('') +
+        '</div></div>' +
+        '<div class="off-set"><div class="off-set-label">Nombre de cartes</div>' +
+        '<div class="off-set-row" data-opt="deckSize">' +
+        [16, 24, 32].map(function (n) { return '<button type="button" class="off-opt' + (n === 24 ? ' active' : '') + '" data-val="' + n + '">' + n + '</button>'; }).join('') +
+        '</div></div>';
+    }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
-      var idxs = shuffle(DECK.map(function (_, i) { return i; })).slice(0, order.length <= 1 ? 12 : 24);
+      var idxs = shuffle(DECK.map(function (_, i) { return i; })).slice(0, order.length <= 1 ? 12 : deckOf(cur));
       if (order.length <= 1) {
         // SOLO : course aux indices.
         return { solo: true, cards: idxs, pos: 0, score: 0, status: 'playing', startedAt: 0, banner: '' };
@@ -212,7 +243,7 @@
     function startTurn() {
       rref().transaction(function (cur) {
         if (!cur || cur.solo || cur.turn !== window.myPid) return cur;
-        cur.started = true; cur.turnEndsAt = Date.now() + 40000;
+        cur.started = true; cur.turnEndsAt = Date.now() + secsOf(cur) * 1000;
         if (!cur.queue || !cur.queue.length) cur.queue = shuffle(cur.cards.slice());
         return cur;
       });

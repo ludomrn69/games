@@ -210,10 +210,13 @@
       for (var c in occ) if (occ[c] >= 2) return true;
       return false;
     }
+    // Barrages activés ? (règle du salon ; drapeau négatif, absent = barrages ON).
+    function barragesOn(s) { return !s || !+(s.noBarrage); }
     // Cible légale AVEC barrages : nul si un barrage est traversé ou atteint.
     function legalTarget(cur, color, p, d) {
       var t = targetOf(p, d);
       if (t == null) return null;
+      if (!barragesOn(cur)) return t; // barrages désactivés : rien ne bloque
       var from = (p === -1) ? 0 : p + 1;
       for (var q = from; q <= Math.min(t, 50); q++) {
         if (isBarrier(cur, (COLOR_INFO[color].start + q) % 52)) return null;
@@ -233,14 +236,34 @@
         'Il faut un 6 pour sortir un cheval de l\'écurie',
         'Avance tes 4 chevaux dans le sens horaire',
         'Tomber sur un adversaire le renvoie à l\'écurie (cases colorées = sûres)',
-        '2 pions d\'une même couleur = barrage : infranchissable pour tous',
+        '2 pions d\'une même couleur = barrage infranchissable (option, réglable au salon)',
         'Un 6 fait rejouer · ramène tes 4 chevaux au centre pour gagner'
       ],
       offline: { solo: true, local: true },
       bot: ludoBot,
       onState: onState,
-      onStart: onStart
+      onStart: onStart,
+      lobbyExtraHTML: lobbyExtraHTML, offlineExtraSetup: offlineExtraSetup
     });
+
+    // ── Barrages : règle activable au salon (barrages ON par défaut) ──────────
+    function lobbyExtraHTML(room) {
+      var on = barragesOn(room), isHost = room && room.host === window.myPid;
+      function b(val, label) {
+        return '<button type="button" class="lb-set-btn' + ((val === '0') === on ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setBarrage(\'' + val + '\')"' : ' disabled') + '>' + label + '</button>';
+      }
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">🚧 Barrages' + (isHost ? '' : ' (réglé par l\'hôte)') + '</div><div class="lb-set-row">' +
+        b('0', 'Avec') + b('1', 'Sans') + '</div></div></div>';
+    }
+    function setBarrage(v) { if (window.roomRef) window.roomRef.child('noBarrage').set(+v ? true : false); }
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">Barrages (2 pions bloquent)</div>' +
+        '<div class="off-set-row" data-opt="noBarrage">' +
+        '<button type="button" class="off-opt active" data-val="0">Avec</button>' +
+        '<button type="button" class="off-opt" data-val="1">Sans</button>' +
+        '</div></div>';
+    }
 
     /* ━━ IA (mode solo hors-ligne) ━━ */
     function ludoScoreMove(state, color, fromP, target) {
