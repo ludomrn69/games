@@ -150,13 +150,47 @@
   <div class="lb-toast" id="lb-toast"></div>
 
   <script>
-    // Le Porte-avions est un rectangle 2×4 (8 cases) ; les autres bateaux sont des
-    // lignes. `shape` = longueur (ligne) ou { w, l } (rectangle) ; `size` = nb de cases.
-    var FLEET = [
-      { name: 'Porte-avions', size: 8, shape: { w: 2, l: 4 } }, { name: 'Croiseur', size: 4, shape: 4 },
-      { name: 'Contre-torpilleur', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 },
-      { name: 'Torpilleur', size: 2, shape: 2 }, { name: 'Vedette', size: 2, shape: 2 }
-    ];
+    // Deux flottes au choix (réglées dans le salon) :
+    //  • CLASSIQUE : la flotte officielle Bataille navale — 5 bateaux en lignes
+    //    5-4-3-3-2 (17 cases). C'est le « vrai jeu ».
+    //  • MODERNE : variante maison avec un Porte-avions rectangle 2×4 + plus de
+    //    bateaux (22 cases). `shape` = longueur (ligne) ou { w, l } (rectangle).
+    var FLEETS = {
+      classic: [
+        { name: 'Porte-avions', size: 5, shape: 5 }, { name: 'Cuirassé', size: 4, shape: 4 },
+        { name: 'Croiseur', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 },
+        { name: 'Torpilleur', size: 2, shape: 2 }
+      ],
+      modern: [
+        { name: 'Porte-avions', size: 8, shape: { w: 2, l: 4 } }, { name: 'Croiseur', size: 4, shape: 4 },
+        { name: 'Contre-torpilleur', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 }, { name: 'Sous-marin', size: 3, shape: 3 },
+        { name: 'Torpilleur', size: 2, shape: 2 }, { name: 'Vedette', size: 2, shape: 2 }
+      ]
+    };
+    function fleetVariant() { var v = (window.room || {}).variant; return v === 'modern' ? 'modern' : 'classic'; }
+    function currentFleet() { return FLEETS[fleetVariant()]; }
+
+    // ── Choix de la flotte (réglage du salon) ─────────────────────────────────
+    function lobbyExtraHTML(room) {
+      var v = (room && room.variant === 'modern') ? 'modern' : 'classic';
+      var isHost = room && room.host === window.myPid;
+      function btn(val, label, title) {
+        return '<button type="button" class="lb-set-btn' + (v === val ? ' active' : '') + '" title="' + title + '"' +
+          (isHost ? ' onclick="setVariant(\'' + val + '\')"' : ' disabled') + '>' + label + '</button>';
+      }
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">🚢 Flotte' + (isHost ? '' : ' (réglée par l\'hôte)') + '</div><div class="lb-set-row">' +
+        btn('classic', 'Classique', 'Flotte officielle : 5 bateaux (5-4-3-3-2)') +
+        btn('modern', 'Moderne', 'Variante : porte-avions 2×4 + 7 bateaux') +
+        '</div></div></div>';
+    }
+    function setVariant(v) { if (v !== 'classic' && v !== 'modern') return; if (window.roomRef) window.roomRef.child('variant').set(v); }
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">Flotte</div>' +
+        '<div class="off-set-row" data-opt="variant">' +
+        '<button type="button" class="off-opt active" data-val="classic">Classique</button>' +
+        '<button type="button" class="off-opt" data-val="modern">Moderne</button>' +
+        '</div></div>';
+    }
     var localFleet = [], selectedIdx = 0, orientation = 'h', placedDone = false, prevStatus = null;
     function rref() { return window.roomRef; }
     function emptyShots() { return '.'.repeat(100); }
@@ -165,7 +199,7 @@
     function oppPid(state) { return ((state || window.room || {}).order || []).filter(function (p) { return p !== window.myPid; })[0]; }
     function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
 
-    function freshFleet() { return FLEET.map(function (s) { return { name: s.name, size: s.size, shape: s.shape, cells: [], placed: false }; }); }
+    function freshFleet() { return currentFleet().map(function (s) { return { name: s.name, size: s.size, shape: s.shape, cells: [], placed: false }; }); }
     // Géométrie des bateaux : centralisée dans bataille-navale-ai.js.
     var cellsFor = window.BattleshipAI.cellsFor;
     function overlaps(cells, exceptIdx) {
@@ -180,9 +214,11 @@
     GameRoom({
       gameKey: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', tagline: 'Coule la flotte adverse',
       minPlayers: 2, maxPlayers: 2,
-      rules: ['Place tes 5 bateaux en secret', 'Chacun son tour, tu tires sur une case adverse', 'Touché : tu rejoues · Manqué : à l\'autre', 'Coule toute la flotte ennemie pour gagner'],
+      rules: ['Place ta flotte en secret (classique 5-4-3-3-2, ou moderne au choix)', 'Chacun son tour, tu tires sur une case adverse', 'Touché : tu rejoues · Manqué : à l\'autre', 'Coule toute la flotte ennemie pour gagner'],
       offline: { solo: true, local: true },
       bot: bnBot,
+      lobbyExtraHTML: lobbyExtraHTML,
+      offlineExtraSetup: offlineExtraSetup,
       offlineTurn: function (r) {
         if (r.status === 'ended') return null;
         if (r.status === 'placing') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].placed)) return o[i]; return o[0]; }
@@ -211,8 +247,9 @@
       if (t >= 0) fire(t);
     }
     function bnBotPlace(pid) {
-      var placed = window.BattleshipAI.placeFleet(FLEET.map(function (s) { return s.shape; }));
-      var ships = placed.map(function (p, i) { return { n: FLEET[i].name, cells: p.cells }; });
+      var fleet = currentFleet();
+      var placed = window.BattleshipAI.placeFleet(fleet.map(function (s) { return s.shape; }));
+      var ships = placed.map(function (p, i) { return { n: fleet[i].name, cells: p.cells }; });
       rref().child('players/' + pid).update({ ships: ships, placed: true }, function () {
         rref().transaction(function (cur) {
           if (!cur || cur.status !== 'placing') return cur;
@@ -229,7 +266,8 @@
 
     function onStart(players, cur) {
       players.forEach(function (p) { cur.players[p.pid].placed = false; cur.players[p.pid].ships = null; cur.players[p.pid].shots = emptyShots(); });
-      return { status: 'placing', turn: null, winner: null, lastShot: null };
+      var variant = (cur && cur.variant === 'modern') ? 'modern' : 'classic';
+      return { status: 'placing', turn: null, winner: null, lastShot: null, variant: variant };
     }
 
     function onState(snap) {
@@ -245,7 +283,7 @@
     function initPlacement(state) {
       var mine = state.players && state.players[window.myPid];
       if (mine && mine.placed && mine.ships) {
-        localFleet = FLEET.map(function (s, i) { var dbs = (mine.ships && mine.ships[i]) || {}; var cells = (dbs.cells || []).slice(); return { name: s.name, size: s.size, shape: s.shape, cells: cells, placed: cells.length === s.size }; });
+        localFleet = currentFleet().map(function (s, i) { var dbs = (mine.ships && mine.ships[i]) || {}; var cells = (dbs.cells || []).slice(); return { name: s.name, size: s.size, shape: s.shape, cells: cells, placed: cells.length === s.size }; });
         placedDone = true; selectedIdx = -1;
       } else { localFleet = freshFleet(); placedDone = false; selectedIdx = 0; }
       renderPlacement(state);
