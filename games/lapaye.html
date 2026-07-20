@@ -55,7 +55,8 @@
       .lp-day .dl { display: block; }
       .lp-day .toks .pawn { width: 17px; height: 17px; font-size: 10px; }
     }
-    .lp-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; margin-top: 8px; font-size: 0.68rem; color: var(--ink-light); }
+    /* Légende posée SUR le plateau bleu : texte clair (sinon illisible en foncé). */
+    .lp-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; margin-top: 8px; padding: 6px 4px 2px; font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.92); }
     .lp-legend span { white-space: nowrap; }
     .lp-proj { background: var(--white); border-radius: 12px; box-shadow: var(--shadow); padding: 8px 12px; margin: 8px auto; max-width: 380px; text-align: left; font-size: 0.78rem; line-height: 1.5; }
     .lp-proj-row.debt { color: #c9503f; } .lp-proj-row.save { color: #b07d16; }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <script src="/head.js" data-title="Dames ♟️" data-emoji="🔴"></script>
+  <script src="/head.js" data-title="Dames ♟️" data-emoji="🟤"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
@@ -24,7 +24,9 @@
        tour + actions, puis scores centrés en dessous. */
     @media (max-width: 560px) {
       .dm-header { grid-template-columns: minmax(0,1fr) auto; }
-      .dm-turn { grid-column: 1; grid-row: 1; }
+      /* stretch : le libellé de tour remplit sa colonne au lieu de se réduire à
+         son contenu (un conteneur flex en justify-self:start se tronquait à « À to »). */
+      .dm-turn { grid-column: 1; grid-row: 1; justify-self: stretch; }
       .dm-actions { grid-column: 2; grid-row: 1; }
       .dm-scores { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
     }
@@ -160,7 +162,7 @@
     GameRoom({
       gameKey: 'dames',
       name: 'Dames',
-      emoji: '🔴',
+      emoji: '🟤',
       tagline: 'Checkers',
       minPlayers: 2,
       maxPlayers: 2,
