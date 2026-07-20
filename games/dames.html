@@ -429,6 +429,7 @@
         if (fromHere.length) { selPath = [i]; selMoves = fromHere; renderPlaying(state); }
         else { selPath = []; selMoves = []; renderPlaying(state); }
       });
+      if (window.Kbd) Kbd.grid(board, '.dm-cell', 8); // navigation clavier (⬆︎⬇︎⬅︎➡︎ + Entrée)
     })();
   </script>
 </body>

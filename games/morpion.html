@@ -428,6 +428,7 @@
         var cell = e.target.closest('.mp-cell');
         if (cell) cellTap(+cell.dataset.i);
       });
+      if (window.Kbd) Kbd.grid(board, '.mp-cell', 3); // navigation clavier (⬆︎⬇︎⬅︎➡︎ + Entrée)
     })();
   </script>
 </body>

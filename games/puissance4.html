@@ -370,6 +370,7 @@
         }
       });
       board.addEventListener('mouseleave', clearHover);
+      if (window.Kbd) Kbd.grid(board, '.p4-cell', 7); // navigation clavier (⬅︎➡︎ colonne, Entrée = lâcher)
     })();
   </script>
 </body>

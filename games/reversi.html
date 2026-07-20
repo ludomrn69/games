@@ -366,6 +366,7 @@
         if (!cell) return;
         playAt(+cell.dataset.i);
       });
+      if (window.Kbd) Kbd.grid(board, '.ot-cell', 8); // navigation clavier (⬆︎⬇︎⬅︎➡︎ + Entrée)
     })();
   </script>
 </body>
