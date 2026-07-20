@@ -410,11 +410,33 @@
         render(state);
         if (state.phase === 'roundEnd') { showRoundEnd(state); maybeAdvance(state); }
         else document.getElementById('dm-overlay').classList.remove('active');
+        maybeAbsent(state);
       } else if (status === 'ended') {
         document.getElementById('dm-overlay').classList.remove('active');
         showResults(state);
       }
       prevStatus = status; prevPhase = state.phase;
+    }
+
+    // Joueur absent en ligne : en phase « decide », un présent hors-ligne qui n'a
+    // pas tranché fige l'expédition. Le bandeau permet de décider à sa place
+    // (sortie = sécurise son butin) ou de le remplacer par un ordi.
+    function maybeAbsent(state) {
+      if (!(window.Lobby && Lobby.absentBanner)) return;
+      var who = null;
+      if (state.status === 'playing' && state.phase === 'decide') {
+        who = (state.order || []).filter(function (p) { return state.inCave && state.inCave[p] && !(state.decisions && (p in state.decisions)); })[0] || null;
+      }
+      Lobby.absentBanner((who && who !== window.myPid && Lobby.isOffline(state, who)) ? who : null, function () {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || cur.phase !== 'decide') return cur;
+          var p = (cur.order || []).filter(function (x) { return cur.inCave && cur.inCave[x] && !(cur.decisions && (x in cur.decisions)); })[0];
+          if (!p || !Lobby.isOffline(cur, p)) return cur;
+          cur.decisions = cur.decisions || {}; cur.decisions[p] = 'leave';
+          resolveDecisions(cur);
+          return cur;
+        });
+      });
     }
 
     /* ━━ Rendu ━━ */

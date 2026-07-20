@@ -249,11 +249,34 @@
       if (status === 'playing') {
         if (prevStatus !== 'playing') { showScreen('s-playing'); hideResult(); }
         renderPlaying(state);
+        maybeAbsent(state);
       } else if (status === 'ended') {
         renderPlaying(state);
         showResult(state);
       }
       prevStatus = status;
+    }
+
+    // Joueur absent en ligne : en phase de proposition, si un joueur hors-ligne
+    // n'a pas encore proposé, la manche se fige. Le bandeau partagé permet de
+    // jouer à sa place (estimation d'ordi) ou de le remplacer par un ordi (🤖).
+    function maybeAbsent(state) {
+      if (!(window.Lobby && Lobby.absentBanner)) return;
+      var who = null;
+      if (state.status === 'playing' && state.phase === 'guess') {
+        who = (state.order || []).filter(function (p) { return !(state.guesses && (p in state.guesses)); })[0] || null;
+      }
+      Lobby.absentBanner((who && who !== window.myPid && Lobby.isOffline(state, who)) ? who : null, function () {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || cur.phase !== 'guess') return cur;
+          var p = (cur.order || []).filter(function (x) { return !(cur.guesses && (x in cur.guesses)); })[0];
+          if (!p || !Lobby.isOffline(cur, p)) return cur;
+          cur.guesses = cur.guesses || {};
+          cur.guesses[p] = estimateGuess(cur, p);
+          maybeReveal(cur);
+          return cur;
+        });
+      });
     }
 
     /* ━━ Proposer un prix ━━ */
@@ -297,7 +320,8 @@
     function nextRound() {
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal') return cur;
-        if (cur.host !== window.myPid) return cur;
+        // Normalement l'hôte fait avancer ; si l'hôte est absent, n'importe qui peut.
+        if (cur.host !== window.myPid && !(window.Lobby && Lobby.isOffline(cur, cur.host))) return cur;
         if ((cur.round || 1) >= (cur.rounds || 5)) {
           // Fin : vainqueur = plus de manches gagnées (nul possible → winner reste null).
           var order = cur.order || [], top = null, tie = false;
@@ -321,17 +345,19 @@
     /* ━━ IA : estime le prix depuis les prix de BASE du catalogue (pas le vrai
        prix) + bruit selon la difficulté, puis propose un peu EN DESSOUS pour éviter
        de dépasser. ━━ */
-    function jpBot(state, pid) {
-      if (state.phase !== 'guess') return;
-      if (state.guesses && (pid in state.guesses)) return;
+    function estimateGuess(state, pid) {
       var lvl = window.Bots ? window.Bots.level(state) : 'normal';
       var noise = lvl === 'hard' ? 0.08 : lvl === 'normal' ? 0.18 : 0.34;
       var margin = lvl === 'hard' ? 0.03 : lvl === 'normal' ? 0.06 : 0.11;
       var base = 0;
       (state.vitrine || []).forEach(function (idx) { base += (CATALOG[idx] || { p: 0 }).p; });
       var est = base * (1 + (Math.random() * 2 - 1) * noise);
-      var bid = Math.max(1, Math.round(est * (1 - margin)));
-      submitGuessValue(pid, bid);
+      return Math.max(1, Math.round(est * (1 - margin)));
+    }
+    function jpBot(state, pid) {
+      if (state.phase !== 'guess') return;
+      if (state.guesses && (pid in state.guesses)) return;
+      submitGuessValue(pid, estimateGuess(state, pid));
     }
 
     /* ━━ Rendu ━━ */
@@ -425,9 +451,9 @@
         '<div class="jp-price-big">' + euro(price) + '</div>' +
         '<div style="font-size:.9rem;color:var(--ink-light);margin-top:2px">' +
           (winner ? (Room.name(winner) + ' remporte la manche 🎉') : 'Tout le monde a dépassé — personne ne marque') + '</div></div>';
-      var isHost = state.host === window.myPid;
+      var canAdvance = state.host === window.myPid || (window.Lobby && Lobby.isOffline(state, state.host));
       var last = (state.round || 1) >= (state.rounds || 5);
-      var btn = isHost
+      var btn = canAdvance
         ? '<button class="btn-primary" onclick="nextRound()" style="margin-top:4px">' + (last ? 'Voir le classement →' : 'Manche suivante →') + '</button>'
         : '<div class="jp-wait">En attente de l\'hôte…</div>';
       return head + '<div class="jp-reveal-list">' + rows + '</div>' + btn;
