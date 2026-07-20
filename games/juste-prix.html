@@ -8,51 +8,59 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
-
     #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
     .jp-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
     html[data-theme="dark"] .jp-header { background: rgba(20,16,28,0.97); }
-    .jp-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-    .jp-turn-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-    .jp-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+    .jp-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .jp-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
     .jp-scores .sep { color: var(--ink-light); margin: 0 5px; font-weight: 400; }
     .jp-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
 
-    .jp-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 26px 16px 40px; width: 100%; max-width: 460px; gap: 18px; }
+    .jp-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 22px 16px 40px; width: 100%; max-width: 460px; gap: 16px; }
 
-    .jp-range { background: var(--white); border: 1px solid var(--gold-light); border-radius: 22px; box-shadow: var(--shadow); padding: 22px 20px; text-align: center; width: 100%; }
-    .jp-range-label { font-family: 'Caveat', cursive; font-size: 1.25rem; color: var(--ink-light); margin-bottom: 6px; }
-    .jp-range-nums { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2rem; color: var(--ink); display: flex; align-items: center; justify-content: center; gap: 14px; }
-    .jp-range-nums .lo, .jp-range-nums .hi { background: linear-gradient(135deg, var(--terracotta), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .jp-range-nums .arrow { color: var(--gold-light); font-size: 1.4rem; }
+    /* Vitrine : une « devanture » dorée avec les articles à estimer. */
+    .jp-vitrine { width: 100%; border-radius: 22px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--gold-light); background: var(--white); }
+    .jp-vitrine-top { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .jp-vitrine-top .lbl { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.1rem; letter-spacing: 0.04em; display: flex; align-items: center; gap: 7px; }
+    .jp-vitrine-top .rnd { font-size: 0.82rem; font-weight: 700; background: rgba(255,255,255,0.22); border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
+    .jp-items { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 20px 16px; }
+    .jp-item { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 116px; padding: 12px 8px; border-radius: 16px; background: var(--cream); border: 1px solid var(--gold-light); }
+    .jp-item .ie { font-size: 2.6rem; line-height: 1; }
+    .jp-item .inm { font-size: 0.82rem; font-weight: 700; text-align: center; color: var(--ink); line-height: 1.15; }
+    .jp-ask { text-align: center; font-family: 'Caveat', cursive; font-size: 1.3rem; color: var(--ink-light); padding: 0 16px 16px; }
 
     .jp-input-row { display: flex; gap: 8px; width: 100%; max-width: 340px; }
-    .jp-input { flex: 1; min-width: 0; padding: 0.85rem 1rem; border: 1.5px solid var(--gold-light); border-radius: 14px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1.3rem; text-align: center; font-weight: 700; }
+    .jp-euro { position: relative; flex: 1; min-width: 0; }
+    .jp-euro .cur { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-weight: 800; color: var(--ink-light); pointer-events: none; }
+    .jp-input { width: 100%; padding: 0.85rem 2rem 0.85rem 1rem; border: 1.5px solid var(--gold-light); border-radius: 14px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 1.3rem; text-align: center; font-weight: 700; }
     .jp-input:focus { outline: none; border-color: var(--gold); }
     .jp-input-row .btn-primary { width: auto; margin: 0; padding: 0 1.3rem; white-space: nowrap; }
-
     .jp-wait { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--ink-light); text-align: center; min-height: 26px; }
 
-    .jp-log { width: 100%; display: flex; flex-direction: column; gap: 7px; }
-    .jp-log-row { display: flex; align-items: center; gap: 10px; background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); animation: fadeUp .25s ease both; }
-    .jp-log-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; border: 2px solid #fff; }
-    .jp-log-name { font-weight: 700; font-size: 0.9rem; }
-    .jp-log-val { margin-left: auto; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.15rem; }
-    .jp-log-dir { font-size: 0.85rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
-    .jp-log-dir.up { color: #fff; background: var(--terracotta); }
-    .jp-log-dir.down { color: var(--ink); background: var(--gold-light); }
-    .jp-log-dir.hit { color: #fff; background: var(--sage); }
+    /* Révélation de la manche. */
+    .jp-reveal { width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+    .jp-price-card { text-align: center; background: var(--white); border: 1px solid var(--gold-light); border-radius: 20px; box-shadow: var(--shadow); padding: 18px 20px; width: 100%; }
+    .jp-price-label { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--ink-light); }
+    .jp-price-big { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2.4rem; background: linear-gradient(135deg, var(--terracotta), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .jp-reveal-list { width: 100%; display: flex; flex-direction: column; gap: 7px; }
+    .jp-reveal-row { display: flex; align-items: center; gap: 10px; background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow); }
+    .jp-reveal-row.win { border-color: var(--sage); box-shadow: 0 0 0 2px rgba(139,158,126,0.3), var(--shadow); }
+    .jp-reveal-row.over { opacity: 0.72; }
+    .jp-rr-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; border: 2px solid #fff; }
+    .jp-rr-name { font-weight: 700; font-size: 0.9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .jp-rr-val { margin-left: auto; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.1rem; white-space: nowrap; }
+    .jp-rr-tag { font-size: 0.78rem; font-weight: 700; padding: 2px 9px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+    .jp-rr-tag.win { color: #fff; background: var(--sage); }
+    .jp-rr-tag.over { color: #fff; background: var(--terracotta); }
+    .jp-rr-tag.gap { color: var(--ink); background: var(--gold-light); }
 
-    /* Result overlay */
+    /* Result overlay (fin de partie) */
     .jp-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
     .jp-overlay.active { display: flex; animation: fadeUp 0.3s ease both; }
-    .jp-overlay-card { background: var(--white); border-radius: 22px; padding: 30px 26px; box-shadow: var(--shadow-hover); text-align: center; max-width: 340px; width: 100%; }
+    .jp-overlay-card { background: var(--white); border-radius: 22px; padding: 30px 26px; box-shadow: var(--shadow-hover); text-align: center; max-width: 360px; width: 100%; }
     .jp-ov-emoji { font-size: 3rem; line-height: 1; margin-bottom: 8px; }
-    .jp-ov-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; margin-bottom: 6px; }
-    .jp-ov-secret { font-size: 1rem; color: var(--ink-light); margin-bottom: 6px; }
-    .jp-ov-secret b { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--terracotta); }
-    .jp-ov-scores { font-size: 1.05rem; font-weight: 700; margin: 10px 0 20px; }
-    .jp-ov-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
+    .jp-ov-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; margin-bottom: 12px; }
+    .jp-ov-rank { display: flex; flex-direction: column; gap: 7px; margin: 4px 0 20px; text-align: left; }
 
     /* Modal */
     .modal { position: fixed; inset: 0; z-index: 520; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
@@ -84,12 +92,9 @@
         </div>
       </div>
       <div class="jp-stage">
-        <div class="jp-range">
-          <div class="jp-range-label">Le nombre mystère est entre</div>
-          <div class="jp-range-nums"><span class="lo" id="jp-lo">1</span><span class="arrow">↔</span><span class="hi" id="jp-hi">1000</span></div>
-        </div>
+        <div class="jp-vitrine" id="jp-vitrine"></div>
         <div id="jp-action"></div>
-        <div class="jp-log" id="jp-log"></div>
+        <div class="jp-reveal" id="jp-reveal"></div>
       </div>
     </div>
   </div>
@@ -98,8 +103,7 @@
     <div class="jp-overlay-card">
       <div class="jp-ov-emoji" id="jp-ov-emoji">🏆</div>
       <div class="jp-ov-title" id="jp-ov-title">—</div>
-      <div class="jp-ov-secret" id="jp-ov-secret"></div>
-      <div class="jp-ov-scores" id="jp-ov-scores"></div>
+      <div class="jp-ov-rank" id="jp-ov-rank"></div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
       <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
     </div>
@@ -120,9 +124,10 @@
     <div class="modal-card">
       <div class="modal-title">Le juste prix</div>
       <div class="modal-body">
-        <p>Un nombre mystère est tiré au sort entre <b>1 et 1000</b>.</p>
-        <p style="margin-top:10px">Chacun son tour, propose un nombre. Le jeu répond <b>« c'est plus ! »</b> ⬆️ ou <b>« c'est moins ! »</b> ⬇️ et la fourchette se resserre pour tout le monde.</p>
-        <p style="margin-top:10px">Le premier à <b>tomber pile</b> sur le nombre gagne la manche. Le score est gardé entre les manches.</p>
+        <p>Une <b>vitrine</b> d'un ou plusieurs articles s'affiche. Devine son <b>prix total</b> en euros.</p>
+        <p style="margin-top:10px">Tout le monde propose un prix en même temps (en secret). Le plus proche <b>sans dépasser</b> le vrai prix remporte la manche.</p>
+        <p style="margin-top:10px"><b>Attention :</b> si tu dépasses, tu es éliminé de la manche. Si tout le monde dépasse, personne ne marque !</p>
+        <p style="margin-top:10px">La partie se joue en plusieurs manches — le plus de manches gagnées l'emporte.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -131,201 +136,324 @@
   <div class="lb-toast" id="lb-toast"></div>
 
   <script>
-    var MAXN = 1000;
-    var prevStatus = null, lastLogLen = -1;
+    /* ━━ Catalogue d'articles (prix de base indicatifs en €). Le vrai prix d'une
+       vitrine = somme des articles, chacun légèrement varié (±10 %) — même vitrine
+       pour tout le monde (générée par l'hôte). Les ordis estiment à partir des prix
+       de BASE ci-dessous (avec du bruit selon la difficulté) : ils ne « lisent »
+       jamais le vrai prix, donc le jeu reste juste. ━━ */
+    var CATALOG = [
+      { e: '🍞', n: 'Baguette', p: 1.2 }, { e: '☕', n: 'Cafetière', p: 49 }, { e: '🎧', n: 'Casque audio', p: 89 },
+      { e: '📱', n: 'Smartphone', p: 599 }, { e: '🚲', n: 'Vélo de ville', p: 320 }, { e: '🧊', n: 'Réfrigérateur', p: 480 },
+      { e: '🛋️', n: 'Canapé', p: 750 }, { e: '📺', n: 'Télévision', p: 549 }, { e: '⌚', n: 'Montre connectée', p: 249 },
+      { e: '🎸', n: 'Guitare', p: 180 }, { e: '🧴', n: 'Parfum', p: 65 }, { e: '👟', n: 'Baskets', p: 95 },
+      { e: '🪑', n: 'Chaise de bureau', p: 129 }, { e: '🍷', n: 'Bouteille de vin', p: 14 }, { e: '🧳', n: 'Valise', p: 79 },
+      { e: '🛴', n: 'Trottinette élec.', p: 399 }, { e: '🖥️', n: 'Écran PC', p: 199 }, { e: '☂️', n: 'Parapluie', p: 18 },
+      { e: '🪴', n: 'Plante verte', p: 24 }, { e: '🎮', n: 'Console de jeu', p: 449 }, { e: '🪥', n: 'Brosse à dents élec.', p: 55 },
+      { e: '🍳', n: 'Poêle', p: 29 }, { e: '🛏️', n: 'Matelas', p: 399 }, { e: '🧥', n: 'Manteau', p: 120 },
+      { e: '👜', n: 'Sac à main', p: 140 }, { e: '🕶️', n: 'Lunettes de soleil', p: 85 }, { e: '⛺', n: 'Tente 4 places', p: 149 },
+      { e: '🎹', n: 'Piano numérique', p: 520 }, { e: '📷', n: 'Appareil photo', p: 430 }, { e: '🧹', n: 'Aspirateur', p: 159 },
+      { e: '🍽️', n: 'Service de table', p: 69 }, { e: '⚽', n: 'Ballon de foot', p: 22 }, { e: '🧸', n: 'Peluche', p: 27 },
+      { e: '💻', n: 'Ordinateur portable', p: 799 }, { e: '🪞', n: 'Miroir mural', p: 59 }, { e: '🔋', n: 'Batterie externe', p: 34 },
+      { e: '🎂', n: 'Gâteau d\'anniv.', p: 32 }, { e: '🥾', n: 'Chaussures de rando', p: 110 }, { e: '🧦', n: 'Lot de chaussettes', p: 12 },
+      { e: '🚗', n: 'GPS voiture', p: 139 }
+    ];
+
+    var prevStatus = null;
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
 
     function rref() { return window.roomRef; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
-    function winsOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].wins) || 0; }
+    function euro(n) { return Math.round(n).toLocaleString('fr-FR') + ' €'; }
+    function scoreOf(state, pid) { return (state.players && state.players[pid] && state.players[pid].score) || 0; }
 
     GameRoom({
       gameKey: 'juste-prix',
       name: 'Le juste prix',
       emoji: '💰',
-      tagline: 'Plus ou moins ?',
+      tagline: 'Devine le prix de la vitrine',
       minPlayers: 2,
       maxPlayers: 8,
       rules: [
-        'Un nombre mystère entre 1 et 1000 est tiré au sort',
-        'Chacun son tour, propose un nombre',
-        'Le jeu répond « c\'est plus ! » ou « c\'est moins ! »',
-        'Le premier à tomber pile gagne la manche'
+        'Une vitrine d\'articles s\'affiche : devine son prix total',
+        'Tout le monde propose en même temps (en secret)',
+        'Le plus proche SANS dépasser gagne la manche',
+        'Dépasser = éliminé de la manche · le plus de manches gagnées l\'emporte'
       ],
-      offline: { solo: true, local: true, soloMinBots: 0 },
+      offline: { solo: true, local: true },
       bot: jpBot,
+      offlineTurn: offlineTurn,
       onState: onState,
-      onStart: onStart
+      onStart: onStart,
+      lobbyExtraHTML: lobbyExtraHTML,
+      offlineExtraSetup: offlineExtraSetup
     });
 
-    /* État initial d'une manche. */
-    function onStart(players) {
-      var secret = 1 + Math.floor(Math.random() * MAXN);
-      var starter = players[Math.floor(Math.random() * players.length)].pid;
-      return { secret: secret, lo: 1, hi: MAXN, max: MAXN, turn: starter, log: null, winner: null };
+    /* ━━ Génération d'une vitrine (1 à 3 articles) ━━ */
+    function newVitrine() {
+      var n = 1 + Math.floor(Math.random() * 3);
+      var pool = CATALOG.map(function (_, i) { return i; });
+      for (var i = pool.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+      var items = pool.slice(0, n);
+      var price = 0;
+      items.forEach(function (idx) { price += Math.round(CATALOG[idx].p * (0.9 + Math.random() * 0.2)); });
+      return { items: items, price: price };
+    }
+
+    /* ━━ Réglage du salon : nombre de manches ━━ */
+    function lobbyExtraHTML(room) {
+      var sel = (room && room.rounds) || 5;
+      var isHost = room && room.host === window.myPid;
+      var btns = [3, 5, 7].map(function (n) {
+        return '<button type="button" class="lb-set-btn' + (n === sel ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setRounds(' + n + ')"' : ' disabled') + '>' + n + '</button>';
+      }).join('');
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">🎯 Manches' + (isHost ? '' : ' (réglées par l\'hôte)') + '</div><div class="lb-set-row">' + btns + '</div></div></div>';
+    }
+    function setRounds(n) { if (window.roomRef) window.roomRef.child('rounds').set(n); }
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">Nombre de manches</div>' +
+        '<div class="off-set-row" data-opt="rounds">' +
+        [3, 5, 7].map(function (n) { return '<button type="button" class="off-opt' + (n === 5 ? ' active' : '') + '" data-val="' + n + '">' + n + '</button>'; }).join('') +
+        '</div></div>';
+    }
+
+    /* ━━ Démarrage ━━ */
+    function onStart(players, cur) {
+      var vt = newVitrine();
+      players.forEach(function (p) { cur.players[p.pid].score = 0; });
+      return { round: 1, rounds: (cur && cur.rounds) || 5, vitrine: vt.items, price: vt.price, guesses: {}, phase: 'guess', winner: null };
+    }
+
+    // Qui doit « agir » maintenant, en phase de devinette :
+    //  • LOCAL (même appareil) : le prochain JOUEUR (humain) qui n'a pas proposé —
+    //    l'écran « passe l'appareil » cycle ainsi chacun pour sa proposition secrète.
+    //  • SOLO / EN LIGNE : seulement le prochain ORDI à piloter ; les humains
+    //    proposent librement via leur champ (secret, simultané).
+    // En révélation, c'est l'hôte qui fait avancer → rien à piloter.
+    function offlineTurn(r) {
+      if (!r || r.status === 'ended' || r.phase !== 'guess') return null;
+      var g = r.guesses || {}, localPass = (window.roomCode === 'LOCAL');
+      for (var i = 0; i < (r.order || []).length; i++) {
+        var p = r.order[i];
+        if (p in g) continue;
+        if (localPass) return p;
+        if (r.players[p] && r.players[p].isBot) return p;
+      }
+      return null;
     }
 
     function onState(snap) {
       var state = snap.val() || {};
       var status = state.status || 'waiting';
-      if (status === 'waiting') hideResult();
       if (status === 'playing') {
-        if (prevStatus !== 'playing') { lastLogLen = -1; showScreen('s-playing'); hideResult(); }
+        if (prevStatus !== 'playing') { showScreen('s-playing'); hideResult(); }
         renderPlaying(state);
+      } else if (status === 'ended') {
+        renderPlaying(state);
+        showResult(state);
       }
       prevStatus = status;
-      if (window.Lobby && Lobby.absentBanner) {
-        var h = (status === 'playing' && !state.winner) ? state.turn : null;
-        Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(state, h)) ? h : null, function () {
-          rref().transaction(function (cur) {
-            if (!cur || cur.status !== 'playing' || cur.winner || !Lobby.isOffline(cur, cur.turn)) return cur;
-            var ord = cur.order || [], i = ord.indexOf(cur.turn); cur.turn = ord[(i + 1) % ord.length];
-            return cur;
-          });
-        });
-      }
     }
 
-    /* Proposer un nombre. */
-    function doGuess(value) {
-      var state = window.room || {};
-      if (state.status !== 'playing' || state.winner) return;
-      if (state.turn !== window.myPid) { lbToast('Ce n\'est pas ton tour'); return; }
-      var v = Math.round(value);
-      if (!isFinite(v) || v < 1 || v > (state.max || MAXN)) { lbToast('Entre un nombre entre 1 et ' + (state.max || MAXN)); return; }
+    /* ━━ Proposer un prix ━━ */
+    function submitGuessValue(pid, val) {
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.winner) return cur;
-        if (cur.turn !== window.myPid) return cur;
-        var order = cur.order || [];
-        var dir;
-        if (v === cur.secret) dir = 'hit';
-        else if (v < cur.secret) { dir = 'up'; cur.lo = Math.max(cur.lo || 1, v + 1); }
-        else { dir = 'down'; cur.hi = Math.min(cur.hi || cur.max, v - 1); }
-        var log = cur.log || [];
-        log.push({ pid: window.myPid, v: v, dir: dir });
-        if (log.length > 10) log = log.slice(log.length - 10);
-        cur.log = log;
-        if (dir === 'hit') {
-          cur.winner = window.myPid;
-          if (!cur.players) cur.players = {};
-          if (!cur.players[window.myPid]) cur.players[window.myPid] = {};
-          cur.players[window.myPid].wins = (cur.players[window.myPid].wins || 0) + 1;
-        } else {
-          var i = order.indexOf(window.myPid);
-          cur.turn = order[(i + 1) % order.length];
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'guess') return cur;
+        if (cur.guesses && (pid in cur.guesses)) return cur;
+        cur.guesses = cur.guesses || {};
+        cur.guesses[pid] = Math.max(0, Math.round(val));
+        maybeReveal(cur);
+        return cur;
+      });
+    }
+    function maybeReveal(cur) {
+      var order = cur.order || [];
+      if (!order.every(function (p) { return cur.guesses && (p in cur.guesses); })) return;
+      // Gagnant : le plus proche SANS dépasser le vrai prix.
+      var price = cur.price, winner = null;
+      order.forEach(function (p) {
+        var g = cur.guesses[p];
+        if (g <= price && (winner === null || g > cur.guesses[winner])) winner = p;
+      });
+      if (winner) {
+        cur.players[winner] = cur.players[winner] || {};
+        cur.players[winner].score = (cur.players[winner].score || 0) + 1;
+      }
+      cur.reveal = { winner: winner };
+      cur.phase = 'reveal';
+    }
+
+    function doGuess() {
+      var inp = document.getElementById('jp-guess');
+      if (!inp) return;
+      var v = parseInt(inp.value, 10);
+      if (isNaN(v) || v < 1) { lbToast('Entre un prix en euros'); return; }
+      if (window.Fx) { Fx.sfx('click'); Fx.vib(8); }
+      submitGuessValue(window.myPid, v);
+    }
+
+    /* ━━ Manche suivante (hôte) ━━ */
+    function nextRound() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal') return cur;
+        if (cur.host !== window.myPid) return cur;
+        if ((cur.round || 1) >= (cur.rounds || 5)) {
+          // Fin : vainqueur = plus de manches gagnées (nul possible → winner reste null).
+          var order = cur.order || [], top = null, tie = false;
+          order.forEach(function (p) {
+            var s = scoreOf(cur, p);
+            if (top === null || s > scoreOf(cur, top)) { top = p; tie = false; }
+            else if (top !== null && s === scoreOf(cur, top)) tie = true;
+          });
+          cur.winner = tie ? null : top;
+          cur.status = 'ended'; cur.phase = 'over';
+          return cur;
         }
+        cur.round = (cur.round || 1) + 1;
+        var vt = newVitrine();
+        cur.vitrine = vt.items; cur.price = vt.price;
+        cur.guesses = {}; cur.reveal = null; cur.phase = 'guess';
         return cur;
       });
     }
 
-    /* IA (mode solo) : recherche dichotomique dans la fourchette connue. */
-    function jpBot(state) {
-      var lo = state.lo || 1, hi = state.hi || (state.max || MAXN);
-      if (hi < lo) hi = lo;
-      // Difficile/moyen : dichotomie (optimal). Facile : propose au hasard dans
-      // l'intervalle connu → met plus de coups à trouver.
-      var guess;
-      if (window.Bots && window.Bots.level(state) === 'easy') guess = lo + Math.floor(Math.random() * (hi - lo + 1));
-      else guess = Math.floor((lo + hi) / 2);
-      doGuess(guess);
+    /* ━━ IA : estime le prix depuis les prix de BASE du catalogue (pas le vrai
+       prix) + bruit selon la difficulté, puis propose un peu EN DESSOUS pour éviter
+       de dépasser. ━━ */
+    function jpBot(state, pid) {
+      if (state.phase !== 'guess') return;
+      if (state.guesses && (pid in state.guesses)) return;
+      var lvl = window.Bots ? window.Bots.level(state) : 'normal';
+      var noise = lvl === 'hard' ? 0.08 : lvl === 'normal' ? 0.18 : 0.34;
+      var margin = lvl === 'hard' ? 0.03 : lvl === 'normal' ? 0.06 : 0.11;
+      var base = 0;
+      (state.vitrine || []).forEach(function (idx) { base += (CATALOG[idx] || { p: 0 }).p; });
+      var est = base * (1 + (Math.random() * 2 - 1) * noise);
+      var bid = Math.max(1, Math.round(est * (1 - margin)));
+      submitGuessValue(pid, bid);
     }
 
     /* ━━ Rendu ━━ */
     function scoresHTML(state) {
       var ord = state.order || [];
       return ord.map(function (pid) {
-        return '<span style="color:' + Room.color(pid) + '">' + escapeHtml(Room.name(pid)) + ' ' + winsOf(state, pid) + '</span>';
+        return '<span style="color:' + Room.color(pid) + '">' + escapeHtml(Room.name(pid)) + ' ' + scoreOf(state, pid) + '</span>';
       }).join('<span class="sep">·</span>');
+    }
+    function vitrineHTML(state) {
+      var items = state.vitrine || [];
+      var tiles = items.map(function (idx) {
+        var it = CATALOG[idx] || { e: '❓', n: '?' };
+        return '<div class="jp-item"><span class="ie">' + it.e + '</span><span class="inm">' + escapeHtml(it.n) + '</span></div>';
+      }).join('');
+      var many = items.length > 1;
+      return '<div class="jp-vitrine-top"><span class="lbl">🪟 Vitrine</span>' +
+        '<span class="rnd">Manche ' + (state.round || 1) + ' / ' + (state.rounds || 5) + '</span></div>' +
+        '<div class="jp-items">' + tiles + '</div>' +
+        '<div class="jp-ask">Devine le prix ' + (many ? 'total' : '') + ' de ' + (many ? 'la vitrine' : 'l\'article') + '</div>';
     }
 
     function renderPlaying(state) {
       setHTML('jp-scores', scoresHTML(state));
-      setText('jp-lo', state.lo || 1);
-      setText('jp-hi', state.hi != null ? state.hi : (state.max || MAXN));
+      setHTML('jp-vitrine', vitrineHTML(state));
+
+      var ord = state.order || [];
+      var guesses = state.guesses || {};
+      var iGuessed = window.myPid in guesses;
+      var nGuessed = ord.filter(function (p) { return p in guesses; }).length;
+      var phase = state.phase;
 
       var ti = document.getElementById('jp-turn');
-      var t = state.turn;
-      if (state.winner) { ti.innerHTML = ''; }
-      else {
-        ti.innerHTML = '<span class="jp-turn-dot" style="background:' + Room.color(t) + '"></span>' +
-          (t === window.myPid ? 'À toi !' : ('Au tour de ' + escapeHtml(Room.name(t))));
-      }
+      if (phase === 'guess') ti.textContent = iGuessed ? 'En attente…' : 'À toi de jouer !';
+      else if (phase === 'reveal') ti.textContent = 'Résultat de la manche';
+      else ti.textContent = '';
 
-      // Zone d'action : champ de saisie seulement à mon tour.
       var action = document.getElementById('jp-action');
-      var myTurn = (t === window.myPid) && !state.winner;
-      var key = myTurn ? 'input' : (state.winner ? 'none' : 'wait');
-      if (action._key !== key) {
-        action._key = key;
-        if (myTurn) {
-          action.innerHTML =
-            '<div class="jp-input-row">' +
-              '<input class="jp-input" id="jp-guess" type="number" inputmode="numeric" min="1" max="' + (state.max || MAXN) + '" placeholder="?" autocomplete="off">' +
-              '<button class="btn-primary" onclick="submitGuess()">Proposer</button>' +
-            '</div>';
-          var inp = document.getElementById('jp-guess');
-          inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitGuess(); });
-          setTimeout(function () { inp.focus(); }, 60);
-        } else if (state.winner) {
-          action.innerHTML = '';
-        } else {
-          action.innerHTML = '<div class="jp-wait">En attente de ' + escapeHtml(Room.name(t)) + '…</div>';
+      var reveal = document.getElementById('jp-reveal');
+
+      if (phase === 'guess') {
+        reveal.innerHTML = '';
+        var key = iGuessed ? 'waited' : 'input';
+        if (action._key !== key) {
+          action._key = key;
+          if (!iGuessed) {
+            action.innerHTML =
+              '<div class="jp-input-row">' +
+                '<div class="jp-euro"><input class="jp-input" id="jp-guess" type="number" inputmode="numeric" min="1" placeholder="?" autocomplete="off"><span class="cur">€</span></div>' +
+                '<button class="btn-primary" onclick="doGuess()">Proposer</button>' +
+              '</div>';
+            var inp = document.getElementById('jp-guess');
+            inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') doGuess(); });
+            setTimeout(function () { inp.focus(); }, 60);
+          } else {
+            action.innerHTML = '';
+          }
         }
-      } else if (!myTurn && !state.winner) {
-        action.innerHTML = '<div class="jp-wait">En attente de ' + escapeHtml(Room.name(t)) + '…</div>';
+        if (iGuessed) action.innerHTML = '<div class="jp-wait">Prix proposé ✓ · en attente des autres (' + nGuessed + '/' + ord.length + ')…</div>';
+      } else {
+        // reveal / over : panneau de résultat
+        action._key = null; action.innerHTML = '';
+        reveal.innerHTML = revealHTML(state);
       }
-
-      // Journal des propositions (plus récent en haut).
-      var log = state.log || [];
-      if (log.length !== lastLogLen) {
-        lastLogLen = log.length;
-        var rows = log.slice().reverse().map(function (e) {
-          var dirTxt = e.dir === 'hit' ? '🎯 Pile !' : e.dir === 'up' ? "C'est plus ⬆️" : "C'est moins ⬇️";
-          return '<div class="jp-log-row">' +
-            '<span class="jp-log-av" style="background:' + Room.color(e.pid) + '">' + Room.emoji(e.pid) + '</span>' +
-            '<span class="jp-log-name">' + escapeHtml(Room.name(e.pid)) + '</span>' +
-            '<span class="jp-log-val">' + e.v + '</span>' +
-            '<span class="jp-log-dir ' + e.dir + '">' + dirTxt + '</span></div>';
-        }).join('');
-        setHTML('jp-log', rows);
-      }
-
-      if (state.winner) showResult(state); else hideResult();
     }
 
-    function submitGuess() {
-      var inp = document.getElementById('jp-guess');
-      if (!inp) return;
-      var v = parseInt(inp.value, 10);
-      if (isNaN(v)) { lbToast('Entre un nombre'); return; }
-      doGuess(v);
+    function revealHTML(state) {
+      var price = state.price, guesses = state.guesses || {};
+      var winner = state.reveal && state.reveal.winner;
+      // Ordre d'affichage : gagnant d'abord, puis du plus proche (sans dépasser) au
+      // plus loin, les « dépassé » en dernier.
+      var ord = (state.order || []).slice().sort(function (a, b) {
+        var ga = guesses[a], gb = guesses[b];
+        var oa = ga > price, ob = gb > price;
+        if (oa !== ob) return oa ? 1 : -1;                 // les dépassements en bas
+        if (oa) return ga - gb;                            // deux dépassements : le plus petit dépassement d'abord
+        return (price - ga) - (price - gb);                // sinon : le plus proche d'abord
+      });
+      var rows = ord.map(function (pid) {
+        var g = guesses[pid], over = g > price, isWin = pid === winner;
+        var tag = isWin ? '<span class="jp-rr-tag win">✓ Gagne</span>'
+          : over ? '<span class="jp-rr-tag over">Trop cher</span>'
+          : '<span class="jp-rr-tag gap">−' + euro(price - g) + '</span>';
+        return '<div class="jp-reveal-row' + (isWin ? ' win' : (over ? ' over' : '')) + '">' +
+          '<span class="jp-rr-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="jp-rr-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="jp-rr-val">' + euro(g) + '</span>' + tag + '</div>';
+      }).join('');
+      var head =
+        '<div class="jp-price-card"><div class="jp-price-label">Le juste prix était</div>' +
+        '<div class="jp-price-big">' + euro(price) + '</div>' +
+        '<div style="font-size:.9rem;color:var(--ink-light);margin-top:2px">' +
+          (winner ? (Room.name(winner) + ' remporte la manche 🎉') : 'Tout le monde a dépassé — personne ne marque') + '</div></div>';
+      var isHost = state.host === window.myPid;
+      var last = (state.round || 1) >= (state.rounds || 5);
+      var btn = isHost
+        ? '<button class="btn-primary" onclick="nextRound()" style="margin-top:4px">' + (last ? 'Voir le classement →' : 'Manche suivante →') + '</button>'
+        : '<div class="jp-wait">En attente de l\'hôte…</div>';
+      return head + '<div class="jp-reveal-list">' + rows + '</div>' + btn;
     }
 
     function showResult(state) {
       var ov = document.getElementById('jp-overlay');
-      var emoji = document.getElementById('jp-ov-emoji');
-      var title = document.getElementById('jp-ov-title');
-      var tries = (state.log || []).length;
-      var pure = (window.roomCode === 'SOLO') && ((state.order || []).length === 1);
-      if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as trouvé !'; }
-      else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a trouvé'; }
-      setHTML('jp-ov-secret', 'Le nombre était <b>' + state.secret + '</b><br>' +
-        '<span style="font-size:.92rem">en ' + tries + ' coup' + (tries > 1 ? 's' : '') + '</span>');
-      if (pure) {
-        var rec = 0; try { rec = +(localStorage.getItem('juste-prix.record') || 0); } catch (e) {}
-        var isNew = (!rec || tries < rec);
-        var best = isNew ? tries : rec;
-        if (isNew) { try { localStorage.setItem('juste-prix.record', best); } catch (e) {} }
-        setHTML('jp-ov-scores', (isNew ? '🥇 Nouveau record : ' : 'Ton record : ') + best + ' coup' + (best > 1 ? 's' : ''));
-      } else {
-        setHTML('jp-ov-scores', scoresHTML(state));
-      }
+      var ord = (state.order || []).slice().sort(function (a, b) { return scoreOf(state, b) - scoreOf(state, a); });
+      var win = state.winner;
+      if (win === window.myPid) { setText('jp-ov-emoji', '🏆'); setText('jp-ov-title', 'Tu gagnes !'); }
+      else if (win) { setText('jp-ov-emoji', '🎉'); setText('jp-ov-title', Room.name(win) + ' gagne'); }
+      else { setText('jp-ov-emoji', '🤝'); setText('jp-ov-title', 'Égalité !'); }
+      var rank = ord.map(function (pid, i) {
+        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+        return '<div class="jp-reveal-row' + (pid === win ? ' win' : '') + '">' +
+          '<span style="width:26px;text-align:center;font-weight:800">' + medal + '</span>' +
+          '<span class="jp-rr-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
+          '<span class="jp-rr-name">' + escapeHtml(Room.name(pid)) + '</span>' +
+          '<span class="jp-rr-val">' + scoreOf(state, pid) + '</span></div>';
+      }).join('');
+      setHTML('jp-ov-rank', rank);
       ov.classList.add('active');
     }
     function hideResult() { var ov = document.getElementById('jp-overlay'); if (ov) ov.classList.remove('active'); }
 
-    function handleReplay() { hideResult(); Lobby.resetToLobby(['wins']); }
+    function handleReplay() { hideResult(); Lobby.resetToLobby([]); }
     function doRestart() { closeModal('modal-restart'); hideResult(); Lobby.resetToLobby([]); }
   </script>
 </body>
