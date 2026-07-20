@@ -94,6 +94,10 @@
   // ── GameRoom : on intercepte l'enregistrement du jeu ─────────────────────────
   window.GameRoom = function (c) {
     cfg = c || {};
+    // Les helpers PARTAGÉS de lobby.js (pastille vitesse des ordis, stats en jeu…)
+    // lisent la config via window.ROOM : on la renseigne aussi hors-ligne, sinon
+    // ils croient que le jeu n'a pas d'ordis et ne s'affichent jamais.
+    window.ROOM = cfg;
     window.myPid = null;
     injectStyles();
     // Défi du jour : on saute l'écran de réglages et on démarre la grille du jour.

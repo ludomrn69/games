@@ -109,8 +109,10 @@
   function resize(){DPR=Math.min(devicePixelRatio||1,2);W=stage.clientWidth;H=stage.clientHeight;
     cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
   addEventListener('resize',resize);
-  // suit le thème du site (mémorisé par nav.js sur les autres pages)
-  try{if(localStorage.getItem('games-theme')==='dark')document.body.classList.add('dark');}catch(e){}
+  // suit le thème du site (mémorisé par nav.js) ou, à défaut, celui du téléphone
+  try{var _st=localStorage.getItem('games-theme');
+    var _dk=(_st==='dark'||_st==='light')?_st==='dark':!!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if(_dk)document.body.classList.add('dark');}catch(e){}
 
   // ── Constantes de jeu ────────────────────────────────────────────────────
   var SHAPES=['circle','triangle','square','plus','star','diamond'];

@@ -105,7 +105,9 @@
     COLS=Math.floor((W-8)/CELL);ROWS=Math.floor((H-8)/CELL);
     OX=(W-COLS*CELL)/2;OY=(H-ROWS*CELL)/2;}
   addEventListener('resize',function(){resize();computeWater();});
-  try{if(localStorage.getItem('games-theme')==='dark')document.body.classList.add('dark');}catch(e){}
+  try{var _st=localStorage.getItem('games-theme');
+    var _dk=(_st==='dark'||_st==='light')?_st==='dark':!!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if(_dk)document.body.classList.add('dark');}catch(e){}
 
   var COLORS=['#e8582c','#2c7be5','#f2b705','#8b5cf6','#37a86b','#e5439b'];
   var PIN_CAP=9, OVER_LIMIT=36, BEST='mini_motorways_best';

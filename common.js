@@ -28,8 +28,18 @@
       if (m) m.setAttribute('content', t === 'dark' ? '#0e0b12' : '#FDF6EC');
     } catch (e) {}
   }
+  // Préférence explicite si l'utilisateur a déjà basculé, sinon on suit le thème
+  // du téléphone (prefers-color-scheme). Dès qu'on bascule, une valeur explicite
+  // est stockée et prend le dessus sur le système.
+  function hasExplicitTheme() {
+    try { var t = localStorage.getItem(THEME_KEY); return t === 'dark' || t === 'light'; } catch (e) { return false; }
+  }
+  function systemTheme() {
+    try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch (e) { return 'light'; }
+  }
   function currentTheme() {
-    try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
+    try { var t = localStorage.getItem(THEME_KEY); if (t === 'dark' || t === 'light') return t; } catch (e) {}
+    return systemTheme();
   }
 
   function injectStyles() {
@@ -67,6 +77,16 @@
     toggle.setAttribute('aria-label', 'Basculer le thème');
     function refreshIcon() { toggle.textContent = currentTheme() === 'dark' ? '☀️' : '🌙'; }
     refreshIcon();
+    // Tant que l'utilisateur n'a pas fait de choix explicite, on suit le thème du
+    // téléphone en temps réel (bascule auto quand l'OS passe en nuit/jour).
+    try {
+      var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      if (mq) {
+        var onSys = function () { if (!hasExplicitTheme()) { applyTheme(systemTheme()); refreshIcon(); } };
+        if (mq.addEventListener) mq.addEventListener('change', onSys);
+        else if (mq.addListener) mq.addListener(onSys);
+      }
+    } catch (e) {}
     toggle.addEventListener('click', function () {
       var next = currentTheme() === 'dark' ? 'light' : 'dark';
       try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
@@ -1051,7 +1071,10 @@
     }
     // Auth anonyme active mais uid pas encore prêt : on attend l'uid pour que le
     // salon soit créé/rejoint sous la bonne identité (repli 2,5 s si l'auth traîne).
-    if (window.GAMES_USE_AUTH && !window.GAMES_UID && window.whenGamesAuth) {
+    // HORS-LIGNE (avion) : l'auth ne viendra jamais → on démarre TOUT DE SUITE
+    // (sinon écran vide 2,5 s avant l'accueil), l'identité repli = pid localStorage.
+    var offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (window.GAMES_USE_AUTH && !window.GAMES_UID && window.whenGamesAuth && !offline) {
       var done = false, go = function () { if (done) return; done = true; begin(); };
       window.whenGamesAuth(go);
       setTimeout(go, 2500);
@@ -1064,6 +1087,13 @@
     var code = (params.get('room') || '').trim().toUpperCase();
     if (code) joinRoomByCode(code, true);
     else window.showScreen('s-home');
+    // Bandeau hors-ligne + boutons en ligne : suivent l'état réseau en direct.
+    var refreshHomeIfActive = function () {
+      var h = document.getElementById('s-home');
+      if (h && h.classList.contains('active')) renderHome();
+    };
+    window.addEventListener('online', refreshHomeIfActive);
+    window.addEventListener('offline', refreshHomeIfActive);
   }
 
   // Encart « Défi du jour » (jeux de puzzle solo) — grille du jour + série.
@@ -1093,17 +1123,28 @@
     var min = c.minPlayers || 2, max = c.maxPlayers || 8;
     var range = (min === max) ? (min + ' joueurs') : (min + ' à ' + max + ' joueurs');
     var rules = (c.rules || []).map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
+    // Hors-ligne (avion) : créer/rejoindre une partie EN LIGNE est impossible. On
+    // grise ces boutons et on affiche un bandeau qui oriente vers Solo/Local.
+    var offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    var hasOff = !!(c.offline && (c.offline.solo || c.offline.local));
+    var offBanner = offline
+      ? ('<div class="lb-offline-note">✈️ <b>Tu es hors-ligne.</b> ' +
+          (hasOff ? 'Créer ou rejoindre une partie en ligne demande une connexion — joue en <b>Solo</b> ou en <b>Local</b> ci-dessous.'
+                  : 'Ce jeu se joue en ligne : reviens quand tu auras du réseau.') + '</div>')
+      : '';
+    var onDis = offline ? ' disabled title="Indisponible hors-ligne"' : '';
     host.innerHTML =
       '<div class="lb-wrap">' +
         (c.emoji ? '<div class="lb-emoji-big">' + c.emoji + '</div>' : '') +
         '<h1 class="lb-title">' + esc(c.name || 'Jeu') + '</h1>' +
         '<p class="lb-sub">' + esc(c.tagline || '') + (c.tagline ? ' · ' : '') + range + '</p>' +
+        offBanner +
         ((c.offline && c.offline.daily && window.Daily) ? dailyHomeHTML(c) : '') +
         (window.GameStats ? GameStats.summaryHTML(c.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
-        '<button class="lb-btn" onclick="Lobby.createRoom()">Créer une partie</button>' +
+        '<button class="lb-btn" onclick="Lobby.createRoom()"' + onDis + '>Créer une partie</button>' +
         '<div style="margin:18px 0 8px;color:var(--ink-light);font-size:0.85rem">ou rejoindre avec un code</div>' +
-        '<input id="lb-join-code" class="lb-input code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text">' +
-        '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()">Rejoindre</button>' +
+        '<input id="lb-join-code" class="lb-input code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text"' + (offline ? ' disabled' : '') + '>' +
+        '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()"' + onDis + '>Rejoindre</button>' +
         (c.offline ? ('<div style="margin:18px 0 6px;color:var(--ink-light);font-size:0.85rem">ou sans connexion ✈️</div>' +
           (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">' + (c.offline.soloNoBots ? '⏱ Solo (chrono)' : '🤖 Solo (contre l\'ordi)') + '</button>' : '') +
           (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">📱 Local (même appareil)</button>' : '')) : '') +
@@ -1118,6 +1159,7 @@
   }
 
   function joinFromInput() {
+    if (navigator.onLine === false) { lbToast('Hors-ligne — joue en Solo ✈️ ou Local 📱'); return; }
     var inp = document.getElementById('lb-join-code');
     var code = (inp && inp.value || '').trim().toUpperCase();
     if (code.length < CODE_LEN) { lbToast('Entre les 5 caractères du code'); return; }
@@ -1127,6 +1169,7 @@
   // ── Créer un salon ────────────────────────────────────────────────────────
   function createRoom(attempt) {
     attempt = attempt || 0;
+    if (navigator.onLine === false) { lbToast('Hors-ligne — joue en Solo ✈️ ou Local 📱'); return; }
     var c = cfg();
     var code = genCode();
     setRoom(code);
@@ -2292,6 +2335,10 @@
   // ── GameRoom : on intercepte l'enregistrement du jeu ─────────────────────────
   window.GameRoom = function (c) {
     cfg = c || {};
+    // Les helpers PARTAGÉS de lobby.js (pastille vitesse des ordis, stats en jeu…)
+    // lisent la config via window.ROOM : on la renseigne aussi hors-ligne, sinon
+    // ils croient que le jeu n'a pas d'ordis et ne s'affichent jamais.
+    window.ROOM = cfg;
     window.myPid = null;
     injectStyles();
     // Défi du jour : on saute l'écran de réglages et on démarre la grille du jour.

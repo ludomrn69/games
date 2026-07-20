@@ -249,7 +249,9 @@
 <script>
 (function(){
 "use strict";
-try{if(localStorage.getItem('games-theme')==='light')document.body.classList.add('light');}catch(e){}
+try{var _st=localStorage.getItem('games-theme');
+  var _lt=(_st==='dark'||_st==='light')?_st==='light':!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if(_lt)document.body.classList.add('light');}catch(e){}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  OpenFront — COUCHE PRÉSENTATION. Toute la simulation vit dans le moteur pur

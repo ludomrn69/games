@@ -109,6 +109,16 @@ html[data-theme="dark"] .game-restart-btn {
 .lb-emoji-big { font-size: 3rem; line-height: 1; margin-bottom: 10px; }
 .lb-sub { font-size: 0.95rem; color: var(--ink-light); margin-bottom: 26px; line-height: 1.5; }
 
+/* Bandeau « tu es hors-ligne » sur l'accueil d'un jeu (avion). */
+.lb-offline-note {
+  width: 100%; max-width: 340px; margin: 0 auto 20px;
+  padding: 11px 15px; border-radius: 14px; text-align: left;
+  background: var(--blush); color: var(--ink);
+  border: 1.5px solid var(--terracotta);
+  font-size: 0.86rem; line-height: 1.45;
+}
+.lb-offline-note b { color: var(--terracotta); }
+
 .lb-btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; max-width: 340px;

@@ -17,8 +17,18 @@
       if (m) m.setAttribute('content', t === 'dark' ? '#0e0b12' : '#FDF6EC');
     } catch (e) {}
   }
+  // Préférence explicite si l'utilisateur a déjà basculé, sinon on suit le thème
+  // du téléphone (prefers-color-scheme). Dès qu'on bascule, une valeur explicite
+  // est stockée et prend le dessus sur le système.
+  function hasExplicitTheme() {
+    try { var t = localStorage.getItem(THEME_KEY); return t === 'dark' || t === 'light'; } catch (e) { return false; }
+  }
+  function systemTheme() {
+    try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch (e) { return 'light'; }
+  }
   function currentTheme() {
-    try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
+    try { var t = localStorage.getItem(THEME_KEY); if (t === 'dark' || t === 'light') return t; } catch (e) {}
+    return systemTheme();
   }
 
   function injectStyles() {
@@ -56,6 +66,16 @@
     toggle.setAttribute('aria-label', 'Basculer le thème');
     function refreshIcon() { toggle.textContent = currentTheme() === 'dark' ? '☀️' : '🌙'; }
     refreshIcon();
+    // Tant que l'utilisateur n'a pas fait de choix explicite, on suit le thème du
+    // téléphone en temps réel (bascule auto quand l'OS passe en nuit/jour).
+    try {
+      var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      if (mq) {
+        var onSys = function () { if (!hasExplicitTheme()) { applyTheme(systemTheme()); refreshIcon(); } };
+        if (mq.addEventListener) mq.addEventListener('change', onSys);
+        else if (mq.addListener) mq.addListener(onSys);
+      }
+    } catch (e) {}
     toggle.addEventListener('click', function () {
       var next = currentTheme() === 'dark' ? 'light' : 'dark';
       try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
