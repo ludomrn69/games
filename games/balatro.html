@@ -395,9 +395,10 @@
     function scoreHand(cards, steps) {
       var ev = evaluate(cards), hb = handBase(ev.key);
       var res = { key: ev.key, name: HANDS[ev.key].name, scoring: ev.scoring, chips: hb.chips, mult: hb.mult };
+      if (G.boss === 'flint') { res.chips = Math.ceil(res.chips / 2); res.mult = Math.max(1, Math.ceil(res.mult / 2)); } // Le Silex
       if (steps) steps.push({ t: 'base', chips: res.chips, mult: res.mult });
       ev.scoring.forEach(function (c) {
-        if (G.boss === 'club' && c.s === '♣') return;                 // couleur débuffée par le boss
+        if (bossDebuff(c)) return;                                    // carte débuffée par le boss
         res.chips += chipOf(c.r);
         if (c.enh === 'bonus') res.chips += 30;                        // carte améliorée (tarot Le Magicien)
         else if (c.enh === 'mult') res.mult += 4;                      // carte améliorée (tarot Le Diable)
@@ -405,7 +406,7 @@
       });
       var idsPlayed = {}; cards.forEach(function (c) { idsPlayed[c.id] = 1; });
       var held = (G.hand || []).filter(function (c) { return !idsPlayed[c.id]; });
-      var ctx = { played: cards.length, money: G.money, discardsLeft: G.discardsLeft, jokers: G.jokers.length, deck: G.deck.length, held: held, plays: (G.handPlays || {})[ev.key] || 0 };
+      var ctx = { played: cards.length, money: G.money, discardsLeft: G.discardsLeft, handsLeft: G.handsLeft, jokers: G.jokers.length, deck: G.deck.length, held: held, plays: (G.handPlays || {})[ev.key] || 0 };
       G.jokers.forEach(function (id) {
         var c0 = res.chips, m0 = res.mult;
         (JOKERS[id].apply || function () {})(res, ctx, (G.jscale || {})[id] || 0);
@@ -463,7 +464,22 @@
       squarej:   { name: 'Joker Carré',  cost: 4, desc: '+4 Jetons cumulés par main de 4 cartes', apply: function (r, c, n) { r.chips += n; }, tick: function (n, r, c) { return c.played === 4 ? n + 4 : n; } },
       supernova: { name: 'Supernova',    cost: 5, desc: '+Mult = nombre de fois cette main jouée', apply: function (r, c) { r.mult += c.plays; } },
       // Utilitaire (aucun effet de score) : garantit ta main la plus jouée dans un Paquet Céleste.
-      astronomer:{ name: 'Astronome',    cost: 6, desc: 'Un Paquet Céleste contient TOUJOURS la planète de ta main la plus jouée', apply: function () {} }
+      astronomer:{ name: 'Astronome',    cost: 6, desc: 'Un Paquet Céleste contient TOUJOURS la planète de ta main la plus jouée', apply: function () {} },
+      // ── Jokers × Mult conditionnels (rares, chers, très puissants) ──
+      theorder:  { name: 'L\'Ordre',      cost: 9, desc: '×3 Mult si Suite', apply: function (r) { if (r.key === 'STR' || r.key === 'SF') r.mult *= 3; } },
+      thetribe:  { name: 'La Tribu',      cost: 9, desc: '×2 Mult si Couleur', apply: function (r) { if (r.key === 'FLUSH' || r.key === 'SF') r.mult *= 2; } },
+      flowerpot: { name: 'Pot de Fleurs', cost: 8, desc: '×3 Mult si les 4 couleurs sont comptées', apply: function (r) { var su = {}; each(r, function (c) { su[c.s] = 1; }); if (Object.keys(su).length >= 4) r.mult *= 3; } },
+      seedouble: { name: 'Vision Double', cost: 6, desc: '×2 Mult si un ♣ et une autre couleur sont comptés', apply: function (r) { var cl = false, ot = false; each(r, function (c) { if (c.s === '♣') cl = true; else ot = true; }); if (cl && ot) r.mult *= 2; } },
+      acrobat:   { name: 'Acrobate',      cost: 6, desc: '×3 Mult sur ta DERNIÈRE main du blind', apply: function (r, c) { if (c.handsLeft === 0) r.mult *= 3; } },
+      swash:     { name: 'Bretteur',      cost: 4, desc: '+4 Mult par autre Joker possédé', apply: function (r, c) { r.mult += 4 * Math.max(0, c.jokers - 1); } },
+      // ── Jokers additifs par carte comptée ──
+      walkie:    { name: 'Talkie-Walkie', cost: 4, desc: 'Chaque 10 ou 4 compté : +10 Jetons, +4 Mult', apply: function (r) { each(r, function (c) { if (c.r === 10 || c.r === 4) { r.chips += 10; r.mult += 4; } }); } },
+      arrowhead: { name: 'Pointe',        cost: 6, desc: '+50 Jetons par ♠ compté', apply: function (r) { each(r, function (c) { if (c.s === '♠') r.chips += 50; }); } },
+      onyx:      { name: 'Onyx',          cost: 7, desc: '+7 Mult par ♣ compté', apply: function (r) { each(r, function (c) { if (c.s === '♣') r.mult += 7; }); } },
+      shootmoon: { name: 'Viser la Lune', cost: 5, desc: '+13 Mult par Dame gardée en main', apply: function (r, c) { c.held.forEach(function (x) { if (x.r === 12) r.mult += 13; }); } },
+      stuntman:  { name: 'Cascadeur',     cost: 7, desc: '+250 Jetons', apply: function (r) { r.chips += 250; } },
+      // ── Cumulatif ──
+      spare:     { name: 'Rechange',      cost: 5, desc: '+2 Mult cumulés par Double paire jouée', apply: function (r, c, n) { r.mult += n; }, tick: function (n, r) { return r.key === 'TWO' ? n + 2 : n; } }
     };
     var JOKER_POOL = Object.keys(JOKERS);
 
@@ -478,7 +494,10 @@
       monde:   { name: 'Le Monde',     cost: 3, desc: '3 cartes sélectionnées → ♠', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 3).forEach(function (c) { c.s = '♠'; }); return true; } },
       pendu:   { name: 'Le Pendu',     cost: 3, desc: 'Détruit jusqu\'à 2 cartes sélectionnées', need: 1, use: function (s) { if (!s.length) return false; var ids = s.slice(0, 2).map(function (c) { return c.id; }); G.hand = G.hand.filter(function (c) { return ids.indexOf(c.id) < 0; }); draw(); return true; } },
       hermite: { name: 'L\'Hermite',   cost: 4, desc: 'Double ton argent (max +20 $)', use: function () { G.money += Math.min(20, G.money); return true; } },
-      jugement:{ name: 'Le Jugement',  cost: 5, desc: 'Crée un Joker aléatoire', use: function () { if (G.jokers.length >= 5) return false; var pool = JOKER_POOL.filter(function (id) { return G.jokers.indexOf(id) < 0; }); if (!pool.length) return false; G.jokers.push(pool[rnd(pool.length)]); return true; } }
+      jugement:{ name: 'Le Jugement',  cost: 5, desc: 'Crée un Joker aléatoire', use: function () { if (G.jokers.length >= 5) return false; var pool = JOKER_POOL.filter(function (id) { return G.jokers.indexOf(id) < 0; }); if (!pool.length) return false; G.jokers.push(pool[rnd(pool.length)]); return true; } },
+      imperatrice:{ name: 'L\'Impératrice', cost: 3, desc: '+4 Mult sur 2 cartes (améliore)', need: 1, use: function (s) { if (!s.length) return false; s.slice(0, 2).forEach(function (c) { c.enh = 'mult'; }); return true; } },
+      temperance:{ name: 'Tempérance',  cost: 3, desc: 'Gagne 2 $ par Joker possédé (max 20 $)', use: function () { G.money += Math.min(20, 2 * G.jokers.length); return true; } },
+      roue:    { name: 'Roue de la Fortune', cost: 4, desc: '+1 niveau à une main au hasard', use: function () { var k = HAND_ORDER[rnd(HAND_ORDER.length)]; G.levels[k] = (G.levels[k] || 1) + 1; return true; } }
     };
     var TAROT_POOL = Object.keys(TAROTS);
 
@@ -494,9 +513,26 @@
       water:   { name: 'L\'Eau',      desc: 'Aucune défausse' },
       manacle: { name: 'La Menotte',  desc: 'Main réduite à 7 cartes' },
       club:    { name: 'Le Trèfle',   desc: 'Les ♣ ne comptent aucun jeton' },
-      hook:    { name: 'Le Crochet',  desc: 'Défausse 2 cartes après chaque main' }
+      hook:    { name: 'Le Crochet',  desc: 'Défausse 2 cartes après chaque main' },
+      goad:    { name: 'L\'Aiguillon',desc: 'Les ♠ ne comptent aucun jeton' },
+      window:  { name: 'La Fenêtre',  desc: 'Les ♦ ne comptent aucun jeton' },
+      head:    { name: 'La Tête',     desc: 'Les ♥ ne comptent aucun jeton' },
+      plant:   { name: 'La Plante',   desc: 'Les figures (V/D/R) ne comptent aucun jeton' },
+      flint:   { name: 'Le Silex',    desc: 'Jetons et Mult de base ÷ 2' },
+      psychic: { name: 'Le Médium',   desc: 'Tu dois jouer 5 cartes' },
+      tooth:   { name: 'La Dent',     desc: '−1 $ par carte jouée' }
     };
     var BOSS_KEYS = Object.keys(BOSSES);
+    // Carte « débuffée » par le boss courant (elle ne rapporte aucun jeton).
+    function bossDebuff(c) {
+      var b = G.boss;
+      if (b === 'club') return c.s === '♣';
+      if (b === 'goad') return c.s === '♠';
+      if (b === 'window') return c.s === '♦';
+      if (b === 'head') return c.s === '♥';
+      if (b === 'plant') return c.r >= 11 && c.r <= 13;
+      return false;
+    }
 
     /* ━━ État de la partie ━━ */
     var G = null, SAVE = 'balatro.run.v2';
@@ -574,6 +610,7 @@
     function playHand() {
       if (ANIM) return; // spectacle en cours : on attend (ou on tape pour passer)
       var cards = selCards(); if (!cards.length) { toast('Choisis des cartes'); return; }
+      if (G.boss === 'psychic' && cards.length !== 5) { toast('Le Médium : joue exactement 5 cartes'); return; }
       var key = evaluate(cards).key; G.handPlays[key] = (G.handPlays[key] || 0) + 1; // compte cette main (Supernova)
       var steps = [];
       var res = scoreHand(cards, steps);
@@ -588,6 +625,7 @@
       G.lastHand = res.name + '  ' + res.chips + ' × ' + res.mult + ' = ' + res.score;
       G.lastHandData = { name: res.name, chips: res.chips, mult: res.mult, score: res.score };
       G.handsLeft--;
+      if (G.boss === 'tooth') G.money = Math.max(0, G.money - G.sel.length); // La Dent : −1 $ / carte jouée
       G.hand = G.hand.filter(function (c) { return G.sel.indexOf(c.id) < 0; }); G.sel = [];
       if (G.boss === 'hook') { for (var k = 0; k < 2 && G.hand.length; k++) G.hand.splice(rnd(G.hand.length), 1); }
       draw();
@@ -772,7 +810,7 @@
     }
     function jokerChip(id, sellable) { var j = JOKERS[id]; return '<div class="ba-joker' + (sellable ? ' sellable' : '') + '" data-jid="' + id + '" onclick="showJoker(\'' + id + '\',' + !!sellable + ')"><span class="jn">' + j.name + '</span>' + j.desc + '</div>'; }
     function cardHTML(c) {
-      var sel = G.sel.indexOf(c.id) >= 0, deb = G.boss === 'club' && c.s === '♣';
+      var sel = G.sel.indexOf(c.id) >= 0, deb = bossDebuff(c);
       var badge = c.enh === 'bonus' ? '<div class="ba-enh chips">+30</div>' : c.enh === 'mult' ? '<div class="ba-enh mult">+4</div>' : '';
       return '<div class="ba-card ' + (isRed(c.s) ? 'red' : 'black') + (sel ? ' sel' : '') + (deb ? ' debuff' : '') + (c.enh ? ' enh' : '') + '" data-cid="' + c.id + '" onclick="toggleSel(' + c.id + ')">' + badge + '<div class="rk">' + rankName(c.r) + '</div><div class="su">' + c.s + '</div></div>';
     }

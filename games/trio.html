@@ -181,15 +181,49 @@
         '36 cartes : les nombres 1–12, trois fois chacun',
         'Retourne la plus basse ▽ / haute △ d\'un joueur, ou une carte du centre',
         'Même nombre → tu continues ; sinon ton tour s\'arrête',
-        '3 Trios pour gagner… ou le Trio de 7 instantané !'
+        '2 ou 3 Trios pour gagner… ou le Trio de 7 instantané (réglables) !'
       ],
       offline: { solo: true, local: true },
       bot: trioBot,
       offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
       offlineEnter: function () { if (window.room) render(window.room); },
       onState: onState,
-      onStart: onStart
+      onStart: onStart,
+      lobbyExtraHTML: lobbyExtraHTML, offlineExtraSetup: offlineExtraSetup
     });
+
+    // ── Réglages du salon : nombre de Trios pour gagner + Trio de 7 instantané ──
+    function winTrios(s) { var n = s && +s.winTrios; return (n === 2 || n === 3) ? n : 3; }
+    function sevenInstant(s) { return !s || !+(s.noSeven); }
+    function lobbyExtraHTML(room) {
+      var isHost = room && room.host === window.myPid;
+      var triosBtns = [2, 3].map(function (n) {
+        return '<button type="button" class="lb-set-btn' + (n === winTrios(room) ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setWinTrios(' + n + ')"' : ' disabled') + '>' + n + '</button>';
+      }).join('');
+      var sev = sevenInstant(room);
+      function sBtn(v, label) {
+        return '<button type="button" class="lb-set-btn' + ((v === '0') === sev ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setNoSeven(\'' + v + '\')"' : ' disabled') + '>' + label + '</button>';
+      }
+      return '<div class="lb-botset">' +
+        '<div class="lb-set"><div class="lb-set-label">🏆 Trios pour gagner</div><div class="lb-set-row">' + triosBtns + '</div></div>' +
+        '<div class="lb-set"><div class="lb-set-label">🍀 Trio de 7 instantané</div><div class="lb-set-row">' + sBtn('0', 'Oui') + sBtn('1', 'Non') + '</div></div>' +
+        (isHost ? '' : '<div class="lb-set-hint">Réglé par l\'hôte</div>') + '</div>';
+    }
+    function setWinTrios(n) { if (window.roomRef) window.roomRef.child('winTrios').set(n); }
+    function setNoSeven(v) { if (window.roomRef) window.roomRef.child('noSeven').set(+v ? true : false); }
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">Trios pour gagner</div>' +
+        '<div class="off-set-row" data-opt="winTrios">' +
+        [2, 3].map(function (n) { return '<button type="button" class="off-opt' + (n === 3 ? ' active' : '') + '" data-val="' + n + '">' + n + '</button>'; }).join('') +
+        '</div></div>' +
+        '<div class="off-set"><div class="off-set-label">Trio de 7 instantané</div>' +
+        '<div class="off-set-row" data-opt="noSeven">' +
+        '<button type="button" class="off-opt active" data-val="0">Oui</button>' +
+        '<button type="button" class="off-opt" data-val="1">Non</button>' +
+        '</div></div>';
+    }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
@@ -314,8 +348,9 @@
       cur.reveal = { picks: [] };
       cur.banner = '🎉 ' + Room.name(active) + ' réunit un Trio de ' + value + ' !';
 
-      if (value === 7) { cur.winner = active; cur.banner = '🍀 ' + Room.name(active) + ' réunit le Trio de 7 — victoire !'; cur.status = 'ended'; return; }
-      if (cur.players[active].trios >= 3) { cur.winner = active; cur.banner = '🏆 ' + Room.name(active) + ' a 3 Trios — victoire !'; cur.status = 'ended'; return; }
+      if (sevenInstant(cur) && value === 7) { cur.winner = active; cur.banner = '🍀 ' + Room.name(active) + ' réunit le Trio de 7 — victoire !'; cur.status = 'ended'; return; }
+      var need = winTrios(cur);
+      if (cur.players[active].trios >= need) { cur.winner = active; cur.banner = '🏆 ' + Room.name(active) + ' a ' + need + ' Trios — victoire !'; cur.status = 'ended'; return; }
       // Plus de cartes en jeu → la partie s'arrête (plus de Trios gagne).
       var cardsLeft = (cur.center || []).length + (cur.order || []).reduce(function (s, p) { return s + handOf(cur, p).length; }, 0);
       if (cardsLeft < 3) { endByCount(cur); return; }

@@ -217,3 +217,14 @@ body {
   div[class$="-header"] > span[class$="-turn"] { font-size: 0.78rem; }
   div[class$="-header"] > span[class$="-scores"] { font-size: 0.72rem; }
 }
+
+/* ══ GRAND ÉCRAN : centrage vertical de la zone de jeu ═════════════════════════
+   Beaucoup de pages ont un `.<xx>-stage { flex: 1 }` (colonne) SOUS un en-tête
+   collant : sur un grand écran haut, le contenu restait collé en haut avec un
+   grand vide dessous. On centre verticalement la zone de jeu (l'en-tête, frère
+   du stage, ne bouge pas). `safe` : si le contenu dépasse, il s'aligne en haut
+   (jamais coupé). Le sélecteur `[class$="-stage"]` couvre toutes ces pages d'un
+   coup ; les plateaux déjà centrés ne changent pas. */
+@media (min-width: 860px) {
+  div[class$="-stage"] { justify-content: safe center; }
+}

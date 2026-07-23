@@ -175,6 +175,7 @@
 
     /* ━━ Constantes ━━ */
     var ROUNDS = 5;
+    function roundsOf(s) { var n = s && s.rounds; return (n === 3 || n === 5) ? n : ROUNDS; }
     var TREASURES = [1, 2, 3, 4, 5, 5, 7, 7, 9, 11, 11, 13, 14, 15, 17];
     var HAZARDS = [
       { k: 'snake', e: '🐍', n: 'Serpent' }, { k: 'spider', e: '🕷️', n: 'Araignée' },
@@ -189,17 +190,35 @@
       gameKey: 'diamants', name: 'Diamants', emoji: '💎', tagline: 'Stop ou encore dans la mine',
       minPlayers: 2, maxPlayers: 8,
       rules: [
-        '5 expéditions : à chaque carte, continuer ⛏️ ou sortir 🏕️ (tous en même temps)',
+        'Plusieurs expéditions : à chaque carte, continuer ⛏️ ou sortir 🏕️ (tous en même temps)',
         'Trésor partagé entre les présents · le 2ᵉ danger d\'un même type fait tout perdre',
         'En sortant, tu ramasses le sol et sécurises ton butin',
-        'Le plus riche après 5 expéditions gagne'
+        'Le plus riche à la fin gagne (3 ou 5 expéditions, au choix)'
       ],
       offline: { solo: true },
       bot: diamBot,
       offlineTurn: offlineTurn,
       offlineEnter: function () { if (window.room) render(window.room); },
-      onState: onState, onStart: onStart
+      onState: onState, onStart: onStart,
+      lobbyExtraHTML: lobbyExtraHTML, offlineExtraSetup: offlineExtraSetup
     });
+
+    // ── Nombre d'expéditions (réglage du salon) ───────────────────────────────
+    function lobbyExtraHTML(room) {
+      var sel = roundsOf(room), isHost = room && room.host === window.myPid;
+      var btns = [3, 5].map(function (n) {
+        return '<button type="button" class="lb-set-btn' + (n === sel ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setRounds(' + n + ')"' : ' disabled') + '>' + n + '</button>';
+      }).join('');
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">⛏️ Expéditions' + (isHost ? '' : ' (réglé par l\'hôte)') + '</div><div class="lb-set-row">' + btns + '</div></div></div>';
+    }
+    function setRounds(n) { if (window.roomRef) window.roomRef.child('rounds').set(n); }
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">Expéditions</div>' +
+        '<div class="off-set-row" data-opt="rounds">' +
+        [3, 5].map(function (n) { return '<button type="button" class="off-opt' + (n === 5 ? ' active' : '') + '" data-val="' + n + '">' + n + '</button>'; }).join('') +
+        '</div></div>';
+    }
 
     /* ━━ Qui doit « agir » (moteur hors-ligne / pilote d'ordis en ligne) ━━ */
     function offlineTurn(r) {
@@ -307,7 +326,7 @@
     }
 
     function endRoundOrGame(cur, disaster) {
-      if ((cur.round || 1) >= ROUNDS) {
+      if ((cur.round || 1) >= roundsOf(cur)) {
         cur.status = 'ended';
         var order = cur.order || [], best = order[0];
         order.forEach(function (p) { if ((cur.banked[p] || 0) > (cur.banked[best] || 0)) best = p; });
@@ -380,7 +399,7 @@
       cur.banked = {}; cur.removedHaz = {}; order.forEach(function (p) { cur.banked[p] = 0; cur.players[p].nextReady = false; });
       cur.round = 1; cur.winner = null;
       startRound(cur);
-      return { winner: null };
+      return { winner: null, rounds: roundsOf(cur) };
     }
 
     function onState(snap) {
@@ -391,11 +410,33 @@
         render(state);
         if (state.phase === 'roundEnd') { showRoundEnd(state); maybeAdvance(state); }
         else document.getElementById('dm-overlay').classList.remove('active');
+        maybeAbsent(state);
       } else if (status === 'ended') {
         document.getElementById('dm-overlay').classList.remove('active');
         showResults(state);
       }
       prevStatus = status; prevPhase = state.phase;
+    }
+
+    // Joueur absent en ligne : en phase « decide », un présent hors-ligne qui n'a
+    // pas tranché fige l'expédition. Le bandeau permet de décider à sa place
+    // (sortie = sécurise son butin) ou de le remplacer par un ordi.
+    function maybeAbsent(state) {
+      if (!(window.Lobby && Lobby.absentBanner)) return;
+      var who = null;
+      if (state.status === 'playing' && state.phase === 'decide') {
+        who = (state.order || []).filter(function (p) { return state.inCave && state.inCave[p] && !(state.decisions && (p in state.decisions)); })[0] || null;
+      }
+      Lobby.absentBanner((who && who !== window.myPid && Lobby.isOffline(state, who)) ? who : null, function () {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || cur.phase !== 'decide') return cur;
+          var p = (cur.order || []).filter(function (x) { return cur.inCave && cur.inCave[x] && !(cur.decisions && (x in cur.decisions)); })[0];
+          if (!p || !Lobby.isOffline(cur, p)) return cur;
+          cur.decisions = cur.decisions || {}; cur.decisions[p] = 'leave';
+          resolveDecisions(cur);
+          return cur;
+        });
+      });
     }
 
     /* ━━ Rendu ━━ */
@@ -406,7 +447,7 @@
     }
     function render(state) {
       var order = state.order || [], me = window.myPid, banked = state.banked || {};
-      setText('dm-round-label', 'Expédition ' + (state.round || 1) + '/' + ROUNDS);
+      setText('dm-round-label', 'Expédition ' + (state.round || 1) + '/' + roundsOf(state));
       setHTML('dm-scores', order.map(function (pid) {
         return '<span class="dm-sc-chip"><span class="dm-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + (banked[pid] || 0) + '</span>';
       }).join(''));
@@ -480,7 +521,7 @@
       var ov = document.getElementById('dm-overlay');
       var disaster = state.roundEndDisaster;
       setText('dm-ov-emoji', disaster ? '💥' : '⛏️');
-      setText('dm-ov-title', 'Expédition ' + (state.round || 1) + '/' + ROUNDS + (disaster ? ' — effondrement !' : ' terminée'));
+      setText('dm-ov-title', 'Expédition ' + (state.round || 1) + '/' + roundsOf(state) + (disaster ? ' — effondrement !' : ' terminée'));
       setText('dm-ov-sub', disaster ? 'Les explorateurs encore dans la mine repartent les mains vides.' : 'Butin sécurisé. En route pour la suivante.');
       var order = state.order || [], banked = state.banked || {};
       setHTML('dm-ov-score', order.slice().sort(function (a, b) { return (banked[b] || 0) - (banked[a] || 0); }).map(function (pid) {

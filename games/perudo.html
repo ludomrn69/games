@@ -193,8 +193,39 @@
       offline: { solo: true, local: true },
       bot: perudoBot,
       offlineEnter: function () { pick = null; if (window.room) render(window.room); },
-      onState: onState, onStart: onStart
+      onState: onState, onStart: onStart,
+      lobbyExtraHTML: lobbyExtraHTML, offlineExtraSetup: offlineExtraSetup
     });
+
+    // ── Règles maison (réglage du salon) : Calza et Palifico activables ────────
+    // Drapeaux « négatifs » sur le salon (noCalza / noPalifico) ; absents = règles
+    // complètes (les deux actives). +v gère aussi bien le booléen (en ligne) que
+    // le 0/1 (hors-ligne, via data-opt).
+    function calzaOn(s) { return !s || !+(s.noCalza); }
+    function palificoOn(s) { return !s || !+(s.noPalifico); }
+    function lobbyExtraHTML(room) {
+      var isHost = room && room.host === window.myPid;
+      function toggle(flag, on, label) {
+        var active = on(room);
+        return '<button type="button" class="lb-set-btn' + (active ? ' active' : '') + '"' +
+          (isHost ? ' onclick="setRule(\'' + flag + '\',' + (active ? 'true' : 'false') + ')"' : ' disabled') + '>' + label + (active ? ' ✓' : '') + '</button>';
+      }
+      return '<div class="lb-botset"><div class="lb-set"><div class="lb-set-label">🎲 Règles maison' + (isHost ? '' : ' (réglées par l\'hôte)') + '</div><div class="lb-set-row">' +
+        toggle('noCalza', calzaOn, 'Calza') + toggle('noPalifico', palificoOn, 'Palifico') +
+        '</div></div></div>';
+    }
+    // flag = 'noCalza'|'noPalifico' ; curOn = est-ce actif actuellement → on bascule.
+    function setRule(flag, curOn) { if (window.roomRef) window.roomRef.child(flag).set(!!curOn); }
+    function offlineExtraSetup() {
+      function row(opt, label) {
+        return '<div class="off-set"><div class="off-set-label">' + label + '</div>' +
+          '<div class="off-set-row" data-opt="' + opt + '">' +
+          '<button type="button" class="off-opt active" data-val="0">Oui</button>' +
+          '<button type="button" class="off-opt" data-val="1">Non</button>' +
+          '</div></div>';
+      }
+      return row('noCalza', 'Règle Calza') + row('noPalifico', 'Règle Palifico');
+    }
 
     /* ━━ Helpers d'état ━━ */
     function activePids(cur) { return (cur.order || []).filter(function (p) { return (cur.diceCount || {})[p] > 0; }); }
@@ -244,7 +275,7 @@
       // PALIFICO : le lanceur vient de passer à 1 dé (une seule fois par joueur).
       cur.palificoDone = cur.palificoDone || {};
       cur.palifico = false;
-      if ((cur.diceCount[cur.turn] || 0) === 1 && !cur.palificoDone[cur.turn] && activeCount(cur) > 2) {
+      if ((cur.diceCount[cur.turn] || 0) === 1 && !cur.palificoDone[cur.turn] && activeCount(cur) > 2 && palificoOn(cur)) {
         cur.palifico = true; cur.palificoDone[cur.turn] = true;
       }
       cur.banner = (cur.palifico ? '🟣 PALIFICO ! Les ⚀ ne sont plus jokers, la valeur est figée. ' : '') + Room.name(cur.turn) + ' ouvre les enchères';
@@ -307,6 +338,7 @@
       if (window.Fx) { Fx.sfx('big'); Fx.vib([25, 40, 60]); }
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.phase !== 'bid' || cur.turn !== window.myPid) return cur;
+        if (!calzaOn(cur)) return cur;
         if (!cur.bid || cur.bid.by === window.myPid) return cur;
         var face = cur.bid.face, qty = cur.bid.qty, dice = {};
         var count = tableCount(cur, face, dice);
@@ -367,7 +399,7 @@
         var expStanding = myCount(bid.face) + unknown * prob(bid.face);
         // Calza ? (l'enchère semble EXACTEMENT juste et il y a un dé à regagner)
         var lvl = window.Bots ? window.Bots.level(state) : 'normal';
-        if (bid.by !== pid && lvl !== 'easy' && (state.diceCount[pid] || 0) < START_DICE &&
+        if (calzaOn(state) && bid.by !== pid && lvl !== 'easy' && (state.diceCount[pid] || 0) < START_DICE &&
             bid.qty >= 3 && Math.abs(expStanding - bid.qty) < 0.3 && Math.random() < 0.5) { callCalza(); return; }
         // Contester ? (si l'enchère en cours dépasse nettement l'espérance)
         var margin = window.Bots ? window.Bots.pick(state, { easy: 1.8, normal: 1.1, hard: 0.7 }) : 1.1;
@@ -510,7 +542,7 @@
         var locked = pal && state.bid && f !== state.bid.face;
         return '<button class="pd-face' + (pick.face === f ? ' sel' : '') + '" ' + (locked ? 'disabled style="opacity:.35"' : 'onclick="setFace(' + f + ')"') + '>' + dieHTML(f, 26) + '</button>';
       }).join('');
-      var canCalza = state.bid && state.bid.by !== me;
+      var canCalza = calzaOn(state) && state.bid && state.bid.by !== me;
       host.innerHTML = handHTML +
         (pal ? '<div class="pd-wait" style="color:#7e57c2;font-weight:700">🟣 Palifico : ⚀ non jokers, valeur figée</div>' : '') +
         '<div class="pd-picker">' +
@@ -520,7 +552,7 @@
         '</div>' +
         '<div class="pd-actions">' +
           '<button class="pd-act dudo" ' + (state.bid ? '' : 'disabled') + ' onclick="callDudo()">🚫 Dudo !</button>' +
-          '<button class="pd-act calza" ' + (canCalza ? '' : 'disabled') + ' onclick="callCalza()" title="Parier que l\'enchère est exactement juste">🎯 Calza</button>' +
+          (calzaOn(state) ? '<button class="pd-act calza" ' + (canCalza ? '' : 'disabled') + ' onclick="callCalza()" title="Parier que l\'enchère est exactement juste">🎯 Calza</button>' : '') +
           '<button class="pd-act bid" onclick="submitBid()">Miser ' + pick.qty + ' ×&nbsp;' + dieHTML(pick.face, 19) + '</button>' +
         '</div>';
     }

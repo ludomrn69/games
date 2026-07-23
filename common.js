@@ -28,8 +28,18 @@
       if (m) m.setAttribute('content', t === 'dark' ? '#0e0b12' : '#FDF6EC');
     } catch (e) {}
   }
+  // Préférence explicite si l'utilisateur a déjà basculé, sinon on suit le thème
+  // du téléphone (prefers-color-scheme). Dès qu'on bascule, une valeur explicite
+  // est stockée et prend le dessus sur le système.
+  function hasExplicitTheme() {
+    try { var t = localStorage.getItem(THEME_KEY); return t === 'dark' || t === 'light'; } catch (e) { return false; }
+  }
+  function systemTheme() {
+    try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch (e) { return 'light'; }
+  }
   function currentTheme() {
-    try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
+    try { var t = localStorage.getItem(THEME_KEY); if (t === 'dark' || t === 'light') return t; } catch (e) {}
+    return systemTheme();
   }
 
   function injectStyles() {
@@ -67,6 +77,16 @@
     toggle.setAttribute('aria-label', 'Basculer le thème');
     function refreshIcon() { toggle.textContent = currentTheme() === 'dark' ? '☀️' : '🌙'; }
     refreshIcon();
+    // Tant que l'utilisateur n'a pas fait de choix explicite, on suit le thème du
+    // téléphone en temps réel (bascule auto quand l'OS passe en nuit/jour).
+    try {
+      var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      if (mq) {
+        var onSys = function () { if (!hasExplicitTheme()) { applyTheme(systemTheme()); refreshIcon(); } };
+        if (mq.addEventListener) mq.addEventListener('change', onSys);
+        else if (mq.addListener) mq.addListener(onSys);
+      }
+    } catch (e) {}
     toggle.addEventListener('click', function () {
       var next = currentTheme() === 'dark' ? 'light' : 'dark';
       try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
@@ -566,6 +586,133 @@
     } catch (e) {}
   }
 
+  // ── Clavier TRANSVERSE (toutes les pages) ─────────────────────────────────
+  // • Contour de focus visible pour la navigation au clavier.
+  // • Modales : Échap ferme, Tab reste piégé dedans, focus posé à l'ouverture.
+  // • Entrée/Espace activent un contrôle personnalisé (role="button" non natif) —
+  //   utile pour les cases de plateau rendues focalisables (voir window.Kbd).
+  function injectFocusCSS() {
+    if (document.getElementById('a11y-kbd-css')) return;
+    var s = document.createElement('style');
+    s.id = 'a11y-kbd-css';
+    s.textContent =
+      ':focus-visible{outline:3px solid var(--gold,#C6985A);outline-offset:2px;border-radius:6px}' +
+      '.kbd-cell{cursor:pointer}.kbd-cell:focus-visible{outline:3px solid var(--terracotta,#C4745A);outline-offset:-3px;z-index:3}';
+    (document.head || document.documentElement).appendChild(s);
+  }
+  function isVisible(n) { return !!(n && !n.disabled && (n.offsetWidth || n.offsetHeight || n.getClientRects().length)); }
+  function activeModals() {
+    var sel = '.modal.active, .lb-modal.active, .uno-overlay.active';
+    return Array.prototype.filter.call(document.querySelectorAll(sel), isVisible);
+  }
+  function focusablesIn(el) {
+    return Array.prototype.filter.call(
+      el.querySelectorAll('button, [href], input, select, textarea, [tabindex]'),
+      function (n) { return n.tabIndex >= 0 && isVisible(n); });
+  }
+  function closeModal(m) {
+    if (m.id && typeof window.closeModal === 'function') { try { window.closeModal(m.id); return; } catch (e) {} }
+    m.classList.remove('active');
+  }
+  function onKeydown(e) {
+    var mods = activeModals(), top = mods[mods.length - 1];
+    if (top) {
+      if (e.key === 'Escape') { closeModal(top); e.preventDefault(); return; }
+      if (e.key === 'Tab') {
+        var f = focusablesIn(top); if (!f.length) return;
+        var first = f[0], last = f[f.length - 1], a = document.activeElement;
+        if (e.shiftKey && (a === first || !top.contains(a))) { last.focus(); e.preventDefault(); }
+        else if (!e.shiftKey && (a === last || !top.contains(a))) { first.focus(); e.preventDefault(); }
+      }
+      return;
+    }
+    // Hors modale : Entrée/Espace « cliquent » un contrôle personnalisé focalisé.
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      var t = e.target;
+      if (t && t.getAttribute && t.getAttribute('role') === 'button' &&
+          !/^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(t.tagName || '')) {
+        t.click(); e.preventDefault();
+      }
+    }
+  }
+  var _openModals = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
+  function focusOpenedModals() {
+    activeModals().forEach(function (m) {
+      if (_openModals && _openModals.has(m)) return;
+      if (_openModals) _openModals.add(m);
+      var target = m.querySelector('[autofocus]') || focusablesIn(m)[0];
+      if (target) { try { target.focus(); } catch (e) {} }
+    });
+    if (_openModals) {
+      // Oublier les modales refermées (pour re-focaliser à la prochaine ouverture).
+      var open = activeModals();
+      Array.prototype.forEach.call(document.querySelectorAll('.modal, .lb-modal, .uno-overlay'), function (m) {
+        if (open.indexOf(m) < 0) _openModals.delete(m);
+      });
+    }
+  }
+  function setupKeyboard() {
+    injectFocusCSS();
+    document.addEventListener('keydown', onKeydown, true);
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(focusOpenedModals).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+  }
+
+  // ── window.Kbd.grid : navigation fléchée sur un plateau de cases ───────────
+  // Les jeux au plateau (Morpion, Puissance 4, Reversi…) re-rendent leur grille à
+  // chaque coup. Un jeu appelle Kbd.grid(container, '.xx-cell', cols) une fois ;
+  // le helper (délégation) gère ⬆︎⬇︎⬅︎➡︎ + Entrée/Espace, rend les cases focalisables
+  // et restaure le focus sur la même case après un re-rendu.
+  window.Kbd = window.Kbd || {};
+  window.Kbd.grid = function (container, selector, cols) {
+    if (!container || container._kbdGrid) return; // une seule fois
+    container._kbdGrid = true;
+    var focusIdx = 0;
+    function cells() { return Array.prototype.slice.call(container.querySelectorAll(selector)); }
+    function decorate() {
+      var cs = cells();
+      for (var i = 0; i < cs.length; i++) {
+        var c = cs[i];
+        c.classList.add('kbd-cell');
+        if (!c.hasAttribute('tabindex')) c.tabIndex = 0;
+        if (!c.getAttribute('role')) c.setAttribute('role', 'button');
+      }
+      return cs;
+    }
+    function focusCell(i) {
+      var cs = decorate(); if (!cs.length) return;
+      focusIdx = Math.max(0, Math.min(cs.length - 1, i));
+      try { cs[focusIdx].focus(); } catch (e) {}
+    }
+    container.addEventListener('keydown', function (e) {
+      var cs = decorate(); if (!cs.length) return;
+      var cur = cs.indexOf(document.activeElement);
+      if (cur < 0) cur = focusIdx;
+      var n = typeof cols === 'function' ? cols() : cols;
+      var d = 0;
+      if (e.key === 'ArrowRight') d = 1;
+      else if (e.key === 'ArrowLeft') d = -1;
+      else if (e.key === 'ArrowDown') d = n;
+      else if (e.key === 'ArrowUp') d = -n;
+      else if (e.key === 'Home') { focusCell(0); e.preventDefault(); return; }
+      else if (e.key === 'End') { focusCell(cs.length - 1); e.preventDefault(); return; }
+      else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { if (cur >= 0) { cs[cur].click(); e.preventDefault(); } return; }
+      else return;
+      focusCell(cur + d); e.preventDefault();
+    });
+    // Après un re-rendu (innerHTML), rendre les nouvelles cases focalisables et,
+    // si le focus était dans la grille, le remettre sur la même position.
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(function () {
+        var had = container.contains(document.activeElement);
+        var cs = decorate();
+        if (had && cs[focusIdx]) { try { cs[focusIdx].focus(); } catch (e) {} }
+      }).observe(container, { childList: true });
+    }
+    decorate();
+  };
+
   // Passe initiale + regroupée sur mutation (les jeux re-rendent par innerHTML).
   var scheduled = false;
   function schedule() {
@@ -575,6 +722,7 @@
   }
   function start() {
     pass();
+    setupKeyboard();
     if (typeof MutationObserver !== 'undefined') {
       new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
     }
@@ -1051,7 +1199,10 @@
     }
     // Auth anonyme active mais uid pas encore prêt : on attend l'uid pour que le
     // salon soit créé/rejoint sous la bonne identité (repli 2,5 s si l'auth traîne).
-    if (window.GAMES_USE_AUTH && !window.GAMES_UID && window.whenGamesAuth) {
+    // HORS-LIGNE (avion) : l'auth ne viendra jamais → on démarre TOUT DE SUITE
+    // (sinon écran vide 2,5 s avant l'accueil), l'identité repli = pid localStorage.
+    var offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (window.GAMES_USE_AUTH && !window.GAMES_UID && window.whenGamesAuth && !offline) {
       var done = false, go = function () { if (done) return; done = true; begin(); };
       window.whenGamesAuth(go);
       setTimeout(go, 2500);
@@ -1064,6 +1215,13 @@
     var code = (params.get('room') || '').trim().toUpperCase();
     if (code) joinRoomByCode(code, true);
     else window.showScreen('s-home');
+    // Bandeau hors-ligne + boutons en ligne : suivent l'état réseau en direct.
+    var refreshHomeIfActive = function () {
+      var h = document.getElementById('s-home');
+      if (h && h.classList.contains('active')) renderHome();
+    };
+    window.addEventListener('online', refreshHomeIfActive);
+    window.addEventListener('offline', refreshHomeIfActive);
   }
 
   // Encart « Défi du jour » (jeux de puzzle solo) — grille du jour + série.
@@ -1093,17 +1251,28 @@
     var min = c.minPlayers || 2, max = c.maxPlayers || 8;
     var range = (min === max) ? (min + ' joueurs') : (min + ' à ' + max + ' joueurs');
     var rules = (c.rules || []).map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
+    // Hors-ligne (avion) : créer/rejoindre une partie EN LIGNE est impossible. On
+    // grise ces boutons et on affiche un bandeau qui oriente vers Solo/Local.
+    var offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+    var hasOff = !!(c.offline && (c.offline.solo || c.offline.local));
+    var offBanner = offline
+      ? ('<div class="lb-offline-note">✈️ <b>Tu es hors-ligne.</b> ' +
+          (hasOff ? 'Créer ou rejoindre une partie en ligne demande une connexion — joue en <b>Solo</b> ou en <b>Local</b> ci-dessous.'
+                  : 'Ce jeu se joue en ligne : reviens quand tu auras du réseau.') + '</div>')
+      : '';
+    var onDis = offline ? ' disabled title="Indisponible hors-ligne"' : '';
     host.innerHTML =
       '<div class="lb-wrap">' +
         (c.emoji ? '<div class="lb-emoji-big">' + c.emoji + '</div>' : '') +
         '<h1 class="lb-title">' + esc(c.name || 'Jeu') + '</h1>' +
         '<p class="lb-sub">' + esc(c.tagline || '') + (c.tagline ? ' · ' : '') + range + '</p>' +
+        offBanner +
         ((c.offline && c.offline.daily && window.Daily) ? dailyHomeHTML(c) : '') +
         (window.GameStats ? GameStats.summaryHTML(c.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
-        '<button class="lb-btn" onclick="Lobby.createRoom()">Créer une partie</button>' +
+        '<button class="lb-btn" onclick="Lobby.createRoom()"' + onDis + '>Créer une partie</button>' +
         '<div style="margin:18px 0 8px;color:var(--ink-light);font-size:0.85rem">ou rejoindre avec un code</div>' +
-        '<input id="lb-join-code" class="lb-input code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text">' +
-        '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()">Rejoindre</button>' +
+        '<input id="lb-join-code" class="lb-input code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" inputmode="text"' + (offline ? ' disabled' : '') + '>' +
+        '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()"' + onDis + '>Rejoindre</button>' +
         (c.offline ? ('<div style="margin:18px 0 6px;color:var(--ink-light);font-size:0.85rem">ou sans connexion ✈️</div>' +
           (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">' + (c.offline.soloNoBots ? '⏱ Solo (chrono)' : '🤖 Solo (contre l\'ordi)') + '</button>' : '') +
           (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">📱 Local (même appareil)</button>' : '')) : '') +
@@ -1118,6 +1287,7 @@
   }
 
   function joinFromInput() {
+    if (navigator.onLine === false) { lbToast('Hors-ligne — joue en Solo ✈️ ou Local 📱'); return; }
     var inp = document.getElementById('lb-join-code');
     var code = (inp && inp.value || '').trim().toUpperCase();
     if (code.length < CODE_LEN) { lbToast('Entre les 5 caractères du code'); return; }
@@ -1127,6 +1297,7 @@
   // ── Créer un salon ────────────────────────────────────────────────────────
   function createRoom(attempt) {
     attempt = attempt || 0;
+    if (navigator.onLine === false) { lbToast('Hors-ligne — joue en Solo ✈️ ou Local 📱'); return; }
     var c = cfg();
     var code = genCode();
     setRoom(code);
@@ -2292,6 +2463,10 @@
   // ── GameRoom : on intercepte l'enregistrement du jeu ─────────────────────────
   window.GameRoom = function (c) {
     cfg = c || {};
+    // Les helpers PARTAGÉS de lobby.js (pastille vitesse des ordis, stats en jeu…)
+    // lisent la config via window.ROOM : on la renseigne aussi hors-ligne, sinon
+    // ils croient que le jeu n'a pas d'ordis et ne s'affichent jamais.
+    window.ROOM = cfg;
     window.myPid = null;
     injectStyles();
     // Défi du jour : on saute l'écran de réglages et on démarre la grille du jour.

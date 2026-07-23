@@ -10,7 +10,15 @@
   page restent en clair dans la page). Charset/viewport restent dans la page (requis tôt).
 */
 (function () {
-  try { if (localStorage.getItem('games-theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
+  // Thème : préférence explicite (localStorage) si elle existe, sinon on suit le
+  // thème du téléphone/OS (prefers-color-scheme). Le toggle de nav.js écrit une
+  // valeur explicite qui l'emporte ensuite.
+  try {
+    var _st = localStorage.getItem('games-theme');
+    var _dark = (_st === 'dark' || _st === 'light') ? (_st === 'dark')
+      : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (_dark) document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
   var me = document.currentScript;
   var title = (me && me.getAttribute('data-title')) || 'Les jeux 🎲';
   var emoji = (me && me.getAttribute('data-emoji')) || '🎲';

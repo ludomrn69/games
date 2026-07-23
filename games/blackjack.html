@@ -156,6 +156,7 @@
       offline: { solo: true, local: true, soloMinBots: 0 },
       bot: bjBot,
       lobbyExtraHTML: lobbyExtraHTML,
+      offlineExtraSetup: offlineExtraSetup,
       onState: onState,
       onStart: onStart,
       offlineTurn: activePid
@@ -175,6 +176,13 @@
     }
     function setStartChips(n) { if (CHIP_OPTIONS.indexOf(n) >= 0 && window.roomRef) window.roomRef.child('startChips').set(n); }
     window.setStartChips = setStartChips;
+    // Même réglage hors-ligne (solo / local) : cave de départ dans l'écran de réglages.
+    function offlineExtraSetup() {
+      return '<div class="off-set"><div class="off-set-label">💰 Jetons de départ</div>' +
+        '<div class="off-set-row" data-opt="startChips">' +
+        CHIP_OPTIONS.map(function (n) { return '<button type="button" class="off-opt' + (n === START_CHIPS ? ' active' : '') + '" data-val="' + n + '">' + n + '</button>'; }).join('') +
+        '</div></div>';
+    }
 
     /* ━━ Qui doit agir maintenant ? (mises puis tour de jeu). Sert au mode hors-ligne
        ET au pilotage des bots en ligne (lobby.botActivePid). ━━ */

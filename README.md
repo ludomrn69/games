@@ -41,7 +41,7 @@ la synchro temps réel.
 | 📝 Petit bac | 2–12 |  | mots |
 | 🔴 Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
 | ⚫ Reversi | 2 | ✈️ | réflexion (IA forte) |
-| 🔴 Dames | 2 | ✈️ | réflexion (IA forte) |
+| 🟤 Dames | 2 | ✈️ | réflexion (IA forte) |
 | ✨ Dobble | 2–8 |  | rapidité |
 | ⚡ Crack-list | 2–8 |  | mots |
 | 🔍 Lynx | 2–12 |  | observation |
