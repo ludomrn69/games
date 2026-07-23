@@ -14,7 +14,7 @@
     #s-playing { flex-direction: column; align-items: center; width: 100%; }
     .cl-top { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 6px 12px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
     html[data-theme="dark"] .cl-top { background: rgba(20,16,28,0.97); }
-    .cl-turn { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); min-width: 0; overflow: hidden; }
+    .cl-turn { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .cl-turn b { color: var(--ink); }
     .cl-die { width: 30px; height: 30px; border-radius: 7px; background: #fff; color: #2C2520; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -2px 4px rgba(0,0,0,.15); }
 
@@ -124,7 +124,8 @@
         <span class="cl-turn" id="cl-turn"></span>
         <span class="cl-die" id="cl-die"></span>
         <div style="display:flex;gap:6px">
-          <button class="game-rules-btn" onclick="openNote()" title="Carnet">📓</button>
+          <!-- Carnet accessible via le gros bouton « 📓 Mon carnet de détective »
+               juste en dessous : on retire le doublon de l'en-tête pour l'alléger. -->
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
         </div>

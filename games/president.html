@@ -502,7 +502,9 @@
       // en cours (affichée sous les joueurs). Sans pli → nouveau pli, taille libre.
       var SIZE_NAMES = { 1: 'Simple', 2: 'Double', 3: 'Triple', 4: 'Carré' };
       var pc = state.pile && state.pile.count;
-      setText('pr-mode', pc ? ('Pli en cours — ' + (SIZE_NAMES[pc] || (pc + ' cartes'))) : 'Nouveau pli — taille libre');
+      // Sans pli, l'étiquette dit juste « Taille libre » : le « Nouveau pli » est
+      // déjà écrit dans la pile vide juste en dessous (on évite la répétition).
+      setText('pr-mode', pc ? ('Pli en cours — ' + (SIZE_NAMES[pc] || (pc + ' cartes'))) : 'Taille libre');
 
       // Pile
       var pileEl = document.getElementById('pr-pile');

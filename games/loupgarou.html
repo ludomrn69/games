@@ -52,8 +52,11 @@
     #s-playing.lg-night .lg-instruct, #s-playing.lg-night .lg-wait { color: #cfd4f0; }
     #s-playing.lg-night .lg-instruct b { color: #fff; }
     #s-playing.lg-night .lg-instruct .lg-you.wait { color: #aab2dd; }
-    /* Le contenu passe AU-DESSUS du ciel (l'overlay est positionné, z:0). */
-    #s-playing > *:not(#lg-sky) { position: relative; z-index: 1; }
+    /* Le contenu passe AU-DESSUS du ciel (l'overlay est positionné, z:0).
+       On EXCLUT .lg-head : sinon ce « position: relative » écrasait son
+       « position: sticky » (l'en-tête — règles, stats, vitesse des ordis —
+       défilait hors écran quand la nuit recentre la vue sur l'action). */
+    #s-playing > *:not(#lg-sky):not(.lg-head) { position: relative; z-index: 1; }
     .lg-phase-icon { font-size: 2rem; } .lg-phase-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.2rem; }
     .lg-role { display: inline-flex; align-items: center; gap: 6px; background: var(--white); border-radius: 30px; padding: 4px 14px; box-shadow: var(--shadow); font-weight: 700; margin-top: 6px; }
     html[data-theme="dark"] .lg-role { background: #2a2333; }

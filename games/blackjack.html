@@ -18,7 +18,9 @@
     .bj-actions { display: flex; gap: 6px; align-items: center; justify-self: end; }
 
     /* Le nom l'annonçait : la zone de jeu est désormais un vrai TAPIS vert (game.css). */
-    .bj-felt { flex: 1; width: 100%; max-width: 640px; margin: 10px auto; padding: 16px 14px 28px; display: flex; flex-direction: column; gap: 14px; }
+    /* Le tapis épouse son contenu (fini le grand rectangle vert vide pendant la
+       phase de mises) : il ne s'étire plus pour remplir tout l'écran. */
+    .bj-felt { flex: 0 1 auto; width: 100%; max-width: 640px; margin: 10px auto; padding: 16px 14px 28px; display: flex; flex-direction: column; gap: 14px; }
     .bj-dealer, .bj-seat { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.16); border-radius: 18px; padding: 12px 14px; color: #fff; }
     .bj-dealer .bj-meta, .bj-seat .bj-meta { color: rgba(255,255,255,0.72); }
     .bj-seat.me .bj-seat-name::after { color: rgba(255,255,255,0.7) !important; }
