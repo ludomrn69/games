@@ -43,7 +43,7 @@ function checkInline(code, label) {
 }
 checkInline(read('index.html'), 'index.html');
 gameHtmls.forEach(function (f) { checkInline(read(path.join('games', f)), 'games/' + f); });
-// Pages de jeu dans des sous-dossiers (ex : games/playus/) : on vérifie au moins la
+// Pages de jeu rangées dans des sous-dossiers de games/ : on vérifie au moins la
 // syntaxe de leur JS inline. Ces pages autonomes ne sont pas listées dans le
 // catalogue `key:` d'index.html, leur mise en cache est garantie par gen-sw-version.
 var subGames = [];
