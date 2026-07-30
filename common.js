@@ -1847,7 +1847,18 @@
         '<input type="range" id="lb-botspeed-range" min="0" max="' + (window.Bots.SPEEDS.length - 1) + '" step="1" aria-label="Vitesse des ordis">' +
         '<span class="lb-botspeed-lbl" id="lb-botspeed-lbl"></span>';
       el.querySelector('#lb-botspeed-range').addEventListener('input', function () { onBotSpeedSlide(+this.value); });
-      document.body.appendChild(el);
+    }
+    // Emplacement : la RANGÉE des boutons d'en-tête (à côté de « 📊 ? ↻ »), pour
+    // ne plus flotter par-dessus le jeu. Repli en pastille flottante si le jeu
+    // n'a pas d'en-tête standard (pas de bouton « ? »).
+    var rulesBtn = document.querySelector('#s-playing .game-rules-btn');
+    var host = rulesBtn && rulesBtn.parentNode;
+    if (host) {
+      el.className = 'lb-botspeed lb-botspeed--docked';
+      if (el.parentNode !== host) host.insertBefore(el, host.firstChild); // en tête de rangée
+    } else {
+      el.className = 'lb-botspeed';
+      if (el.parentNode !== document.body) document.body.appendChild(el);
     }
     el.style.display = 'inline-flex';
     var rng = document.getElementById('lb-botspeed-range');

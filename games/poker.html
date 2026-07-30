@@ -13,7 +13,17 @@
     html[data-theme="dark"] .pk-header { background: rgba(20,16,28,0.97); }
     .pk-phase { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; white-space: nowrap; }
     .pk-title { justify-self: center; font-family: 'Playfair Display', serif; font-weight: 800; }
-    .pk-actions-top { display: flex; gap: 6px; align-items: center; justify-self: end; }
+    .pk-actions-top { display: flex; gap: 6px; align-items: center; justify-self: end; min-width: 0; }
+    /* En-tête serré sur mobile : le curseur de vitesse des ordis vient s'ajouter à
+       la rangée « 📊 ? ↻ ». On passe en flex (au lieu de la grille 3 colonnes rigide)
+       et on masque le titre décoratif « ♠️ Poker » (la phase à gauche + le tapis
+       rendent le jeu évident) pour laisser toute la place au curseur. */
+    @media (max-width: 620px) {
+      .pk-header { display: flex; justify-content: space-between; }
+      .pk-title { display: none; }
+      .pk-phase { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .pk-actions-top { flex: 0 0 auto; }
+    }
 
     .pk-felt { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 14px 12px 150px; box-sizing: border-box; }
     /* Tapis central : cartes communes + pot */
@@ -63,8 +73,12 @@
     .pk-seat-top { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
     .pk-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0; }
     .pk-name { font-weight: 800; font-size: 0.9rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pk-badge { font-size: 0.62rem; font-weight: 800; padding: 1px 6px; border-radius: 20px; background: var(--cream); color: var(--ink-light); }
-    .pk-badge.btn { background: #2c2520; color: #fff; } .pk-badge.sb { background: #7aa7d8; color: #fff; } .pk-badge.bb { background: #d8905a; color: #fff; }
+    /* Jetons de position posés « sur le tapis » : donneur (D, jeton blanc classique),
+       petite blinde (SB, bleu) et grosse blinde (BB, orange) — repérables d'un coup. */
+    .pk-badge { font-size: 0.66rem; font-weight: 900; padding: 2px 7px; border-radius: 20px; background: var(--cream); color: var(--ink-light);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2); letter-spacing: 0.02em; }
+    .pk-badge.btn { background: #fff; color: #2c2520; border: 1.5px solid #2c2520; }
+    .pk-badge.sb { background: #4f86c6; color: #fff; } .pk-badge.bb { background: #d17a3f; color: #fff; }
     .pk-stack { font-weight: 800; color: var(--gold); font-size: 0.9rem; white-space: nowrap; }
     .pk-seat-mid { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .pk-hole { display: flex; gap: 5px; }
@@ -76,6 +90,15 @@
     .pk-bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(253,246,236,0.98); backdrop-filter: blur(10px); border-top: 1px solid var(--gold-light); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); z-index: 200; }
     html[data-theme="dark"] .pk-bar { background: rgba(20,16,28,0.98); }
     .pk-bar-inner { max-width: 720px; margin: 0 auto; }
+    /* Ma main rappelée juste au-dessus des boutons d'action (mes 2 cartes + combi + position). */
+    .pk-bar-hole { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 9px; }
+    .pk-bar-cards { display: flex; gap: 6px; }
+    .pk-card.mid { width: 40px; height: 57px; font-size: 1rem; border-radius: 7px; }
+    .pk-card.mid .su { font-size: 0.9rem; }
+    .pk-bar-hole-meta { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+    .pk-bar-mine { font-size: 0.66rem; font-weight: 800; color: var(--ink-light); text-transform: uppercase; letter-spacing: 0.05em; }
+    .pk-bar-combo { font-size: 0.9rem; font-weight: 800; color: var(--sage); }
+    .pk-bar-pos { display: flex; gap: 4px; }
     .pk-bar-info { text-align: center; font-size: 0.82rem; color: var(--ink-light); margin-bottom: 8px; min-height: 18px; }
     .pk-btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
     .pk-btn { border: none; border-radius: 30px; padding: 0.7rem 1.2rem; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.92rem; cursor: pointer; box-shadow: var(--shadow); }
@@ -814,8 +837,25 @@
       var canRaise = maxTo > s.curBet && stack > 0;
       var comboNow = myComboNow(s);
       var html = '<div class="pk-bar-inner">';
-      html += '<div class="pk-bar-info">Pot ' + pot + ' · ' + (toCall > 0 ? 'à suivre : ' + toCall : 'personne n\'a misé') + ' · tes jetons : ' + stack +
-        (comboNow ? ' · <b style="color:var(--sage)">✋ ' + comboNow + '</b>' : '') + '</div>';
+      // MA MAIN, toujours sous les yeux au moment de choisir : mes 2 cartes + ma
+      // combinaison + ma POSITION (donneur / petite / grosse blinde) juste au-dessus
+      // des boutons. Fini de perdre sa main de vue quand la barre d'action s'ouvre,
+      // et la position aide à décider si l'on joue ou non.
+      var myHole = s.hole && s.hole[me];
+      if (myHole) {
+        var myPos = '';
+        if (me === s.buttonPid) myPos += '<span class="pk-badge btn">D</span>';
+        if (me === s.sbPid) myPos += '<span class="pk-badge sb">SB</span>';
+        if (me === s.bbPid) myPos += '<span class="pk-badge bb">BB</span>';
+        html += '<div class="pk-bar-hole">' +
+          '<div class="pk-bar-cards">' + myHole.map(function (c) { return cardHTML(c, 'mid'); }).join('') + '</div>' +
+          '<div class="pk-bar-hole-meta">' +
+            '<span class="pk-bar-mine">Ta main</span>' +
+            (comboNow ? '<span class="pk-bar-combo">✋ ' + comboNow + '</span>' : '') +
+            (myPos ? '<span class="pk-bar-pos">' + myPos + '</span>' : '') +
+          '</div></div>';
+      }
+      html += '<div class="pk-bar-info">Pot ' + pot + ' · ' + (toCall > 0 ? 'à suivre : ' + toCall : 'personne n\'a misé') + ' · tes jetons : ' + stack + '</div>';
       if (canRaise) {
         if (raiseVal == null || raiseVal < minTo || raiseVal > maxTo) raiseVal = Math.min(maxTo, Math.max(minTo, s.curBet + Math.max(s.bb, Math.round(pot / 2))));
         html += '<div class="pk-quick">' +

@@ -158,7 +158,6 @@ node tools/check.js          # syntaxe + cohérence (rapide, lancé en CI)
 node tools/gen-readme.js     # régénère le tableau des jeux depuis index.html
 node tools/bench.js          # banc d'essai des IA (~1 min)
 node tools/bench.js --full   # plus de parties, profondeur de jeu réelle
-node tools/bench-playus.js   # smoke test des mini-jeux Playus (charge + démarre)
 ```
 Le tableau « Les jeux » ci-dessus est **généré** depuis le catalogue `GAMES` de
 `index.html` (source unique). Ne l'édite pas à la main : modifie `index.html` puis

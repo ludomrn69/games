@@ -7,7 +7,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
-  <script src="/playus-extra.js"></script><!-- médailles Playus (seuils partagés) -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--cream); color: var(--ink); font-family: 'DM Sans', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
@@ -55,6 +54,11 @@
     .card .emoji { font-size: 2.6rem; line-height: 1; }
     .card .name { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.05rem; text-align: center; }
     .card .players { font-size: 0.78rem; color: var(--ink-light); }
+    /* Pastille « jouable en solo contre l'ordi » : rassure que le jeu se lance
+       seul même quand la fourchette affichée démarre à 2 (ex. Poker « 2–6 »). */
+    .card .solo-badge { display: inline-flex; align-items: center; gap: 3px; margin-top: 1px;
+      font-size: 0.66rem; font-weight: 800; line-height: 1; padding: 3px 8px; border-radius: 20px;
+      color: var(--terracotta); background: rgba(196,116,90,0.12); border: 1px solid rgba(196,116,90,0.28); }
     .card.soon { opacity: 0.5; pointer-events: none; }
     .card.soon::after { content: 'bientôt'; position: absolute; top: 8px; right: 8px; font-size: 0.6rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: 1px; color: var(--gold); background: var(--cream); padding: 2px 7px; border-radius: 20px; }
@@ -72,46 +76,6 @@
     .plane-check .pc-btn { border: none; border-radius: 12px; padding: 0.55rem 0.95rem; font-weight: 700; font-family: 'DM Sans', sans-serif;
       cursor: pointer; background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; font-size: 0.85rem; white-space: nowrap; }
     .plane-check .pc-btn[disabled] { opacity: 0.55; cursor: default; }
-
-    /* ── Mode Playus Arena : mini-jeux réflexes façon appli mobile ──
-       Harmonisé avec la charte : prune profonde + accents dorés (fini le néon
-       violet/rose qui jurait avec le crème du reste de la page). */
-    .playus-section { margin-top: 46px; }
-    .playus-banner { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-radius: 24px; margin-bottom: 18px;
-      background: radial-gradient(130% 115% at 50% 0, #5a3f8a, #32224e); color: #fff;
-      border: 1px solid rgba(245,199,126,0.25);
-      box-shadow: 0 12px 34px rgba(50,34,78,0.4); position: relative; overflow: hidden; }
-    .playus-banner::after { content: ''; position: absolute; inset: 0; background:
-      radial-gradient(circle at 85% 20%, rgba(242,193,78,0.18), transparent 45%); pointer-events: none; }
-    .playus-banner .pb-emoji { font-size: 2.6rem; line-height: 1; }
-    .playus-banner .pb-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.45rem; color: #f5c77e; }
-    .playus-banner .pb-sub { font-size: 0.82rem; opacity: 0.92; margin-top: 3px; }
-    .card.playus { background: linear-gradient(160deg, #3a2a5e, #221739); border: 1px solid #4a3a6e; color: #fff; }
-    .card.playus:hover { box-shadow: 0 14px 30px rgba(90,63,138,0.4); border-color: rgba(245,199,126,0.45); }
-    .card.playus .name { color: #fff; }
-    .card.playus .players { color: #c9b8ef; }
-    .card.playus .off-badge { filter: grayscale(0.2); }
-    /* Trois modes Playus : Solo entraînement · Salon (compétition) · Jeu du jour. */
-    .playus-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
-    .pu-mode { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; text-decoration: none;
-      background: linear-gradient(160deg, #3a2a5e, #241a3c); border: 1px solid #4a3a6e; color: #fff; transition: transform .14s, border-color .14s, box-shadow .14s; }
-    .pu-mode:hover { transform: translateY(-2px); border-color: rgba(245,199,126,0.5); box-shadow: 0 12px 26px rgba(90,63,138,0.38); }
-    .pu-mode .pm-emoji { font-size: 1.9rem; line-height: 1; flex: 0 0 auto; }
-    .pu-mode .pm-title { font-weight: 800; font-size: 1rem; color: #f5c77e; }
-    .pu-mode .pm-sub { font-size: 0.76rem; color: #c9b8ef; margin-top: 2px; }
-    .pu-daily { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-radius: 18px; text-decoration: none;
-      background: radial-gradient(130% 120% at 0 0, #6a4a9e, #2c1f47); border: 1.5px solid rgba(245,199,126,0.45); color: #fff; transition: transform .14s, box-shadow .14s; }
-    .pu-daily:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(90,63,138,0.45); }
-    .pu-daily .pd-badge { font-size: 0.66rem; font-weight: 900; letter-spacing: 1px; background: linear-gradient(135deg,#ffb020,#ff7a3d); color: #fff; border-radius: 20px; padding: 3px 10px; }
-    .pu-daily .pd-emoji { font-size: 2.3rem; line-height: 1; }
-    .pu-daily .pd-name { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.15rem; }
-    .pu-daily .pd-sub { font-size: 0.78rem; color: #d8c9f5; margin-top: 2px; }
-    .pu-daily .pd-go { margin-left: auto; font-weight: 800; background: rgba(255,255,255,0.14); border-radius: 30px; padding: 8px 16px; white-space: nowrap; }
-    @media (max-width: 560px) { .playus-modes { grid-template-columns: 1fr; } .pu-daily .pd-go { display: none; } }
-    .duel-btn { display: inline-block; margin-top: 4px; border: 1px solid rgba(245,199,126,0.4); background: rgba(255,255,255,0.06); color: #f5c77e;
-      border-radius: 20px; padding: 3px 10px; font-size: 0.72rem; font-weight: 800; cursor: pointer; font-family: 'DM Sans', sans-serif;
-      transition: background .15s; }
-    .duel-btn:hover, .duel-btn:focus-visible { background: rgba(245,199,126,0.18); }
   </style>
 </head>
 <body>
@@ -137,28 +101,6 @@
 
     <p class="search-empty" id="search-empty">Aucun jeu ne correspond à ta recherche.</p>
 
-    <section class="playus-section">
-      <div class="playus-banner">
-        <span class="pb-emoji">🕹️</span>
-        <div>
-          <div class="pb-title">Playus Arena</div>
-          <div class="pb-sub">Compétition de mini-jeux de réflexes façon appli mobile</div>
-        </div>
-      </div>
-      <div class="playus-modes">
-        <a class="pu-mode" href="#playus-grid">
-          <span class="pm-emoji">🎯</span>
-          <span><span class="pm-title">Solo entraînement</span><span class="pm-sub">Joue seul, bats ton record, décroche les médailles</span></span>
-        </a>
-        <a class="pu-mode" href="games/playus/arena.html">
-          <span class="pm-emoji">⚔️</span>
-          <span><span class="pm-title">Salon — compétition</span><span class="pm-sub">Crée ou rejoins une partie en ligne, à plusieurs</span></span>
-        </a>
-        <a class="pu-daily" id="pu-daily" href="#"></a>
-      </div>
-      <div class="grid" id="playus-grid"></div>
-    </section>
-
     <p class="offline-note">✈️ = jouable <b>hors-ligne</b> (solo contre l'ordi ou en local sur un seul appareil).<br>Ouvre le site une fois avec connexion, puis il fonctionne <b>sans réseau</b> (idéal en avion).</p>
 
     <div class="plane-check" id="plane-check" hidden>
@@ -176,33 +118,33 @@
   <script>
     var GAMES = [      { key: 'soiree',          name: 'Mode Soirée',     emoji: '🎉', players: '2–8',  on: true, type: 'tournoi multi-jeux' },
       { key: 'petit-bac',       name: 'Petit bac',       emoji: '📝', players: '2–12', on: true, type: 'mots' },
-      { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
-      { key: 'reversi',         name: 'Reversi',         emoji: '⚫', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
-      { key: 'dames',           name: 'Dames',           emoji: '🟤', players: '2',    on: true, offline: true, type: 'réflexion (IA forte)' },
+      { key: 'puissance4',      name: 'Puissance 4',     emoji: '🔴', players: '2',    on: true, offline: true, solo: true, type: 'réflexion (IA forte)' },
+      { key: 'reversi',         name: 'Reversi',         emoji: '⚫', players: '2',    on: true, offline: true, solo: true, type: 'réflexion (IA forte)' },
+      { key: 'dames',           name: 'Dames',           emoji: '🟤', players: '2',    on: true, offline: true, solo: true, type: 'réflexion (IA forte)' },
       { key: 'dobble-emoji',    name: 'Dobble',          emoji: '✨', players: '2–8',  on: true, type: 'rapidité' },
       { key: 'crack-list',      name: 'Crack-list',      emoji: '⚡', players: '2–8',  on: true, type: 'mots' },
       { key: 'lynx',            name: 'Lynx',            emoji: '🔍', players: '2–12', on: true, type: 'observation' },
       { key: 'pictionary',      name: 'Pictionary',      emoji: '🎨', players: '2–12', on: true, type: 'dessin' },
-      { key: 'blackjack',       name: 'Blackjack',       emoji: '🂡', players: '1–6',  on: true, offline: true, type: 'cartes / 21' },
-      { key: 'poker',           name: 'Poker',           emoji: '♠️', players: '2–6',  on: true, offline: true, type: "cartes / Texas Hold'em" },
-      { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true, type: 'cartes' },
-      { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true, type: 'cartes' },
-      { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true, type: 'placement' },
-      { key: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', players: '2',    on: true, offline: true, type: 'déduction' },
+      { key: 'blackjack',       name: 'Blackjack',       emoji: '🂡', players: '1–6',  on: true, offline: true, solo: true, type: 'cartes / 21' },
+      { key: 'poker',           name: 'Poker',           emoji: '♠️', players: '2–6',  on: true, offline: true, solo: true, type: "cartes / Texas Hold'em" },
+      { key: 'uno',             name: 'Uno',             emoji: '🃏', players: '2–8',  on: true, offline: true, solo: true, type: 'cartes' },
+      { key: 'skyjo',           name: 'Skyjo',           emoji: '🎴', players: '2–8',  on: true, offline: true, solo: true, type: 'cartes' },
+      { key: 'blokus',          name: 'Blokus',          emoji: '🧩', players: '2–4',  on: true, offline: true, solo: true, type: 'placement' },
+      { key: 'bataille-navale', name: 'Bataille navale', emoji: '🚢', players: '2',    on: true, offline: true, solo: true, type: 'déduction' },
       { key: 'codenames',       name: 'Codenames',       emoji: '🕵️', players: '4–8',  on: true, type: 'mots / équipes' },
-      { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true, type: 'réflexion' },
+      { key: 'morpion',         name: 'Morpion',         emoji: '⭕', players: '2',    on: true, offline: true, solo: true, type: 'réflexion' },
       { key: 'undercover',      name: 'Undercover',      emoji: '🕵️‍♂️', players: '3–12', on: true, type: 'déduction sociale' },
-      { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true, type: 'cartes' },
-      { key: 'ludo',            name: 'Petits chevaux',   emoji: '🐴', players: '2–4',  on: true, offline: true, type: 'plateau / dés' },
-      { key: 'juste-prix',      name: 'Le juste prix',   emoji: '💰', players: '2–8',  on: true, offline: true, type: 'déduction' },
+      { key: 'president',       name: 'Président',       emoji: '🤵', players: '3–8',  on: true, offline: true, solo: true, type: 'cartes' },
+      { key: 'ludo',            name: 'Petits chevaux',   emoji: '🐴', players: '2–4',  on: true, offline: true, solo: true, type: 'plateau / dés' },
+      { key: 'juste-prix',      name: 'Le juste prix',   emoji: '💰', players: '2–8',  on: true, offline: true, solo: true, type: 'déduction' },
       { key: 'telephone-dessine', name: 'Gartic Phone',  emoji: '🖍️', players: '3–10', on: true, type: 'dessin' },
-      { key: 'monopoly',        name: 'Monopoly',        emoji: '🏠', players: '2–6',  on: true, offline: true, type: 'plateau' },
-      { key: 'cluedo',          name: 'Cluedo',          emoji: '🔎', players: '2–6',  on: true, offline: true, type: 'déduction (plateau)' },
-      { key: 'papayoo',         name: 'Papayoo',         emoji: '🐔', players: '3–6',  on: true, offline: true, type: 'plis' },
-      { key: 'trio',            name: 'Trio',            emoji: '🔢', players: '3–6',  on: true, offline: true, type: 'mémoire' },
-      { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true, type: 'cartes simultanées' },
-      { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true, type: 'déduction (IA solveur)' },
-      { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true, type: 'coopératif / timing' },
+      { key: 'monopoly',        name: 'Monopoly',        emoji: '🏠', players: '2–6',  on: true, offline: true, solo: true, type: 'plateau' },
+      { key: 'cluedo',          name: 'Cluedo',          emoji: '🔎', players: '2–6',  on: true, offline: true, solo: true, type: 'déduction (plateau)' },
+      { key: 'papayoo',         name: 'Papayoo',         emoji: '🐔', players: '3–6',  on: true, offline: true, solo: true, type: 'plis' },
+      { key: 'trio',            name: 'Trio',            emoji: '🔢', players: '3–6',  on: true, offline: true, solo: true, type: 'mémoire' },
+      { key: 'sixnimmt',        name: '6 qui prend !',   emoji: '🐮', players: '2–10', on: true, offline: true, solo: true, type: 'cartes simultanées' },
+      { key: 'mastermind',      name: 'Mastermind',      emoji: '🎯', players: '1–8',  on: true, offline: true, solo: true, type: 'déduction (IA solveur)' },
+      { key: 'themind',         name: 'The Mind',        emoji: '🧠', players: '2–6',  on: true, offline: true, solo: true, type: 'coopératif / timing' },
       { key: '2048',            name: '2048',            emoji: '🔢', players: '1–6',  on: true, offline: true, type: 'solo + course' },
       { key: 'sudoku',          name: 'Sudoku',          emoji: '9️⃣', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
       { key: 'queens',          name: 'Queens',          emoji: '👑', players: '1–6',  on: true, offline: true, type: 'solo + course (chrono)' },
@@ -212,16 +154,16 @@
       { key: 'sutom',           name: 'Sutom',           emoji: '🟥', players: '1–6',  on: true, offline: true, type: 'mot mystère (chrono)' },
       { key: 'solitaire',       name: 'Solitaire',       emoji: '🃏', players: '1–6',  on: true, offline: true, type: 'cartes solo (chrono)' },
       { key: 'balatro',         name: 'Balatro',         emoji: '🃏', players: '1',    on: true, offline: true, type: 'roguelike poker (solo)' },
-      { key: 'millebornes',     name: 'Mille Bornes',    emoji: '🚗', players: '2–4',  on: true, offline: true, type: 'cartes / course' },
-      { key: 'loupgarou',       name: 'Loup-Garou',      emoji: '🐺', players: '4–12', on: true, offline: true, type: 'déduction sociale (IA)' },
+      { key: 'millebornes',     name: 'Mille Bornes',    emoji: '🚗', players: '2–4',  on: true, offline: true, solo: true, type: 'cartes / course' },
+      { key: 'loupgarou',       name: 'Loup-Garou',      emoji: '🐺', players: '4–12', on: true, offline: true, solo: true, type: 'déduction sociale (IA)' },
       { key: 'timesup',         name: "Time's Up",       emoji: '⏱️', players: '4–12', on: true, offline: true, type: 'équipes (4 min · + solo chrono)' },
-      { key: 'lapaye',          name: 'La Bonne Paye',   emoji: '💰', players: '2–6',  on: true, offline: true, type: 'gestion / cartes' },
-      { key: 'diamants',        name: 'Diamants',        emoji: '💎', players: '2–8',  on: true, offline: true, type: 'stop-ou-encore' },
-      { key: 'perudo',          name: 'Perudo',          emoji: '🎲', players: '2–6',  on: true, offline: true, type: 'dés / bluff' },
+      { key: 'lapaye',          name: 'La Bonne Paye',   emoji: '💰', players: '2–6',  on: true, offline: true, solo: true, type: 'gestion / cartes' },
+      { key: 'diamants',        name: 'Diamants',        emoji: '💎', players: '2–8',  on: true, offline: true, solo: true, type: 'stop-ou-encore' },
+      { key: 'perudo',          name: 'Perudo',          emoji: '🎲', players: '2–6',  on: true, offline: true, solo: true, type: 'dés / bluff' },
       { key: 'mini-metro',      name: 'Mini Métro',      emoji: '🚇', players: '1',    on: true, offline: true, type: 'gestion / réseau (solo)' },
       { key: 'mini-motorways',  name: 'Mini Motorways',  emoji: '🚗', players: '1',    on: true, offline: true, type: 'gestion / routes (solo)' },
-      { key: 'nothanks',        name: 'No Thanks!',       emoji: '🙅', players: '2–7',  on: true, offline: true, type: 'stop-ou-encore' },
-      { key: 'yams',            name: "Yam's",           emoji: '🎲', players: '1–6',  on: true, offline: true, type: 'dés / combinaisons' },
+      { key: 'nothanks',        name: 'No Thanks!',       emoji: '🙅', players: '2–7',  on: true, offline: true, solo: true, type: 'stop-ou-encore' },
+      { key: 'yams',            name: "Yam's",           emoji: '🎲', players: '1–6',  on: true, offline: true, solo: true, type: 'dés / combinaisons' },
       { key: 'openfront',       name: 'OpenFront',       emoji: '🗺️', players: '1',    on: true, offline: true, type: 'stratégie / conquête (solo vs IA)' }
     ];
     // Rangement de l'accueil : les jeux sont GROUPÉS par grande famille (ordre
@@ -254,7 +196,8 @@
       var fav = getFavs().indexOf(g.key) >= 0;
       var inner = (g.offline ? '<span class="off-badge" title="Jouable hors-ligne (solo / local)">✈️</span>' : '') +
         '<button class="fav-btn' + (fav ? ' on' : '') + '" data-fav="' + g.key + '" title="' + (fav ? 'Retirer des favoris' : 'Ajouter aux favoris') + '" aria-label="Favori">' + (fav ? '★' : '☆') + '</button>' +
-        '<div class="emoji">' + g.emoji + '</div><div class="name">' + g.name + '</div><div class="players">' + g.players + ' joueurs</div>';
+        '<div class="emoji">' + g.emoji + '</div><div class="name">' + g.name + '</div><div class="players">' + g.players + ' joueurs</div>' +
+        (g.solo ? '<div class="solo-badge" title="Jouable seul contre l\'ordinateur">🤖 solo vs ordi</div>' : '');
       return g.on ? '<a class="' + cls + '" href="games/' + g.key + '.html">' + inner + '</a>'
                   : '<div class="' + cls + '">' + inner + '</div>';
     }
@@ -285,108 +228,14 @@
       toggleFav(b.getAttribute('data-fav'));
     });
 
-    // ── Catalogue « Playus Arena » ────────────────────────────────────────────
-    // Mini-jeux réflexes autonomes rangés dans games/playus/. On utilise « s: »
-    // (slug) et non « key: » pour ne pas entrer en conflit avec la vérif de
-    // cohérence (tools/check.js n'attend ces pages qu'en sous-dossier).
-    var PLAYUS = [
-      // Groupe 1 — Timing & précision
-      { s: 'center-hit',   name: 'Center Hit',   emoji: '🎯', tag: 'Précision' },
-      { s: 'knife-throw',  name: 'Knife Throw',  emoji: '🔪', tag: 'Précision' },
-      { s: 'color-reflex', name: 'Color Reflex', emoji: '🟩', tag: 'Réflexe' },
-      { s: 'on-time',      name: 'On Time!',     emoji: '⏱️', tag: 'Timing' },
-      { s: 'perfect-shape',name: 'Perfect Shape',emoji: '🔵', tag: 'Timing' },
-      { s: 'target-speed', name: 'Target Speed', emoji: '◎',  tag: 'Vitesse' },
-      { s: 'times-up',     name: "Time's up!",   emoji: '⏳', tag: 'Survie' },
-      // Groupe 2 — Physique arcade
-      { s: 'flap',         name: 'Flap',         emoji: '🐤', tag: 'Arcade' },
-      { s: 'keep-up',      name: 'Keep up!',     emoji: '⚪', tag: 'Arcade' },
-      { s: 'descend',      name: 'Descend',      emoji: '🔵', tag: 'Arcade' },
-      { s: 'bloopy',       name: 'Bloopy',       emoji: '🟪', tag: 'Saut' },
-      { s: 'bouncy',       name: 'Bouncy',       emoji: '🔴', tag: 'Casse-brique' },
-      { s: 'trampbox',     name: 'Trampbox',     emoji: '📦', tag: 'Rebond' },
-      { s: 'balldrop',     name: 'Balldrop',     emoji: '🌀', tag: 'Chute' },
-      { s: 'ballracer',    name: 'Ballracer',    emoji: '🟡', tag: 'Esquive' },
-      // Groupe 3 — Vitesse & réflexes
-      { s: 'grid',         name: 'Grid',         emoji: '🟦', tag: 'Réflexe' },
-      { s: 'speed-tap',    name: 'Speed Tap',    emoji: '👆', tag: 'Vitesse' },
-      { s: 'swipe-fast',   name: 'Swipe Fast!',  emoji: '➡️', tag: 'Swipe' },
-      { s: 'react',        name: 'React!',       emoji: '⚡', tag: 'Réflexe' },
-      { s: 'count',        name: 'Count!',       emoji: '🔢', tag: 'Vitesse' },
-      { s: 'call-me',      name: 'Call me',      emoji: '🔗', tag: 'Tracé' },
-      { s: 'slicer',       name: 'Slicer',       emoji: '🔪', tag: 'Swipe' },
-      { s: 'balloon-pop',  name: 'Balloon Pop',  emoji: '🎈', tag: 'Réflexe' },
-      // Groupe 4 — Conduite & adresse
-      { s: 'drift',        name: 'Drift!',       emoji: '🏎️', tag: 'Conduite' },
-      { s: 'zig',          name: 'Zig',          emoji: '⚡', tag: 'Conduite' },
-      { s: 'kenneys-race', name: 'Kenneys Race', emoji: '🏁', tag: 'Course' },
-      { s: 'tilted',       name: 'Tilted',       emoji: '⚖️', tag: 'Équilibre' },
-      { s: 'sword-balance',name: 'Sword Balance',emoji: '⚔️', tag: 'Équilibre' },
-      { s: 'tower-stack',  name: 'Tower Stack',  emoji: '🗼', tag: 'Adresse' },
-      { s: 'ninja-chop',   name: 'Ninja Chop',   emoji: '🥷', tag: 'Rapidité' },
-      { s: 'dangerwall',   name: 'Dangerwall',   emoji: '🧊', tag: 'Esquive' },
-      { s: 'astro-glide',  name: 'Astro Glide',  emoji: '🚀', tag: 'Esquive' },
-      { s: 'jumpy',        name: 'Jumpy',        emoji: '🐸', tag: 'Esquive' },
-      { s: 'speedgolf',    name: 'Speedgolf',    emoji: '⛳', tag: 'Adresse' },
-      // Groupe 5 — Mémoire & logique
-      { s: 'color-memory', name: 'Color Memory', emoji: '🎨', tag: 'Mémoire' },
-      { s: 'memorizer',    name: 'Memorizer',    emoji: '✖️', tag: 'Mémoire' },
-      { s: 'memory',       name: 'Memory',       emoji: '🧠', tag: 'Mémoire' },
-      { s: 'balls-cups',   name: 'Balls & Cups', emoji: '🥤', tag: 'Observation' },
-      { s: 'boxguesser',   name: 'Boxguesser',   emoji: '📦', tag: 'Logique' },
-      { s: 'snake',        name: 'Snake',        emoji: '🐍', tag: 'Classique' },
-      { s: 'piano',        name: 'Piano',        emoji: '🎹', tag: 'Rythme' },
-      { s: 'rhythm',       name: 'Rhythm',       emoji: '🥁', tag: 'Rythme' }
-    ];
-    // ── Médailles Playus : seuils bronze/argent/or PARTAGÉS (playus-extra.js,
-    // source unique avec l'écran de fin des mini-jeux), comparés au record local.
-    function playusMedal(slug) {
-      if (!window.PlayusMedals) return '';
-      var best = PlayusMedals.bestOf(slug);
-      var m = PlayusMedals.medalOf(slug, best);
-      return m ? '<span style="position:absolute;top:6px;right:8px;font-size:1rem" title="Record : ' + best + '">' + m + '</span>' : '';
-    }
-    var pg = document.getElementById('playus-grid');
-    if (pg) {
-      pg.innerHTML = PLAYUS.map(function (g) {
-        // Le « bouton » Duel vit DANS le lien de la carte : un <button> dans un
-        // <a> est du HTML invalide (focus clavier imprévisible) → span role=button.
-        return '<a class="card playus" href="games/playus/' + g.s + '.html">' +
-          '<span class="off-badge" title="Jouable hors-ligne">✈️</span>' +
-          playusMedal(g.s) +
-          '<div class="emoji" aria-hidden="true">' + g.emoji + '</div>' +
-          '<div class="name">' + g.name + '</div>' +
-          '<div class="players">' + g.tag + '</div></a>';
-      }).join('');
-    }
-    // ── Jeu commun du jour : le MÊME mini-jeu pour tout le monde (tiré selon la
-    // date), à jouer en solo pour battre le score du jour + garder sa série. ──
-    (function renderDaily() {
-      var el = document.getElementById('pu-daily');
-      if (!el || !PLAYUS.length) return;
-      var idx = (window.Daily ? Daily.seed('playus-daily') : (new Date().getFullYear() * 372 + new Date().getMonth() * 31 + new Date().getDate())) % PLAYUS.length;
-      var g = PLAYUS[idx];
-      var st = window.PlayusDaily ? PlayusDaily.state() : { streak: 0, doneToday: false, best: 0 };
-      el.href = 'games/playus/' + g.s + '.html?daily=1';
-      el.innerHTML = '<span class="pd-emoji">' + g.emoji + '</span>' +
-        '<span><span class="pd-badge">🗓️ JEU DU JOUR</span>' +
-        '<div class="pd-name">' + g.name + '</div>' +
-        '<div class="pd-sub">' + (st.doneToday ? 'Fait aujourd\'hui ✓ · record du jour ' + st.best : 'Même jeu pour tous aujourd\'hui — bats le score !') +
-        (st.streak ? ' · série ' + st.streak + ' 🔥' : '') + '</div></span>' +
-        '<span class="pd-go">' + (st.doneToday ? '↻ Rejouer' : '▶ Jouer') + '</span>';
-    })();
-
     // ── Recherche de jeu ──────────────────────────────────────────────────────
-    // Filtre en direct les cartes (jeux classiques + Playus Arena) par nom.
-    // Masque les titres de catégorie vides et la section Playus si rien ne matche.
+    // Filtre en direct les cartes par nom. Masque les titres de catégorie vides.
     (function setupSearch() {
       var search = document.getElementById('game-search');
       var clearBtn = document.getElementById('search-clear');
       var bar = document.getElementById('search-bar');
       var emptyMsg = document.getElementById('search-empty');
       var gridEl = document.getElementById('grid');
-      var playusGrid = document.getElementById('playus-grid');
-      var playusSection = document.querySelector('.playus-section');
       if (!search || !gridEl) return;
       function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
       function nameOf(el) { var n = el.querySelector('.name'); return norm(n ? n.textContent : ''); }
@@ -404,14 +253,6 @@
           if (show) { groupHasVisible = true; anyVisible = true; }
         });
         closeGroup();
-        // Grille Playus Arena.
-        var playusVisible = false;
-        if (playusGrid) Array.prototype.forEach.call(playusGrid.children, function (el) {
-          var show = !q || nameOf(el).indexOf(q) !== -1;
-          el.style.display = show ? '' : 'none';
-          if (show) { playusVisible = true; anyVisible = true; }
-        });
-        if (playusSection) playusSection.style.display = playusVisible ? '' : 'none';
         emptyMsg.style.display = (q && !anyVisible) ? 'block' : 'none';
       }
       search.addEventListener('input', apply);
