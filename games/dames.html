@@ -8,12 +8,16 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
     html { scroll-behavior: smooth; }
 
-    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); align-items: center; }
     .dm-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
     html[data-theme="dark"] .dm-header { background: rgba(20,16,28,0.97); }
-    .dm-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .dm-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: stretch; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
     .dm-turn-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
     .dm-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
     .dm-score-chip { display: inline-flex; align-items: center; gap: 5px; }
@@ -31,9 +35,8 @@
       .dm-scores { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
     }
 
-    .dm-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 14px; width: 100%; }
-    .dm-frame { display: grid; grid-template-columns: repeat(8, 1fr); width: min(88vw, 460px); aspect-ratio: 1; border: 5px solid #5a3a26; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
-    @media (min-width: 900px) { .dm-frame { width: min(66vh, 560px); } }
+    .dm-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px 14px; width: 100%; }
+    .dm-frame { display: grid; grid-template-columns: repeat(8, 1fr); width: min(92vw, max(250px, calc(100dvh - 205px)), 860px); aspect-ratio: 1; border: 5px solid #5a3a26; border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
     /* Réglage de variante (salon) */
     .dm-settings { background: var(--white); border-radius: 16px; padding: 14px 16px; box-shadow: var(--shadow); margin: 0 auto 14px; max-width: 340px; }
     .dm-settings-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ink-light); margin-bottom: 8px; }
@@ -51,7 +54,7 @@
     .dm-piece { width: 76%; height: 76%; border-radius: 50%; background-image: radial-gradient(circle at 34% 28%, rgba(255,255,255,0.5), rgba(255,255,255,0) 55%); box-shadow: inset -2px -3px 6px rgba(0,0,0,0.35), inset 2px 2px 5px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
     .dm-piece.w { background-color: #ece3d2; }
     .dm-piece.b { background-color: #23262e; }
-    .dm-piece .crown { font-size: 1.1rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+    .dm-piece .crown { font-size: clamp(1rem, 4.4vmin, 2.3rem); line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
     .dm-hint { margin-top: 16px; font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); text-align: center; min-height: 24px; }
 
     .dm-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
@@ -69,7 +72,16 @@
     .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
-    @media (min-width: 760px) { .dm-frame{width:min(66vw,540px)} }
+    /* Tablette : damier qui remplit l'écran (cf. .dm-frame), scores et tour lisibles de loin. */
+    @media (min-width: 760px) {
+      .dm-turn { font-size: 1.45rem; }
+      .dm-scores { font-size: 1.25rem; gap: 12px; }
+      .dm-mini { width: 20px; height: 20px; }
+      .dm-turn-dot { width: 17px; height: 17px; }
+      .dm-hint { font-size: 1.35rem; margin-top: 10px; }
+      .dm-frame { border-width: 8px; border-radius: 14px; }
+      .dm-cell.sel { box-shadow: inset 0 0 0 6px var(--gold); }
+    }
   </style>
 </head>
 <body>
@@ -142,6 +154,10 @@
     var selMoves = [];       // coups légaux complets partant de selPath[0]
 
     function rref() { return window.roomRef; }
+    // Mode table (un seul appareil au milieu) : on nomme le joueur au lieu de dire « toi ».
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
+    // Nulle : 25 coups chacun (50 demi-coups) de dames sans aucune prise.
+    var DRAW_QUIET = 50;
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     var escapeHtml = window.esc;
@@ -171,7 +187,7 @@
         'La prise est obligatoire, et les rafles s\'enchaînent',
         'Atteindre la dernière rangée transforme un pion en dame 👑',
         '10×10 international (au choix) : pions prennent aussi en arrière, dames volantes, prise majoritaire',
-        'On gagne en capturant tous les pions adverses'
+        'On gagne en capturant ou en bloquant tous les pions adverses · nulle après 25 coups chacun de dames sans prise'
       ],
       offline: { solo: true, local: true, open: true },
       bot: damesBot,
@@ -234,7 +250,7 @@
       var variant = (cur && cur.variant) || readSetupVariant() || 'en8';
       window.DamesAI.configure(variant);
       var starter = players[0].pid; // siège 0 = blanc commence
-      return { variant: variant, board: window.DamesAI.startBoard(), turn: starter, starter: starter, winner: null, lastFrom: -1, lastTo: -1 };
+      return { variant: variant, board: window.DamesAI.startBoard(), turn: starter, starter: starter, winner: null, lastFrom: -1, lastTo: -1, quiet: 0 };
     }
 
     function onState(snap) {
@@ -266,7 +282,12 @@
         var legal = AI.legalMoves(b, me), ok = false;
         for (var i = 0; i < legal.length; i++) { if (legal[i].join(',') === move.join(',')) { ok = true; break; } }
         if (!ok) return cur;
+        var cBefore = AI.counts(b), wasKing = (b[move[0]] === 'W' || b[move[0]] === 'B');
         cur.board = AI.applyMove(b, move, me);
+        var cAfter = AI.counts(cur.board);
+        var captured = (cBefore.w + cBefore.W + cBefore.b + cBefore.B) !== (cAfter.w + cAfter.W + cAfter.b + cAfter.B);
+        // Compteur de coups « calmes » (dame déplacée sans prise) : remis à 0 par toute prise ou tout coup de pion.
+        cur.quiet = (wasKing && !captured) ? ((cur.quiet || 0) + 1) : 0;
         cur.lastFrom = move[0];
         cur.lastTo = move[move.length - 1];
         // L'adversaire n'a plus de coup → victoire.
@@ -275,6 +296,8 @@
           if (!cur.players) cur.players = {};
           if (!cur.players[window.myPid]) cur.players[window.myPid] = {};
           cur.players[window.myPid].wins = (cur.players[window.myPid].wins || 0) + 1;
+        } else if (cur.quiet >= DRAW_QUIET) {
+          cur.winner = 'draw'; // finale de dames interminable → partie nulle
         } else {
           cur.turn = order[(order.indexOf(window.myPid) + 1) % order.length];
         }
@@ -308,7 +331,12 @@
       var myTurn = (state.turn === window.myPid) && !state.winner;
       var legal = myTurn ? AI.legalMoves(b, me) : [];
       // Le 2e joueur (siège NOIR) voit le plateau retourné : ses pions face à lui.
-      var flip = (ord.indexOf(window.myPid) === 1);
+      // Mode table : le damier ne bouge JAMAIS (il est posé sur la table). En « face à
+      // face », l'écran pivote de 180° pour le 2e joueur : on retourne alors aussi la
+      // grille, les deux rotations s'annulent → les pions restent physiquement en place.
+      var flip = isTable()
+        ? !!(state.tableFace && !state.winner && ord.indexOf(state.turn) === 1)
+        : (ord.indexOf(window.myPid) === 1);
       // Cases de départ jouables (pour le surlignage / la sélection).
       var fromSquares = {};
       legal.forEach(function (m) { fromSquares[m[0]] = true; });
@@ -318,13 +346,16 @@
       else {
         var t = state.turn, seat = ord.indexOf(t);
         ti.innerHTML = '<span class="dm-turn-dot" style="background:' + seatColor(seat) + '"></span>' +
-          (t === window.myPid ? 'À toi' : ('Au tour de ' + escapeHtml(Room.name(t))));
-        var mustCapture = legal.length && legal[0].length > 2;
+          ((t === window.myPid && !isTable()) ? 'À toi' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        var mustCapture = !!legal._caps;
+        var who = isTable() ? Room.name(t) + ' : ' : '';
+        var quietLeft = DRAW_QUIET - (state.quiet || 0);
         var inRafle = selPath.length > 1;
-        setText('dm-hint', myTurn
-          ? (inRafle ? 'Continue la rafle — touche la case du saut suivant'
-             : (mustCapture ? 'Prise obligatoire — touche un pion puis chaque saut' : 'Touche un de tes pions, puis sa case d\'arrivée'))
-          : 'En attente de ' + Room.name(t) + '…');
+        var cap1 = function (x) { return x.charAt(0).toUpperCase() + x.slice(1); };
+        setText('dm-hint', (myTurn
+          ? who + (who ? String : cap1)(inRafle ? 'continue la rafle — touche la case du saut suivant'
+             : (mustCapture ? 'prise obligatoire — touche un pion puis chaque saut' : (isTable() ? 'touche un pion, puis sa case d\'arrivée' : 'Touche un de tes pions, puis sa case d\'arrivée')))
+          : 'En attente de ' + Room.name(t) + '…') + (quietLeft <= 20 ? ' · nulle dans ' + quietLeft + ' coups sans prise' : ''));
       }
 
       // Rafle en cours : on affiche le plateau APRÈS les sauts déjà joués (pions
@@ -367,8 +398,9 @@
     function showResult(state) {
       var ov = document.getElementById('dm-overlay');
       var emoji = document.getElementById('dm-ov-emoji'), title = document.getElementById('dm-ov-title');
-      if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Égalité'; }
-      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Partie nulle'; }
+      else if (state.winner === window.myPid && !isTable()) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else if (isTable()) { emoji.textContent = '🏆'; title.textContent = Room.name(state.winner) + ' a gagné !'; }
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
       setHTML('dm-ov-scores', scoresHTML(state));
       ov.classList.add('active'); hidePeekBtn();

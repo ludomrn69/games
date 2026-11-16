@@ -8,11 +8,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
 
-    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); align-items: center; }
     .mp-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
     html[data-theme="dark"] .mp-header { background: rgba(20,16,28,0.97); }
-    .mp-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .mp-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: stretch; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
     .mp-turn-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
     .mp-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; }
     .mp-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
@@ -29,12 +33,12 @@
     .mp-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; width: 100%; }
     /* Look « ardoise » : grille au trait, symboles ✕ / ◯ (volontairement très
        différent du Puissance 4 qui empile des pastilles rouges/jaunes). */
-    .mp-frame { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 2.4vw, 14px); width: min(86vw, 360px); aspect-ratio: 1; background: #1f2a37; border: 3px solid #2c3a4a; border-radius: 18px; padding: clamp(10px, 3vw, 16px); box-shadow: var(--shadow); }
+    .mp-frame { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 2.4vw, 14px); width: min(86vw, max(240px, calc(100dvh - 225px)), 660px); aspect-ratio: 1; background: #1f2a37; border: 3px solid #2c3a4a; border-radius: 18px; padding: clamp(10px, 3vw, 16px); box-shadow: var(--shadow); }
     html[data-theme="dark"] .mp-frame { background: #161f29; }
     .mp-cell { aspect-ratio: 1; border-radius: 12px; background: rgba(255,255,255,0.04); border: 2px dashed rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
     .mp-cell:hover { background: rgba(255,255,255,0.09); }
     .mp-cell.sel { background: rgba(255,255,255,0.12); border-style: solid; border-color: #f2c200; }
-    .mp-mark { font-size: clamp(2.2rem, 11vw, 3.4rem); font-weight: 900; line-height: 1; font-family: 'DM Sans', sans-serif; animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both; text-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+    .mp-mark { font-size: clamp(2.2rem, min(11vw, 13vh), 7rem); font-weight: 900; line-height: 1; font-family: 'DM Sans', sans-serif; animation: pop 0.3s cubic-bezier(0.34,1.56,0.64,1) both; text-shadow: 0 2px 6px rgba(0,0,0,0.35); }
     .mp-mark.mp-x { color: #ff6b5e; }   /* joueur 1 : croix corail */
     .mp-mark.mp-o { color: #38c7d6; }   /* joueur 2 : rond cyan */
     @keyframes pop { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
@@ -43,6 +47,16 @@
     .mp-cell.win .mp-mark { animation: mppulse 0.9s ease-in-out infinite alternate; }
     @keyframes mppulse { from { transform: scale(1);} to { transform: scale(1.12);} }
     .mp-hint { margin-top: 18px; font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--ink-light); text-align: center; min-height: 26px; }
+
+    /* Tablette : grille qui remplit l'écran (cf. .mp-frame), scores et tour lisibles de loin. */
+    @media (min-width: 760px) {
+      .mp-stage { padding: 14px 16px; }
+      .mp-turn { font-size: 1.45rem; }
+      .mp-scores { font-size: 1.25rem; }
+      .mp-hint { font-size: 1.4rem; margin-top: 12px; }
+      .mp-frame { border-radius: 26px; gap: 16px; padding: 20px; }
+      .mp-cell { border-radius: 18px; border-width: 3px; }
+    }
 
     .mp-overlay { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.55); backdrop-filter: blur(4px); }
     .mp-overlay.active { display: flex; animation: fadeUp 0.3s ease both; }
@@ -169,6 +183,7 @@
       bot: morpionBot,
       onState: onState,
       onStart: onStart,
+      offlineEnter: function () { selectedCell = -1; },
       lobbyExtraHTML: lobbyExtraHTML,
       offlineExtraSetup: offlineExtraSetup
     });
@@ -261,6 +276,8 @@
       prevStatus = status;
     }
 
+    // Mode table (un seul appareil au milieu) : on nomme le joueur au lieu de dire « toi ».
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function myMark(state) { return String((state.order || []).indexOf(window.myPid)); }
 
     /* ━━ Interactions ━━ */
@@ -359,7 +376,7 @@
       if (state.winner) { ti.innerHTML = ''; setText('mp-hint', ''); }
       else {
         var t = state.turn;
-        ti.innerHTML = '<span class="mp-turn-dot" style="background:' + mpColor(ord.indexOf(t)) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        ti.innerHTML = '<span class="mp-turn-dot" style="background:' + mpColor(ord.indexOf(t)) + '"></span>' + ((t === window.myPid && !isTable()) ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
         var hint;
         if (isClassic(state)) {
           hint = (t === window.myPid) ? 'Pose un pion pour aligner 3 cases' : ('En attente de ' + Room.name(t) + '…');
@@ -369,6 +386,8 @@
         } else {
           hint = (t === window.myPid) ? (selectedCell >= 0 ? 'Touche une case libre pour déplacer' : 'Choisis un de tes pions à déplacer') : ('En attente de ' + Room.name(t) + '…');
         }
+        // Mode table : on précise à qui s'adresse la consigne.
+        if (isTable() && t === window.myPid) hint = Room.name(t) + ' : ' + hint.charAt(0).toLowerCase() + hint.slice(1);
         setText('mp-hint', hint);
       }
 
@@ -395,7 +414,8 @@
       var emoji = document.getElementById('mp-ov-emoji');
       var title = document.getElementById('mp-ov-title');
       if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Match nul !'; }
-      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else if (state.winner === window.myPid && !isTable()) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else if (isTable()) { emoji.textContent = '🏆'; title.textContent = Room.name(state.winner) + ' a gagné !'; }
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
       setHTML('mp-ov-scores', scoresHTML(state));
       document.getElementById('mp-overlay').classList.add('active');

@@ -8,13 +8,17 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
     html { scroll-behavior: smooth; }
 
     /* Playing */
-    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); align-items: center; }
     .p4-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
     html[data-theme="dark"] .p4-header { background: rgba(20,16,28,0.97); }
-    .p4-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .p4-turn { font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: stretch; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .p4-turn-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
     .p4-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; }
     .p4-scores .sep { color: var(--ink-light); margin: 0 6px; font-weight: 400; }
@@ -29,10 +33,10 @@
       .p4-scores { grid-area: scores; justify-self: center; }
     }
 
-    .p4-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; width: 100%; }
+    .p4-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 16px; width: 100%; }
     /* Look classique « Connect 4 » : plateau BLEU, trous crème, jetons rouge/jaune
        (identité visuelle nette, distincte du Morpion en ✕/◯). */
-    .p4-frame { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: clamp(4px, 1.6vw, 9px); width: min(92vw, 430px); aspect-ratio: 7 / 6; background: linear-gradient(160deg, #2a6fd6, #1c4fa8); border: 3px solid #14397c; border-radius: 20px; padding: clamp(7px, 2.2vw, 12px); box-shadow: var(--shadow); }
+    .p4-frame { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: clamp(4px, 1.3vw, 14px); width: min(92vw, max(250px, calc((100dvh - 215px) * 7 / 6)), 860px); aspect-ratio: 7 / 6; background: linear-gradient(160deg, #2a6fd6, #1c4fa8); border: 3px solid #14397c; border-radius: 20px; padding: clamp(7px, 1.8vw, 18px); box-shadow: var(--shadow); }
     .p4-cell { aspect-ratio: 1; border-radius: 50%; background: var(--cream); box-shadow: inset 0 3px 7px rgba(20,30,60,0.45); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
     html[data-theme="dark"] .p4-cell { background: #2a2433; }
     .p4-cell.colhover { background: rgba(255,255,255,0.55); }
@@ -62,7 +66,14 @@
     .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
-    @media (min-width: 760px) { .p4-frame{width:min(64vw,520px)} }
+    /* Tablette : plateau qui remplit l'écran (cf. .p4-frame), scores et tour lisibles de loin. */
+    @media (min-width: 760px) {
+      .p4-stage { padding: 14px 16px; }
+      .p4-turn { font-size: 1.45rem; }
+      .p4-scores { font-size: 1.25rem; }
+      .p4-hint { font-size: 1.35rem; margin-top: 10px; }
+      .p4-frame { border-radius: 28px; border-width: 4px; }
+    }
   </style>
 </head>
 <body>
@@ -137,6 +148,8 @@
     var p4Anim = -2; // dernier jeton animé localement
 
     function rref() { return window.roomRef; }
+    // Mode table (un seul appareil au milieu) : on nomme le joueur au lieu de dire « toi ».
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function emptyBoard() { return '.'.repeat(42); }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
@@ -291,8 +304,8 @@
         setText('p4-hint', '');
       } else {
         var t = state.turn;
-        ti.innerHTML = '<span class="p4-turn-dot" style="background:' + p4Color((state.order || []).indexOf(t)) + '"></span>' + (t === window.myPid ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
-        setText('p4-hint', (t === window.myPid) ? 'Touche une colonne pour lâcher ton jeton' : 'En attente de ' + Room.name(t) + '…');
+        ti.innerHTML = '<span class="p4-turn-dot" style="background:' + p4Color((state.order || []).indexOf(t)) + '"></span>' + ((t === window.myPid && !isTable()) ? 'À toi de jouer' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        setText('p4-hint', (t === window.myPid) ? (isTable() ? Room.name(t) + ' : touche une colonne pour lâcher ton jeton' : 'Touche une colonne pour lâcher ton jeton') : 'En attente de ' + Room.name(t) + '…');
       }
 
       var board = document.getElementById('p4-board');
@@ -326,7 +339,8 @@
       var emoji = document.getElementById('p4-ov-emoji');
       var title = document.getElementById('p4-ov-title');
       if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Match nul'; }
-      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else if (state.winner === window.myPid && !isTable()) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else if (isTable()) { emoji.textContent = '🏆'; title.textContent = Room.name(state.winner) + ' a gagné !'; }
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
       setHTML('p4-ov-scores', scoresHTML(state));
       ov.classList.add('active');
@@ -362,6 +376,7 @@
       });
       function clearHover() { board.querySelectorAll('.colhover').forEach(function (x) { x.classList.remove('colhover'); }); }
       board.addEventListener('mouseover', function (e) {
+        if (window.matchMedia && matchMedia('(hover: none)').matches) return; // tactile : pas de survol (la colonne restait allumée)
         var cell = e.target.closest('.p4-cell');
         clearHover();
         var st = window.room || {};
