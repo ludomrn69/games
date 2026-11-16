@@ -357,7 +357,8 @@
       var seatBtn = document.querySelector('.off-seat.active');
       faceToFace = !!(seatBtn && seatBtn.dataset.seat === 'face' && tableHumans === 2);
       var rows = readNameRows();
-      saveTable({ n: tableHumans, face: faceToFace, players: rows.concat((loadTable().players || []).slice(rows.length)) });
+      var fixedN = document.getElementById('off-humans'); fixedN = !!(fixedN && fixedN.dataset && fixedN.dataset.fixed);
+      saveTable({ n: fixedN ? (loadTable().n || 0) : tableHumans, face: faceToFace, players: rows.concat((loadTable().players || []).slice(rows.length)) });
     }
     var d = document.querySelector('.off-diff.active');
     offlineDifficulty = (d && d.dataset.diff) || 'normal';
@@ -449,7 +450,7 @@
     try {
       localStorage.setItem(resumeKey(), JSON.stringify({
         v: 1, ts: Date.now(), room: room,
-        totalPlayers: totalPlayers, offlineDifficulty: offlineDifficulty
+        totalPlayers: totalPlayers, offlineDifficulty: offlineDifficulty, extraOpts: offlineExtraOpts
       }));
     } catch (e) {}
   }
@@ -487,6 +488,7 @@
     var order = (room.order && room.order.length) ? room.order : Object.keys(room.players || {});
     totalPlayers = saved.totalPlayers || order.length;
     offlineDifficulty = saved.offlineDifficulty || room.difficulty || 'normal';
+    offlineExtraOpts = saved.extraOpts || {};
     players = order.map(function (pid) {
       var p = (room.players || {})[pid] || {};
       return { pid: pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat, isBot: !!p.isBot };

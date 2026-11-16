@@ -16,7 +16,8 @@ body {
   background: var(--cream);
   color: var(--ink);
   font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
+  /* pas de min-height ici : .app (marge de 52px sous la nav) porte déjà la hauteur,
+     sinon chaque page défile de 52px pour rien. */
   -webkit-font-smoothing: antialiased;
 }
 

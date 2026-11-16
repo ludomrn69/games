@@ -52,9 +52,9 @@ la synchro temps réel.
 | 🎴 Skyjo | 2–8 | ✈️ | cartes |
 | 🧩 Blokus | 2–4 | ✈️ | placement |
 | 🚢 Bataille navale | 2 | ✈️ | déduction |
-| 🕵️ Codenames | 4–8 |  | mots / équipes |
+| 🕵️ Codenames | 4–8 | ✈️ | mots / équipes |
 | ⭕ Morpion | 2 | ✈️ | réflexion |
-| 🕵️‍♂️ Undercover | 3–12 |  | déduction sociale |
+| 🕵️‍♂️ Undercover | 3–12 | ✈️ | déduction sociale |
 | 🤵 Président | 3–8 | ✈️ | cartes |
 | 🐴 Petits chevaux | 2–4 | ✈️ | plateau / dés |
 | 💰 Le juste prix | 2–8 | ✈️ | déduction |

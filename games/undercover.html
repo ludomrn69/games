@@ -67,6 +67,35 @@
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
     @media (min-width: 760px) { .uc-wrap,.uc-players{max-width:660px;margin-inline:auto} }
+
+    /* ══ MODE TABLE (?mode=local) : on se passe la tablette pour lire son mot ══ */
+    .uc-thead { text-align: center; margin: 6px 0 16px; }
+    .uc-thead .who { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2rem; color: var(--ink); }
+    .uc-thead .step { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-light); margin-bottom: 4px; }
+    .uc-thead .hint { color: var(--ink-light); margin-top: 4px; }
+    .uc-table .uc-wrap { max-width: 760px; }
+    .uc-table .uc-card { -webkit-tap-highlight-color: transparent; max-width: 520px; padding: 44px 28px; border: 2px dashed var(--gold-light); }
+    .uc-table .uc-card.shown { border-style: solid; border-color: var(--terracotta); }
+    .uc-table .uc-card .word { font-size: clamp(2.2rem, 6vw, 3.4rem); min-height: 3.6rem; }
+    .uc-table .uc-card.mrwhite .word { font-size: 1.7rem; }
+    .uc-table .uc-card .tap-hint { font-size: 1.2rem; }
+    .uc-table .uc-info { font-family: 'DM Sans', sans-serif; font-size: 1rem; line-height: 1.6; background: var(--white); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow); }
+    .uc-table .uc-info b { color: var(--ink); }
+    .uc-table .uc-info .ord { display: block; font-weight: 800; color: var(--terracotta); font-size: 1.08rem; margin: 4px 0; }
+    .uc-table .uc-players { max-width: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    .uc-table .uc-prow { padding: 14px 16px; font-size: 1.08rem; }
+    .uc-table .uc-prow.votable { border-color: var(--gold-light); }
+    .uc-table .uc-pav { width: 42px; height: 42px; font-size: 1.35rem; }
+    .uc-table .uc-elim-banner { font-size: 1.1rem; padding: 14px 16px; border: 2px solid var(--terracotta); }
+    .uc-table .uc-guess-form { max-width: 480px; }
+    .uc-tbtn { display: block; margin: 4px auto 0; border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink); border-radius: 30px; padding: 0.65rem 1.4rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .uc-peek { position: fixed; inset: 0; z-index: 8500; background: rgba(20,16,28,0.96); display: none; align-items: center; justify-content: center; padding: 24px; }
+    .uc-peek.active { display: flex; }
+    .uc-peek-card { background: var(--white); border-radius: 22px; padding: 28px 24px; text-align: center; max-width: 440px; width: 100%; box-shadow: var(--shadow-hover); }
+    .uc-peek-card h3 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.4rem; margin-bottom: 12px; }
+    .uc-peek-card .w { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2.6rem; color: var(--terracotta); margin: 10px 0 18px; }
+    .uc-peek-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .uc-peek-list button { border: 1.5px solid var(--gold-light); background: var(--cream); color: var(--ink); border-radius: 12px; padding: 0.7rem 0.4rem; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -88,11 +117,13 @@
       </div>
       <div class="uc-wrap">
         <div id="uc-elim-banner" class="uc-elim-banner" style="display:none"></div>
+        <div id="uc-thead" class="uc-thead" style="display:none"></div>
         <div id="uc-card" class="uc-card" style="display:none" onclick="toggleWord()">
           <div class="lbl">Ton mot secret</div>
           <div class="word hidden-w" id="uc-word">• • • •</div>
           <div class="tap-hint" id="uc-tap-hint">Touche pour révéler / cacher</div>
         </div>
+        <button class="btn-primary" id="uc-next-btn" style="display:none" onclick="tableNext()">Cacher et passer au suivant</button>
         <div class="uc-info" id="uc-info"></div>
         <div class="uc-players" id="uc-players"></div>
         <div id="uc-guess-area" style="display:none">
@@ -103,6 +134,7 @@
           </div>
         </div>
         <button class="btn-primary" id="uc-vote-btn" style="display:none" onclick="startVote()">Lancer le vote</button>
+        <button class="uc-tbtn" id="uc-peek-btn" style="display:none" onclick="peekGo('pick')">👀 J'ai oublié mon mot</button>
       </div>
     </div>
 
@@ -118,7 +150,18 @@
     </div>
   </div>
 
+  <!-- ══ Mode table : revoir son mot en secret ══ -->
+  <div class="uc-peek" id="uc-peek"></div>
+
   <!-- ══ MODALS ══ -->
+  <div class="modal" id="modal-elim">
+    <div class="modal-card">
+      <div class="modal-title" id="elim-title">Éliminer ?</div>
+      <div class="modal-sub">Son rôle sera révélé à tout le monde.</div>
+      <div class="modal-btns"><button class="btn-link" onclick="closeModal('modal-elim')">Annuler</button>
+        <button class="btn-primary" id="elim-ok" style="width:auto;padding:0.7rem 1.4rem" onclick="confirmEliminate()">Éliminer</button></div>
+    </div>
+  </div>
   <div class="modal" id="modal-restart">
     <div class="modal-card">
       <div class="modal-title">Nouvelle partie ?</div>
@@ -133,7 +176,7 @@
       <div class="modal-body">
         <p>Presque tout le monde reçoit le <b>même mot</b> (les civils). Mais 1 ou 2 <b>undercover</b> reçoivent un mot <b>légèrement différent</b> — sans le savoir.</p>
         <p style="margin-top:8px">À tour de rôle, chacun dit <b>un seul mot</b> pour décrire le sien, sans se faire repérer. Puis tout le monde <b>vote</b> pour éliminer un suspect.</p>
-        <p style="margin-top:8px">Les civils gagnent s'ils éliminent tous les undercover. Les undercover gagnent s'il en reste autant que de civils.</p>
+        <p style="margin-top:8px">Les civils gagnent s'ils éliminent tous les imposteurs. Les imposteurs gagnent s'il ne reste plus qu'<b>un seul civil</b>. En cas d'égalité au vote, on revote.</p>
         <p style="margin-top:8px">Option <b>Mr. White</b> : il n'a aucun mot et bluffe ; éliminé, il peut gagner s'il devine le mot des civils.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
@@ -152,8 +195,39 @@
       ['Bière', 'Vin'], ['Bateau', 'Sous-marin'], ['Montre', 'Bracelet'], ['Pull', 'Manteau'], ['Tigre', 'Lion'],
       ['Sandwich', 'Burger'], ['Piano', 'Orgue'], ['Pluie', 'Brouillard'], ['Pirate', 'Corsaire'], ['Ski', 'Surf'],
       ['Abeille', 'Guêpe'], ['Crayon', 'Stylo'], ['Pomme', 'Poire'], ['Train', 'Bus'], ['Sorcier', 'Magicien'],
-      ['Riz', 'Pâtes'], ['Canard', 'Oie'], ['Lac', 'Étang'], ['Tente', 'Caravane'], ['Comédie', 'Théâtre']
+      ['Riz', 'Pâtes'], ['Canard', 'Oie'], ['Lac', 'Étang'], ['Tente', 'Caravane'], ['Comédie', 'Théâtre'],
+      ['Football', 'Rugby'], ['Tennis', 'Ping-pong'], ['Piscine', 'Baignoire'], ['Douche', 'Bain'], ['Lit', 'Canapé'],
+      ['Chaise', 'Tabouret'], ['Fourchette', 'Cuillère'], ['Assiette', 'Bol'], ['Verre', 'Tasse'], ['Four', 'Micro-ondes'],
+      ['Frigo', 'Congélateur'], ['Beurre', 'Margarine'], ['Fromage', 'Yaourt'], ['Chocolat', 'Caramel'], ['Bonbon', 'Chewing-gum'],
+      ['Gâteau', 'Biscuit'], ['Croissant', 'Pain au chocolat'], ['Baguette', 'Brioche'], ['Frites', 'Chips'], ['Ketchup', 'Mayonnaise'],
+      ['Sel', 'Sucre'], ['Miel', 'Confiture'], ['Banane', 'Ananas'], ['Carotte', 'Radis'], ['Tomate', 'Poivron'],
+      ['Jus', 'Soda'], ['Lait', 'Crème'], ['Champagne', 'Cidre'], ['Cinéma', 'Télévision'], ['Radio', 'Podcast'],
+      ['Livre', 'Magazine'], ['Lettre', 'E-mail'], ['Téléphone', 'Tablette'], ['Clavier', 'Manette'], ['Photo', 'Tableau'],
+      ['Chanteur', 'Rappeur'], ['Danse', 'Gymnastique'], ['Tambour', 'Batterie'], ['Trompette', 'Saxophone'], ['Clown', 'Mime'],
+      ['Policier', 'Gendarme'], ['Pompier', 'Ambulancier'], ['Professeur', 'Directeur'], ['Boulanger', 'Pâtissier'], ['Coiffeur', 'Barbier'],
+      ['Dentiste', 'Vétérinaire'], ['Pilote', 'Astronaute'], ['Cheval', 'Âne'], ['Vache', 'Chèvre'], ['Poule', 'Dinde'],
+      ['Lapin', 'Lièvre'], ['Souris', 'Hamster'], ['Requin', 'Dauphin'], ['Crocodile', 'Lézard'], ['Grenouille', 'Crapaud'],
+      ['Papillon', 'Libellule'], ['Moustique', 'Mouche'], ['Aigle', 'Hibou'], ['Pingouin', 'Manchot'], ['Rose', 'Tulipe'],
+      ['Sapin', 'Chêne'], ['Montagne', 'Colline'], ['Rivière', 'Ruisseau'], ['Île', 'Presqu\'île'], ['Volcan', 'Geyser'],
+      ['Orage', 'Tempête'], ['Étoile', 'Planète'], ['Printemps', 'Automne'], ['Noël', 'Nouvel An'], ['Anniversaire', 'Mariage'],
+      ['Voiture', 'Camion'], ['Taxi', 'Ambulance'], ['Trottinette', 'Skateboard'], ['Hélicoptère', 'Drone'], ['Voilier', 'Paquebot'],
+      ['École', 'Collège'], ['Hôpital', 'Pharmacie'], ['Hôtel', 'Camping'], ['Musée', 'Bibliothèque'], ['Supermarché', 'Marché'],
+      ['Restaurant', 'Cantine'], ['Église', 'Cathédrale'], ['Pont', 'Tunnel'], ['Ascenseur', 'Escalier'], ['Porte', 'Fenêtre'],
+      ['Chapeau', 'Casquette'], ['Écharpe', 'Cravate'], ['Chaussure', 'Chausson'], ['Gant', 'Moufle'], ['Sac', 'Valise'],
+      ['Lunettes', 'Jumelles'], ['Parapluie', 'Parasol'], ['Bougie', 'Lampe'], ['Marteau', 'Tournevis'], ['Balai', 'Aspirateur'],
+      ['Vampire', 'Zombie'], ['Fantôme', 'Squelette'], ['Dragon', 'Dinosaure'], ['Princesse', 'Fée'], ['Chevalier', 'Samouraï'],
+      ['Épée', 'Poignard'], ['Trésor', 'Butin'], ['Rêve', 'Cauchemar'], ['Rire', 'Sourire'], ['Colère', 'Jalousie']
     ];
+    // Paire tirée au hasard, en évitant celles déjà jouées récemment sur cet appareil.
+    function pickPair() {
+      var recent = [];
+      try { recent = JSON.parse(localStorage.getItem('games.undercover.recent')) || []; } catch (e) {}
+      var pool = []; for (var i = 0; i < PAIRS.length; i++) if (recent.indexOf(PAIRS[i][0]) < 0) pool.push(PAIRS[i]);
+      if (!pool.length) pool = PAIRS;
+      var pair = pool[Math.floor(Math.random() * pool.length)];
+      try { localStorage.setItem('games.undercover.recent', JSON.stringify(recent.concat([pair[0]]).slice(-Math.floor(PAIRS.length * 0.7)))); } catch (e) {}
+      return pair;
+    }
 
     var ROLE_LABEL = { civil: 'Civil', undercover: 'Undercover', mrwhite: 'Mr. White' };
     var prevPhase = null, wordShown = false;
@@ -180,7 +254,22 @@
       ],
       lobbyExtraHTML: lobbyExtraHTML,
       onState: onState,
-      onStart: onStart
+      onStart: onStart,
+      // Mode table : chacun lit son mot à tour de rôle (écran « passe l'appareil » entre
+      // deux), puis discussion et vote se font à voix haute, la tablette posée au milieu.
+      offline: { local: true, localNoBots: true },
+      offlineTurn: function (room) {
+        if (room.phase !== 'word') return null;
+        var o = room.order || [];
+        for (var i = 0; i < o.length; i++) if (room.players[o[i]] && !room.players[o[i]].seen) return o[i];
+        return null;
+      },
+      offlineEnter: function () { wordShown = false; seenOnce = false; },
+      offlineExtraSetup: function () {
+        return '<div class="off-set"><div class="off-set-label">Mr. White — sans mot, il bluffe (dès 5 joueurs)</div>' +
+          '<div class="off-set-row" data-opt="useMrWhite"><button type="button" class="off-opt active" data-val="0">Sans</button>' +
+          '<button type="button" class="off-opt" data-val="1">Avec</button></div></div>';
+      }
     });
 
     function lobbyExtraHTML(room) {
@@ -194,10 +283,12 @@
     function onStart(players, cur) {
       var n = players.length;
       var nUnder = n >= 7 ? 2 : 1;
+      // Mode table : après « Reprendre la partie », le moteur a oublié le réglage → on le garde nous-mêmes.
+      if (cur && cur.table && cur.useMrWhite == null && keepMrWhite != null) cur.useMrWhite = keepMrWhite;
       var nMrWhite = (cur && cur.useMrWhite && n >= 5) ? 1 : 0;
       // sécurité : garder au moins 2 civils
       while (nUnder + nMrWhite > n - 2) { if (nMrWhite > 0) nMrWhite--; else nUnder = Math.max(1, nUnder - 1); }
-      var pair = PAIRS[Math.floor(Math.random() * PAIRS.length)];
+      var pair = pickPair();
       var civilFirst = Math.random() < 0.5;
       var civilWord = civilFirst ? pair[0] : pair[1];
       var underWord = civilFirst ? pair[1] : pair[0];
@@ -219,6 +310,7 @@
         cur.players[p.pid].word = (r === 'undercover') ? underWord : (r === 'mrwhite') ? '' : civilWord;
         cur.players[p.pid].alive = true;
         cur.players[p.pid].vote = null;
+        cur.players[p.pid].seen = null;
       });
 
       return {
@@ -243,8 +335,25 @@
     function onlineAlive(state) { return alivePids(state).filter(function (p) { return state.players[p].online; }); }
 
     /* ━━ Rendu ━━ */
+    function paintCard(me) {
+      var card = document.getElementById('uc-card');
+      card.style.display = 'block';
+      card.classList.toggle('mrwhite', me.role === 'mrwhite');
+      card.classList.toggle('shown', !!wordShown);
+      var wordEl = document.getElementById('uc-word');
+      if (me.role === 'mrwhite') {
+        wordEl.classList.remove('hidden-w');
+        wordEl.textContent = wordShown ? 'Tu es Mr. White 🤫 (aucun mot, bluffe !)' : '• • • •';
+        if (!wordShown) wordEl.classList.add('hidden-w');
+      } else {
+        if (wordShown) { wordEl.classList.remove('hidden-w'); wordEl.textContent = me.word || '?'; }
+        else { wordEl.classList.add('hidden-w'); wordEl.textContent = '• • • •'; }
+      }
+    }
+
     function render(state) {
       setText('uc-round', 'Manche ' + (state.round || 1));
+      if (state.table) { renderTable(state); return; }
       var me = (state.players && state.players[window.myPid]) || {};
       var iAmAlive = !!me.alive;
 
@@ -256,18 +365,7 @@
       } else banner.style.display = 'none';
 
       // carte mot
-      var card = document.getElementById('uc-card');
-      card.style.display = 'block';
-      card.classList.toggle('mrwhite', me.role === 'mrwhite');
-      var wordEl = document.getElementById('uc-word');
-      if (me.role === 'mrwhite') {
-        wordEl.classList.remove('hidden-w');
-        wordEl.textContent = wordShown ? 'Tu es Mr. White 🤫 (aucun mot, bluffe !)' : '• • • •';
-        if (!wordShown) wordEl.classList.add('hidden-w');
-      } else {
-        if (wordShown) { wordEl.classList.remove('hidden-w'); wordEl.textContent = me.word || '?'; }
-        else { wordEl.classList.add('hidden-w'); wordEl.textContent = '• • • •'; }
-      }
+      paintCard(me);
 
       // zone guess (Mr White)
       var guessArea = document.getElementById('uc-guess-area');
@@ -293,6 +391,7 @@
         var oa = onlineAlive(state);
         var voted = oa.filter(function (p) { return state.players[p].vote; });
         info.innerHTML = iAmAlive ? 'Touche le nom de la personne à éliminer.' : 'Tu es éliminé·e — tu observes.';
+        if (state.tie && state.tie.length) info.innerHTML = '⚖️ Égalité entre ' + state.tie.map(function (p) { return escapeHtml(Room.name(p)); }).join(' et ') + ' — on revote !<br>' + info.innerHTML;
         info.innerHTML += '<br><span style="font-size:0.9em">' + voted.length + '/' + oa.length + ' ont voté</span>';
       } else if (state.phase === 'guess') {
         info.innerHTML = '';
@@ -304,24 +403,26 @@
     function renderPlayers(state, iAmAlive) {
       var ord = state.order || [];
       var me = state.players[window.myPid] || {};
-      var canVote = (state.phase === 'vote' && iAmAlive);
+      var table = !!state.table;
+      if (table) me = {};
+      var canVote = (state.phase === 'vote' && (iAmAlive || table));
       var cont = document.getElementById('uc-players');
       cont.innerHTML = ord.map(function (pid) {
         var p = state.players[pid] || {};
         var dead = !p.alive;
-        var votable = canVote && !dead && pid !== window.myPid;
+        var votable = canVote && !dead && (table || pid !== window.myPid);
         var votedByMe = me.vote === pid;
         var right = '';
         if (dead && p.role) right = '<span class="uc-prole ' + p.role + '">' + ROLE_LABEL[p.role] + '</span>';
         else if (votedByMe) right = '<span class="uc-pvote">ton vote ✓</span>';
         return '<div class="uc-prow' + (votable ? ' votable' : '') + (votedByMe ? ' voted-by-me' : '') + (dead ? ' dead' : '') + '" ' + (votable ? 'data-pid="' + pid + '"' : '') + '>' +
           '<span class="uc-pav" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="uc-pname">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="uc-pname">' + escapeHtml(Room.name(pid)) + (!table && pid === window.myPid ? ' (toi)' : '') + '</span>' +
           right + '</div>';
       }).join('');
     }
 
-    function toggleWord() { wordShown = !wordShown; if (window.room) render(window.room); }
+    function toggleWord() { wordShown = !wordShown; if (wordShown) seenOnce = true; if (window.room) render(window.room); }
 
     /* ━━ Actions ━━ */
     function startVote() {
@@ -335,6 +436,7 @@
     function castVote(targetPid) {
       var st = window.room || {};
       if (st.phase !== 'vote') return;
+      if (st.table) { askEliminate(targetPid); return; }
       var me = st.players[window.myPid];
       if (!me || !me.alive) return;
       rref().child('players/' + window.myPid + '/vote').set(targetPid);
@@ -354,16 +456,30 @@
           var v = cur.players[p] && cur.players[p].alive && cur.players[p].vote;
           if (v && cur.players[v]) counts[v] = (counts[v] || 0) + 1;
         });
-        var best = null, bestN = -1;
-        order.forEach(function (p) { if ((counts[p] || 0) > bestN) { bestN = counts[p] || 0; best = p; } });
-        // élimination
-        cur.players[best].alive = false;
-        cur.lastEliminated = { pid: best, role: cur.players[best].role };
-        order.forEach(function (p) { if (cur.players[p]) cur.players[p].vote = null; });
-        if (cur.players[best].role === 'mrwhite') { cur.phase = 'guess'; cur.mrWhiteId = best; return cur; }
-        applyWinCheck(cur);
+        var bestN = 0;
+        order.forEach(function (p) { if ((counts[p] || 0) > bestN) bestN = counts[p] || 0; });
+        var top = order.filter(function (p) { return bestN > 0 && (counts[p] || 0) === bestN; });
+        if (!top.length) return cur;
+        // Égalité : on revote une fois ; si l'égalité persiste, le sort désigne parmi les ex æquo.
+        if (top.length > 1 && !(cur.tie && cur.tie.length)) {
+          order.forEach(function (p) { if (cur.players[p]) cur.players[p].vote = null; });
+          cur.tie = top;
+          return cur;
+        }
+        eliminateIn(cur, top[Math.floor(Math.random() * top.length)]);
         return cur;
       });
+    }
+
+    // Élimination d'un joueur (commune au vote en ligne et au mode table).
+    function eliminateIn(cur, best) {
+      var order = cur.order || [];
+      cur.players[best].alive = false;
+      cur.lastEliminated = { pid: best, role: cur.players[best].role };
+      order.forEach(function (p) { if (cur.players[p]) cur.players[p].vote = null; });
+      cur.tie = null;
+      if (cur.players[best].role === 'mrwhite') { cur.phase = 'guess'; cur.mrWhiteId = best; return; }
+      applyWinCheck(cur);
     }
 
     function applyWinCheck(cur) {
@@ -372,7 +488,8 @@
       var imp = alive.filter(function (p) { return cur.players[p].role === 'undercover' || cur.players[p].role === 'mrwhite'; });
       var civ = alive.filter(function (p) { return cur.players[p].role === 'civil'; });
       if (imp.length === 0) { cur.winner = 'civils'; cur.phase = 'ended'; }
-      else if (imp.length >= civ.length) { cur.winner = 'impostors'; cur.phase = 'ended'; }
+      // Règle classique : les imposteurs gagnent quand il ne reste plus qu'un civil.
+      else if (civ.length <= 1) { cur.winner = 'impostors'; cur.phase = 'ended'; }
       else { cur.phase = 'vote'; cur.round = (cur.round || 1) + 1; }
     }
 
@@ -381,13 +498,107 @@
       var guess = input.value;
       if (!guess.trim()) { lbToast('Écris un mot'); return; }
       rref().transaction(function (cur) {
-        if (!cur || cur.status !== 'playing' || cur.phase !== 'guess' || cur.mrWhiteId !== window.myPid) return cur;
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'guess' || (!cur.table && cur.mrWhiteId !== window.myPid)) return cur;
         var correct = normalize(guess) === normalize(cur.civilWord || '');
         cur.mrWhiteGuess = { text: guess, correct: correct };
         if (correct) { cur.winner = 'mrwhite'; cur.phase = 'ended'; }
         else applyWinCheck(cur);
         return cur;
+      }, function (err, ok) { if (ok) input.value = ''; });
+    }
+
+    /* ━━ MODE TABLE ━━ */
+    var seenOnce = false, elimPid = null, peekStep = null, peekPid = null;
+    function show(id, on, disp) { var el = document.getElementById(id); if (el) el.style.display = on ? (disp || 'block') : 'none'; }
+    function renderTable(state) {
+      document.getElementById('s-playing').classList.add('uc-table');
+      var order = state.order || [], info = document.getElementById('uc-info'), head = document.getElementById('uc-thead');
+      show('uc-vote-btn', false);
+      // 1) Chacun lit son mot, à tour de rôle (la tablette passe de main en main).
+      if (state.phase === 'word') {
+        var pid = window.myPid, me = state.players[pid] || {}, k = order.indexOf(pid);
+        show('uc-elim-banner', false); show('uc-guess-area', false); show('uc-peek-btn', false); show('uc-info', false);
+        document.getElementById('uc-players').innerHTML = '';
+        head.style.display = 'block';
+        head.innerHTML = '<div class="step">Mot secret · joueur ' + (k + 1) + '/' + order.length + '</div><div class="who">' + Room.emoji(pid) + ' ' + escapeHtml(Room.name(pid)) + '</div>' +
+          '<div class="hint">Regarde ton mot sans le montrer, puis cache-le.</div>';
+        paintCard(me);
+        setText('uc-tap-hint', wordShown ? 'Touche pour cacher' : 'Touche la carte pour voir ton mot');
+        var next = document.getElementById('uc-next-btn');
+        next.style.display = 'block'; next.disabled = !seenOnce;
+        next.textContent = (k === order.length - 1) ? '✅ Mot caché — on pose la tablette et on joue !' : '✅ Cacher et passer au joueur suivant';
+        return;
+      }
+      // 2) Tablette au milieu : tout ce qui suit est public.
+      wordShown = false;
+      show('uc-thead', false); show('uc-card', false); show('uc-next-btn', false); show('uc-info', true);
+      var banner = document.getElementById('uc-elim-banner');
+      if (state.lastEliminated) {
+        banner.style.display = 'block';
+        banner.innerHTML = '☠️ <b>' + escapeHtml(Room.name(state.lastEliminated.pid)) + '</b> est éliminé·e — c\'était un <b>' + ROLE_LABEL[state.lastEliminated.role] + '</b>';
+      } else banner.style.display = 'none';
+      if (state.phase === 'guess') {
+        show('uc-guess-area', true); show('uc-peek-btn', false); show('uc-info', false);
+        setText('uc-guess-info', '🤫 ' + Room.name(state.mrWhiteId) + ' était Mr. White ! Dernière chance : devine le mot des civils pour gagner quand même 👇');
+        document.getElementById('uc-guess-form').style.display = 'flex';
+      } else {
+        show('uc-guess-area', false); show('uc-peek-btn', true);
+        // Ordre de parole : les vivants, dans l'ordre tiré au départ (on décale d'un cran à chaque manche).
+        var so = (state.speakOrder || order).filter(function (p) { return state.players[p] && state.players[p].alive; });
+        var shift = so.length ? ((state.round || 1) - 1) % so.length : 0;
+        so = so.slice(shift).concat(so.slice(0, shift));
+        info.innerHTML = '🗣️ À tour de rôle, chacun dit <b>un seul mot</b> pour décrire le sien :' +
+          '<span class="ord">' + so.map(function (p) { return escapeHtml(Room.name(p)); }).join(' → ') + '</span>' +
+          '🗳️ Puis votez tous ensemble (3, 2, 1… pointez du doigt !) et <b>touchez ci-dessous le joueur éliminé</b>. En cas d\'égalité, on revote.';
+      }
+      renderPlayers(state, false);
+    }
+    function tableNext() {
+      var pid = window.myPid;
+      if (!seenOnce) return;
+      wordShown = false; seenOnce = false;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.table || cur.phase !== 'word' || !cur.players[pid]) return cur;
+        cur.players[pid].seen = true;
+        var o = cur.order || [];
+        if (o.every(function (p) { return cur.players[p] && cur.players[p].seen; })) cur.phase = 'vote';
+        return cur;
       });
+    }
+    function askEliminate(pid) {
+      elimPid = pid;
+      setText('elim-title', 'Éliminer ' + Room.name(pid) + ' ?');
+      openModal('modal-elim');
+    }
+    function confirmEliminate() {
+      var pid = elimPid; elimPid = null; closeModal('modal-elim');
+      if (!pid) return;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.table || cur.phase !== 'vote' || !cur.players[pid] || !cur.players[pid].alive) return cur;
+        eliminateIn(cur, pid);
+        return cur;
+      });
+    }
+    // « J'ai oublié mon mot » : on choisit son prénom, on prend la tablette, on regarde, on cache.
+    function peekGo(step, pid) {
+      var st = window.room || {}, el = document.getElementById('uc-peek');
+      if (pid) peekPid = pid;
+      peekStep = (step === 'close' || !st.players) ? null : step;
+      if (!peekStep) { el.classList.remove('active'); el.innerHTML = ''; peekPid = null; return; }
+      var html;
+      if (peekStep === 'pick') {
+        html = '<h3>Qui veut revoir son mot ?</h3><div class="uc-peek-list">' + (st.order || []).filter(function (p) { return st.players[p].alive; }).map(function (p) {
+          return '<button data-pid="' + p + '" onclick="peekGo(\'pass\',\'' + p + '\')">' + Room.emoji(p) + ' ' + escapeHtml(Room.name(p)) + '</button>'; }).join('') +
+          '</div><button class="btn-link" onclick="peekGo(\'close\')">Annuler</button>';
+      } else if (peekStep === 'pass') {
+        html = '<h3>Passe la tablette à ' + escapeHtml(Room.name(peekPid)) + '</h3><p style="color:var(--ink-light);margin-bottom:16px">Les autres ne regardent pas !</p>' +
+          '<button class="btn-primary" id="uc-peek-show" onclick="peekGo(\'show\')">👁 Voir mon mot</button><button class="btn-link mt-4" onclick="peekGo(\'close\')">Annuler</button>';
+      } else {
+        var p = st.players[peekPid] || {};
+        html = '<h3>' + escapeHtml(Room.name(peekPid)) + ', ton mot :</h3><div class="w">' + (p.role === 'mrwhite' ? 'Mr. White 🤫<div style="font-size:1rem;color:var(--ink-light)">aucun mot, bluffe !</div>' : escapeHtml(p.word || '?')) + '</div>' +
+          '<button class="btn-primary" id="uc-peek-hide" onclick="peekGo(\'close\')">🙈 Cacher</button>';
+      }
+      el.innerHTML = '<div class="uc-peek-card">' + html + '</div>'; el.classList.add('active');
     }
 
     /* ━━ Résultats ━━ */
@@ -397,7 +608,8 @@
       var me = state.players[window.myPid] || {};
       var myTeam = (me.role === 'undercover' || me.role === 'mrwhite') ? (me.role === 'mrwhite' ? 'mrwhite' : 'impostors') : 'civils';
       var iWon = (win === 'civils' && myTeam === 'civils') || (win === 'impostors' && myTeam === 'impostors') || (win === 'mrwhite' && me.role === 'mrwhite');
-      setText('res-emoji', iWon ? '🏆' : '🙈');
+      setText('res-emoji', state.table ? (win === 'civils' ? '🏆' : win === 'mrwhite' ? '🤫' : '🕵️‍♂️') : (iWon ? '🏆' : '🙈'));
+      peekGo('close');
       var title = win === 'civils' ? 'Les civils gagnent !' : win === 'mrwhite' ? 'Mr. White gagne !' : 'Les undercover gagnent !';
       setText('res-title', title);
       var sub = 'Mot des civils : « ' + (state.civilWord || '?') + ' » · mot undercover : « ' + (state.underWord || '?') + ' »';
@@ -412,8 +624,9 @@
       }).join('');
     }
 
-    function handleReplay() { wordShown = false; Lobby.resetToLobby([]); }
-    function doRestart() { closeModal('modal-restart'); wordShown = false; Lobby.resetToLobby([]); }
+    var keepMrWhite = null;
+    function handleReplay() { wordShown = false; keepMrWhite = (window.room || {}).useMrWhite; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); handleReplay(); }
 
     /* ━━ Clics ━━ */
     document.getElementById('uc-players').addEventListener('click', function (e) {
