@@ -87,8 +87,10 @@
     return out;
   }
   // Nœuds atteignables en 1..die pas (BFS). Les pièces sont terminales.
-  function reachable(s, pid, die) {
-    var start = s.pos[pid], occ = occupiedCorr(s, pid);
+  function reachable(s, pid, die) { return bfs(s, s.pos[pid], occupiedCorr(s, pid), die); }
+  // Distances (en pas) depuis `start` vers tous les nœuds à ≤ die pas. Une pièce
+  // atteinte arrête le déplacement (on ne la traverse pas).
+  function bfs(s, start, occ, die) {
     var dist = {}; dist[start] = 0; var q = [start], res = {};
     while (q.length) {
       var cur = q.shift(), d = dist[cur];
@@ -203,7 +205,7 @@
   function solved(m) { var e = normMem(m).env; return !!(e.suspect && e.arme && e.piece); }
 
   // ── Déroulé du tour ─────────────────────────────────────────────────────────
-  function log(s, msg) { s.log = s.log || []; s.log.push(msg); if (s.log.length > 14) s.log = s.log.slice(s.log.length - 14); }
+  function log(s, msg) { s.log = s.log || []; s.log.push(msg); if (s.log.length > 40) s.log = s.log.slice(s.log.length - 40); }
   var NAMEFN = null; function nm(pid) { return NAMEFN ? NAMEFN(pid) : pid; }
 
   function actor(s) {
@@ -214,7 +216,10 @@
 
   function roll(s, rnd) {
     if (s.phase !== 'roll') return;
-    s.dice = 1 + Math.floor((rnd ? rnd() : Math.random()) * 6);
+    // DEUX dés (comme le vrai jeu) : avec un seul, traverser le manoir prenait 3-4
+    // tours de couloir sans rien faire. s.dice = total ; s.dicePair = les deux faces.
+    var d1 = 1 + Math.floor((rnd ? rnd() : Math.random()) * 6), d2 = 1 + Math.floor((rnd ? rnd() : Math.random()) * 6);
+    s.dicePair = [d1, d2]; s.dice = d1 + d2;
     s.reach = reachable(s, s.turn, s.dice);
     s.phase = 'move';
   }
@@ -228,7 +233,8 @@
     return true;
   }
   function useSecret(s) {
-    if (s.phase !== 'move' && s.phase !== 'action' && s.phase !== 'roll') return false;
+    // Le passage secret REMPLACE le déplacement aux dés (pas « dés + passage »).
+    if (s.phase !== 'move' && s.phase !== 'roll') return false;
     var n = s.pos[s.turn]; if (!isRoomNode(n)) return false;
     var dest = SECRET[roomIdx(n)]; if (dest == null) return false;
     s.pos[s.turn] = 'R' + dest; s.reach = null;
@@ -292,11 +298,23 @@
     finishDisprove(s, pid, card);
     return true;
   }
-  function botDisproveChoice(s) {
+  function botDisproveChoice(s, level) {
     var sg = s.suggestion; var pid = sg.responders[sg.idx];
     var has = sg.cards.filter(function (c) { return (s.hands[pid] || []).indexOf(c) >= 0; });
-    // montrer de préférence une carte déjà montrée à ce suggérant (minimise l'info) — sinon une au hasard
-    return has[0];
+    if (has.length < 2 || level === 'easy') return has[0];
+    // Montrer de préférence une carte DÉJÀ montrée à ce suggérant (il n'apprend rien),
+    // sinon une carte déjà montrée à quelqu'un d'autre, sinon la pièce (9 pièces : c'est
+    // l'information la moins précieuse).
+    var sh = (s.mem && s.mem[pid] && s.mem[pid].shown) || {};
+    var best = has[0], bs = -1;
+    has.forEach(function (c) {
+      var sc = 0;
+      if (sh[sg.by + '|' + c]) sc += 100;
+      s.order.forEach(function (q) { if (q !== sg.by && sh[q + '|' + c]) sc += 10; });
+      if (catOf(c) === 'piece') sc += 1;
+      if (sc > bs) { bs = sc; best = c; }
+    });
+    return best;
   }
   function finishDisprove(s, pid, card) {
     var sg = s.suggestion;
@@ -304,6 +322,14 @@
     if (pid) log(s, nm(pid) + ' réfute (montre une carte à ' + nm(sg.by) + ')');
     else log(s, 'Personne n’a pu réfuter !');
     recordEvent(s, { by: sg.by, cards: sg.cards.slice(), disprover: pid, shown: card, passers: sg.passers || [], responders: sg.responders.slice() });
+    // Historique PUBLIC des suggestions (sans la carte montrée) : sert au carnet de
+    // chaque joueur, y compris ceux qui n'avaient pas l'écran sous les yeux (mode table).
+    s.evN = (s.evN || 0) + 1;
+    s.history = s.history || [];
+    s.history.push({ n: s.evN, by: sg.by, c: sg.cards.slice(), d: pid || null, p: (sg.passers || []).slice() });
+    if (s.history.length > 60) s.history = s.history.slice(s.history.length - 60);
+    // Le réfutant retient ce qu'il a déjà montré, et à qui (pour re-montrer la même).
+    if (pid && s.mem && s.mem[pid]) { var mm = normMem(s.mem[pid]); mm.shown = mm.shown || {}; mm.shown[sg.by + '|' + card] = true; }
     s.phase = 'postsuggest';
   }
 
@@ -343,22 +369,69 @@
   // et dès que l'enveloppe est connue on FONCE au centre accuser. Niveau « facile » =
   // suggestions au hasard (déduit plus lentement).
   function man(a, dr, dc) { var p = a.split(','); return Math.abs(+p[0] - dr) + Math.abs(+p[1] - dc); }
-  function chooseTargetRoom(m) {
-    if (m.env.piece) return ROOMS.indexOf(m.env.piece);
-    for (var i = 0; i < 9; i++) if (!m.holds[ROOMS[i]] && m.env.piece !== ROOMS[i]) return i;
-    return 0;
+  // Pièces où il est UTILE de suggérer : tant que la pièce du crime est inconnue,
+  // celles que personne ne détient à notre connaissance ; ensuite la pièce du crime
+  // ou une des nôtres (personne ne pourra réfuter avec la carte « pièce » → on isole
+  // le suspect et l'arme).
+  function usefulRooms(m) {
+    var out = [], i;
+    if (m.env.piece) {
+      out.push(ROOMS.indexOf(m.env.piece));
+      for (i = 0; i < 9; i++) if (m.holds[ROOMS[i]] === m.self) out.push(i);
+    } else {
+      for (i = 0; i < 9; i++) if (!m.holds[ROOMS[i]]) out.push(i);
+    }
+    if (!out.length) out.push(0);
+    return out;
   }
-  function pickTest(cards, m, lvl) {
-    var rem = cards.filter(function (c) { return !m.holds[c]; });
-    if (!rem.length) rem = cards.slice();
-    if (lvl === 'easy') return rem[Math.floor(Math.random() * rem.length)];
-    return rem[0];
+  // La pièce utile LA PLUS PROCHE (vraies distances de couloir, passages secrets compris).
+  function chooseTargetRoom(m, s, pid) {
+    var cand = usefulRooms(m);
+    if (!s) return cand[0];
+    var here = s.pos[pid], d = bfs(s, here, {}, 99), best = cand[0], bd = 1e9;
+    var sec = isRoomNode(here) ? SECRET[roomIdx(here)] : null;
+    cand.forEach(function (k) {
+      var dk = d['R' + k]; if (dk == null) dk = 500;
+      if (sec === k) dk = Math.min(dk, 1);
+      if (dk < bd) { bd = dk; best = k; }
+    });
+    return best;
   }
-  function closestTowardRoom(reach, targetIdx) {
+  function rndOf(a) { return a[Math.floor(Math.random() * a.length)]; }
+  // Choix du suspect et de l'arme d'une suggestion. Une suggestion est PUBLIQUE :
+  // nommer la carte qu'on croit coupable renseigne toute la table. Donc :
+  //  • catégorie encore inconnue → une carte non localisée AU HASARD ;
+  //  • « moyen/difficile » : on glisse volontiers une de SES cartes dans l'autre
+  //    catégorie (personne ne peut la montrer → la réponse porte sur ce qu'on teste,
+  //    et les autres n'apprennent rien) ;
+  //  • catégorie résolue → une de SES cartes (sinon la carte coupable) : personne ne
+  //    peut la montrer, la réponse porte donc sur ce qu'il reste à trouver.
+  function pickPair(m, lvl) {
+    function unk(cards) { var r = cards.filter(function (c) { return !m.holds[c]; }); return r.length ? r : cards.slice(); }
+    // « facile » : pose une fois sur deux une question au hasard, même sur une carte déjà vue.
+    if (lvl === 'easy') return Math.random() < 0.7 ? [rndOf(SUSPECTS), rndOf(WEAPONS)] : [rndOf(unk(SUSPECTS)), rndOf(unk(WEAPONS))];
+    function mine(cards) { return cards.filter(function (c) { return m.holds[c] === m.self; }); }
+    function one(cards, cat, cover) {
+      var own = mine(cards);
+      if (m.env[cat]) {
+        // (jamais une carte d'un adversaire : il la montrerait et on n'apprendrait rien)
+        return own.length ? rndOf(own) : m.env[cat];
+      }
+      if (cover && own.length) return rndOf(own);
+      return rndOf(unk(cards));
+    }
+    // Quand les deux catégories restent à trouver, on en teste une « à découvert »
+    // et on couvre l'autre avec une de ses cartes (une fois sur deux).
+    var both = !m.env.suspect && !m.env.arme, focus = Math.random() < 0.5, cover = both && Math.random() < 0.5;
+    return [one(SUSPECTS, 'suspect', cover && !focus), one(WEAPONS, 'arme', cover && focus)];
+  }
+  function closestTowardRoom(reach, targetIdx, s) {
+    // Vraie distance de marche jusqu'à la pièce visée (les murs comptent), pas un vol d'oiseau.
+    var dT = s ? bfs(s, 'R' + targetIdx, {}, 99) : null;
     var doors = doorLanes(targetIdx), best = null, bd = 1e9;
     Object.keys(reach).forEach(function (n) {
       if (isRoomNode(n)) return;
-      var d = Math.min.apply(null, doors.map(function (dl) { return man(n, dl[0], dl[1]); }));
+      var d = (dT && dT[n] != null) ? dT[n] : Math.min.apply(null, doors.map(function (dl) { return man(n, dl[0], dl[1]); }));
       if (d < bd) { bd = d; best = n; }
     });
     return best;
@@ -374,11 +447,16 @@
   }
   // Joue UN pas du bot pour le joueur courant. level : 'easy' | 'normal' | 'hard'.
   function botStep(s, level) {
-    if (s.phase === 'disprove') { disprove(s, botDisproveChoice(s)); return; }
+    if (s.phase === 'disprove') { disprove(s, botDisproveChoice(s, level)); return; }
     var pid = s.turn, m = normMem(s.mem[pid]);
     var solv = solved(m), inPool = isPoolNode(s.pos[pid]);
     if (s.phase === 'roll') {
       if (solv && inPool) { accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
+      // Passage secret : si la pièce d'en face est utile et que celle-ci ne l'est pas.
+      if (!solv && level !== 'easy' && isRoomNode(s.pos[pid])) {
+        var hereK = roomIdx(s.pos[pid]), secK = SECRET[hereK], use = usefulRooms(m);
+        if (secK != null && use.indexOf(hereK) < 0 && use.indexOf(secK) >= 0) { useSecret(s); return; }
+      }
       roll(s); return;
     }
     if (s.phase === 'move') {
@@ -391,15 +469,17 @@
         stay(s); return;
       }
       var node = s.pos[pid];
+      // « facile » : flâne une fois sur deux (case atteignable au hasard).
+      if (level === 'easy' && Math.random() < 0.5) { var any = Object.keys(s.reach || {}); if (any.length) { moveTo(s, rndOf(any)); return; } }
       if (isRoomNode(node)) {
-        var rn = ROOMS[roomIdx(node)];
-        if ((!m.env.piece && !m.holds[rn]) || m.env.piece === rn) { stay(s); return; }
+        if (usefulRooms(m).indexOf(roomIdx(node)) >= 0) { stay(s); return; }
       }
-      var reach = s.reach || {}, target = chooseTargetRoom(m);
+      var reach = s.reach || {}, target = chooseTargetRoom(m, level === 'easy' ? null : s, pid);
       if (reach['R' + target] != null) { moveTo(s, 'R' + target); return; }
-      var useful = Object.keys(reach).filter(function (n) { return isRoomNode(n) && !m.holds[ROOMS[roomIdx(n)]]; });
+      var okRooms = usefulRooms(m);
+      var useful = Object.keys(reach).filter(function (n) { return isRoomNode(n) && okRooms.indexOf(roomIdx(n)) >= 0; });
       if (useful.length) { moveTo(s, useful[0]); return; }
-      var cell = closestTowardRoom(reach, target);
+      var cell = closestTowardRoom(reach, target, level === 'easy' ? null : s);
       if (cell) { moveTo(s, cell); return; }
       var corr = Object.keys(reach).filter(function (n) { return !isRoomNode(n); });
       if (corr.length) { moveTo(s, corr[Math.floor(Math.random() * corr.length)]); return; }
@@ -407,7 +487,7 @@
     }
     if (s.phase === 'action') {
       if (solv && inPool) { accuse(s, m.env.suspect, m.env.arme, m.env.piece); return; }
-      if (isRoomNode(s.pos[pid])) { suggest(s, pickTest(SUSPECTS, m, level), pickTest(WEAPONS, m, level)); return; }
+      if (isRoomNode(s.pos[pid])) { var pr = pickPair(m, level); suggest(s, pr[0], pr[1]); return; }
       endTurn(s); return;
     }
     if (s.phase === 'postsuggest') {
@@ -423,7 +503,7 @@
     isCorr: isCorr, doorLanes: doorLanes, roomCells: roomCells, roomOfCell: roomOfCell,
     isPoolCell: isPoolCell, isPoolNode: isPoolNode, poolCells: poolCells,
     GRID_W: GRID_W, GRID_H: GRID_H, ROOM_RECT: ROOM_RECT, CELLAR: CELLAR, DOORS: DOORS, ADJOIN: ADJOIN,
-    isRoomNode: isRoomNode, roomIdx: roomIdx, reachable: reachable, neighbors: neighbors,
+    isRoomNode: isRoomNode, roomIdx: roomIdx, reachable: reachable, bfs: bfs, neighbors: neighbors,
     initGame: initGame, roll: roll, moveTo: moveTo, useSecret: useSecret, stay: stay,
     suggest: suggest, disprove: disprove, botDisproveChoice: botDisproveChoice, accuse: accuse,
     endTurn: endTurn, actor: actor, alivePlayers: alivePlayers,
