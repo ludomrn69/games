@@ -206,7 +206,7 @@
         'Quand tu ne peux plus jouer, passe',
         'Le moins de cases restantes gagne'
       ],
-      offline: { solo: true, local: true },
+      offline: { solo: true, local: true, open: true },
       bot: blokusBot,
       offlineTurn: function (r) { return (r.status === 'playing') ? ownerOf(r, r.turn) : null; },
       offlineEnter: function () { clearSelection(); if (window.room) renderPlaying(window.room); },

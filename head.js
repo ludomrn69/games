@@ -35,6 +35,12 @@
   // iOS ignore les icônes du manifest : l'« Ajouter à l'écran d'accueil » a besoin
   // d'un apple-touch-icon en PNG (sinon icône blanche). Voir icons/.
   add('link', { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' });
+  // « Ajouter à l'écran d'accueil » (iPad/iPhone) : le site s'ouvre alors en PLEIN ÉCRAN,
+  // sans barre d'adresse — comme une vraie appli de jeux de plateau.
+  add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
+  add('meta', { name: 'mobile-web-app-capable', content: 'yes' });
+  add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'default' });
+  add('meta', { name: 'apple-mobile-web-app-title', content: 'Les jeux' });
   add('link', { rel: 'stylesheet', href: '/fonts.css' });
   add('link', { rel: 'stylesheet', href: '/theme.css' });
   add('link', { rel: 'stylesheet', href: '/game.css' });
