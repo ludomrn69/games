@@ -85,6 +85,36 @@
     .sn-set-btn { flex: 1; padding: 0.55rem 0; border: 1.5px solid var(--gold-light); border-radius: 12px; background: var(--white); color: var(--ink); font-family: 'DM Sans', sans-serif; font-weight: 700; cursor: pointer; }
     .sn-set-btn.active { background: linear-gradient(135deg, var(--terracotta), var(--gold)); color: #fff; border-color: transparent; }
     @media (min-width: 760px) { .sn-hand,.sn-opps{max-width:900px;margin-inline:auto} }
+
+    /* ━━ Mode table (un iPad au milieu) : tout en plus grand, pose pas à pas ━━ */
+    .sn-act { display: flex; justify-content: center; min-height: 0; padding: 0 12px; }
+    .sn-act:empty { display: none; }
+    .sn-act-btn { border: none; border-radius: 30px; padding: 0.7rem 1.8rem; font: 800 1.05rem 'DM Sans', sans-serif; color: #fff; background: linear-gradient(135deg, var(--terracotta), var(--gold)); box-shadow: var(--shadow); cursor: pointer; margin: 2px 0 6px; }
+    .sn-act-btn.ghost { background: var(--white); color: var(--ink-light); border: 1.5px solid var(--gold-light); font-weight: 700; font-size: 0.9rem; padding: 0.45rem 1.2rem; }
+    .sn-play-name { font-size: 0.72rem; font-weight: 700; color: var(--ink); max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ncard.just { outline: 3px solid var(--gold); animation: snJust .45s ease-out; }
+    @keyframes snJust { from { transform: translateY(-14px) scale(1.15); opacity: .3; } to { transform: none; opacity: 1; } }
+    .sn-table .sn-banner { font-size: 1.45rem; min-height: 34px; }
+    .sn-table .sn-plays { max-width: 900px; gap: 10px; }
+    .sn-table .sn-play .ncard { width: 46px; height: 60px; font-size: 1.15rem; }
+    .sn-table .sn-play { gap: 4px; }
+    .sn-table .sn-opp { font-size: 0.92rem; padding: 5px 13px 5px 6px; }
+    .sn-table .sn-opp-av { width: 28px; height: 28px; font-size: 1rem; }
+    @media (min-width: 760px) {
+      .sn-table .sn-rows { max-width: 760px; width: min(84vw, 760px); gap: 8px; }
+      .sn-table .sn-row { padding: 7px 12px; gap: 8px; }
+      .sn-table .sn-row-cards { gap: 6px; }
+      .sn-table .sn-row .ncard { min-width: 54px; height: 70px; font-size: 1.35rem; border-radius: 9px; }
+      .sn-table .sn-row .ncard .bh svg { width: 11px; height: 10px; }
+      .sn-table .sn-row-heads { font-size: 0.95rem; min-width: 52px; text-align: right; }
+      .sn-table .sn-hand .ncard { min-width: 62px; height: 84px; font-size: 1.5rem; }
+      .sn-table .sn-hand { gap: 8px; padding-bottom: 22px; }
+      .sn-table .sn-my-label { font-size: 1.25rem; }
+    }
+    @media (min-width: 760px) and (max-height: 860px) {
+      .sn-table .sn-row .ncard { height: 60px; min-width: 50px; }
+      .sn-table .sn-rows { padding: 8px 10px; gap: 6px; }
+    }
   </style>
 </head>
 <body>
@@ -108,9 +138,10 @@
       <div class="sn-info" id="sn-info"></div>
       <div class="sn-opps" id="sn-opps"></div>
       <div class="sn-banner" id="sn-banner"></div>
+      <div class="sn-act" id="sn-act"></div>
       <div class="sn-plays" id="sn-plays"></div>
       <div class="sn-rows felt felt-green" id="sn-rows"></div>
-      <div class="sn-my-label">Tes cartes <span id="sn-my-count"></span></div>
+      <div class="sn-my-label" id="sn-my-label"><span id="sn-my-who">Tes cartes</span> <span id="sn-my-count"></span></div>
       <div class="sn-hand" id="sn-hand"></div>
     </div>
 
@@ -176,10 +207,10 @@
         'La 6ᵉ carte d\'une rangée → tu ramasses les 5 (leurs têtes)',
         'On enchaîne les donnes : le plus petit total gagne'
       ],
-      offline: { solo: true },
+      offline: { solo: true, local: true },
       bot: sixBot,
       offlineTurn: offlineTurn,
-      offlineEnter: function () { if (window.room) render(window.room); },
+      offlineEnter: function () { picked = null; if (window.room) render(window.room); },
       lobbyExtraHTML: lobbyExtraHTML,
       onState: onState,
       onStart: onStart
@@ -190,9 +221,18 @@
     //  • sélection → un ordi qui n'a pas encore choisi (les humains cliquent).
     function offlineTurn(r) {
       if (!r || r.status === 'ended') return null;
-      if (r.phase === 'chooseRow') return r.pendingLow;
+      // Mode table : la rangée à ramasser se choisit à la vue de tous (aucune info
+      // secrète) → pas d'écran « passe l'appareil » pour un humain, seulement les ordis.
+      if (r.phase === 'chooseRow') return (r.table && !isBotP(r, r.pendingLow)) ? null : r.pendingLow;
       if (r.phase === 'select') {
         var picks = r.picks || {};
+        // Mode table : chaque humain choisit en secret, à tour de rôle, puis les ordis.
+        if (r.table) {
+          for (var h = 0; h < (r.order || []).length; h++) {
+            var hp = r.order[h];
+            if (!(hp in picks) && !isBotP(r, hp) && handOf(r, hp).length) return hp;
+          }
+        }
         for (var i = 0; i < (r.order || []).length; i++) {
           var p = r.order[i];
           if (!(p in picks) && r.players[p] && r.players[p].isBot) return p;
@@ -200,6 +240,8 @@
       }
       return null;
     }
+
+    function isBotP(r, pid) { return !!(r && r.players && r.players[pid] && r.players[pid].isBot); }
 
     function lobbyExtraHTML(room) {
       var sel = (room && room.target) || 66;
@@ -261,7 +303,50 @@
       // résolution (utile quand on doit choisir une rangée à ramasser).
       cur.lastPlays = q.map(function (x) { return { pid: x.pid, val: x.val }; });
       cur.picks = {}; cur.resolveQueue = q; cur.phase = 'resolve';
+      // Mode table : on s'arrête sur la RÉVÉLATION, puis les cartes sont posées une à
+      // une (stepResolve, minuterie côté rendu) pour que toute la tablée suive.
+      if (cur.table) { cur.phase = 'reveal'; cur.lastMove = null; cur.banner = 'Cartes révélées ! On les pose de la plus petite à la plus grande…'; return; }
       processResolve(cur);
+    }
+
+    /* ━━ Mode table : résolution pas à pas, visible de tous ━━ */
+    var stepT = null;
+    function tableAfterMove(cur, pid, val, gained, tookRow) {
+      var q = cur.resolveQueue || [];
+      cur.lastMove = { pid: pid, val: val, took: gained || 0 };
+      cur.banner = Room.name(pid) + ' pose le ' + val +
+        (tookRow ? ' et ramasse une rangée : +' + gained + ' 🐮' : (gained ? ' : 6ᵉ carte → ramasse ' + gained + ' 🐮 !' : ''));
+      cur.pendingLow = null;
+      if (q.length) { cur.phase = 'resolve'; cur.resolveQueue = q; }
+      else { cur.phase = 'placed'; cur.resolveQueue = null; }
+    }
+    function stepResolve() {
+      clearTimeout(stepT); stepT = null;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.table) return;
+        if (cur.phase !== 'reveal' && cur.phase !== 'resolve') return;
+        var q = cur.resolveQueue || [];
+        if (!q.length) { cur.phase = 'placed'; cur.resolveQueue = null; return cur; }
+        var item = q[0], before = cur.players[item.pid].heads || 0;
+        var res = placeCard(cur, item.pid, item.val);
+        if (res && res.low) {
+          cur.phase = 'chooseRow'; cur.pendingLow = item.pid; cur.resolveQueue = q;
+          cur.banner = Room.name(item.pid) + ' : le ' + item.val + ' est trop bas → touche la rangée à ramasser';
+          return cur;
+        }
+        q.shift();
+        tableAfterMove(cur, item.pid, item.val, (cur.players[item.pid].heads || 0) - before, false);
+        return cur;
+      });
+    }
+    // Fin de la pose : la tablée a vu le résultat, on passe au tour (ou à la donne) suivant.
+    function nextRound() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'placed') return;
+        cur.lastMove = null;
+        finishRound(cur);
+        return cur;
+      });
     }
 
     // Place une carte ; renvoie {low:true} si elle est plus basse que toutes les rangées.
@@ -298,7 +383,11 @@
       var order = cur.order || [];
       order.forEach(function (p) { cur.players[p].penalty = (cur.players[p].penalty || 0) + (cur.players[p].heads || 0); });
       var max = -1; order.forEach(function (p) { max = Math.max(max, cur.players[p].penalty || 0); });
-      if (max >= (cur.target || 66)) { cur.status = 'ended'; cur.phase = 'over'; return; }
+      if (max >= (cur.target || 66)) {
+        // Vainqueur = le plus petit total (sert aussi au son de fin et aux stats).
+        var best = order[0]; order.forEach(function (p) { if ((cur.players[p].penalty || 0) < (cur.players[best].penalty || 0)) best = p; });
+        cur.status = 'ended'; cur.phase = 'over'; cur.winner = best; return;
+      }
       cur.deal = (cur.deal || 1) + 1;
       dealRound(order, cur);
       cur.banner = 'Donne ' + cur.deal + ' — choisissez une carte';
@@ -308,11 +397,16 @@
     function chooseRow(rowIdx) {
       if (window.Fx) { Fx.sfx('error'); Fx.vib([15, 25, 30]); }
       rref().transaction(function (cur) {
-        if (!cur || cur.phase !== 'chooseRow' || cur.pendingLow !== window.myPid) return cur;
+        if (!cur || cur.phase !== 'chooseRow') return cur;
+        // Mode table : un humain choisit sa rangée directement sur l'écran commun.
+        var tableHuman = cur.table && !isBotP(cur, cur.pendingLow);
+        if (cur.pendingLow !== window.myPid && !tableHuman) return cur;
         var q = cur.resolveQueue, item = q[0];
-        cur.players[item.pid].heads = (cur.players[item.pid].heads || 0) + sumHeads(cur.rows[rowIdx]);
+        var gain = sumHeads(cur.rows[rowIdx]);
+        cur.players[item.pid].heads = (cur.players[item.pid].heads || 0) + gain;
         cur.rows[rowIdx] = [item.val];
         q.shift();
+        if (cur.table) { tableAfterMove(cur, item.pid, item.val, gain, true); return cur; }
         cur.phase = 'resolve'; cur.pendingLow = null;
         processResolve(cur);
         return cur;
@@ -326,6 +420,8 @@
       if (state.phase === 'chooseRow' && state.pendingLow === pid) {
         return chooseRow(window.SixNimmtAI.chooseRow(state.rows)); // rangée la moins chère
       }
+      // Mode table : tous les ordis choisissent d'un coup (une seule attente).
+      if (state.table && state.phase === 'select') return pickAllBots();
       if (state.phase === 'select' && !(state.picks && pid in state.picks)) {
         var hand = handOf(state, pid); if (!hand.length) return;
         var val = (window.Bots && window.Bots.shouldBlunder(state))
@@ -333,6 +429,21 @@
           : window.SixNimmtAI.chooseCard(state.rows, hand);
         return pickFor(pid, val);
       }
+    }
+    function pickAllBots() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'select') return;
+        cur.picks = cur.picks || {};
+        (cur.order || []).forEach(function (p) {
+          if (!isBotP(cur, p) || (p in cur.picks)) return;
+          var hand = handOf(cur, p); if (!hand.length) return;
+          cur.picks[p] = (window.Bots && window.Bots.shouldBlunder(cur))
+            ? hand[Math.floor(Math.random() * hand.length)]
+            : window.SixNimmtAI.chooseCard(cur.rows, hand);
+        });
+        maybeResolve(cur);
+        return cur;
+      });
     }
     // Sélection d'un ordi (identité pid).
     function pickFor(pid, val) {
@@ -358,6 +469,14 @@
     }
     function render(state) {
       var order = state.order || [], me = window.myPid;
+      var table = !!state.table;
+      // Mode table : la main n'est visible que pendant le choix secret du joueur actif.
+      var tablePublic = table && state.phase !== 'select';
+      document.getElementById('s-playing').classList.toggle('sn-table', table);
+      clearTimeout(stepT); stepT = null;
+      if (table && state.status === 'playing' && (state.phase === 'reveal' || state.phase === 'resolve')) {
+        stepT = setTimeout(stepResolve, state.phase === 'reveal' ? 1700 : 1150);
+      }
       setHTML('sn-info', 'Donne ' + (state.deal || 1) + ' · seuil ' + (state.target || 66) + ' têtes · manche : tête de bœuf = pénalité');
 
       // Moi + adversaires : on affiche AUSSI mon propre total de têtes (avant, on ne
@@ -369,12 +488,22 @@
         var rh = headsOf(state, pid);
         return '<div class="sn-opp' + (isMe ? ' sn-opp-me' : '') + (hasPicked ? ' picked' : '') + '">' +
           '<span class="sn-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          (isMe ? 'Toi' : escapeHtml(Room.name(pid))) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
+          ((isMe && !table) ? 'Toi' : escapeHtml(Room.name(pid))) + ' <span class="pen">' + penOf(state, pid) + '</span>' +
           (rh > 0 ? ' <span class="sn-row-heads">+' + rh + '🐮</span>' : '') +
           (state.phase === 'select' ? (hasPicked ? ' <span class="ok">✅</span>' : ' <span title="Doit encore choisir sa carte">⏳</span>') : '') + '</div>';
       }
-      setHTML('sn-opps', chip(me, true) + order.filter(function (p) { return p !== me; }).map(function (pid) { return chip(pid, false); }).join(''));
+      if (table) setHTML('sn-opps', order.map(function (pid) { return chip(pid, !tablePublic && pid === me); }).join(''));
+      else setHTML('sn-opps', chip(me, true) + order.filter(function (p) { return p !== me; }).map(function (pid) { return chip(pid, false); }).join(''));
       setText('sn-banner', state.banner || '');
+      // Mode table : bouton d'action commun (accélérer la pose / tour suivant).
+      var act = '';
+      if (table && (state.phase === 'reveal' || state.phase === 'resolve')) act = '<button class="sn-act-btn ghost" onclick="stepResolve()">⏩ Poser la suivante</button>';
+      else if (table && state.phase === 'placed') {
+        var left = order.some(function (p) { return handOf(state, p).length > 0; });
+        var over = !left && order.some(function (p) { return penOf(state, p) + headsOf(state, p) >= (state.target || 66); });
+        act = '<button class="sn-act-btn" onclick="nextRound()">' + (left ? 'Tour suivant ▶' : (over ? '🏁 Voir le classement' : 'Donne suivante ▶')) + '</button>';
+      }
+      setHTML('sn-act', act);
 
       // Cartes révélées de la manche : on montre ce que CHACUN a joué pendant la
       // résolution, pour choisir sa rangée en connaissance de cause. Déjà posées =
@@ -382,7 +511,7 @@
       var plays = state.lastPlays || [], queue = state.resolveQueue || [];
       var pendingVal = queue.length ? queue[0].val : null, remainingVals = {};
       queue.forEach(function (x) { remainingVals[x.val] = true; });
-      var resolving = (state.phase === 'resolve' || state.phase === 'chooseRow');
+      var resolving = (state.phase === 'resolve' || state.phase === 'chooseRow' || state.phase === 'reveal' || state.phase === 'placed');
       // On garde les cartes du tour visibles PENDANT la résolution ET après (au début
       // de la sélection suivante) → on voit ce que tout le monde a joué, pas juste un
       // flash. Un intitulé rappelle si c'est le tour en cours ou le précédent.
@@ -391,7 +520,8 @@
         ? '<div class="sn-plays-label">' + (resolving ? 'Cartes révélées' : 'Tour précédent') + '</div>' +
           plays.map(function (pl) {
             return '<div class="sn-play' + (resolving && !remainingVals[pl.val] ? ' done' : '') + (pl.val === pendingVal ? ' now' : '') + (!resolving ? ' done' : '') + '">' +
-              '<span class="sn-play-av" style="background:' + Room.color(pl.pid) + '">' + Room.emoji(pl.pid) + '</span>' + ncard(pl.val) + '</div>';
+              '<span class="sn-play-av" style="background:' + Room.color(pl.pid) + '">' + Room.emoji(pl.pid) + '</span>' +
+              (table ? '<span class="sn-play-name">' + escapeHtml(Room.name(pl.pid)) + '</span>' : '') + ncard(pl.val) + '</div>';
           }).join('')
         : '');
 
@@ -399,9 +529,10 @@
       var rowsSig = JSON.stringify(state.rows || []);
       if (window._snRowsSig !== undefined && window._snRowsSig !== rowsSig && window.Fx) Fx.sfx('place');
       window._snRowsSig = rowsSig;
-      var chooseMine = (state.phase === 'chooseRow' && state.pendingLow === me);
+      var chooseMine = (state.phase === 'chooseRow' && (state.pendingLow === me || (table && !isBotP(state, state.pendingLow))));
+      var justVal = (table && state.lastMove && state.phase !== 'select') ? state.lastMove.val : null;
       setHTML('sn-rows', (state.rows || []).map(function (row, ri) {
-        var slots = row.map(function (v, k) { return ncard(v, (k === 4 ? ' slot6' : '')); }).join('');
+        var slots = row.map(function (v, k) { return ncard(v, (k === 4 ? ' slot6' : '') + (v === justVal ? ' just' : '')); }).join('');
         return '<div class="sn-row' + (chooseMine ? ' pickable' : '') + '"' + (chooseMine ? ' onclick="chooseRow(' + ri + ')"' : '') + '>' +
           '<div class="sn-row-cards">' + slots + '</div><span class="sn-row-heads">' + sumHeads(row) + ' 🐮</span></div>';
       }).join(''));
@@ -410,6 +541,11 @@
       var myHand = handOf(state, me);
       var iPicked = state.picks && (me in state.picks);
       var canPick = (state.phase === 'select') && !iPicked && !state.winner;
+      var lab = document.getElementById('sn-my-label');
+      lab.style.display = tablePublic ? 'none' : '';
+      document.getElementById('sn-hand').style.display = tablePublic ? 'none' : '';
+      setText('sn-my-who', table ? 'Cartes de ' + Room.name(me) : 'Tes cartes');
+      if (tablePublic) myHand = [];
       setText('sn-my-count', '(' + myHand.length + ')' + (canPick ? ' — choisis une carte' : (iPicked ? ' — en attente…' : (chooseMine ? ' — prends une rangée ↑' : ''))));
       setHTML('sn-hand', myHand.map(function (v) {
         var chosen = iPicked && state.picks[me] === v;
@@ -456,8 +592,9 @@
       showScreen('s-results');
       var order = (state.order || []).slice().sort(function (a, b) { return penOf(state, a) - penOf(state, b); });
       var winner = order[0];
-      setText('res-emoji', winner === window.myPid ? '🏆' : '🐮');
-      setText('res-title', winner === window.myPid ? 'Gagné ! (moins de têtes)' : Room.name(winner) + ' gagne');
+      var mine = winner === window.myPid && !state.table;
+      setText('res-emoji', (mine || state.table) ? '🏆' : '🐮');
+      setText('res-title', mine ? 'Gagné ! (moins de têtes)' : Room.name(winner) + ' gagne');
       setHTML('res-rank', order.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +

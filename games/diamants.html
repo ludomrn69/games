@@ -93,6 +93,24 @@
 
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
     @media (min-width: 760px) { .dm-explorers,.dm-choices,.dm-mypanel,.dm-head{max-width:820px;margin-inline:auto} }
+    /* ━━ Mode table : révélation des choix lisible de toute la tablée ━━ */
+    .dm-exp.active { box-shadow: 0 0 0 2px var(--gold), var(--shadow); }
+    .dm-exp.rv-leave { background: #e6f1e4; box-shadow: 0 0 0 2px var(--sage); color: #2C2520; }
+    .dm-exp.rv-stay { background: #fbe9d6; box-shadow: 0 0 0 2px var(--terracotta); color: #2C2520; }
+    .dm-exp.rv-leave .st, .dm-exp.rv-stay .st { font-weight: 800; color: #2C2520; opacity: 1; }
+    @media (min-width: 760px) {
+      .dm-table .dm-exp { font-size: 1rem; padding: 7px 14px 7px 7px; }
+      .dm-table .dm-path { max-width: 880px; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px 8px; }
+      .dm-table .dm-card { width: 78px; height: 108px; border-radius: 12px; }
+      .dm-table .dm-card .big { font-size: 2.1rem; }
+      .dm-table .dm-card .val { font-size: 1.5rem; }
+      .dm-table .dm-card .lbl { font-size: 0.6rem; }
+      .dm-table .dm-banner { font-size: 1.6rem; }
+      .dm-table .dm-choice { font-size: 1.15rem; padding: 1.2rem 0.8rem; }
+      .dm-table .dm-choice small { font-size: 0.82rem; }
+      .dm-table .dm-mypanel { max-width: 620px; }
+      .dm-table .dm-onhand { font-size: 1.1rem; }
+    }
   </style>
 </head>
 <body>
@@ -195,7 +213,7 @@
         'En sortant, tu ramasses le sol et sécurises ton butin',
         'Le plus riche à la fin gagne (3 ou 5 expéditions, au choix)'
       ],
-      offline: { solo: true },
+      offline: { solo: true, local: true },
       bot: diamBot,
       offlineTurn: offlineTurn,
       offlineEnter: function () { if (window.room) render(window.room); },
@@ -224,6 +242,16 @@
     function offlineTurn(r) {
       if (!r || r.status !== 'playing') return null;
       var order = r.order || [];
+      function isB(p) { return !!(r.players[p] && r.players[p].isBot); }
+      // Mode table : chaque humain encore dans la mine décide en secret, à tour de
+      // rôle (écran « passe l'appareil »), puis les ordis ; la révélation et la fin
+      // d'expédition se valident d'un seul bouton commun (personne n'est « actif »).
+      if (r.table) {
+        if (r.phase !== 'decide') return null;
+        var und = order.filter(function (p) { return r.inCave && r.inCave[p] && !(r.decisions && (p in r.decisions)); });
+        var hum = und.filter(function (p) { return !isB(p); });
+        return hum[0] || und[0] || null;
+      }
       if (r.phase === 'roundEnd') {
         for (var i = 0; i < order.length; i++) { var p = order[i]; if (r.players[p] && r.players[p].isBot && !r.players[p].nextReady) return p; }
         return null;
@@ -346,11 +374,39 @@
         if (!cur.inCave || !cur.inCave[me]) return cur;
         if (cur.decisions && (me in cur.decisions)) return cur;
         cur.decisions = cur.decisions || {}; cur.decisions[me] = choice;
+        // Mode table : à plusieurs dans la mine, on s'arrête sur la RÉVÉLATION des
+        // choix (visible de tous) avant de retourner la carte suivante.
+        var inC = pidsIn(cur);
+        if (cur.table && inC.length > 1) {
+          if (inC.every(function (p) { return p in cur.decisions; })) { cur.phase = 'reveal'; cur.banner = 'Tout le monde a choisi !'; }
+          return cur;
+        }
         resolveDecisions(cur);
         return cur;
       });
     }
-    function setNextReady() { rref().child('players/' + window.myPid + '/nextReady').set(true); }
+    // Mode table : après la révélation des choix, on applique et on retourne la carte.
+    function tableContinue() {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal') return;
+        cur.phase = 'decide';
+        resolveDecisions(cur);
+        return cur;
+      });
+    }
+    function setNextReady() {
+      // Mode table : un seul bouton pour toute la tablée → expédition suivante.
+      if (window.room && window.room.table) {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'playing' || cur.phase !== 'roundEnd') return;
+          cur.round = (cur.round || 1) + 1;
+          startRound(cur);
+          return cur;
+        });
+        return;
+      }
+      rref().child('players/' + window.myPid + '/nextReady').set(true);
+    }
 
     function maybeAdvance(state) {
       var order = state.order || [];
@@ -447,6 +503,8 @@
     }
     function render(state) {
       var order = state.order || [], me = window.myPid, banked = state.banked || {};
+      var table = !!state.table, reveal = table && state.phase === 'reveal';
+      document.getElementById('s-playing').classList.toggle('dm-table', table);
       setText('dm-round-label', 'Expédition ' + (state.round || 1) + '/' + roundsOf(state));
       setHTML('dm-scores', order.map(function (pid) {
         return '<span class="dm-sc-chip"><span class="dm-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + (banked[pid] || 0) + '</span>';
@@ -455,7 +513,8 @@
 
       var path = state.path || [];
       // Serpentin : rangée paire → gauche→droite, rangée impaire → droite→gauche.
-      var COLS = window.matchMedia && window.matchMedia('(min-width: 760px)').matches ? 5 : 4;
+      var wide = window.matchMedia && window.matchMedia('(min-width: 760px)').matches;
+      var COLS = wide ? (state.table ? 8 : 5) : 4; // mode table sur tablette : galerie large, cartes plus grandes
       var pot = state.pot || 0;
       var entrance = '<div class="dm-entrance">⛺ Entrée de la mine' +
         (pot > 0 ? ' · au sol <span class="dm-floor">' + '💎'.repeat(Math.min(pot, 8)) + (pot > 8 ? '…' : '') + '</span> ' + pot : '') + '</div>';
@@ -494,9 +553,10 @@
         var decided = state.decisions && (pid in state.decisions);
         var gems = (state.roundGems || {})[pid] || 0;
         var st = inCave ? (decided ? 'décidé' : '⛏️ dans la mine') : '🏕️ sorti·e';
-        return '<div class="dm-exp' + (inCave ? '' : ' out') + (inCave && decided ? ' decided' : '') + '">' +
+        if (reveal && inCave) st = state.decisions[pid] === 'leave' ? '🏕️ SORT' : '⛏️ CONTINUE';
+        return '<div class="dm-exp' + (inCave ? '' : ' out') + (inCave && decided ? ' decided' : '') + (reveal && inCave ? ' rv-' + state.decisions[pid] : '') + (table && state.phase === 'decide' && pid === me && inCave && !decided ? ' active' : '') + '">' +
           '<span class="dm-exp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') +
+          escapeHtml(Room.name(pid)) + (pid === me && !table ? ' (toi)' : '') +
           (inCave ? ' <span class="gem">' + gems + '💎</span>' : '') + ' <span class="st">' + st + '</span></div>';
       }).join(''));
 
@@ -505,7 +565,22 @@
       var iIn = state.inCave && state.inCave[me];
       var iDecided = state.decisions && (me in state.decisions);
       var myGems = (state.roundGems || {})[me] || 0;
+      if (reveal) {
+        var lv = pidsIn(state).filter(function (p) { return state.decisions[p] === 'leave'; });
+        host.innerHTML = '<div class="dm-onhand">' + (lv.length ? (lv.length === 1 ? '<b>' + escapeHtml(Room.name(lv[0])) + '</b> rentre au camp' + (state.relics && state.relics.length ? ' (seul·e → relique 🏺 !)' : '') : '<b>' + lv.length + '</b> explorateurs rentrent au camp et se partagent le sol') : 'Personne ne rentre : tout le monde s\'enfonce dans la mine…') + '</div>' +
+          '<div class="dm-choices"><button class="dm-choice stay" onclick="tableContinue()">' + (lv.length === pidsIn(state).length ? '🏕️ Fin de l\'expédition' : '🃏 Retourner la carte suivante') + '<small>posez l\'iPad au milieu, tout le monde regarde</small></button></div>';
+        return;
+      }
       if (state.phase !== 'decide') { host.innerHTML = ''; return; }
+      if (table && iIn && !iDecided) {
+        host.innerHTML = '<div class="dm-onhand"><b>' + escapeHtml(Room.name(me)) + '</b>, ton choix secret — dans ta besace : <b>' + myGems + ' 💎</b></div>' +
+          '<div class="dm-choices">' +
+            '<button class="dm-choice leave" onclick="decide(\'leave\')">🏕️ Sortir<small>sécurise ' + myGems + '💎 + le sol partagé</small></button>' +
+            '<button class="dm-choice stay" onclick="decide(\'stay\')">⛏️ Continuer<small>plus de trésors… mais du danger</small></button>' +
+          '</div>';
+        return;
+      }
+      if (table) { host.innerHTML = '<div class="dm-wait">Les ordis réfléchissent…</div>'; return; }
       if (!iIn) { host.innerHTML = '<div class="dm-wait">🏕️ Tu es sorti·e — butin en sécurité. On regarde les autres…</div>'; return; }
       if (iDecided) { host.innerHTML = '<div class="dm-wait">Choix enregistré — en attente des autres explorateurs…</div>'; return; }
       var n = Math.max(1, nIn(state));
@@ -528,6 +603,7 @@
         return '<span class="dm-sc-chip"><span class="dm-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' ' + (banked[pid] || 0) + '</span>';
       }).join(''));
       var meReady = state.players && state.players[window.myPid] && state.players[window.myPid].nextReady;
+      if (state.table) meReady = false;
       var btn = document.getElementById('dm-next-btn'); btn.disabled = !!meReady; btn.textContent = meReady ? 'En attente…' : 'Expédition suivante →';
       var online = order.filter(function (p) { return state.players[p] && state.players[p].online; });
       var ready = online.filter(function (p) { return state.players[p].nextReady; });
@@ -541,14 +617,14 @@
       order.sort(function (a, b) { return (banked[b] || 0) - (banked[a] || 0); });
       var top = banked[order[0]] || 0;
       var winners = order.filter(function (p) { return (banked[p] || 0) === top; });
-      var iWon = winners.indexOf(window.myPid) >= 0;
+      var iWon = winners.indexOf(window.myPid) >= 0 && !state.table;
       setText('res-emoji', winners.length > 1 ? '🤝' : (iWon ? '🏆' : '💎'));
       setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu es le plus riche ! 🏆' : Room.name(order[0]) + ' gagne !'));
       var medals = ['🥇', '🥈', '🥉'];
       setHTML('res-rank', order.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid && !state.table ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-score">' + (banked[pid] || 0) + ' 💎</span></div>';
       }).join(''));
     }

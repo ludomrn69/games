@@ -55,6 +55,26 @@
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
     @media (min-width: 760px) { .db-arena{max-width:720px;margin-inline:auto} }
+
+    /* ━━ Mode table : l'iPad au milieu, une carte par joueur tournée vers SON bord ━━ */
+    #s-playing.dbt-on { height: calc(100vh - 52px); height: calc(100dvh - 52px); min-height: 0; overflow: hidden; }
+    #s-playing.dbt-on .db-head { position: static; flex: none; }
+    #s-playing.dbt-on .db-arena, #s-playing.dbt-on .db-status { display: none !important; }
+    .dbt { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; background: radial-gradient(ellipse at center, #6b4a7a 0%, #46305a 70%, #382649 100%); }
+    .dbt-zone { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: space-between; transition: opacity .2s; }
+    .dbt .db-card { width: var(--d); height: var(--d); font-size: calc(var(--d) * 0.15); border-width: 4px; }
+    .dbt .db-emoji-btn { font-size: 1em; width: 1.65em; height: 1.65em; padding: 0; touch-action: none; }
+    .dbt-center { position: absolute; }
+    .dbt-center .db-card { border-color: var(--terracotta); box-shadow: 0 0 0 6px rgba(255,255,255,0.14), 0 10px 34px rgba(0,0,0,0.35); }
+    .dbt-name { display: flex; align-items: center; gap: 7px; background: rgba(255,255,255,0.94); color: #2C2520; border-radius: 30px; padding: 3px 14px 3px 4px; font: 800 1rem 'DM Sans', sans-serif; height: 34px; box-shadow: 0 2px 10px rgba(0,0,0,0.25); white-space: nowrap; }
+    .dbt-name .av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; }
+    .dbt-name .sc { color: var(--terracotta); font-weight: 900; font-size: 1.1rem; }
+    .dbt-zone.frozen .db-card { opacity: 0.35; filter: grayscale(1); }
+    .dbt-zone.frozen .dbt-name { background: #f6d6cf; }
+    .dbt-zone.winner .db-card { box-shadow: 0 0 0 8px var(--gold), 0 0 34px 10px rgba(255,214,120,0.75); }
+    .dbt-zone.loser { opacity: 0.45; }
+    .dbt .db-emoji-btn.hit { background: rgba(255,214,120,0.9); box-shadow: 0 0 0 4px var(--gold); z-index: 2; }
+    .dbt .db-emoji-btn.miss { background: rgba(207,67,53,0.3); }
   </style>
 </head>
 <body>
@@ -85,6 +105,7 @@
         </div>
         <div class="db-scoreboard" id="db-scoreboard"></div>
       </div>
+      <div class="dbt" id="db-table" style="display:none"></div>
       <div class="db-status" id="db-status">Trouve l'emoji commun entre ta carte et celle du paquet !</div>
     </div>
 
@@ -151,6 +172,7 @@
 
     /* ━━ State ━━ */
     var prevStatus = null, roundLocked = false, advanceTimer = null;
+    var TABLE = window.OFFLINE_MODE === 'local';
     function rref() { return window.roomRef; }
 
     /* ━━ Enregistrement du salon ━━ */
@@ -160,13 +182,17 @@
       emoji: '✨',
       tagline: 'Le plus rapide rafle',
       minPlayers: 2,
-      maxPlayers: 8,
+      maxPlayers: TABLE ? 4 : 8,   // mode table : un bord d'écran par joueur → 4 au plus
       rules: [
         'Chacun a sa carte, une carte est au centre (le paquet)',
         'Entre deux cartes, il y a toujours 1 emoji en commun',
         'Tape l\'emoji commun pour rafler la carte du paquet',
         'Tout le monde joue en même temps · le plus de cartes gagne'
       ],
+      // Mode table : tout le monde joue EN MÊME TEMPS sur le même écran (multi-touch),
+      // personne n'est « actif » → pas d'écran de passe ni de bandeau de tour.
+      offline: { local: true, open: true },
+      offlineTurn: function () { return null; },
       onState: onState,
       onStart: onStart,
       beforeJoin: function () { roundLocked = false; }
@@ -191,7 +217,7 @@
       if (status !== 'playing' && advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
       if (status === 'playing') {
         if (prevStatus !== 'playing') { roundLocked = false; showOverlay(false); showScreen('s-playing'); }
-        renderPlaying(state);
+        if (TABLE) tableRender(state); else renderPlaying(state);
       } else if (status === 'finished') {
         showOverlay(false);
         showResults(state);
@@ -327,21 +353,134 @@
       ord.sort(function (a, b) { return (scores[b] || 0) - (scores[a] || 0); });
       var top = scores[ord[0]] || 0;
       var winners = ord.filter(function (p) { return (scores[p] || 0) === top; });
-      var iWon = winners.indexOf(window.myPid) >= 0;
+      var iWon = winners.indexOf(window.myPid) >= 0 && !TABLE;
       setText('res-emoji', winners.length > 1 ? '🤝' : '🏆');
       setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !'));
       var medals = ['🥇', '🥈', '🥉'];
       document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid && !TABLE ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-score">' + (scores[pid] || 0) + '</span></div>';
       }).join('');
     }
 
+    /* ━━ Mode table (2 à 4 joueurs autour de l'iPad, multi-touch) ━━
+       Carte commune au centre ; chaque joueur a SA carte près de SON bord, tournée
+       vers lui. Premier à toucher sur sa carte le symbole commun → +1 et il prend la
+       carte du centre. Erreur → sa carte est gelée un court instant. */
+    var FREEZE_MS = 1500, WIN_MS = 1100;
+    var tblFrozen = {}, tblSig = null;
+    // Places autour de la table, dans l'ordre des joueurs (sens horaire depuis le bas).
+    function tableSeats(n, land) {
+      if (n === 2) return land ? ['L', 'R'] : ['B', 'T'];   // duel : le long du grand côté
+      return ['B', 'L', 'T', 'R'].slice(0, n);
+    }
+    function tableBuild(state) {
+      var host = document.getElementById('db-table'), order = state.order || [], n = order.length;
+      var W = host.clientWidth, H = host.clientHeight, land = W >= H;
+      var lab = 44, long = Math.max(W, H), short = Math.min(W, H);
+      var d = (n === 2) ? Math.min((long - 2 * lab - 60) / 3, short * 0.8, 420) : Math.min((short - 2 * lab - 40) / 3, 320);
+      d = Math.max(120, Math.floor(d));
+      var seats = tableSeats(n, land), html = '';
+      order.forEach(function (pid, i) {
+        var side = seats[i], zh = d + lab, off = zh / 2 + 8;
+        var cx = side === 'L' ? off : side === 'R' ? W - off : W / 2;
+        var cy = side === 'T' ? off : side === 'B' ? H - off : H / 2;
+        var rot = { B: 0, L: 90, T: 180, R: 270 }[side];
+        html += '<div class="dbt-zone" id="dbt-z-' + pid + '" style="--d:' + d + 'px;width:' + d + 'px;height:' + zh + 'px;left:' + (cx - d / 2) + 'px;top:' + (cy - zh / 2) + 'px;transform:rotate(' + rot + 'deg)">' +
+          '<div class="db-card mine" id="dbt-c-' + pid + '"></div>' +
+          '<div class="dbt-name"><span class="av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' <span class="sc" id="dbt-s-' + pid + '">0</span></div></div>';
+      });
+      html += '<div class="dbt-center" style="--d:' + d + 'px;left:' + (W / 2 - d / 2) + 'px;top:' + (H / 2 - d / 2) + 'px"><div class="db-card center" id="dbt-center"></div></div>';
+      host.innerHTML = html;
+    }
+    function tableCard(el, symbols, pid) {
+      el.innerHTML = '';
+      var positions = [{ x: 50, y: 50 }];
+      for (var i = 0; i < 7; i++) { var a = (2 * Math.PI * i / 7) - Math.PI / 2; positions.push({ x: 50 + 35 * Math.cos(a), y: 50 + 35 * Math.sin(a) }); }
+      // Ordre d'affichage mélangé de façon stable (sinon le symbole « pivot » du
+      // générateur serait toujours au même endroit).
+      var order = symbols.map(function (s, k) { return { s: s, r: seededRand(s * 17 + symbols[0] * 3 + symbols[7] + (pid ? 5 : 0)) + k * 1e-6 }; }).sort(function (a, b) { return a.r - b.r; });
+      order.forEach(function (o, idx) {
+        var symIdx = o.s, pos = positions[idx], seed = symIdx * 31 + idx * 7 + (pid ? 0 : 13);
+        var rot = Math.floor(seededRand(seed) * 360), scale = 0.8 + seededRand(seed + 1) * 0.45;
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'db-emoji-btn' + (pid ? '' : ' read');
+        btn.style.left = pos.x + '%'; btn.style.top = pos.y + '%';
+        btn.style.transform = 'translate(-50%,-50%) rotate(' + rot + 'deg) scale(' + scale.toFixed(3) + ')';
+        btn.textContent = EMOJIS[symIdx]; btn.dataset.sym = symIdx;
+        if (pid) {
+          var h = function (e) { e.preventDefault(); tableTap(pid, symIdx, btn); };
+          if (window.PointerEvent) btn.addEventListener('pointerdown', h); else { btn.addEventListener('touchstart', h, { passive: false }); btn.addEventListener('mousedown', h); }
+        }
+        el.appendChild(btn);
+      });
+    }
+    function tableRender(state) {
+      var sp = document.getElementById('s-playing'), host = document.getElementById('db-table');
+      sp.classList.add('dbt-on'); host.style.display = 'block';
+      var order = state.order || [], cards = state.cards || {}, deckArr = cards.deck || [], scores = state.scores || {};
+      var center = deckArr.length ? deckArr[deckArr.length - 1] : null, rw = state.roundWinner;
+      setText('deck-label', 'Paquet : ' + deckArr.length + ' carte' + (deckArr.length > 1 ? 's' : ''));
+      // (Re)construction si les joueurs ou la taille de l'écran ont changé.
+      var sig = order.join(',') + '|' + host.clientWidth + 'x' + host.clientHeight;
+      if (sig !== tblSig || !document.getElementById('dbt-center')) { tblSig = sig; tableBuild(state); }
+      var cEl = document.getElementById('dbt-center');
+      if (center) {
+        cEl.style.visibility = '';
+        var key = deckArr.length + ':' + center.join(',');
+        if (cEl.dataset.key !== key) { tableCard(cEl, center, null); cEl.dataset.key = key; cEl.classList.remove('entering'); void cEl.offsetWidth; cEl.classList.add('entering'); }
+      } else cEl.style.visibility = 'hidden';
+      order.forEach(function (pid) {
+        var el = document.getElementById('dbt-c-' + pid), z = document.getElementById('dbt-z-' + pid), c = cards[pid];
+        if (!el || !c) return;
+        var k = c.join(',');
+        if (el.dataset.key !== k) { tableCard(el, c, pid); el.dataset.key = k; }
+        setText('dbt-s-' + pid, scores[pid] || 0);
+        z.classList.toggle('winner', rw === pid);
+        z.classList.toggle('loser', !!rw && rw !== pid);
+        z.classList.toggle('frozen', !rw && (tblFrozen[pid] || 0) > Date.now());
+      });
+      document.querySelectorAll('#db-table .db-emoji-btn.hit').forEach(function (b) { b.classList.remove('hit'); });
+      if (rw) {
+        // Le symbole commun s'allume sur la carte du gagnant ET au centre.
+        var ws = state.winSym;
+        document.querySelectorAll('#dbt-c-' + rw + ' .db-emoji-btn, #dbt-center .db-emoji-btn').forEach(function (b) { if (+b.dataset.sym === ws) b.classList.add('hit'); });
+        if (!advanceTimer) advanceTimer = setTimeout(function () { advanceTimer = null; advanceRound(); }, WIN_MS);
+      } else if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+    }
+    function tableTap(pid, symIdx, btn) {
+      var state = window.room || {};
+      if (state.status !== 'playing' || state.roundWinner) return;
+      if ((tblFrozen[pid] || 0) > Date.now()) return;
+      var deckArr = (state.cards || {}).deck || [], center = deckArr.length ? deckArr[deckArr.length - 1] : null;
+      var mine = (state.cards || {})[pid];
+      if (!center || !mine || mine.indexOf(symIdx) < 0) return;
+      if (center.indexOf(symIdx) < 0) {
+        // Erreur : pénalité légère, la carte du joueur est gelée un court instant.
+        tblFrozen[pid] = Date.now() + FREEZE_MS;
+        var z = document.getElementById('dbt-z-' + pid);
+        if (z) z.classList.add('frozen');
+        btn.classList.add('miss');
+        if (window.Fx) { Fx.sfx('error'); Fx.vib(30); }
+        setTimeout(function () { btn.classList.remove('miss'); if (z && (tblFrozen[pid] || 0) <= Date.now()) z.classList.remove('frozen'); }, FREEZE_MS + 20);
+        return;
+      }
+      if (window.Fx) { Fx.sfx('coin'); Fx.vib(15); }
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || cur.roundWinner) return;
+        cur.scores = cur.scores || {};
+        cur.scores[pid] = (cur.scores[pid] || 0) + 1;
+        cur.roundWinner = pid; cur.winSym = symIdx;
+        return cur;
+      });
+    }
+    if (TABLE) window.addEventListener('resize', function () { if (window.room && window.room.status === 'playing') tableRender(window.room); });
+
     function showOverlay(v) { var ov = document.getElementById('round-overlay'); if (ov) ov.classList.toggle('active', !!v); }
-    function handleReplay() { roundLocked = false; Lobby.resetToLobby([]); }
-    function doRestart() { closeModal('modal-restart'); roundLocked = false; Lobby.resetToLobby([]); }
+    function handleReplay() { roundLocked = false; tblFrozen = {}; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); roundLocked = false; tblFrozen = {}; Lobby.resetToLobby([]); }
   </script>
 </body>
 </html>

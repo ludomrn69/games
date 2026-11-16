@@ -106,6 +106,54 @@
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
     @media (min-width: 760px) { .pic-stage,.pic-play{max-width:900px;margin-inline:auto} }
+
+    /* ━━ Mode table : un iPad au milieu, on devine À L'ORAL ━━
+       Grand canevas plein écran + colonne d'outils (chrono, mot secret à maintenir,
+       couleurs, « qui a trouvé ? »). En portrait la colonne passe sous le canevas. */
+    #s-playing.pt-on { height: calc(100vh - 52px); height: calc(100dvh - 52px); overflow: hidden; }
+    #s-playing.pt-on .pic-header { position: static; flex: none; }
+    .pt { flex: 1; min-height: 0; display: flex; gap: 10px; padding: 10px; }
+    .pt-canvas { flex: 1; min-width: 0; min-height: 0; display: flex; }
+    .pt-canvas .pic-canvas-wrap { flex: 1; min-width: 0; min-height: 0; border-radius: 18px; }
+    .pt-canvas #pic-canvas { width: 100%; height: 100%; }
+    .pt-side { flex: none; width: 250px; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
+    .pt-timer { display: flex; align-items: center; gap: 10px; background: var(--white); border-radius: 14px; padding: 8px 12px; box-shadow: var(--shadow); }
+    .pt-timer-num { font: 900 1.9rem 'Playfair Display', serif; min-width: 48px; text-align: center; color: var(--ink); }
+    .pt-timer-num.warning { color: var(--terracotta); }
+    .pt-word-btn { border: 2px dashed var(--terracotta); background: var(--white); color: var(--terracotta); border-radius: 14px; padding: 12px 8px; font: 800 0.95rem 'DM Sans', sans-serif; cursor: pointer; min-height: 62px; touch-action: none; -webkit-user-select: none; user-select: none; }
+    .pt-word-btn.show { border-style: solid; background: var(--terracotta); color: #fff; font: 900 1.35rem 'Playfair Display', serif; }
+    .pt-side .pic-toolbar { justify-content: center; gap: 8px; padding: 10px; }
+    .pt-side .color-swatch { width: 30px; height: 30px; }
+    .pt-side .color-swatches { gap: 6px; justify-content: center; }
+    .pt-side .size-btn { width: 40px; height: 40px; font-size: 1rem; }
+    .pt-side .pic-eraser-btn, .pt-side .pic-clear-btn { padding: 9px 12px; font-size: 0.9rem; font-weight: 700; }
+    .pt-side .toolbar-divider { display: none; }
+    .pt-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1.4px; color: var(--ink-light); text-align: center; margin-top: 2px; }
+    .pt-found { display: flex; flex-direction: column; gap: 7px; }
+    .pt-found-btn { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink); border-radius: 30px; padding: 6px 12px 6px 6px; font: 700 1rem 'DM Sans', sans-serif; cursor: pointer; box-shadow: var(--shadow); text-align: left; }
+    .pt-found-btn .av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex: none; }
+    .pt-found-btn .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pt-found-btn .sc { font-weight: 800; color: var(--gold); }
+    .pt-found-btn:active { background: var(--sage); color: #fff; }
+    .pt-pass { border: none; background: transparent; color: var(--ink-light); font: 700 0.92rem 'DM Sans', sans-serif; padding: 10px; cursor: pointer; text-decoration: underline; }
+    .pt-ready-av { width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin: 0 auto 14px; box-shadow: 0 0 0 4px var(--gold-light); }
+    .pt-big-btn { border: none; border-radius: 34px; padding: 1rem 2.2rem; font: 800 1.15rem 'DM Sans', sans-serif; color: #fff; background: linear-gradient(135deg, var(--terracotta), var(--gold)); box-shadow: var(--shadow-hover); cursor: pointer; }
+    .pt-scoreline { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 26px; }
+    .pt-scoreline .pic-sc-chip { font-size: 0.95rem; padding: 5px 12px 5px 5px; }
+    .pt-scoreline .pic-sc-av { width: 26px; height: 26px; font-size: 0.95rem; }
+    .pt-table-choices .pic-word-choice { font-size: 1.5rem; padding: 1.2rem; }
+    @media (orientation: portrait) {
+      .pt { flex-direction: column; }
+      .pt-side { width: auto; flex-direction: row; flex-wrap: wrap; align-items: stretch; justify-content: center; overflow: visible; }
+      .pt-side > * { flex: 0 1 auto; }
+      .pt-timer { flex: 1 1 200px; }
+      .pt-word-btn { flex: 1 1 220px; }
+      .pt-side .pic-toolbar { flex: 1 1 100%; }
+      .pt-label { flex: 1 1 100%; }
+      .pt-found { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      .pt-found-btn { flex: 0 1 220px; }
+      .pt-pass { flex: 1 1 100%; padding: 4px; }
+    }
   </style>
 </head>
 <body>
@@ -129,6 +177,19 @@
 
       <div id="pic-choosing-panel" class="pic-choosing-panel" style="display:none">
         <div id="pic-choosing-content"></div>
+      </div>
+
+      <!-- Mode table : canevas plein écran + colonne d'outils (rempli par le script) -->
+      <div id="pic-table" class="pt" style="display:none">
+        <div class="pt-canvas" id="pt-canvas-host"></div>
+        <div class="pt-side">
+          <div class="pt-timer"><span class="pt-timer-num" id="pt-timer-num">75</span><div class="pic-timer-bar-bg"><div class="pic-timer-bar" id="pt-timer-bar" style="width:100%"></div></div></div>
+          <button type="button" class="pt-word-btn" id="pt-word-btn">🙈 Maintenir pour voir le mot</button>
+          <div id="pt-tools-host"></div>
+          <div class="pt-label">Qui a trouvé ?</div>
+          <div class="pt-found" id="pt-found"></div>
+          <button type="button" class="pt-pass" onclick="tableFound(null)">⏭ Personne — passer</button>
+        </div>
       </div>
 
       <div id="pic-drawing-panel" class="pic-play-area" style="display:none">
@@ -241,6 +302,8 @@
     var currentColor = '#2C2520', currentWidth = 6, lastColor = '#2C2520', isEraser = false;
     var pendingStrokes = [], lastSentIdx = 0, strokeSyncInterval = null, strokeListener = null;
     var timerInterval = null, timerAdvanced = false;
+    // Mode table (un seul appareil, hors-ligne) : pas de synchro des traits, on devine à l'oral.
+    var TABLE = window.OFFLINE_MODE === 'local', WSCALE = 1;
     function rref() { return window.roomRef; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
@@ -264,6 +327,16 @@
         'Le meilleur score après toutes les manches gagne'
       ],
       lobbyExtraHTML: lobbyExtraHTML,
+      // Mode table : tout se passe sur l'écran commun (le mot secret est protégé par
+      // le jeu lui-même : bouton à maintenir), d'où `open` = pas d'écran de passe.
+      offline: { local: true, open: true },
+      offlineTurn: function (r) { return (r && r.status !== 'finished') ? r.drawer : null; },
+      offlineExtraSetup: function () {
+        return '<div class="off-set"><div class="off-set-label">Tours de table (chacun dessine autant de fois)</div>' +
+          '<div class="off-set-row" data-opt="laps">' +
+          [1, 2, 3].map(function (n) { return '<button type="button" class="off-opt' + (n === 2 ? ' active' : '') + '" data-val="' + n + '">' + n + '</button>'; }).join('') +
+          '</div></div>';
+      },
       onState: onState,
       onStart: onStart,
       onLeave: stopAllIntervals
@@ -282,9 +355,13 @@
       var order = players.map(function (p) { return p.pid; });
       var scores = {};
       players.forEach(function (p) { scores[p.pid] = 0; cur.players[p.pid].nextRoundReady = false; });
+      var opts = pickRandom(WORDS, 3);
       return {
-        status: 'choosing', round: 1, maxRounds: (cur && cur.maxRounds) || 6,
-        drawer: order[0], wordOptions: pickRandom(WORDS, 3), chosenWord: null,
+        status: 'choosing', round: 1,
+        // Mode table : N tours de table complets (chacun dessine le même nombre de fois).
+        maxRounds: (cur && cur.table) ? order.length * ((cur && cur.laps) || 2) : ((cur && cur.maxRounds) || 6),
+        usedWords: (cur && cur.table) ? opts.slice() : null,
+        drawer: order[0], wordOptions: opts, chosenWord: null,
         scores: scores, guessHistory: null, guessedCorrectly: false, guessedBy: null,
         strokes: null, timerStart: null
       };
@@ -316,7 +393,8 @@
       setText('pic-round-label', 'Manche ' + (state.round || 1) + '/' + (state.maxRounds || 6));
       var drawer = state.drawer;
       var badge = document.getElementById('pic-role-badge');
-      if (drawer === window.myPid) { badge.textContent = 'Tu dessines'; badge.className = 'pic-role-badge drawing'; }
+      if (TABLE) { badge.textContent = '✏️ ' + Room.name(drawer) + ' dessine'; badge.className = 'pic-role-badge drawing'; }
+      else if (drawer === window.myPid) { badge.textContent = 'Tu dessines'; badge.className = 'pic-role-badge drawing'; }
       else { badge.textContent = 'Tu devines'; badge.className = 'pic-role-badge guessing'; }
       // mini scoreboard
       var ord = state.order || [], scores = state.scores || {};
@@ -336,6 +414,7 @@
       panel.style.display = 'flex';
       var iAmDrawer = state.drawer === window.myPid;
       var content = document.getElementById('pic-choosing-content');
+      if (TABLE) { tableChoosing(state, content); return; }
       if (iAmDrawer) {
         var opts = (state.wordOptions || []).map(function (w) {
           return '<button class="pic-word-choice" onclick="chooseWord(\'' + w.replace(/'/g, "\\'") + '\')">' + escapeHtml(w) + '</button>';
@@ -364,6 +443,15 @@
 
     function chooseWord(word) {
       var st = window.room || {};
+      if (TABLE) {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'choosing' || (cur.wordOptions || []).indexOf(word) < 0) return;
+          cur.status = 'drawing'; cur.chosenWord = word; cur.guessedCorrectly = false; cur.guessedBy = null;
+          cur.strokes = null; cur.guessHistory = null; cur.timerStart = Date.now();
+          return cur;
+        });
+        return;
+      }
       if (st.status !== 'choosing' || st.drawer !== window.myPid) return;
       rref().update({ status: 'drawing', chosenWord: word, guessedCorrectly: false, guessedBy: null, strokes: null, guessHistory: null, timerStart: Date.now() });
     }
@@ -375,6 +463,7 @@
       showScreen('s-playing');
       updateHeader(state);
       document.getElementById('pic-choosing-panel').style.display = 'none';
+      if (TABLE) { tableDrawing(state); return; }
       document.getElementById('pic-drawing-panel').style.display = 'flex';
 
       var iAmDrawer = state.drawer === window.myPid;
@@ -425,7 +514,9 @@
         canvas.addEventListener('mouseup', onUp); canvas.addEventListener('mouseleave', onUp);
         canvas.addEventListener('touchstart', onTouchStart, { passive: false });
         canvas.addEventListener('touchmove', onTouchMove, { passive: false });
-        canvas.addEventListener('touchend', onUp);
+        canvas.addEventListener('touchend', onTouchEnd);
+        canvas.addEventListener('touchcancel', onTouchEnd);
+        drawTouchId = null; isDrawing = false;
         buildToolbar();
       }
     }
@@ -450,13 +541,18 @@
       else { isEraser = true; currentColor = '#ffffff'; currentWidth = 24; btn.classList.add('active'); document.querySelectorAll('.color-swatch').forEach(function (s) { s.classList.remove('active'); }); }
     }
     function getPos(e) { var r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * (CANVAS_W / r.width), y: (e.clientY - r.top) * (CANVAS_H / r.height) }; }
-    function onDown(e) { isDrawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; drawStroke(p.x, p.y, p.x + 0.1, p.y + 0.1, currentColor, currentWidth); pendingStrokes.push({ x0: p.x, y0: p.y, x1: p.x + 0.1, y1: p.y + 0.1, c: currentColor, w: currentWidth }); }
-    function onMove(e) { if (!isDrawing) return; var p = getPos(e); drawStroke(lastX, lastY, p.x, p.y, currentColor, currentWidth); pendingStrokes.push({ x0: lastX, y0: lastY, x1: p.x, y1: p.y, c: currentColor, w: currentWidth }); lastX = p.x; lastY = p.y; }
+    function onDown(e) { isDrawing = true; var p = getPos(e); lastX = p.x; lastY = p.y; drawStroke(p.x, p.y, p.x + 0.1, p.y + 0.1, currentColor, currentWidth); if (TABLE) return; pendingStrokes.push({ x0: p.x, y0: p.y, x1: p.x + 0.1, y1: p.y + 0.1, c: currentColor, w: currentWidth }); }
+    function onMove(e) { if (!isDrawing) return; var p = getPos(e); drawStroke(lastX, lastY, p.x, p.y, currentColor, currentWidth); if (!TABLE) pendingStrokes.push({ x0: lastX, y0: lastY, x1: p.x, y1: p.y, c: currentColor, w: currentWidth }); lastX = p.x; lastY = p.y; }
     function onUp() { isDrawing = false; }
-    function onTouchStart(e) { e.preventDefault(); var t = e.touches[0]; onDown({ clientX: t.clientX, clientY: t.clientY }); }
-    function onTouchMove(e) { e.preventDefault(); var t = e.touches[0]; onMove({ clientX: t.clientX, clientY: t.clientY }); }
-    function drawStroke(x0, y0, x1, y1, color, width) { if (!ctx) return; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); }
-    function clearCanvas() { if (!ctx) return; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H); rref().child('strokes').remove(); rref().child('strokes').push({ clear: true }); pendingStrokes = []; lastSentIdx = 0; }
+    // On suit UN doigt (celui qui a commencé le trait) : une paume ou un 2ᵉ doigt posé
+    // sur la tablette ne fait plus sauter le trait.
+    var drawTouchId = null;
+    function touchById(list) { for (var i = 0; i < list.length; i++) if (list[i].identifier === drawTouchId) return list[i]; return null; }
+    function onTouchStart(e) { e.preventDefault(); if (drawTouchId !== null && touchById(e.touches)) return; var t = e.changedTouches[0]; drawTouchId = t.identifier; onDown({ clientX: t.clientX, clientY: t.clientY }); }
+    function onTouchMove(e) { e.preventDefault(); var t = touchById(e.touches); if (t) onMove({ clientX: t.clientX, clientY: t.clientY }); }
+    function onTouchEnd(e) { if (drawTouchId === null || !touchById(e.touches)) { drawTouchId = null; onUp(); } }
+    function drawStroke(x0, y0, x1, y1, color, width) { if (!ctx) return; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.strokeStyle = color; ctx.lineWidth = width * WSCALE; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); }
+    function clearCanvas() { if (!ctx) return; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H); if (TABLE) { pendingStrokes = []; return; } rref().child('strokes').remove(); rref().child('strokes').push({ clear: true }); pendingStrokes = []; lastSentIdx = 0; }
 
     function startStrokeSync() {
       if (strokeSyncInterval) clearInterval(strokeSyncInterval);
@@ -580,6 +676,7 @@
       stopAllIntervals(); detachStrokeListener();
       showScreen('s-playing'); updateHeader(state);
       document.getElementById('pic-choosing-panel').style.display = 'none';
+      if (TABLE) { tableRoundEnd(state); return; }
       document.getElementById('pic-drawing-panel').style.display = 'flex';
       document.getElementById('pic-toolbar').classList.add('hidden');
       document.getElementById('pic-guess-area').style.display = 'none';
@@ -612,6 +709,8 @@
     }
     function setNextRoundReady() {
       var btn = document.getElementById('btn-next-round'); if (btn) btn.disabled = true;
+      // Mode table : un seul bouton pour toute la tablée.
+      if (TABLE) { rref().transaction(function (cur) { if (!cur || cur.status !== 'round-end') return; advancePatch(cur); return cur; }); return; }
       rref().child('players/' + window.myPid + '/nextRoundReady').set(true);
     }
     function advancePatch(cur) {
@@ -620,9 +719,16 @@
       if ((cur.round || 1) >= (cur.maxRounds || 6)) { cur.status = 'finished'; return; }
       cur.round = (cur.round || 1) + 1;
       cur.drawer = ord[(cur.round - 1) % ord.length];
-      cur.wordOptions = pickRandom(WORDS, 3);
+      // Mode table : on ne repropose pas un mot déjà proposé dans la partie.
+      var pool = WORDS;
+      if (cur.table) {
+        var used = cur.usedWords || [];
+        pool = WORDS.filter(function (w) { return used.indexOf(w) < 0; });
+        if (pool.length < 3) { pool = WORDS; used = []; }
+        cur.wordOptions = pickRandom(pool, 3); cur.usedWords = used.concat(cur.wordOptions);
+      } else cur.wordOptions = pickRandom(WORDS, 3);
       cur.chosenWord = null; cur.guessedCorrectly = false; cur.guessedBy = null;
-      cur.timerStart = null; cur.strokes = null; cur.guessHistory = null;
+      cur.timerStart = null; cur.strokes = null; cur.guessHistory = null; cur.passed = null;
       cur.status = 'choosing';
       ord.forEach(function (pid) { if (cur.players[pid]) cur.players[pid].nextRoundReady = false; });
     }
@@ -649,20 +755,121 @@
       ord.sort(function (a, b) { return (scores[b] || 0) - (scores[a] || 0); });
       var top = scores[ord[0]] || 0;
       var winners = ord.filter(function (p) { return (scores[p] || 0) === top; });
-      var iWon = winners.indexOf(window.myPid) >= 0;
+      var iWon = winners.indexOf(window.myPid) >= 0 && !TABLE;
+      if (TABLE) tableHide();
       setText('res-emoji', winners.length > 1 ? '🤝' : '🏆');
       setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !'));
       var medals = ['🥇', '🥈', '🥉'];
       document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid && !TABLE ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-score">' + (scores[pid] || 0) + ' pts</span></div>';
       }).join('');
     }
 
-    function handleReplay() { stopAllIntervals(); Lobby.resetToLobby([]); }
-    function doRestart() { closeModal('modal-restart'); document.getElementById('pic-overlay').classList.remove('active'); stopAllIntervals(); Lobby.resetToLobby([]); }
+    /* ━━ Mode table ━━ */
+    function tableHide() {
+      document.getElementById('pic-table').style.display = 'none';
+      document.getElementById('s-playing').classList.remove('pt-on');
+    }
+    function scoreChips(state, cls) {
+      var scores = state.scores || {};
+      return (state.order || []).map(function (pid) {
+        return '<span class="pic-sc-chip' + (pid === state.drawer ? ' drawer' : '') + '"><span class="pic-sc-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' + escapeHtml(Room.name(pid)) + ' ' + (scores[pid] || 0) + '</span>';
+      }).join('');
+    }
+    // 1) « Passe l'iPad au dessinateur » → 2) il découvre ses 3 mots → 3) il en choisit un.
+    function tableChoosing(state, content) {
+      tableHide();
+      var d = state.drawer;
+      content.innerHTML = '<div class="pt-ready-av" style="background:' + Room.color(d) + '">' + Room.emoji(d) + '</div>' +
+        '<h2>' + escapeHtml(Room.name(d)) + ' dessine !</h2>' +
+        '<p class="sub">Passe-lui l\'iPad. Les autres ne regardent pas l\'écran 🙈</p>' +
+        '<button type="button" class="pt-big-btn" id="pt-show-words">Je suis ' + escapeHtml(Room.name(d)) + ' — voir mes mots</button>' +
+        '<div class="pt-scoreline">' + scoreChips(state) + '</div>';
+      document.getElementById('pt-show-words').onclick = function () {
+        var opts = (state.wordOptions || []).map(function (w) {
+          return '<button class="pic-word-choice" onclick="chooseWord(\'' + w.replace(/'/g, "\\'") + '\')">' + escapeHtml(w) + '</button>';
+        }).join('');
+        content.innerHTML = '<h2>Choisis ton mot</h2><p class="sub">Le chrono (' + TIMER_DURATION + ' s) démarre dès que tu touches un mot.</p><div class="pic-word-choices pt-table-choices">' + opts + '</div>';
+      };
+    }
+    function tableDrawing(state) {
+      document.getElementById('pic-drawing-panel').style.display = 'none';
+      document.getElementById('s-playing').classList.add('pt-on');
+      document.getElementById('pic-table').style.display = 'flex';
+      window.scrollTo(0, 0);
+      // Le canevas et la barre d'outils existants sont déplacés dans la mise en page table.
+      var host = document.getElementById('pt-canvas-host'), wrap = document.getElementById('pic-canvas-wrap');
+      if (wrap.parentNode !== host) host.appendChild(wrap);
+      var tb = document.getElementById('pic-toolbar');
+      if (tb.parentNode !== document.getElementById('pt-tools-host')) document.getElementById('pt-tools-host').appendChild(tb);
+      tb.classList.remove('hidden');
+      // Canevas à la taille réelle de la zone (×2 pour la netteté Retina).
+      var w = Math.max(200, wrap.clientWidth), h = Math.max(200, wrap.clientHeight);
+      CANVAS_W = Math.round(w * 2); CANVAS_H = Math.round(h * 2); WSCALE = CANVAS_W / 600;
+      setupCanvas(true);
+      // Mot secret : visible seulement tant qu'on maintient le bouton.
+      var wb = document.getElementById('pt-word-btn');
+      function showW(e) { if (e) e.preventDefault(); wb.textContent = (window.room && window.room.chosenWord) || '?'; wb.classList.add('show'); }
+      function hideW() { wb.textContent = '🙈 Maintenir pour voir le mot'; wb.classList.remove('show'); }
+      hideW();
+      wb.ontouchstart = showW; wb.ontouchend = hideW; wb.ontouchcancel = hideW;
+      wb.onmousedown = showW; wb.onmouseup = hideW; wb.onmouseleave = hideW;
+      wb.oncontextmenu = function (e) { e.preventDefault(); };
+      // « Qui a trouvé ? » : un bouton par devineur (+2 pour lui, +1 pour le dessinateur).
+      var scores = state.scores || {};
+      document.getElementById('pt-found').innerHTML = (state.order || []).filter(function (p) { return p !== state.drawer; }).map(function (pid) {
+        return '<button type="button" class="pt-found-btn" onclick="tableFound(\'' + pid + '\')"><span class="av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span><span class="nm">' + escapeHtml(Room.name(pid)) + '</span><span class="sc">' + (scores[pid] || 0) + '</span></button>';
+      }).join('');
+      // Chrono
+      timerAdvanced = false;
+      function tick() {
+        var st = window.room || {};
+        if (st.status !== 'drawing') { clearInterval(timerInterval); return; }
+        var elapsed = (Date.now() - (st.timerStart || Date.now())) / 1000, remaining = Math.max(0, TIMER_DURATION - elapsed);
+        var bar = document.getElementById('pt-timer-bar'), num = document.getElementById('pt-timer-num');
+        bar.style.width = (remaining / TIMER_DURATION * 100) + '%'; num.textContent = Math.ceil(remaining);
+        var warn = remaining <= 15; bar.classList.toggle('warning', warn); num.classList.toggle('warning', warn);
+        if (warn && remaining > 0 && window.Fx && Math.ceil(remaining) <= 5) Fx.sfx('click');
+        if (remaining <= 0 && !timerAdvanced) {
+          timerAdvanced = true; clearInterval(timerInterval);
+          if (window.Fx) { Fx.sfx('error'); Fx.vib([40, 40, 80]); }
+          rref().transaction(function (cur) { if (!cur || cur.status !== 'drawing') return; cur.status = 'round-end'; return cur; });
+        }
+      }
+      tick(); timerInterval = setInterval(tick, 500);
+    }
+    // Validation à l'oral : pid = celui qui a trouvé, ou null (« passé », aucun point).
+    function tableFound(pid) {
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'drawing') return;
+        if (pid && pid !== cur.drawer && cur.players[pid]) {
+          cur.guessedCorrectly = true; cur.guessedBy = pid;
+          cur.scores = cur.scores || {};
+          cur.scores[pid] = (cur.scores[pid] || 0) + 2;
+          cur.scores[cur.drawer] = (cur.scores[cur.drawer] || 0) + 1;
+        } else cur.passed = true;
+        cur.status = 'round-end';
+        return cur;
+      });
+    }
+    function tableRoundEnd(state) {
+      var by = state.guessedBy;
+      setText('pic-ov-emoji', by ? '🎉' : (state.passed ? '⏭' : '⏰'));
+      setText('pic-ov-title', by ? (Room.name(by) + ' a trouvé !') : (state.passed ? 'Mot passé' : 'Temps écoulé !'));
+      document.getElementById('pic-ov-word').innerHTML = 'C\'était : <span>' + escapeHtml(state.chosenWord || '?') + '</span>' +
+        (by ? '<br>+2 pour ' + escapeHtml(Room.name(by)) + ' · +1 pour ' + escapeHtml(Room.name(state.drawer)) : '');
+      document.getElementById('pic-ov-score').innerHTML = scoreChips(state);
+      var btn = document.getElementById('btn-next-round');
+      btn.disabled = false; btn.textContent = isLastRound(state) ? 'Voir les résultats →' : 'Manche suivante →';
+      setText('pic-ov-msg', '');
+      document.getElementById('pic-overlay').classList.add('active');
+    }
+
+    function handleReplay() { stopAllIntervals(); prevStatus = null; Lobby.resetToLobby([]); }
+    function doRestart() { closeModal('modal-restart'); document.getElementById('pic-overlay').classList.remove('active'); stopAllIntervals(); if (TABLE) prevStatus = null; Lobby.resetToLobby([]); }
   </script>
 </body>
 </html>
