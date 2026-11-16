@@ -609,7 +609,7 @@
   // Face à face (2 humains) : on retourne tout l'écran de jeu vers le joueur actif.
   function setFlip(pid) {
     var flip = !!(mode === 'local' && faceToFace && pid && humanPids.indexOf(pid) === 1);
-    document.body.classList.toggle('off-flip', flip);
+    try { document.body.classList.toggle('off-flip', flip); } catch (e) {}
   }
   // Empêche la mise en veille de l'écran pendant la partie (tablette posée sur la table).
   var wake = null;
@@ -654,7 +654,7 @@
       '.off-name-row{display:flex;align-items:center;gap:6px;background:var(--white);border:1.5px solid var(--gold-light);border-radius:14px;padding:4px 8px 4px 4px;}' +
       '.off-emo{width:38px;height:38px;flex:none;border:none;border-radius:50%;background:var(--cream);font-size:1.25rem;cursor:pointer;line-height:1;}' +
       '.off-name{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);font:600 1rem "DM Sans",sans-serif;outline:none;padding:6px 0;}' +
-      '#off-turn{position:fixed;top:64px;left:50%;z-index:8000;display:flex;align-items:center;gap:8px;padding:8px 18px 8px 8px;border-radius:40px;background:var(--white);color:var(--ink);border:1.5px solid var(--gold);box-shadow:var(--shadow-hover);font:500 1.05rem "DM Sans",sans-serif;white-space:nowrap;pointer-events:none;opacity:0;transform:translate(-50%,-14px) scale(.94);transition:opacity .22s,transform .22s;}' +
+      '#off-turn{position:fixed;top:104px;left:50%;z-index:8000;display:flex;align-items:center;gap:8px;padding:8px 18px 8px 8px;border-radius:40px;background:var(--white);color:var(--ink);border:1.5px solid var(--gold);box-shadow:var(--shadow-hover);font:500 1.05rem "DM Sans",sans-serif;white-space:nowrap;pointer-events:none;opacity:0;transform:translate(-50%,-14px) scale(.94);transition:opacity .22s,transform .22s;}' +
       '#off-turn.show{opacity:1;transform:translate(-50%,0) scale(1);}' +
       '.off-turn-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.15rem;}' +
       // Tablette posée sur la table : pas de zoom au double-tap, pas de rebond ni de sélection.
@@ -662,7 +662,7 @@
       '.screen{-webkit-user-select:none;user-select:none;} .screen input,.screen textarea{-webkit-user-select:text;user-select:text;}' +
       // Face à face : l\'écran de jeu, le bandeau et le « passe l\'appareil » pivotent de 180°.
       'body.off-flip #s-playing{rotate:180deg;}' +
-      'body.off-flip #off-turn{top:auto;bottom:18px;transform:translate(-50%,14px) scale(.94) rotate(180deg);}' +
+      'body.off-flip #off-turn{top:auto;bottom:56px;transform:translate(-50%,14px) scale(.94) rotate(180deg);}' +
       'body.off-flip #off-turn.show{transform:translate(-50%,0) scale(1) rotate(180deg);}' +
       'body.off-flip .off-pass-card{rotate:180deg;}';
     var s = document.createElement('style'); s.id = 'off-styles'; s.textContent = css;

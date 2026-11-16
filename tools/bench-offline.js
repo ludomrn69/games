@@ -25,7 +25,7 @@ function fakeEl() {
   return { style: {}, _h: '', set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; }, textContent: '',
     classList: { add: function () {}, remove: function () {}, toggle: function () {} }, dataset: {}, onclick: null,
     appendChild: function () {}, remove: function () {}, setAttribute: function () {}, addEventListener: function () {},
-    querySelector: function () { return null; }, querySelectorAll: function () { return []; }, parentNode: { insertBefore: function () {} } };
+    querySelector: function () { return null; }, querySelectorAll: function () { return []; }, closest: function () { return null; }, parentNode: { insertBefore: function () {} } };
 }
 
 // Charge offline.js dans un environnement neuf pour une URL donnée (avion : pas de firebase).
@@ -144,6 +144,53 @@ function boardCfg(cap) {
   if (!store[KEY]) ok('sauvegarde effacée en fin de partie'); else bad('sauvegarde non purgée après la fin');
 })();
 
+// ── 4) MODE TABLE (local) : plusieurs humains sur un appareil + ordis d'appoint ──
+function tableCfg(cap, open) {
+  return {
+    gameKey: 'tabledemo', name: 'Table', minPlayers: 2, maxPlayers: 4,
+    offline: { solo: true, local: true, open: !!open },
+    bot: function (state, pid) { cap.botCalls = (cap.botCalls || 0) + 1; cap.botPid = pid; cap.botMyPid = global.window.myPid;
+      global.window.roomRef.transaction(function (cur) { cur.turn = 'p0'; cur.botPlayed = true; return cur; }); },
+    onStart: function (players) { cap.n = players.length; return { turn: 'p0', winner: null }; },
+    onState: function () { cap.views = (cap.views || []).concat([global.window.myPid]); }
+  };
+}
+var pending = 0;
+(function () {
+  var cap = {}, r = loadOffline('?mode=local', {});
+  r.win.GameRoom(tableCfg(cap, true));
+  var b = r.els['off-start']; if (b && typeof b.onclick === 'function') b.onclick(); else bad('mode table : bouton « Commencer » introuvable');
+  var room = r.win.room;
+  if (room && room.status === 'playing' && cap.n === 2 && room.table === true) ok('mode TABLE : partie à 2 humains démarrée hors-ligne'); else bad('mode table : la partie ne démarre pas');
+  if (r.win.OFFLINE_MODE === 'local') ok('window.OFFLINE_MODE exposé aux jeux'); else bad('OFFLINE_MODE absent');
+  if (r.win.myPid === 'p0') ok('l\'écran est donné au joueur actif (p0)'); else bad('myPid ≠ joueur actif au départ');
+  r.win.roomRef.transaction(function (cur) { cur.turn = 'p1'; return cur; });
+  if (r.win.myPid === 'p1') ok('changement de tour → l\'écran passe au joueur suivant (p1)'); else bad('myPid ne suit pas le tour en mode table');
+  r.win.roomRef.transaction(function (cur) { cur.winner = 'p1'; return cur; });
+  if (!r.store['games.resume.tabledemo.local']) ok('fin de partie en mode table → sauvegarde purgée'); else bad('sauvegarde table non purgée');
+})();
+(function () {
+  // Reprise d'une partie de table AVEC un ordi d'appoint dont c'est le tour : l'ordi doit
+  // jouer tout seul, et l'écran ne doit JAMAIS être rendu du point de vue de l'ordi.
+  var players = { p0: { name: 'Léa', emoji: '🦊', seat: 0 }, p1: { name: 'Ordi', emoji: '🤖', seat: 1, isBot: true } };
+  var store = { 'games.resume.tabledemo.local': JSON.stringify({ v: 1, ts: Date.now(), totalPlayers: 2,
+    room: { game: 'tabledemo', status: 'playing', host: 'p0', order: ['p0', 'p1'], players: players, turn: 'p1', table: true } }) };
+  var cap = {}, r = loadOffline('?mode=local', store);
+  r.win.GameRoom(tableCfg(cap, false));
+  var rb = r.els['off-resume']; if (rb && typeof rb.onclick === 'function') rb.onclick(); else bad('mode table : « Reprendre » non proposé');
+  pending++;
+  setTimeout(function () {
+    if (cap.botCalls >= 1 && cap.botPid === 'p1' && cap.botMyPid === 'p1') ok('mode table : l\'ordi d\'appoint joue à son tour'); else bad('mode table : l\'ordi d\'appoint ne joue pas (' + cap.botCalls + ')');
+    if ((cap.views || []).indexOf('p1') < 0) ok('l\'écran n\'est jamais rendu du point de vue de l\'ordi'); else bad('la main de l\'ordi a été affichée (' + cap.views + ')');
+    if (r.win.room.botPlayed && r.win.myPid === 'p0') ok('après l\'ordi, l\'écran revient à l\'humain'); else bad('retour à l\'humain KO');
+    pending--; finish();
+  }, 900);
+})();
+
+function finish() {
+if (pending > 0) return;
 console.log('');
 if (fails.length) { console.error('❌ ' + fails.length + ' test(s) hors-ligne échoué(s) :'); fails.forEach(function (f) { console.error('   - ' + f); }); process.exit(1); }
 console.log('✅ Hors-ligne OK : avion, solo, défi du jour et reprise de partie fonctionnent sans aucune connexion.');
+}
+finish();
