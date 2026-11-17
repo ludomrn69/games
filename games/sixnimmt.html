@@ -426,7 +426,7 @@
         var hand = handOf(state, pid); if (!hand.length) return;
         var val = (window.Bots && window.Bots.shouldBlunder(state))
           ? hand[Math.floor(Math.random() * hand.length)]
-          : window.SixNimmtAI.chooseCard(state.rows, hand);
+          : window.SixNimmtAI.chooseCard(state.rows, hand, { nPlayers: (state.order || []).length });
         return pickFor(pid, val);
       }
     }
@@ -439,7 +439,7 @@
           var hand = handOf(cur, p); if (!hand.length) return;
           cur.picks[p] = (window.Bots && window.Bots.shouldBlunder(cur))
             ? hand[Math.floor(Math.random() * hand.length)]
-            : window.SixNimmtAI.chooseCard(cur.rows, hand);
+            : window.SixNimmtAI.chooseCard(cur.rows, hand, { nPlayers: (cur.order || []).length });
         });
         maybeResolve(cur);
         return cur;
@@ -578,7 +578,7 @@
           if (cur.phase === 'select') {
             var ap = (cur.order || []).filter(function (p) { return !(cur.picks && (p in cur.picks)); })[0];
             if (ap && Lobby.isOffline(cur, ap)) {
-              var val = window.SixNimmtAI.chooseCard(cur.rows, handOf(cur, ap));
+              var val = window.SixNimmtAI.chooseCard(cur.rows, handOf(cur, ap), { nPlayers: (cur.order || []).length });
               cur.picks = cur.picks || {}; cur.picks[ap] = val; maybeResolve(cur); return cur;
             }
           }

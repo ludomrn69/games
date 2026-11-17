@@ -4,8 +4,9 @@
   (touché), 'm' (manqué).
 
   IA de tir = chasse par DENSITÉ DE PROBABILITÉ + poursuite des touches :
-   • Poursuite : dès qu'un bateau encore à flot est touché, on prolonge la ligne
-     (forte préférence à l'alignement de deux touches) jusqu'à le couler.
+   • Poursuite : dès qu'un bateau encore à flot est touché, on compte les
+     placements (vraie forme, Porte-avions 2×4 compris) qui EXPLIQUENT les touches
+     actives, pondérés par le nombre de touches couvertes → case la plus probable.
    • Chasse : on compte, pour chaque case vierge, combien de placements LÉGAUX des
      bateaux ENCORE EN VIE pourraient l'occuper → on tire sur la case la plus
      probable. En « difficile », on se limite au damier (parité) : un bateau de
@@ -79,68 +80,76 @@
     return a;
   }
 
-  function chooseShot(shots, remainingSizes, sunkCells, level) {
+  // Une taille reçue en NOMBRE DE CASES (c'est ce que passe la page) est ramenée à
+  // sa vraie forme : 8 cases = le Porte-avions 2×4 (et non une ligne de 8).
+  function specOf(sz) {
+    if (typeof sz !== 'number') return sz;
+    if (sz > 5) { for (var i = 0; i < FLEET.length; i++) { var f = FLEET[i]; if (typeof f !== 'number' && f.w * f.l === sz) return f; } }
+    return sz;
+  }
+
+  function chooseShot(shots, remainingSizes, sunkCells, level, opts) {
     sunkCells = sunkCells || {};
-    var sizes = (remainingSizes && remainingSizes.length) ? remainingSizes : FLEET;
+    opts = opts || {};
+    var sizes = ((remainingSizes && remainingSizes.length) ? remainingSizes : FLEET).map(specOf);
     function tried(i) { return shots[i] !== '.'; }
     // Touche « active » = sur un bateau encore à flot (pas une case déjà coulée).
     function active(i) { return shots[i] === 'h' && !sunkCells[i]; }
 
-    var free = [];
-    for (var f = 0; f < CELLS; f++) if (!tried(f)) free.push(f);
+    var free = [], nActive = 0;
+    for (var f = 0; f < CELLS; f++) { if (!tried(f)) free.push(f); else if (active(f)) nActive++; }
     if (!free.length) return -1;
     if (level === 'easy') return free[Math.floor(Math.random() * free.length)];
 
-    // ── Poursuite : prolonger une touche active ───────────────────────────────
-    var best = -1, bestSc = -1;
-    for (var i = 0; i < CELLS; i++) {
-      if (!active(i)) continue;
-      var ns = neighbors(i);
-      for (var x = 0; x < ns.length; x++) {
-        var nb = ns[x]; if (tried(nb)) continue;
-        var di = nb - i, opp = i - di, sc = 2;
-        // Si la case OPPOSÉE est aussi une touche active → on est sur la ligne du
-        // bateau : prolonger ici est presque sûr de toucher encore.
-        if (opp >= 0 && opp < CELLS && active(opp)) {
-          var sameRow = Math.abs(di) === 1 ? (Math.floor(opp / SIZE) === Math.floor(i / SIZE)) : true;
-          if (sameRow) sc = 18;
-        }
-        if (sc > bestSc || (sc === bestSc && Math.random() < 0.4)) { bestSc = sc; best = nb; }
-      }
-    }
-    if (best >= 0) return best;
+    // Moyen : la CHASSE est parfois aléatoire (≈ 1 fois sur 3). La POURSUITE d'une
+    // touche reste sérieuse à tous les niveaux (on ne lâche pas un bateau entamé).
+    if (level === 'normal' && !nActive && Math.random() < 0.35) return free[Math.floor(Math.random() * free.length)];
 
-    // Moyen : la CHASSE est parfois aléatoire (≈ 1 fois sur 4) → nettement moins
-    // efficace que « difficile » (densité + damier systématiques). La POURSUITE
-    // d'une touche, elle, reste optimale à tous les niveaux (on ne lâche jamais un
-    // bateau entamé).
-    if (level === 'normal' && Math.random() < 0.25) return free[Math.floor(Math.random() * free.length)];
-
-    // ── Chasse : densité de placements des bateaux ENCORE EN VIE ───────────────
-    var W = new Array(CELLS); for (var z = 0; z < CELLS; z++) W[z] = 0;
+    // ── Densité unifiée ────────────────────────────────────────────────────────
+    // On énumère TOUS les placements encore possibles de chaque bateau à flot, avec
+    // sa vraie forme (un placement ne peut couvrir ni un tir manqué ni une case
+    // coulée, mais il PEUT couvrir des touches actives). W = densité de chasse ;
+    // WH = densité de poursuite : placements qui expliquent des touches actives,
+    // pondérés très fortement par le nombre de touches couvertes.
+    var W = new Array(CELLS), WH = new Array(CELLS), z;
+    for (z = 0; z < CELLS; z++) { W[z] = 0; WH[z] = 0; }
+    var HW = opts.hitW || 12;
     for (var si = 0; si < sizes.length; si++) {
-      var L = sizes[si];
-      for (var dir = 0; dir < 2; dir++) {
+      var L = sizes[si], sp = shapeOf(L), ndir = (sp.w === sp.l) ? 1 : 2;
+      for (var dir = 0; dir < ndir; dir++) {
         for (var p = 0; p < CELLS; p++) {
           var cells = cellsFor(L, p, dir ? 'v' : 'h'); if (!cells) continue;
-          var clean = true; for (var k = 0; k < cells.length; k++) { if (tried(cells[k])) { clean = false; break; } }
-          if (!clean) continue;
-          for (var b = 0; b < cells.length; b++) W[cells[b]] += 1;
+          var okP = true, hits = 0;
+          for (var k = 0; k < cells.length; k++) {
+            var ch = shots[cells[k]];
+            if (ch === 'm' || sunkCells[cells[k]]) { okP = false; break; }
+            if (ch === 'h') hits++;
+          }
+          if (!okP || hits === cells.length) continue;
+          if (hits) { var wt = Math.pow(HW, hits - 1); for (var b = 0; b < cells.length; b++) WH[cells[b]] += wt; }
+          else { for (var b2 = 0; b2 < cells.length; b2++) W[cells[b2]] += 1; }
         }
       }
     }
-    // Plus petite DIMENSION (une forme rectangulaire compte par sa plus petite arête) :
-    // sert au damier (parité), valable tant qu'aucun bateau ne tient sur une seule case.
-    var minSize = Math.min.apply(null, sizes.map(function (sz) { return (typeof sz === 'number') ? sz : Math.min(sz.w, sz.l); }));
-    var bc = -1, bw = -1;
-    for (var c2 = 0; c2 < CELLS; c2++) {
-      if (tried(c2)) continue;
-      // Damier (parité) en difficile : inutile de viser une case sur deux tant que
-      // le plus petit bateau restant fait ≥ 2.
-      if (level === 'hard' && minSize >= 2 && ((Math.floor(c2 / SIZE) + (c2 % SIZE)) % 2 !== 0)) continue;
-      if (W[c2] > bw) { bw = W[c2]; bc = c2; }
+    var bc = -1, bw = -1, c2;
+    if (nActive) {
+      for (c2 = 0; c2 < CELLS; c2++) {
+        if (tried(c2) || WH[c2] <= 0) continue;
+        var sc = WH[c2] + W[c2] * 0.01 + Math.random() * 0.001;
+        if (sc > bw) { bw = sc; bc = c2; }
+      }
+      if (bc >= 0) return bc;
     }
-    if (bc >= 0 && bw > 0) return bc;
+    // Plus petite DIMENSION restante : sert au damier (parité).
+    var minSize = Math.min.apply(null, sizes.map(function (sz) { return (typeof sz === 'number') ? sz : Math.min(sz.w, sz.l); }));
+    var usePar = level === 'hard' && minSize >= 2 && !opts.noParity;
+    for (c2 = 0; c2 < CELLS; c2++) {
+      if (tried(c2)) continue;
+      if (usePar && ((Math.floor(c2 / SIZE) + (c2 % SIZE)) % 2 !== 0)) continue;
+      var s2 = W[c2] + Math.random() * 0.5;
+      if (s2 > bw && W[c2] > 0) { bw = s2; bc = c2; }
+    }
+    if (bc >= 0) return bc;
     // Repli : meilleure densité sans contrainte de parité, sinon n'importe quelle case.
     bc = -1; bw = -1;
     for (var c3 = 0; c3 < CELLS; c3++) { if (tried(c3)) continue; if (W[c3] > bw) { bw = W[c3]; bc = c3; } }
