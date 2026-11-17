@@ -72,6 +72,55 @@
     .tr-myhand .tcard { width: 38px; height: 52px; font-size: 1.15rem; }
     .tr-myhand .tcard.ext { box-shadow: 0 0 0 2px var(--terracotta), 0 2px 7px rgba(0,0,0,0.16); }
 
+    .tr-peek { margin-left: 8px; border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink); border-radius: 30px; padding: 0.35rem 0.9rem; font: 700 0.85rem 'DM Sans', sans-serif; cursor: pointer; vertical-align: middle; }
+    @media (hover: none) { .tcard.pick:hover { transform: none; } }
+    /* Mode table : rien de la main suivante ne transparaît sous l'écran « passe l'appareil ». */
+    body:has(#off-pass.show) .tr-myhand { visibility: hidden; }
+    /* ── TABLETTE (iPad posé sur la table) : cartes et rangées agrandies, la largeur sert. ── */
+    @media (min-width: 760px) and (min-height: 700px) {
+      .tr-banner { font-size: 1.7rem; padding-top: 10px; }
+      .tr-hint { font-size: 1.05rem; padding-bottom: 10px; }
+      .tr-myhand-label { font-size: 1.3rem; }
+      .tr-peek { font-size: 1rem; padding: 0.5rem 1.2rem; min-height: 44px; }
+      .tr-myhand { gap: 8px; margin-top: 8px; }
+      .tr-myhand .tcard { width: 58px; height: 80px; font-size: 1.8rem; border-radius: 11px; }
+      .tr-reveal-wrap { width: min(94vw, 760px) !important; padding: 8px 12px 12px !important; margin: 8px auto 6px !important; }
+      .tr-reveal-label { font-size: 1.2rem; }
+      .tr-reveal { min-height: 104px; gap: 14px; }
+      .tr-reveal .tcard { width: 74px; height: 102px; font-size: 2.4rem; border-radius: 12px; }
+      .tr-reveal-empty { font-size: 1.3rem; }
+      .tr-section-label { font-size: 0.95rem; margin: 12px 0 8px; }
+      .tr-main { max-width: 1120px; gap: 36px; padding: 0 16px; }
+      .tr-center { max-width: 470px; gap: 12px; }
+      .tr-center .tcard { max-width: 96px; font-size: 2.4rem; border-radius: 13px; }
+      .tr-players { gap: 8px; padding: 0 0 12px; max-width: none; }
+      .tr-prow { padding: 6px 16px; gap: 12px; border-radius: 18px; }
+      .tr-pav { width: 38px; height: 38px; font-size: 1.25rem; }
+      .tr-pname { font-size: 1.08rem; }
+      .tr-trios { font-size: 1rem; }
+      .tr-ext { gap: 10px; }
+      .tr-ext .tcard { width: 50px; height: 68px; font-size: 1.5rem; border-radius: 10px; }
+      .tr-ext-lbl { font-size: 0.8rem; }
+    }
+    /* Paysage tablette : la main et les cartes retournées partagent la même rangée
+       (sinon la hauteur d'un iPad couché ne suffit pas → défilement). */
+    @media (min-width: 1000px) and (min-height: 700px) and (orientation: landscape) {
+      #s-playing.active { display: grid; grid-template-columns: 1.35fr 1fr; grid-template-rows: auto auto auto auto 1fr; align-items: center;
+        grid-template-areas: "head head" "banner banner" "hint hint" "hand reveal" "main main"; }
+      .tr-head { grid-area: head; } .tr-banner { grid-area: banner; } .tr-hint { grid-area: hint; }
+      .tr-myhand-wrap { grid-area: hand; padding-left: 20px; }
+      .tr-reveal-wrap { grid-area: reveal; width: auto !important; margin: 4px 20px 6px 0 !important; align-self: stretch; }
+      .tr-main { grid-area: main; align-self: start; width: 100%; }
+      .tr-main-col:first-child { flex: 0.72 1 0; } .tr-main-col:last-child { flex: 1.28 1 0; }
+      .tr-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    /* Portrait tablette : centre puis joueurs, l'un sous l'autre, en pleine largeur. */
+    @media (min-width: 760px) and (min-height: 700px) and (orientation: portrait) {
+      .tr-main { flex-direction: column; align-items: stretch; gap: 6px; }
+      .tr-center { max-width: 700px; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); }
+      .tr-center .tcard { max-width: 78px; }
+      .tr-players { max-width: 720px; width: 100%; }
+    }
     .modal { position: fixed; inset: 0; background: rgba(44,37,32,0.55); backdrop-filter: blur(6px); z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; }
     .modal.active { display: flex; }
     .modal-card { background: var(--white); border-radius: 22px; padding: 26px 24px; box-shadow: var(--shadow-hover); text-align: center; max-width: 380px; width: 100%; }
@@ -104,7 +153,8 @@
       <div class="tr-hint" id="tr-hint"></div>
       <!-- Ma main EN HAUT (pour bien l'avoir sous les yeux). -->
       <div class="tr-myhand-wrap">
-        <div class="tr-myhand-label">Ta main <span id="tr-my-count"></span></div>
+        <div class="tr-myhand-label"><span id="tr-my-who">Ta main</span> <span id="tr-my-count"></span>
+          <button type="button" class="tr-peek" id="tr-peek" style="display:none" onclick="togglePeek()">👁 Voir mes cartes</button></div>
         <div class="tr-myhand" id="tr-myhand"></div>
       </div>
       <div class="tr-reveal-wrap felt felt-plum" style="margin:6px auto 4px;width:min(94vw,420px);padding:12px 10px 14px">
@@ -186,7 +236,7 @@
       offline: { solo: true, local: true },
       bot: trioBot,
       offlineTurn: function (r) { return (r.status === 'ended') ? null : r.turn; },
-      offlineEnter: function () { if (window.room) render(window.room); },
+      offlineEnter: function () { peek = false; if (window.room) render(window.room); },
       onState: onState,
       onStart: onStart,
       lobbyExtraHTML: lobbyExtraHTML, offlineExtraSetup: offlineExtraSetup
@@ -224,6 +274,13 @@
         '<button type="button" class="off-opt" data-val="1">Non</button>' +
         '</div></div>';
     }
+
+    // Mode table (plusieurs joueurs sur le même appareil) : pas de « tu/toi », et la main
+    // du joueur actif reste FACE CACHÉE par défaut — tout le monde regarde l'écran pour
+    // mémoriser les cartes retournées ; « 👁 Voir mes cartes » la montre le temps d'un coup d'œil.
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
+    var peek = false;
+    function togglePeek() { peek = !peek; if (window.room) render(window.room); }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
@@ -284,6 +341,7 @@
     // Applique un pick (calculé par makePick) au tour du joueur actif courant.
     function doReveal(makePick) {
       if (window.Fx) { Fx.sfx('flip'); Fx.vib(8); }
+      peek = false; // mode table : la main se recache dès qu'on retourne une carte (tous regardent l'écran)
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.winner || cur.turn !== window.myPid) return cur;
         if (cur.reveal && cur.reveal.done) return cur;          // en pause mémorisation : on n'agit pas
@@ -406,7 +464,7 @@
       setHTML('tr-hint', paused
         ? '👀 Mémorise bien les cartes… elles vont se recacher.'
         : (myTurn
-          ? (picks.length ? 'Cherche un autre <b>' + target + '</b> : ta plus basse ▽/haute △ (en haut), celle d\'un joueur, ou le centre.' : 'À toi ! Retourne une carte : ta plus basse ▽/haute △ (en haut), celle d\'un joueur, ou le centre.')
+          ? (picks.length ? 'Cherche un autre <b>' + target + '</b> : ta plus basse ▽/haute △ (en haut), celle d\'un joueur, ou le centre.' : (isTable() ? escapeHtml(Room.name(me)) + ' : retourne une carte :' : 'À toi ! Retourne une carte :') + ' ta plus basse ▽/haute △ (en haut), celle d\'un joueur, ou le centre.')
           : 'Au tour de <b>' + escapeHtml(Room.name(state.turn)) + '</b>.'));
 
       // Cartes retournées cette séquence
@@ -459,11 +517,18 @@
       var myLow = accessibleIdx(state, me, 'low'), myHigh = accessibleIdx(state, me, 'high');
       var myFlipped = flippedHandIdx(reveal, me);
       setHTML('tr-my-count', '(' + myHand.length + ' cartes) · 🎴 ' + triosOf(state, me) + '/3');
+      // (jamais la main d'un ordi : pendant sa pause « mémorisation », le moteur laisse myPid sur lui)
+      var hideMine = isTable() && (!peek || !!((state.players[me] || {}).isBot));
+      setText('tr-my-who', isTable() ? 'Main de ' + Room.name(me) : 'Ta main');
+      var pk = document.getElementById('tr-peek');
+      if (pk) { pk.style.display = isTable() ? '' : 'none'; pk.textContent = peek ? '🙈 Cacher mes cartes' : '👁 Voir mes cartes'; }
       setHTML('tr-myhand', myHand.map(function (v, i) {
         var committed = myFlipped.indexOf(i) >= 0;             // déjà retournée cette séquence
         var playable = canAct && !committed && (i === myLow || i === myHigh);
         var which = (i === myLow) ? 'low' : 'high';
         var cls = (v === 7 ? ' seven' : '') + (committed ? ' flip' : '') + (playable ? ' pick ext' : '');
+        // Mode table, main cachée : dos de carte (▽ basse / △ haute restent jouables).
+        if (hideMine && !committed) return '<div class="tcard back' + (playable ? ' pick ext' : '') + '"' + (playable ? ' onclick="revealHand(\'' + me + '\',\'' + which + '\')"' : '') + '>' + (i === myLow ? '▽' : i === myHigh ? '△' : '') + '</div>';
         return '<div class="tcard' + cls + '"' + (playable ? ' onclick="revealHand(\'' + me + '\',\'' + which + '\')"' : '') + '>' + v + '</div>';
       }).join('') || '—');
 
@@ -492,8 +557,9 @@
       showScreen('s-results');
       var order = (state.order || []).slice().sort(function (a, b) { return triosOf(state, b) - triosOf(state, a); });
       var winner = state.winner || order[0];
-      setText('res-emoji', winner === window.myPid ? '🏆' : '🎴');
-      setText('res-title', winner === window.myPid ? 'Tu gagnes !' : Room.name(winner) + ' gagne');
+      var iWon = winner === window.myPid && !isTable();
+      setText('res-emoji', (iWon || isTable()) ? '🏆' : '🎴');
+      setText('res-title', iWon ? 'Tu gagnes !' : Room.name(winner) + ' gagne');
       setHTML('res-rank', order.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +

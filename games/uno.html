@@ -78,7 +78,10 @@
     .uno-card .cidx.b { top: auto; left: auto; bottom: 4%; right: 8%; transform: rotate(180deg); }
     .uno-card.color-W .cidx { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     /* Défausse en éventail : les 3 dernières cartes restent visibles, tournées. */
-    #uno-discard.fanpile > .uno-card { box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    /* (.uno-card pose position:relative → il faut re-préciser l'empilement ici, sinon les
+       3 cartes s'affichaient l'une SOUS l'autre en colonne au lieu de se superposer.) */
+    #uno-discard.fanpile > .uno-card { box-shadow: 0 2px 6px rgba(0,0,0,0.3); position: absolute; left: 0; top: 0; }
+    #uno-discard.fanpile > .uno-card:last-child { position: relative; }
     /* Grands écrans / écrans hauts : cartes plus charnues, la table s'étale. */
     @media (min-height: 780px) {
       .uno-card { width: 58px; height: 87px; }
@@ -178,6 +181,36 @@
     .uno-hist-list { max-height: 50vh; overflow-y: auto; text-align: left; display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; }
     .uno-hist-list .entry { padding: 4px 6px; border-bottom: 1px solid var(--gold-light); }
 
+    /* « UNO ! » à annoncer maintenant (2 cartes à mon tour, ou 1 carte non annoncée) : le bouton bat. */
+    .uno-action-btn.uno-call.need { animation: unoNeed 0.8s ease-in-out infinite alternate; box-shadow: 0 0 0 3px var(--gold-light); }
+    @keyframes unoNeed { to { transform: scale(1.1); } }
+    /* ── TABLETTE (iPad posé sur la table, portrait ou paysage) : la table prend toute
+       la largeur, piles et main passent à une taille confortable au doigt. ── */
+    @media (min-width: 760px) and (min-height: 700px) {
+      .uno-opps { gap: 10px; padding-top: 14px; }
+      .uno-opp-chip { font-size: 1.05rem; padding: 7px 16px 7px 7px; }
+      .uno-opp-av { width: 32px; height: 32px; font-size: 1.15rem; }
+      .uno-opp-chip .cnt { font-size: 0.95rem; padding: 1px 9px; }
+      .uno-center { width: min(94vw, 1000px); gap: 70px; min-height: 240px; padding: 20px 26px; border-radius: 26px; }
+      .uno-pile-label { font-size: 1.2rem; }
+      .uno-current-color { width: 24px; height: 24px; }
+      .uno-card.lg { width: 112px; height: 168px; font-size: 2.9rem; border-radius: 16px; }
+      .uno-draw-pile { font-size: 1.5rem !important; }
+      .uno-my-label { font-size: 1.3rem; margin: 6px 0; }
+      .uno-my-hand { gap: 10px; max-width: 1140px; padding-bottom: 10px; }
+      .uno-my-hand .uno-card.in-hand { width: 84px; height: 126px; font-size: 2.1rem; border-radius: 14px; }
+      .uno-actions { gap: 12px; }
+      .uno-action-btn { font-size: 1.05rem; padding: 0.75rem 1.5rem; min-height: 48px; }
+      .uno-turn-banner { font-size: 1rem; padding: 7px 16px; }
+      .uno-sc-chip { font-size: 0.95rem; }
+      .uno-overlay-card { max-width: 460px; padding: 34px 30px; }
+      .color-pick { width: 84px; height: 84px; border-radius: 20px; }
+    }
+    /* Mode table : tant que l'écran « passe l'appareil » est affiché, la main du joueur
+       suivant est MASQUÉE (le voile est flouté mais laissait deviner les couleurs). */
+    body:has(#off-pass.show) .uno-my-hand { visibility: hidden; }
+    /* Tactile : pas de carte qui reste « levée » après un toucher (hover collant sur iPad). */
+    @media (hover: none) { .uno-card.in-hand:hover, .uno-draw-pile:hover { transform: none; box-shadow: 0 3px 10px rgba(0,0,0,0.18); } }
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
     @keyframes cardFly { from { transform: translateY(44px) rotate(7deg) scale(1.18); opacity: 0; } to { opacity: 1; } }
     .card-in { animation: cardFly 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
@@ -218,11 +251,11 @@
         </div>
       </div>
 
-      <div class="uno-my-label">Tes cartes <span id="uno-my-count">(0)</span></div>
+      <div class="uno-my-label"><span id="uno-my-who">Tes cartes</span> <span id="uno-my-count">(0)</span></div>
       <div class="uno-my-hand" id="uno-my-hand"></div>
       <div class="uno-actions">
         <button class="uno-action-btn" id="btn-pass" onclick="passTurn()">Passer</button>
-        <button class="uno-action-btn uno-call" onclick="callUno()">UNO !</button>
+        <button class="uno-action-btn uno-call" id="btn-uno" onclick="callUno()">UNO !</button>
         <button class="uno-action-btn" onclick="callCounterUno()">Contre-UNO</button>
         <button class="uno-action-btn" id="btn-challenge" style="display:none" onclick="challengeDraw4()">⚖️ Défier le +4</button>
       </div>
@@ -293,7 +326,7 @@
       <div class="modal-body">
         <p>Pose une carte de la même <b>couleur</b> ou du même <b>chiffre/symbole</b> que celle du dessus.</p>
         <p style="margin-top:10px">⊘ saute le joueur suivant · ↺ inverse le sens · +2 / +4 font piocher le suivant · Joker change la couleur.</p>
-        <p style="margin-top:10px">Quand il te reste 1 carte, clique <b>UNO !</b> sinon un autre peut te pénaliser (Contre-UNO). Premier à vider sa main gagne la manche.</p>
+        <p style="margin-top:10px">En posant ton avant-dernière carte, annonce <b>UNO !</b> (touche le bouton juste avant de la poser, ou juste après) sinon un autre peut te pénaliser (Contre-UNO). Premier à vider sa main gagne la manche.</p>
         <p style="margin-top:10px"><b>Variantes</b> (réglées dans le salon — tout désactivé = règles officielles) :</p>
         <p style="margin-top:6px">• <b>Cumul +2</b> : un +2 se contre avec un +2, le perdant pioche tout · <b>Cumul +4</b> : pareil entre +4 · <b>Croisé</b> : +2 et +4 se répondent entre eux (active les deux cumuls).</p>
         <p style="margin-top:6px">• <b>Défi +4</b> (règle officielle) : quand tu subis un +4, tu peux <b>défier</b> — si le poseur avait encore la couleur en main, c'est LUI qui pioche ; sinon tu pioches 6. (Les ordis ne défient pas.)</p>
@@ -332,6 +365,8 @@
 
     /* ━━ State ━━ */
     var prevStatus = null, pendingWildCard = null;
+    // Mode table (plusieurs joueurs sur le même appareil) : pas de « tu/toi », on nomme les joueurs.
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function rref() { return window.roomRef; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
@@ -363,7 +398,9 @@
       bot: unoBot,
       offlineTurn: function (r) {
         if (r.status === 'ended') return null;
-        if (r.status === 'roundEnd') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
+        if (r.status === 'roundEnd') { var o = r.order || [];
+          // Mode table : un seul « Manche suivante » pour toute la tablée, sur l'humain qui tient l'appareil.
+          if (isTable()) { var hm = o.filter(function (p) { return r.players[p] && !r.players[p].isBot; }); return hm.indexOf(window.myPid) >= 0 ? window.myPid : hm[0]; } for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
         if (r.await7) return r.await7; // règle maison 7 : le poseur doit choisir
         return r.turn;
       },
@@ -392,7 +429,10 @@
       // Pioche en attente (+2/+4 selon variantes) : contrer si possible, sinon subir.
       // (Les ordis ne défient jamais un +4 — assumé dans les règles.)
       if ((state.pendingDraw || 0) > 0) {
-        var answers = hand.filter(function (c) { return pendAnswer(state, c); });
+        // (croisé : un +2 sur un +4 doit AUSSI être de la couleur demandée — sans ce test
+        // l'ordi tentait un coup refusé et restait figé pour toujours.)
+        var topB = (state.discardPile || []).slice(-1)[0];
+        var answers = hand.filter(function (c) { return pendAnswer(state, c) && canPlay(c, topB, state.currentColor); });
         if (answers.length) {
           // Préférer un +2 (garder les +4), sinon +4 avec la couleur dominante.
           answers.sort(function (a, b) { return (a === 'W4' ? 1 : 0) - (b === 'W4' ? 1 : 0); });
@@ -413,9 +453,9 @@
       else passTurn();
     }
     function unoBotPlay(hand, card, color) {
-      var willBeOne = (hand.length - 1 === 1);
-      playCard(card, color);
-      if (willBeOne) callUno();
+      // UNO annoncé DANS la transaction de pose : après playCard, le moteur hors-ligne a
+      // déjà rendu window.myPid à un humain (un callUno() ici le pénalisait d'un faux UNO).
+      playCard(card, color, false, hand.length - 1 === 1);
     }
 
     // ── Catalogue des VARIANTES : une entrée = un réglage du salon qui change la
@@ -592,7 +632,16 @@
 
       var dirArrow = (state.dir === -1 ? '↺' : '↻');
       var pendLbl = state.pendingDraw > 0 ? ('  · ' + (state.pendingDraw > (state.pendingType === 'W4' ? 4 : 2) ? 'cumul ' : '') + '+' + state.pendingDraw + ' à subir') : '';
-      setText('uno-turn-banner', (isMyTurn ? 'À toi de jouer !' : 'Au tour de ' + Room.name(turn)) + '  ' + dirArrow + pendLbl);
+      setText('uno-turn-banner', (isMyTurn ? (isTable() ? 'À toi, ' + Room.name(turn) + ' !' : 'À toi de jouer !') : 'Au tour de ' + Room.name(turn)) + '  ' + dirArrow + pendLbl);
+      setText('uno-my-who', isTable() ? 'Cartes de ' + Room.name(window.myPid) : 'Tes cartes');
+      // « UNO ! » : mis en avant quand il faut l'annoncer (2 cartes à mon tour, ou 1 carte non annoncée).
+      var meP = (state.players && state.players[window.myPid]) || {};
+      var unoBtn = document.getElementById('btn-uno');
+      if (unoBtn) {
+        var needUno = !meP.unoCalled && ((myHand.length === 2 && isMyTurn) || myHand.length === 1);
+        unoBtn.classList.toggle('need', !!needUno);
+        unoBtn.textContent = (meP.unoCalled && myHand.length <= 2) ? 'UNO ✓' : 'UNO !';
+      }
       document.getElementById('uno-turn-banner').classList.toggle('me', isMyTurn);
 
       setText('uno-pile-count', (state.drawPile || []).length);
@@ -704,7 +753,7 @@
       return { pile: shuffle(rest), discard: [top] };
     }
 
-    function playCard(card, chosenColor, jump) {
+    function playCard(card, chosenColor, jump, sayUno) {
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing') return cur;
         var me = window.myPid;
@@ -726,7 +775,9 @@
         cur.currentColor = chosenColor;
         cur.drewThisTurn = false;
         if (hand.length !== 1) cur.players[me].unoCalled = false;
+        else if (sayUno) cur.players[me].unoCalled = true;
         logEntry(cur, me, (jumping ? '⚡ jump-in ! joue ' : 'joue ') + cardLabel(card, parseCard(card).wild ? chosenColor : null));
+        if (hand.length === 1 && cur.players[me].unoCalled) logEntry(cur, me, '🟠 dit <b>UNO !</b>');
 
         if (hand.length === 0) {
           cur.scores = cur.scores || {};
@@ -862,14 +913,19 @@
             cD = pile.pop(); h.push(cD); got++;
             if (canPlay(cD, topD, cur.currentColor)) break;
           }
-          if (!got) return cur;
+          if (!got) { cur.drewThisTurn = true; logEntry(cur, me, 'ne peut pas piocher (pioche vide)'); return cur; }
           cur.players[me].hand = h;
           cur.drawPile = pile; cur.discardPile = discard; cur.drewThisTurn = true;
           if (h.length !== 1) cur.players[me].unoCalled = false;
           logEntry(cur, me, 'pioche ' + got + ' carte' + (got > 1 ? 's' : '') + ' (jusqu\'à jouable)');
           return cur;
         }
-        if (!pile.length) { var r2 = reshuffleInto(pile, discard); pile = r2.pile; discard = r2.discard; if (!pile.length) return cur; }
+        if (!pile.length) {
+          var r2 = reshuffleInto(pile, discard); pile = r2.pile; discard = r2.discard;
+          // Plus AUCUNE carte à piocher (tout est en main) : on autorise à passer, sinon
+          // le joueur sans carte jouable (et l'ordi) restait bloqué pour toujours.
+          if (!pile.length) { cur.drewThisTurn = true; logEntry(cur, me, 'ne peut pas piocher (pioche vide)'); return cur; }
+        }
         h.push(pile.pop());
         cur.players[me].hand = h;
         cur.drawPile = pile; cur.discardPile = discard; cur.drewThisTurn = true;
@@ -927,6 +983,7 @@
         if (!cur || cur.status !== 'playing' || cur.turn !== window.myPid || !cur.drewThisTurn) return cur;
         cur.turn = step(cur.order || [], window.myPid, cur.dir || 1, 1);
         cur.drewThisTurn = false;
+        if (cur.players[window.myPid] && ((cur.players[window.myPid].hand || []).length !== 1)) cur.players[window.myPid].unoCalled = false;
         logEntry(cur, window.myPid, 'passe son tour');
         return cur;
       });
@@ -938,6 +995,12 @@
         if (!cur || cur.status !== 'playing') return cur;
         var me = window.myPid, h = (cur.players[me] && cur.players[me].hand) || [];
         if (h.length === 1) { if (cur.players[me].unoCalled) return cur; cur.players[me].unoCalled = true; logEntry(cur, me, '🟠 dit <b>UNO !</b>'); }
+        else if (h.length === 2 && cur.turn === me && !cur.await7) {
+          // Annonce ANTICIPÉE : « UNO ! » en posant son avant-dernière carte (comme à la
+          // vraie table). Le drapeau reste levé jusqu'à la pose ; il retombe si on pioche.
+          if (cur.players[me].unoCalled) return cur;
+          cur.players[me].unoCalled = true;
+        }
         else {
           var pile = (cur.drawPile || []).slice(), discard = (cur.discardPile || []).slice(), hand = h.slice();
           for (var i = 0; i < 2; i++) { if (!pile.length) { var r = reshuffleInto(pile, discard); pile = r.pile; discard = r.discard; if (!pile.length) break; } hand.push(pile.pop()); }
@@ -966,7 +1029,7 @@
     function showRoundEnd(state) {
       if (!document.getElementById('s-playing').classList.contains('active')) showScreen('s-playing');
       renderPlaying(state);
-      var winner = state.roundWinner, iWon = winner === window.myPid;
+      var winner = state.roundWinner, iWon = winner === window.myPid && !isTable();
       setText('uno-ov-emoji', iWon ? '🎉' : '👏');
       setText('uno-ov-title', iWon ? 'Tu gagnes la manche !' : Room.name(winner) + ' gagne la manche !');
       setText('uno-ov-sub', iWon ? 'Main vidée — bien joué.' : Room.name(winner) + ' a vidé sa main.');
@@ -982,7 +1045,18 @@
       document.getElementById('uno-overlay').classList.add('active');
       maybeNextRound(state);
     }
-    function setNextReady() { rref().child('players/' + window.myPid + '/nextReady').set(true); }
+    function setNextReady() {
+      if (isTable()) {
+        // Mode table : tout le monde est autour de l'appareil → un geste suffit.
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'roundEnd') return cur;
+          (cur.order || []).forEach(function (p) { if (cur.players[p]) cur.players[p].nextReady = true; });
+          return cur;
+        });
+        return;
+      }
+      rref().child('players/' + window.myPid + '/nextReady').set(true);
+    }
     function maybeNextRound(state) {
       var ord = state.order || [];
       var online = ord.filter(function (p) { return state.players[p] && state.players[p].online; });
@@ -1009,14 +1083,14 @@
       ord.sort(function (a, b) { return (scores[b] || 0) - (scores[a] || 0); });
       var top = scores[ord[0]] || 0;
       var winners = ord.filter(function (p) { return (scores[p] || 0) === top; });
-      var iWon = winners.indexOf(window.myPid) >= 0;
+      var iWon = winners.indexOf(window.myPid) >= 0 && !isTable();
       setText('res-emoji', winners.length > 1 ? '🤝' : '🏆');
       setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !'));
       var medals = ['🥇', '🥈', '🥉'];
       document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid && !isTable() ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-score">' + (scores[pid] || 0) + '</span></div>';
       }).join('');
     }
