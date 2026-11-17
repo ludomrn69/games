@@ -8,9 +8,13 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
     :root { --lu-R: #e05a4e; --lu-B: #3e7cb1; --lu-G: #34a853; --lu-Y: #e6b800; }
 
-    #s-playing { min-height: calc(100vh - 52px); }
+    #s-playing { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
     .lu-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     html[data-theme="dark"] .lu-head { background: rgba(20,16,28,0.97); }
     .lu-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
@@ -24,7 +28,7 @@
     .lu-chip .home { font-size: 0.72rem; color: var(--ink-light); }
 
     .lu-board-wrap { display: flex; justify-content: center; padding: 6px 8px; }
-    .lu-board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(15, minmax(0, 1fr)); width: min(94vw, 420px, 62vh); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
+    .lu-board { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(15, minmax(0, 1fr)); width: min(94vw, max(240px, calc(100dvh - 335px)), 900px); aspect-ratio: 1; background: var(--white); border: 2px solid var(--gold-light); border-radius: 10px; overflow: hidden; }
     /* ── Plateau façon VRAI Ludo : piste blanche bien détourée, départs pleins
        fléchés, escaliers numérotés, écuries en quart de plateau coloré. ── */
     .lu-cell { aspect-ratio: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1px; position: relative; }
@@ -77,7 +81,39 @@
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
-    @media (min-width: 760px) { .lu-board{width:min(58vw,500px,64vh)} }
+    /* ── Tablette : le plateau prend toute la place disponible, textes lisibles de loin ── */
+    @media (min-width: 760px) {
+      .lu-chip { font-size: 1.05rem; padding: 6px 16px 6px 8px; gap: 8px; border-width: 3px; }
+      .lu-chip-av { width: 30px; height: 30px; font-size: 1.05rem; }
+      .lu-chip .sw { width: 18px; height: 18px; border-radius: 5px; }
+      .lu-chip .home { font-size: 0.95rem; }
+      .lu-banner { font-size: 1.5rem; min-height: 36px; }
+      .lu-turn-txt { font-size: 1.3rem; }
+      .lu-die { width: 76px; height: 76px; border-radius: 18px; }
+      .lu-roll-btn { font-size: 1.25rem; padding: 0.95rem 2.2rem; }
+      .lu-board { border-width: 3px; border-radius: 16px; }
+      .lu-token { border-width: 2.5px; font-size: 18px; }
+      .lu-arrow { font-size: 1.5rem; } .lu-step { font-size: 1.15rem; } .lu-cell.center-mark { font-size: 1.6rem; }
+    }
+    @media (min-width: 760px) and (orientation: portrait) {
+      .lu-board { width: min(94vw, calc(100dvh - 400px)); }
+    }
+    /* Paysage (tablette posée sur la table) : plateau à gauche sur toute la hauteur,
+       joueurs + dé dans une colonne à droite → plus aucun scroll pendant la partie. */
+    @media (min-width: 900px) and (orientation: landscape) {
+      #s-playing.active { display: grid; grid-template-columns: auto minmax(250px, 330px); grid-template-rows: auto auto auto 1fr; justify-content: center; column-gap: 30px; }
+      .lu-head { grid-column: 1 / -1; grid-row: 1; }
+      .lu-board-wrap { grid-column: 1; grid-row: 2 / span 3; padding: 12px 0; align-self: center; }
+      .lu-board { width: min(calc(100vw - 420px), calc(100dvh - 138px)); }
+      .lu-legend { grid-column: 2; grid-row: 2; flex-direction: column; align-items: stretch; padding: 18px 0 6px; gap: 10px; }
+      .lu-chip { border-radius: 18px; }
+      .lu-chip .home { margin-left: auto; }
+      .lu-banner { grid-column: 2; grid-row: 3; padding: 10px 0; }
+      .lu-controls { grid-column: 2; grid-row: 4; justify-content: flex-start; padding: 6px 0 16px; gap: 14px; }
+      .lu-dice { flex-direction: column; }
+      .lu-die { width: 110px; height: 110px; border-radius: 24px; }
+      .lu-roll-btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -174,6 +210,8 @@
     /* ━━ State ━━ */
     var prevStatus = null, boardBuilt = false, lastDieShown = null, _luPrev = {};
     function rref() { return window.roomRef; }
+    // Mode table (un seul appareil au milieu) : on nomme le joueur au lieu de dire « toi ».
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
 
@@ -239,7 +277,7 @@
         '2 pions d\'une même couleur = barrage infranchissable (option, réglable au salon)',
         'Un 6 fait rejouer · ramène tes 4 chevaux au centre pour gagner'
       ],
-      offline: { solo: true, local: true },
+      offline: { solo: true, local: true, open: true },
       bot: ludoBot,
       onState: onState,
       onStart: onStart,
@@ -410,7 +448,9 @@
             if (prevCell) {
               var pa = prevCell.getBoundingClientRect(), pb = cell.getBoundingClientRect();
               el.style.transition = 'none';
-              el.style.transform = 'translate(' + (pa.left - pb.left) + 'px,' + (pa.top - pb.top) + 'px) scale(1.25)';
+              // Face à face : l'écran est pivoté de 180° → les écarts mesurés à l'écran sont inversés.
+              var sg = document.body.classList.contains('off-flip') ? -1 : 1;
+              el.style.transform = 'translate(' + sg * (pa.left - pb.left) + 'px,' + sg * (pa.top - pb.top) + 'px) scale(1.25)';
               el.style.zIndex = '5';
               requestAnimationFrame(function () {
                 el.style.transition = 'transform 0.55s cubic-bezier(0.3, 1.1, 0.5, 1)';
@@ -427,7 +467,7 @@
       var banner = document.getElementById('lu-banner');
       if (state.lastRoll) {
         var lr = state.lastRoll;
-        var who = lr.pid === window.myPid ? 'Tu fais' : (Room.name(lr.pid) + ' fait');
+        var who = (lr.pid === window.myPid && !isTable()) ? 'Tu fais' : (Room.name(lr.pid) + ' fait');
         banner.textContent = '🎲 ' + who + ' ' + lr.die + (lr.moved === false ? ' — aucun coup possible' : '');
       } else banner.textContent = '';
 
@@ -439,11 +479,11 @@
           dieEl.classList.remove('rolling'); void dieEl.offsetWidth; dieEl.classList.add('rolling');
           if (window.Fx) { Fx.sfx('deal'); Fx.vib([15, 30, 15]); }
         }
-        dieEl.innerHTML = window.Fx ? Fx.die(state.die, 40) : String(state.die);
-      } else { dieEl.textContent = '🎲'; }
+        dieEl.innerHTML = window.Fx ? Fx.die(state.die, Math.max(40, Math.round((dieEl.clientWidth || 56) * 0.72))) : String(state.die);
+      } else { dieEl.textContent = '🎲'; dieEl.style.fontSize = Math.round((dieEl.clientWidth || 56) * 0.5) + 'px'; }
       lastDieShown = state.die;
 
-      setText('lu-turn-txt', isMyTurn ? ('À toi ! (' + COLOR_INFO[myCol].name + ')') : ('Au tour de ' + Room.name(turn) + ' (' + COLOR_INFO[(state.colorOf || {})[turn]].name + ')'));
+      setText('lu-turn-txt', (isMyTurn && !isTable()) ? ('À toi ! (' + COLOR_INFO[myCol].name + ')') : ('Au tour de ' + Room.name(turn) + ' (' + COLOR_INFO[(state.colorOf || {})[turn]].name + ')'));
       var rollBtn = document.getElementById('lu-roll-btn');
       rollBtn.disabled = !(isMyTurn && state.die == null);
       rollBtn.textContent = (isMyTurn && state.die != null) ? 'Choisis un pion ↑' : 'Lancer le dé';
@@ -551,6 +591,8 @@
 
     function onBoardClick(e) {
       var tok = e.target.closest('.lu-token.movable');
+      // Tactile : toucher la CASE suffit (le pion seul est une cible trop petite).
+      if (!tok) { var cell = e.target.closest('.lu-cell'); tok = cell && cell.querySelector('.lu-token.movable'); }
       if (tok && tok.dataset.color) moveToken(tok.dataset.color, +tok.dataset.tok);
     }
 
@@ -560,14 +602,15 @@
       var ord = (state.order || []).slice();
       ord.sort(function (a, b) { return homeCount(state, state.colorOf[b]) - homeCount(state, state.colorOf[a]); });
       var win = state.winner;
-      setText('res-emoji', win === window.myPid ? '🏆' : '🐴');
-      setText('res-title', win === window.myPid ? 'Tu gagnes la course !' : Room.name(win) + ' gagne !');
+      var meWin = (win === window.myPid && !isTable());
+      setText('res-emoji', (meWin || isTable()) ? '🏆' : '🐴');
+      setText('res-title', meWin ? 'Tu gagnes la course !' : Room.name(win) + ' gagne la course !');
       var medals = ['🥇', '🥈', '🥉'];
       document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
         var col = state.colorOf[pid];
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + ((pid === window.myPid && !isTable()) ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-score">🏠 ' + homeCount(state, col) + '/4</span></div>';
       }).join('');
     }

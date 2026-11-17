@@ -8,8 +8,12 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
 
-    #s-playing.active { min-height: calc(100vh - 52px); display: flex; flex-direction: column; }
+    #s-playing.active { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); display: flex; flex-direction: column; }
     .nt-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     html[data-theme="dark"] .nt-head { background: rgba(20,16,28,0.97); }
     .nt-round-label { font-family: 'Caveat', cursive; font-size: 1.15rem; color: var(--gold); }
@@ -124,7 +128,7 @@
         'Une suite ne compte que par sa plus petite carte · jeton = −1',
         'Le plus petit score gagne'
       ],
-      offline: { solo: true, local: true },
+      offline: { solo: true, local: true, open: true },
       bot: ntBot,
       offlineEnter: function () { if (window.room) render(window.room); },
       onState: onState, onStart: onStart

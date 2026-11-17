@@ -8,12 +8,16 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
     html { scroll-behavior: smooth; }
 
-    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); align-items: center; }
+    #s-playing { flex-direction: column; min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); align-items: center; }
     .ot-header { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
     html[data-theme="dark"] .ot-header { background: rgba(20,16,28,0.97); }
-    .ot-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: start; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .ot-turn { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: 'Caveat', cursive; font-size: 1.05rem; color: var(--ink-light); justify-self: stretch; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
     .ot-turn-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.25); }
     .ot-scores { justify-self: center; text-align: center; font-weight: 700; white-space: nowrap; font-size: 0.95rem; display: flex; align-items: center; gap: 10px; }
     .ot-score-chip { display: inline-flex; align-items: center; gap: 5px; }
@@ -30,8 +34,8 @@
       .ot-scores { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
     }
 
-    .ot-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 14px; width: 100%; }
-    .ot-frame { display: grid; grid-template-columns: repeat(8, 1fr); gap: clamp(2px, 0.9vw, 5px); width: min(94vw, 460px); aspect-ratio: 1; background: linear-gradient(160deg, #1f7a4d, #176039); border: 4px solid #0e4427; border-radius: 14px; padding: clamp(5px, 1.6vw, 9px); box-shadow: var(--shadow); }
+    .ot-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 14px 14px; width: 100%; }
+    .ot-frame { display: grid; grid-template-columns: repeat(8, 1fr); gap: clamp(2px, 0.9vw, 5px); width: min(94vw, max(250px, calc(100dvh - 205px)), 860px); aspect-ratio: 1; background: linear-gradient(160deg, #1f7a4d, #176039); border: 4px solid #0e4427; border-radius: 14px; padding: clamp(5px, 1.6vw, 9px); box-shadow: var(--shadow); }
     .ot-cell { position: relative; aspect-ratio: 1; border-radius: 6px; background: #2a8d5c; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; cursor: pointer; }
     .ot-cell.playable::after { content: ''; width: 30%; height: 30%; border-radius: 50%; background: rgba(255,255,255,0.35); }
     .ot-cell.playable:hover::after { background: rgba(255,255,255,0.6); }
@@ -58,7 +62,16 @@
     .modal-btns { display: flex; gap: 12px; align-items: center; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
-    @media (min-width: 760px) { .ot-frame{width:min(66vw,540px)} }
+    /* Tablette : plateau qui remplit l'écran (cf. .ot-frame), scores et tour lisibles de loin. */
+    @media (min-width: 760px) {
+      .ot-turn { font-size: 1.45rem; }
+      .ot-scores { font-size: 1.25rem; gap: 14px; }
+      .ot-mini { width: 20px; height: 20px; }
+      .ot-turn-dot { width: 17px; height: 17px; }
+      .ot-hint { font-size: 1.35rem; margin-top: 10px; }
+      .ot-frame { border-radius: 20px; border-width: 6px; }
+      .ot-cell { border-radius: 9px; }
+    }
   </style>
 </head>
 <body>
@@ -129,6 +142,8 @@
     var lastSeen = -2;
 
     function rref() { return window.roomRef; }
+    // Mode table (un seul appareil au milieu) : on nomme le joueur au lieu de dire « toi ».
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function setHTML(id, v) { var el = document.getElementById(id); if (el) el.innerHTML = v; }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
     var escapeHtml = window.esc;
@@ -156,7 +171,7 @@
         'On ne joue que sur une case qui retourne au moins un pion',
         'Pas de coup possible → on passe · plus de pions à la fin = gagné'
       ],
-      offline: { solo: true, local: true },
+      offline: { solo: true, local: true, open: true },
       bot: reversiBot,
       onState: onState,
       onStart: onStart
@@ -252,7 +267,7 @@
     function advance(cur, order, me, opp) {
       var AI = window.ReversiAI, b = cur.board;
       if (AI.legalMoves(b, opp).length) { cur.turn = order[+opp]; return; }
-      if (AI.legalMoves(b, me).length) { cur.turn = order[+me]; return; } // adversaire passe, je rejoue
+      if (AI.legalMoves(b, me).length) { cur.turn = order[+me]; cur.passed = true; return; } // adversaire passe, je rejoue
       finish(cur, order);
     }
     function advanceAfterPass(cur, order, me, opp) {
@@ -301,9 +316,12 @@
       else {
         var t = state.turn, seat = ord.indexOf(t);
         ti.innerHTML = '<span class="ot-turn-dot" style="background:' + seatColor(seat) + '"></span>' +
-          (t === window.myPid ? 'À toi' : ('Au tour de ' + escapeHtml(Room.name(t))));
-        if (myTurn && !legalForMe.length) setText('ot-hint', 'Aucun coup possible — tu passes…');
-        else setText('ot-hint', myTurn ? 'Touche une case en surbrillance' : 'En attente de ' + Room.name(t) + '…');
+          ((t === window.myPid && !isTable()) ? 'À toi' : ('Au tour de ' + escapeHtml(Room.name(t))));
+        var who = isTable() ? Room.name(t) + ' : ' : '';
+        // L'adversaire n'avait aucun coup : on le dit (sinon on ne comprend pas pourquoi le même joueur rejoue).
+        var skipped = (state.passed && ord.length === 2) ? Room.name(ord[1 - seat]) + ' ne peut pas jouer et passe · ' : '';
+        if (myTurn && !legalForMe.length) setText('ot-hint', isTable() ? Room.name(t) + ' n\'a aucun coup et passe…' : 'Aucun coup possible — tu passes…');
+        else setText('ot-hint', myTurn ? skipped + who + (who ? 'touche' : 'Touche') + ' une case en surbrillance' : skipped + 'En attente de ' + Room.name(t) + '…');
       }
 
       var board = document.getElementById('ot-board');
@@ -335,7 +353,8 @@
       var ov = document.getElementById('ot-overlay');
       var emoji = document.getElementById('ot-ov-emoji'), title = document.getElementById('ot-ov-title');
       if (state.winner === 'draw') { emoji.textContent = '🤝'; title.textContent = 'Égalité'; }
-      else if (state.winner === window.myPid) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else if (state.winner === window.myPid && !isTable()) { emoji.textContent = '🏆'; title.textContent = 'Tu as gagné !'; }
+      else if (isTable()) { emoji.textContent = '🏆'; title.textContent = Room.name(state.winner) + ' a gagné !'; }
       else { emoji.textContent = '🎉'; title.textContent = Room.name(state.winner) + ' a gagné'; }
       setHTML('ot-ov-scores', scoresHTML(state));
       ov.classList.add('active'); hidePeekBtn();

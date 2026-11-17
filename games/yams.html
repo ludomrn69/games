@@ -8,11 +8,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
     /*
       YAM'S — 5 dés, 3 lancers, 13 catégories. Le tapis vert accueille les dés
       (pipdie de game.css) qu'on BLOQUE d'un tap entre deux lancers.
     */
-    #s-playing { min-height: calc(100vh - 52px); }
+    #s-playing { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
     .ya-head { position: sticky; top: 52px; z-index: 100; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     html[data-theme="dark"] .ya-head { background: rgba(20,16,28,0.97); }
     .ya-title-mini { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--gold); }
@@ -195,7 +199,7 @@
         'Bonus +35 si la section haute (1→6) atteint 63',
         'Feuille pleine partout → le plus gros total gagne'
       ],
-      offline: { solo: true, local: true, soloMinBots: 0 },
+      offline: { solo: true, local: true, open: true, soloMinBots: 0 },
       bot: yamsBot,
       onState: onState,
       onStart: onStart,
@@ -345,14 +349,14 @@
         var filled = CATS.filter(function (c) { return sh[c.k] != null; }).length;
         return '<span class="ya-opp' + (state.turn === pid ? ' turn' : '') + '">' +
           '<span class="ya-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') +
+          escapeHtml(Room.name(pid)) + ((pid === me && window.OFFLINE_MODE !== 'local') ? ' (toi)' : '') +
           ' <span class="tot">' + totalOf(sh) + '</span><span style="opacity:.55;font-weight:600">· ' + filled + '/13</span></span>';
       }).join('');
 
       // bandeau
       var b = document.getElementById('ya-banner');
       b.textContent = isMyTurn
-        ? (rolls === 0 ? 'À toi ! Lance les dés' : rolls < 3 ? 'Lancer ' + rolls + '/3 — bloque 📌 puis relance, ou choisis une case' : 'Choisis une case de ta feuille')
+        ? (rolls === 0 ? (window.OFFLINE_MODE !== 'local' ? 'À toi ! Lance les dés' : Room.name(window.myPid) + ', lance les dés') : rolls < 3 ? 'Lancer ' + rolls + '/3 — bloque 📌 puis relance, ou choisis une case' : 'Choisis une case de ta feuille')
         : 'Au tour de ' + Room.name(state.turn);
       b.classList.toggle('me', isMyTurn);
 
@@ -401,11 +405,11 @@
       var order = (state.order || []).slice().sort(function (a, b) { return totalOf((state.players[b] || {}).sheet) - totalOf((state.players[a] || {}).sheet); });
       var w = order[0], iWon = w === window.myPid;
       setText('res-emoji', iWon ? '🏆' : '🎲');
-      setText('res-title', iWon ? 'Tu gagnes !' : Room.name(w) + ' gagne !');
+      setText('res-title', (iWon && window.OFFLINE_MODE !== 'local') ? 'Tu gagnes !' : Room.name(w) + ' gagne !');
       document.getElementById('res-rank').innerHTML = order.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + ((pid === window.myPid && window.OFFLINE_MODE !== 'local') ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-sc">' + totalOf((state.players[pid] || {}).sheet) + '</span></div>';
       }).join('');
     }

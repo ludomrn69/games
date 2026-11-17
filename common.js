@@ -1275,7 +1275,7 @@
         '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()"' + onDis + '>Rejoindre</button>' +
         (c.offline ? ('<div style="margin:18px 0 6px;color:var(--ink-light);font-size:0.85rem">ou sans connexion ✈️</div>' +
           (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">' + (c.offline.soloNoBots ? '⏱ Solo (chrono)' : '🤖 Solo (contre l\'ordi)') + '</button>' : '') +
-          (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">📱 Local (même appareil)</button>' : '')) : '') +
+          (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">🎲 Mode table (même appareil)</button>' : '')) : '') +
         (rules ? '<div class="lb-code-card" style="text-align:left;margin-top:24px"><div class="lb-code-label">Règles rapides</div><ul style="list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:6px;font-size:0.86rem;color:var(--ink-light)">' + rules + '</ul></div>' : '') +
         '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
       '</div>';
@@ -2416,6 +2416,15 @@
   var offlineExtraOpts = {}; // réglages propres au jeu choisis à l'écran de réglages (ex. { size: 6 })
   var statsRecorded = false; // stats par jeu : un seul enregistrement par partie
   var BOT_DELAY = 650;
+  // ── Mode TABLE (local) : l'appareil est posé au milieu, tout le monde joue dessus ──
+  window.OFFLINE_MODE = mode;         // 'solo' | 'local' — lisible par les jeux
+  var tableHumans = 2;                // nombre d'humains autour de la table
+  var faceToFace = false;             // 2 joueurs assis face à face → l'écran pivote à chaque tour
+  var lastHuman = null;               // dernier humain à avoir eu l'écran (évite un « passe l'appareil » inutile)
+  var TABLE_KEY = 'games.table.v1';
+  function loadTable() { try { return JSON.parse(localStorage.getItem(TABLE_KEY)) || {}; } catch (e) { return {}; } }
+  function saveTable(t) { try { localStorage.setItem(TABLE_KEY, JSON.stringify(t)); } catch (e) {} }
+  function isOpenGame() { return !!(cfg && cfg.offline && cfg.offline.open); }
 
   function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
   function snap() { var r = clone(room); return { val: function () { return r; } }; }
@@ -2552,14 +2561,29 @@
       if (max - 1 >= 1 && !(noBots && off.noDiff)) controls += diffRow(noBots ? 'Difficulté' : 'Niveau des ordis');
       if (!noBots && cfg.bot) controls += speedRow();   // vitesse des ordis (pas pour un solo-chrono pur)
     } else {
-      controls = counterRow('Nombre de joueurs', min, max, min);
+      // Mode TABLE : des humains (prénoms modifiables) + éventuellement des ordis.
+      var tb = loadTable();
+      var canBots = localCanBots();
+      var loH = canBots ? 1 : min;
+      var defH = Math.max(loH, Math.min(max, tb.n || Math.max(min, 2)));
+      if (loH < max) controls = counterRow('Joueurs autour de la table', loH, max, defH, 'off-humans');
+      else controls = '<div id="off-humans" data-fixed="' + max + '"></div>';
+      controls += '<div class="off-set"><div class="off-set-label">Prénoms (touche l\'émoji pour le changer)</div><div id="off-names"></div></div>';
+      if (canBots && max > 1) {
+        controls += counterRow('Ordis en plus', 0, Math.max(0, max - 1), 0, 'off-bots', 'off-botn');
+        controls += diffRow('Niveau des ordis');
+      }
+      controls += '<div class="off-set" id="off-seat-set"><div class="off-set-label">Placement</div><div class="off-set-row">' +
+        '<button type="button" class="off-seat' + (tb.face ? '' : ' active') + '" data-seat="side">👥 Côte à côte</button>' +
+        '<button type="button" class="off-seat' + (tb.face ? ' active' : '') + '" data-seat="face">🔄 Face à face</button></div>' +
+        '<div class="off-set-hint">Face à face : l\'écran se retourne vers le joueur dont c\'est le tour.</div></div>';
     }
     // Réglages propres au jeu (ex. taille de grille du Sudoku). Chaque rangée porte
     // data-opt="<clé>" ; le bouton actif (.off-opt) donne data-val, reporté sur le salon.
     if (cfg.offlineExtraSetup) controls += cfg.offlineExtraSetup(cfg);
     var sub = mode === 'solo'
       ? (noBots ? 'Toi contre le chrono ⏱' : (loBots === 0 ? 'Toi contre le jeu' : 'Tu joues contre l\'ordi'))
-      : 'Chacun son tour, on se passe l\'appareil';
+      : (isOpenGame() ? 'L\'appareil au milieu de la table, chacun joue à son tour' : 'Chacun son tour, on se passe l\'appareil');
     // Reprise d'une partie interrompue (le plus utile en avion) : proposée en tête,
     // avant les réglages, si un snapshot valide existe pour ce jeu et ce mode.
     var saved = loadResume();
@@ -2571,7 +2595,7 @@
       '<div class="lb-wrap">' +
         (cfg.emoji ? '<div class="lb-emoji-big">' + cfg.emoji + '</div>' : '') +
         '<h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
-        '<p class="lb-sub">' + (mode === 'solo' ? '🤖 Solo' : '📱 Local') + ' · ' + sub + '</p>' +
+        '<p class="lb-sub">' + (mode === 'solo' ? '🤖 Solo' : '🎲 Mode table') + ' · ' + sub + '</p>' +
         (window.GameStats ? GameStats.summaryHTML(cfg.gameKey, window.Puzzle ? Puzzle.fmtTime : null) : '') +
         resumeBtn +
         controls +
@@ -2589,14 +2613,79 @@
     // Sélecteur générique : un clic active un bouton dans SA rangée (compteur ou difficulté).
     host.querySelectorAll('.off-set-row').forEach(function (row) {
       row.addEventListener('click', function (e) {
-        var b = e.target.closest('.off-num, .off-diff, .off-speed, .off-opt'); if (!b) return;
-        row.querySelectorAll('.off-num, .off-diff, .off-speed, .off-opt').forEach(function (x) { x.classList.remove('active'); });
+        var b = e.target.closest('.off-num, .off-diff, .off-speed, .off-opt, .off-botn, .off-seat'); if (!b) return;
+        row.querySelectorAll('.off-num, .off-diff, .off-speed, .off-opt, .off-botn, .off-seat').forEach(function (x) { x.classList.remove('active'); });
         b.classList.add('active');
+        if (mode === 'local') refreshTableSetup();
         // Vitesse des ordis : mémorisée immédiatement (préférence appareil).
         if (b.classList.contains('off-speed') && window.Bots) window.Bots.setSpeedPref(b.dataset.speed);
       });
     });
+    if (mode === 'local') refreshTableSetup();
     showScreen('s-home');
+  }
+
+  // ── Mode TABLE : prénoms + émojis des joueurs, ordis d'appoint, placement ────
+  function localCanBots() { var off = (cfg && cfg.offline) || {}; return !!(off.solo && cfg.bot && !off.soloNoBots && !off.localNoBots); }
+  function setupHumans() {
+    var fixed = document.getElementById('off-humans');
+    if (fixed && fixed.dataset && fixed.dataset.fixed) return +fixed.dataset.fixed;
+    var a = document.querySelector('#off-humans .off-num.active');
+    return a ? +a.dataset.val : (cfg.minPlayers || 2);
+  }
+  function setupBots() { var a = document.querySelector('#off-bots .off-botn.active'); return a ? +a.dataset.val : 0; }
+  function tableDefaults(i, used) {
+    var id0 = readIdentity(), E = (window.Avatars && Avatars.EMOJIS) || ['🦊', '🐼', '🐧', '🦁', '🐸', '🐰', '🦄', '🐵'];
+    var name = (i === 0 && id0 && id0.name) ? id0.name : ('Joueur ' + (i + 1));
+    var emoji = (i === 0 && id0 && id0.emoji && !used[id0.emoji]) ? id0.emoji : null;
+    if (!emoji) for (var k = 0; k < E.length; k++) if (!used[E[k]]) { emoji = E[k]; break; }
+    return { name: name, emoji: emoji || E[i % E.length] };
+  }
+  // Lit les rangées de prénoms affichées (ce que l'utilisateur a déjà tapé est conservé).
+  function readNameRows() {
+    var out = [];
+    document.querySelectorAll('#off-names .off-name-row').forEach(function (r) {
+      out.push({ name: (r.querySelector('.off-name').value || '').trim().slice(0, 14), emoji: r.querySelector('.off-emo').textContent });
+    });
+    return out;
+  }
+  function refreshTableSetup() {
+    var box = document.getElementById('off-names'); if (!box) return;
+    var n = setupHumans(), max = cfg.maxPlayers || 8;
+    var tb = loadTable(), saved = tb.players || [], cur = readNameRows();
+    var rows = [], used = {};
+    for (var i = 0; i < n; i++) {
+      var p = cur[i] || saved[i] || null;
+      if (!p || !p.emoji || used[p.emoji]) { var d = tableDefaults(i, used); p = { name: (p && p.name) || d.name, emoji: d.emoji }; }
+      used[p.emoji] = true; rows.push(p);
+    }
+    box.innerHTML = rows.map(function (p, i) {
+      return '<div class="off-name-row"><button type="button" class="off-emo" data-i="' + i + '" aria-label="Changer l\'émoji">' + esc(p.emoji) + '</button>' +
+        '<input class="off-name" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Joueur ' + (i + 1) + '" value="' + esc(/^Joueur \d+$/.test(p.name) ? '' : p.name) + '"></div>';
+    }).join('');
+    box.querySelectorAll('.off-emo').forEach(function (b) {
+      b.onclick = function () {
+        var E = (window.Avatars && Avatars.EMOJIS) || ['🦊', '🐼', '🐧', '🦁'];
+        var taken = {}; box.querySelectorAll('.off-emo').forEach(function (x) { if (x !== b) taken[x.textContent] = true; });
+        var k = E.indexOf(b.textContent);
+        for (var j = 1; j <= E.length; j++) { var e = E[(k + j + E.length) % E.length]; if (!taken[e]) { b.textContent = e; break; } }
+      };
+    });
+    // Ordis d'appoint : on masque les valeurs qui feraient dépasser le maximum.
+    var bots = document.getElementById('off-bots');
+    if (bots) {
+      var room4 = Math.max(0, max - n), act = setupBots();
+      bots.querySelectorAll('.off-botn').forEach(function (b) {
+        var v = +b.dataset.val; b.style.display = (v <= room4) ? '' : 'none';
+        b.classList.toggle('active', v === Math.min(act, room4));
+      });
+      var bs = bots.closest('.off-set'); if (bs) bs.style.display = room4 > 0 ? '' : 'none';
+      var dr = document.querySelector('.off-diff'); dr = dr && dr.closest('.off-set');
+      if (dr) dr.style.display = (room4 > 0 && setupBots() > 0) ? '' : 'none';
+    }
+    // Face à face : seulement à 2 humains (l'écran pivote de 180° à chaque tour).
+    var seat = document.getElementById('off-seat-set');
+    if (seat) seat.style.display = (n === 2) ? '' : 'none';
   }
   function unsupported(host, msg) {
     host.innerHTML = '<div class="lb-wrap"><div class="lb-emoji-big">🚫</div><h1 class="lb-title">' + esc(cfg.name || 'Jeu') + '</h1>' +
@@ -2605,10 +2694,10 @@
       '<a class="lb-link" href="/index.html">← Tous les jeux</a></div>';
     showScreen('s-home');
   }
-  function counterRow(label, lo, hi, initial) {
+  function counterRow(label, lo, hi, initial, id, cls) {
     var btns = '';
-    for (var v = lo; v <= hi; v++) btns += '<button type="button" class="off-num' + (v === initial ? ' active' : '') + '" data-val="' + v + '">' + v + '</button>';
-    return '<div class="off-set"><div class="off-set-label">' + label + '</div><div class="off-set-row">' + btns + '</div></div>';
+    for (var v = lo; v <= hi; v++) btns += '<button type="button" class="' + (cls || 'off-num') + (v === initial ? ' active' : '') + '" data-val="' + v + '">' + v + '</button>';
+    return '<div class="off-set"><div class="off-set-label">' + label + '</div><div class="off-set-row"' + (id ? ' id="' + id + '"' : '') + '>' + btns + '</div></div>';
   }
   function diffRow(label) {
     var B = window.Bots || { LEVELS: ['easy', 'normal', 'hard'], LABELS: { easy: 'Facile', normal: 'Moyen', hard: 'Difficile' } };
@@ -2631,11 +2720,26 @@
     var noBots = mode === 'solo' && cfg.offline && cfg.offline.soloNoBots;
     var active = document.querySelector('.off-num.active');
     var val = active ? +active.dataset.val : min;
-    if (mode === 'solo') totalPlayers = noBots ? 1 : ((max > 2) ? (1 + val) : 2);
-    else totalPlayers = (max > 2) ? val : min;
-    // En solo « 0 adversaire autorisé », le plancher tombe à 1 (joueur seul).
-    var soloPure = (mode === 'solo' && cfg.offline && cfg.offline.soloMinBots === 0);
-    totalPlayers = Math.max(soloPure ? 1 : min, Math.min(max, totalPlayers));
+    if (mode === 'solo') {
+      totalPlayers = noBots ? 1 : ((max > 2) ? (1 + val) : 2);
+      // En solo « 0 adversaire autorisé », le plancher tombe à 1 (joueur seul).
+      var soloPure = (cfg.offline && cfg.offline.soloMinBots === 0);
+      totalPlayers = Math.max(soloPure ? 1 : min, Math.min(max, totalPlayers));
+    } else {
+      // Mode TABLE : humains + ordis d'appoint, bornés par min/max du jeu.
+      tableHumans = Math.max(1, Math.min(max, setupHumans()));
+      var nb = Math.max(0, Math.min(max - tableHumans, setupBots()));
+      if (tableHumans + nb < min) {
+        if (window.lbToast) lbToast('Il faut au moins ' + min + ' joueurs' + (localCanBots() ? ' (ajoute un ordi)' : ''));
+        return;
+      }
+      totalPlayers = tableHumans + nb;
+      var seatBtn = document.querySelector('.off-seat.active');
+      faceToFace = !!(seatBtn && seatBtn.dataset.seat === 'face' && tableHumans === 2);
+      var rows = readNameRows();
+      var fixedN = document.getElementById('off-humans'); fixedN = !!(fixedN && fixedN.dataset && fixedN.dataset.fixed);
+      saveTable({ n: fixedN ? (loadTable().n || 0) : tableHumans, face: faceToFace, players: rows.concat((loadTable().players || []).slice(rows.length)) });
+    }
     var d = document.querySelector('.off-diff.active');
     offlineDifficulty = (d && d.dataset.diff) || 'normal';
     // Réglages propres au jeu : chaque .off-set-row[data-opt] → salon[clé] = valeur.
@@ -2659,15 +2763,21 @@
     dailyRecorded = false;
     var _od = document.getElementById('off-daily'); if (_od) _od.remove();
     var id0 = readIdentity();
-    var pmap = {}, ids = [];
+    var pmap = {}, ids = [], usedEmoji = {};
+    var tablePlayers = (mode === 'local') ? (loadTable().players || []) : [];
     players = [];
     for (var i = 0; i < totalPlayers; i++) {
       var pid = 'p' + i;
-      var bot = (mode === 'solo' && i > 0);
+      var bot = (mode === 'solo') ? (i > 0) : (i >= tableHumans);
       var name, emoji;
-      if (bot) { name = totalPlayers > 2 ? ('Ordi ' + i) : 'Ordi'; emoji = BOT_EMOJI[(i - 1) % BOT_EMOJI.length]; }
+      var nBots = (mode === 'solo') ? totalPlayers - 1 : totalPlayers - tableHumans;
+      var bi = (mode === 'solo') ? i : (i - tableHumans + 1);   // rang de l'ordi (1, 2, …)
+      var trow = (mode === 'local' && !bot) ? tablePlayers[i] : null;
+      if (bot) { name = nBots > 1 ? ('Ordi ' + bi) : 'Ordi'; emoji = BOT_EMOJI[(bi - 1) % BOT_EMOJI.length]; }
+      else if (trow) { name = trow.name || ('Joueur ' + (i + 1)); emoji = (trow.emoji && !usedEmoji[trow.emoji]) ? trow.emoji : (window.Avatars ? Avatars.firstFreeEmoji(pmap) : '🦊'); }
       else if (i === 0 && id0 && id0.name) { name = id0.name; emoji = id0.emoji || (window.Avatars ? Avatars.firstFreeEmoji(pmap) : '🦊'); }
       else { name = 'Joueur ' + (i + 1); emoji = window.Avatars ? Avatars.firstFreeEmoji(pmap) : '🦊'; }
+      usedEmoji[emoji] = true;
       var color = window.Avatars ? Avatars.pickColor(pmap) : 'var(--gold)';
       pmap[pid] = { name: name, emoji: emoji, color: color, seat: i, online: true, ready: false, isBot: bot };
       if (savedKeep && savedKeep[pid]) for (var k in savedKeep[pid]) pmap[pid][k] = savedKeep[pid][k];
@@ -2681,6 +2791,8 @@
     // Réglages propres au jeu (ex. { size: 6 }) posés sur le salon AVANT onStart, qui
     // les lit (ex. le Sudoku lit room.size pour générer une grille 6×6 ou 9×9).
     for (var ek in offlineExtraOpts) if (offlineExtraOpts.hasOwnProperty(ek)) room[ek] = offlineExtraOpts[ek];
+    if (mode === 'local') { room.table = true; if (faceToFace) room.tableFace = true; }
+    lastHuman = null; keepAwake();
     window.room = room; window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
 
     var onList = players.map(function (p) { return { pid: p.pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat }; });
@@ -2718,7 +2830,7 @@
     try {
       localStorage.setItem(resumeKey(), JSON.stringify({
         v: 1, ts: Date.now(), room: room,
-        totalPlayers: totalPlayers, offlineDifficulty: offlineDifficulty
+        totalPlayers: totalPlayers, offlineDifficulty: offlineDifficulty, extraOpts: offlineExtraOpts
       }));
     } catch (e) {}
   }
@@ -2756,12 +2868,15 @@
     var order = (room.order && room.order.length) ? room.order : Object.keys(room.players || {});
     totalPlayers = saved.totalPlayers || order.length;
     offlineDifficulty = saved.offlineDifficulty || room.difficulty || 'normal';
+    offlineExtraOpts = saved.extraOpts || {};
     players = order.map(function (pid) {
       var p = (room.players || {})[pid] || {};
       return { pid: pid, name: p.name, emoji: p.emoji, color: p.color, seat: p.seat, isBot: !!p.isBot };
     });
     humanPids = players.filter(function (p) { return !p.isBot; }).map(function (p) { return p.pid; });
     humanPid = humanPids[0];
+    tableHumans = humanPids.length; faceToFace = !!room.tableFace && tableHumans === 2;
+    lastHuman = null; keepAwake();
     window.room = room;
     window.roomCode = (mode === 'solo' ? 'SOLO' : 'LOCAL');
     lastTurnShown = null;
@@ -2799,20 +2914,47 @@
       }
       if (ended()) clearResume(); else saveResume();
     } else {
-      if (ended()) { hidePass(); lastTurnShown = null; window.myPid = humanPids[0] || (room.order || [])[0]; safeOnState(); clearResume(); return; }
-      window.myPid = active || room.turn || (room.order || [])[0];
+      if (ended()) {
+        hidePass(); lastTurnShown = null; setFlip(null);
+        window.myPid = lastHuman || humanPids[0] || (room.order || [])[0]; safeOnState(); clearResume();
+        if (!endFx) { endFx = true; if (window.Sfx) Sfx.play('win'); }
+        return;
+      }
+      // Tour d'un ORDI (mode table avec ordis d'appoint) : l'écran reste sur le dernier
+      // humain (on ne montre jamais la main d'un ordi), puis l'ordi joue après un délai.
+      if (active && isBot(active)) {
+        window.myPid = lastHuman || humanPids[0] || active;
+        safeOnState();
+        try { if (window.Lobby && window.Lobby.refreshBotSpeedUI) window.Lobby.refreshBotSpeedUI(); } catch (e) {}
+        if (active !== lastTurnShown) { lastTurnShown = active; if (isOpenGame()) turnBanner(active); }
+        setTimeout(botStep, (window.Bots && window.Bots.speedDelay) ? window.Bots.speedDelay(room) : BOT_DELAY);
+        saveResume();
+        return;
+      }
+      var fallback = room.turn || (room.order || [])[0];
+      if (!active && isBot(fallback)) fallback = lastHuman || humanPids[0] || fallback;
+      window.myPid = active || fallback;
       var changed = (active !== lastTurnShown);
       safeOnState();
       try { if (window.Lobby && window.Lobby.refreshGameStatsUI) window.Lobby.refreshGameStatsUI(room); } catch (e) {}
       // À chaque changement de joueur actif : réinit éventuelle de l'état local du jeu.
       if (changed && cfg.offlineEnter) { try { cfg.offlineEnter(room, window.myPid); } catch (e) {} }
-      if (changed && active) { showPass(active); lastTurnShown = active; }
+      if (changed && active) {
+        setFlip(active);
+        // Jeu à information PUBLIQUE (plateau posé sur la table) : simple bandeau « au
+        // tour de… ». Jeu à mains cachées : écran « passe l'appareil », sauf si c'est le
+        // même humain qui reprend la main (il n'y a alors rien à cacher).
+        if (isOpenGame() || humanPids.length < 2 || active === lastHuman) { hidePass(); turnBanner(active); }
+        else showPass(active);
+        lastTurnShown = active;
+      }
+      if (active) lastHuman = active;
       saveResume();
     }
   }
 
   function botStep() {
-    if (mode !== 'solo' || !room || ended()) return;
+    if (!room || ended()) return;
     var active = activePidOf();
     if (!isBot(active)) return;
     window.myPid = active;
@@ -2834,6 +2976,33 @@
     }
     return el;
   }
+  // ── Mode TABLE : bandeau « au tour de… », écran retourné, écran toujours allumé ──
+  var bannerT = null;
+  function turnBanner(pid) {
+    if (mode !== 'local' || !room || totalPlayers < 2) return;
+    var p = (room.players && room.players[pid]) || {};
+    var el = document.getElementById('off-turn');
+    if (!el) { el = document.createElement('div'); el.id = 'off-turn'; el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
+    el.innerHTML = '<span class="off-turn-av" style="background:' + esc(p.color || 'var(--gold)') + '">' + esc(p.emoji || '🎲') + '</span>' +
+      '<span>Au tour de <b>' + esc(p.name || '?') + '</b></span>';
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(bannerT); bannerT = setTimeout(function () { el.classList.remove('show'); }, 1700);
+  }
+  // Face à face (2 humains) : on retourne tout l'écran de jeu vers le joueur actif.
+  function setFlip(pid) {
+    var flip = !!(mode === 'local' && faceToFace && pid && humanPids.indexOf(pid) === 1);
+    try { document.body.classList.toggle('off-flip', flip); } catch (e) {}
+  }
+  // Empêche la mise en veille de l'écran pendant la partie (tablette posée sur la table).
+  var wake = null;
+  function keepAwake() {
+    try {
+      if (!navigator.wakeLock || wake) return;
+      navigator.wakeLock.request('screen').then(function (w) { wake = w; w.addEventListener('release', function () { wake = null; }); }).catch(function () {});
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && room && !ended()) keepAwake(); });
+
   function showPass(pid) {
     if (mode !== 'local' || totalPlayers < 2) return;
     var p = (room.players && room.players[pid]) || {};
@@ -2859,7 +3028,25 @@
       '.off-pass-card{background:var(--white);border-radius:22px;padding:32px 26px;text-align:center;max-width:340px;width:100%;box-shadow:var(--shadow-hover);}' +
       '.off-pass-av{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto 12px;border:3px solid #fff;box-shadow:0 0 0 3px var(--gold-light);}' +
       '.off-pass-title{font-family:"Playfair Display",serif;font-weight:900;font-size:1.4rem;margin-bottom:4px;}' +
-      '.off-pass-sub{color:var(--ink-light);font-size:.9rem;margin-bottom:18px;}';
+      '.off-pass-sub{color:var(--ink-light);font-size:.9rem;margin-bottom:18px;}' +
+      '.off-botn,.off-seat{min-width:46px;padding:.5rem .8rem;border:1.5px solid var(--gold-light);border-radius:12px;background:var(--white);color:var(--ink);font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;}' +
+      '.off-botn.active,.off-seat.active{background:linear-gradient(135deg,var(--terracotta),var(--gold));color:#fff;border-color:transparent;}' +
+      '.off-set-hint{font-size:.76rem;color:var(--ink-light);margin-top:-2px;}' +
+      '#off-names{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:6px;}' +
+      '.off-name-row{display:flex;align-items:center;gap:6px;background:var(--white);border:1.5px solid var(--gold-light);border-radius:14px;padding:4px 8px 4px 4px;}' +
+      '.off-emo{width:38px;height:38px;flex:none;border:none;border-radius:50%;background:var(--cream);font-size:1.25rem;cursor:pointer;line-height:1;}' +
+      '.off-name{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);font:600 1rem "DM Sans",sans-serif;outline:none;padding:6px 0;}' +
+      '#off-turn{position:fixed;top:56px;left:50%;z-index:8000;display:flex;align-items:center;gap:8px;padding:8px 18px 8px 8px;border-radius:40px;background:var(--white);color:var(--ink);border:1.5px solid var(--gold);box-shadow:var(--shadow-hover);font:500 1.05rem "DM Sans",sans-serif;white-space:nowrap;pointer-events:none;opacity:0;transform:translate(-50%,-14px) scale(.94);transition:opacity .22s,transform .22s;}' +
+      '#off-turn.show{opacity:1;transform:translate(-50%,0) scale(1);}' +
+      '.off-turn-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.15rem;}' +
+      // Tablette posée sur la table : pas de zoom au double-tap, pas de rebond ni de sélection.
+      'html,body{touch-action:manipulation;overscroll-behavior:none;-webkit-touch-callout:none;}' +
+      '.screen{-webkit-user-select:none;user-select:none;} .screen input,.screen textarea{-webkit-user-select:text;user-select:text;}' +
+      // Face à face : l\'écran de jeu, le bandeau et le « passe l\'appareil » pivotent de 180°.
+      'body.off-flip #s-playing{rotate:180deg;}' +
+      'body.off-flip #off-turn{top:auto;bottom:8px;transform:translate(-50%,14px) scale(.94) rotate(180deg);}' +
+      'body.off-flip #off-turn.show{transform:translate(-50%,0) scale(1) rotate(180deg);}' +
+      'body.off-flip .off-pass-card{rotate:180deg;}';
     var s = document.createElement('style'); s.id = 'off-styles'; s.textContent = css;
     document.head.appendChild(s);
   }

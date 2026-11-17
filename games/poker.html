@@ -302,12 +302,24 @@
       ],
       offline: { solo: true, local: true },
       bot: pokerBot,
-      offlineTurn: function (room) { return actor(room); },
+      // Mode table : entre deux donnes, l'écran reste à l'humain qui tient l'appareil (c'est
+      // lui qui touche « Donne suivante ») — sinon le moteur rendait la main au 1er joueur
+      // SANS écran « passe l'appareil », et ses 2 cartes s'affichaient devant tout le monde.
+      offlineTurn: function (room) {
+        if (isTable() && room && room.status === 'playing' && !room.winner && room.phase === 'handover') {
+          var hm = (room.order || []).filter(function (p) { return room.players[p] && !room.players[p].isBot; });
+          return hm.indexOf(window.myPid) >= 0 ? window.myPid : hm[0];
+        }
+        return actor(room);
+      },
       lobbyExtraHTML: lobbyExtraHTML,
       offlineExtraSetup: offlineExtraSetup,
       onState: onState,
       onStart: onStart
     });
+
+    // Mode table (plusieurs joueurs sur le même appareil) : pas de « tu/toi », on nomme les joueurs.
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
 
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
@@ -726,6 +738,7 @@
     function scheduleNextHand(s) {
       if (nextHandTimer) { clearTimeout(nextHandTimer); nextHandTimer = null; }
       if (s.phase !== 'handover' || s.winner) return;
+      if (isTable()) return; // mode table : on laisse le temps de lire l'abattage (bouton « Donne suivante »)
       var iDrive = (!s.host || s.host === window.myPid);
       if (!iDrive) return;
       nextHandTimer = setTimeout(function () {
@@ -792,21 +805,21 @@
         var holeHTML = '';
         var hc = s.hole && s.hole[pid];
         if (hc) {
-          var showCards = (pid === me) || (s.showAll && reveal[pid]);
+          var showCards = (pid === me && !(isTable() && s.phase === 'handover')) || (s.showAll && reveal[pid]);
           holeHTML = '<div class="pk-hole">' + hc.map(function (c) { return cardHTML(showCards ? c : null, 'sm' + (isWinnerCard(s, pid) ? ' win' : '')); }).join('') + '</div>';
         } else if (!out) { holeHTML = '<div class="pk-hole"><div class="pk-card back sm" style="opacity:.3"></div><div class="pk-card back sm" style="opacity:.3"></div></div>'; }
         var betLine = (s.bet && s.bet[pid]) ? '<div class="pk-bet">' + chipsHTML(s.bet[pid], 3) + ' ' + s.bet[pid] + '</div>' : '<div class="pk-bet"></div>';
         var lastLine = (s.lastAct && s.lastAct[pid] && !folded) ? '<div class="pk-lastact">' + escapeHtml(s.lastAct[pid]) + '</div>' : (folded ? '<div class="pk-lastact">couché</div>' : '');
         var comboLine = (s.showAll && reveal[pid]) ? '<div class="pk-combo">' + reveal[pid].combo + '</div>' : '';
         // MA main en direct : « tu as actuellement… » (personne d'autre ne la voit)
-        if (pid === me && !s.showAll && !folded && !out) {
+        if (pid === me && !s.showAll && !folded && !out && !(isTable() && s.phase === 'handover')) {
           var mc = myComboNow(s);
           if (mc) comboLine = '<div class="pk-combo">✋ ' + mc + '</div>';
         }
         var posStyle = seatPos[pid] ? ' style="left:' + seatPos[pid].x.toFixed(1) + '%;top:' + seatPos[pid].y.toFixed(1) + '%"' : '';
         return '<div class="pk-seat' + (pid === me ? ' me' : '') + (active ? ' active' : '') + (folded ? ' folded' : '') + (out ? ' out' : '') + '"' + posStyle + '>' +
           '<div class="pk-seat-top"><span class="pk-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="pk-name">' + escapeHtml(Room.name(pid)) + (pid === me ? ' (toi)' : '') + '</span>' + badges + '</div>' +
+          '<span class="pk-name">' + escapeHtml(Room.name(pid)) + (pid === me && !isTable() ? ' (toi)' : '') + '</span>' + badges + '</div>' +
           '<div class="pk-seat-mid"><div>' + holeHTML + comboLine + betLine + lastLine + '</div>' +
           '<span class="pk-stack">' + (out ? 'éliminé' : (s.stacks[pid] || 0) + ' 🪙') + '</span></div>' +
           '</div>';
@@ -821,7 +834,7 @@
     function renderBar(s) {
       var me = window.myPid, bar = document.getElementById('pk-bar');
       if (s.phase === 'handover') {
-        var iDrive = (!s.host || s.host === me);
+        var iDrive = (!s.host || s.host === me) || isTable();
         bar.innerHTML = '<div class="pk-bar-inner"><div class="pk-bar-info">Fin de la donne</div>' +
           '<div class="pk-btn-row"><button class="pk-btn next" onclick="doNextHand(window.myPid)"' + (iDrive ? '' : ' disabled') + '>Donne suivante ▶</button></div></div>';
         return;
@@ -850,7 +863,7 @@
         html += '<div class="pk-bar-hole">' +
           '<div class="pk-bar-cards">' + myHole.map(function (c) { return cardHTML(c, 'mid'); }).join('') + '</div>' +
           '<div class="pk-bar-hole-meta">' +
-            '<span class="pk-bar-mine">Ta main</span>' +
+            '<span class="pk-bar-mine">' + (isTable() ? 'Main de ' + escapeHtml(Room.name(me)) : 'Ta main') + '</span>' +
             (comboNow ? '<span class="pk-bar-combo">✋ ' + comboNow + '</span>' : '') +
             (myPos ? '<span class="pk-bar-pos">' + myPos + '</span>' : '') +
           '</div></div>';
@@ -884,13 +897,14 @@
       if (nextHandTimer) { clearTimeout(nextHandTimer); nextHandTimer = null; }
       showScreen('s-results');
       var win = s.winner;
-      setText('res-emoji', win === window.myPid ? '🏆' : '♠️');
-      setText('res-title', win === window.myPid ? 'Tu remportes la table ! 🏆' : (win ? Room.name(win) + ' rafle tous les jetons' : 'Partie terminée'));
+      var iWon = win === window.myPid && !isTable();
+      setText('res-emoji', (iWon || isTable()) ? '🏆' : '♠️');
+      setText('res-title', iWon ? 'Tu remportes la table ! 🏆' : (win ? Room.name(win) + ' rafle tous les jetons' : 'Partie terminée'));
       var order = (s.order || []).slice().sort(function (a, b) { return (s.stacks[b] || 0) - (s.stacks[a] || 0); });
       setHTML('res-rank', order.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid && !isTable() ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-sc">' + (s.stacks[pid] || 0) + ' 🪙</span></div>';
       }).join(''));
     }

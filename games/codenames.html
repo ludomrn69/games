@@ -96,6 +96,86 @@
     .res-title.red { color: var(--cn-red); } .res-title.blue { color: var(--cn-blue); }
     .res-sub { color: var(--ink-light); margin-bottom: 22px; }
     @media (min-width: 760px) { .cn-grid{max-width:780px;margin-inline:auto} }
+
+    /* ══ MODE TABLE (?mode=local) : l'iPad posé au milieu, plateau en grand ══ */
+    body.cn-tb { min-height: 0; }
+    .cn-key-btn { border: none; border-radius: 30px; padding: 0 14px; height: 36px; background: #2a2430; color: #fff; font-weight: 800; font-family: 'DM Sans', sans-serif; font-size: 0.86rem; cursor: pointer; white-space: nowrap; }
+    .cn-tt { display: flex; align-items: stretch; gap: 10px; width: min(97vw, 1120px); margin: 8px auto 0; }
+    .cn-tt-team { flex: none; min-width: 108px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; padding: 4px 14px; border: 3px solid var(--c); color: var(--c); background: var(--white); transition: background .25s, color .25s, transform .25s; }
+    .cn-tt-team.red { --c: var(--cn-red); } .cn-tt-team.blue { --c: var(--cn-blue); }
+    .cn-tt-team .n { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 2rem; line-height: 1; }
+    .cn-tt-team .l { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; line-height: 1.15; text-align: left; }
+    .cn-tt.turn-red .cn-tt-team.red, .cn-tt.turn-blue .cn-tt-team.blue { background: var(--c); color: #fff; transform: scale(1.04); box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
+    .cn-tt-mid { flex: 1; min-width: 0; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 10px; color: #fff; text-align: center; background: var(--cn-red); transition: background .25s; }
+    .cn-tt.turn-blue .cn-tt-mid { background: var(--cn-blue); }
+    .cn-tt-mid .t { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.35rem; line-height: 1.15; }
+    .cn-tt-mid .s { font-size: 0.86rem; font-weight: 600; opacity: 0.95; }
+    .cn-tt.pulse .cn-tt-mid { animation: cnPulse 0.7s ease; }
+    @keyframes cnPulse { 0% { transform: scale(0.94); filter: brightness(1.5); } 60% { transform: scale(1.03); } 100% { transform: scale(1); filter: none; } }
+
+    .cn-table .cn-grid-wrap { width: min(97vw, 1120px) !important; padding: 10px !important; margin: 8px auto !important; }
+    .cn-table .cn-grid { width: 100%; max-width: none; gap: 8px; grid-auto-rows: clamp(64px, calc((100vh - 345px) / 5), 150px); grid-auto-rows: clamp(64px, calc((100dvh - 345px) / 5), 150px); }
+    .cn-table .cn-word { aspect-ratio: auto; position: relative; border-radius: 12px; border-width: 2px; font-size: clamp(0.8rem, 2.05vw, 1.5rem); letter-spacing: 0.5px; background: #fbf3e2; color: #2c2520; border-color: #d9c8a3; cursor: pointer; -webkit-tap-highlight-color: transparent; overflow: hidden; }
+    /* Comme sur les vraies cartes : le mot est aussi imprimé à l'envers pour ceux d'en face. */
+    .cn-table .cn-word .w2 { position: absolute; top: 5px; left: 0; right: 0; font-size: 0.55em; opacity: 0.45; transform: rotate(180deg); font-weight: 700; }
+    .cn-table .cn-word.sel { background: #fff3c4; border-color: var(--gold); box-shadow: 0 0 0 4px var(--gold), 0 8px 18px rgba(0,0,0,0.35); transform: scale(1.05); z-index: 2; }
+    .cn-table .cn-word .ok { position: absolute; bottom: 4px; left: 0; right: 0; font-size: 0.5em; font-weight: 800; color: #9a6a10; letter-spacing: 0; }
+    .cn-table .cn-word.off { cursor: default; }
+    .cn-table .cn-agent svg { width: clamp(22px, 3.6vw, 42px); height: clamp(22px, 3.6vw, 42px); }
+    .cn-table .cn-word .rw { font-size: 0.6em; opacity: 0.9; }
+    .cn-table .cn-word.revealed-neutral, .cn-table .cn-word.revealed-red, .cn-table .cn-word.revealed-blue, .cn-table .cn-word.revealed-assassin { cursor: default; }
+    .cn-table .cn-word.revealed-red { background: linear-gradient(160deg, #e2574b, #b8352b); color: #fff; border-color: #8a2c24; }
+    .cn-table .cn-word.revealed-blue { background: linear-gradient(160deg, #4a8fd0, #2a5f95); color: #fff; border-color: #1d4266; }
+    .cn-table .cn-word.revealed-neutral { background: linear-gradient(160deg, #cdbb95, #b5a078); color: #5a4a2a; border-color: #9c8760; opacity: 0.8; }
+    .cn-table .cn-word.revealed-assassin { background: linear-gradient(160deg, #2a2430, #000); color: #ff7b6e; border-color: #000; }
+    @media (orientation: portrait) { .cn-table .cn-word { font-size: clamp(0.8rem, 2.3vw, 1.5rem); } .cn-table .cn-grid { grid-auto-rows: clamp(64px, calc((100dvh - 345px) / 5), 175px); } }
+
+    .cn-tp { width: min(97vw, 1120px); margin: 0 auto; padding: 2px 0 calc(12px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; min-height: 62px; }
+    .cn-tp-label { font-weight: 700; font-size: 0.95rem; color: var(--ink); }
+    .cn-nbs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .cn-nb { width: 50px; height: 50px; border-radius: 14px; border: 2px solid var(--gold-light); background: var(--white); color: var(--ink); font-weight: 900; font-size: 1.25rem; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+    .cn-nb:active { background: var(--gold); color: #fff; }
+    .cn-tp-clue { display: flex; align-items: center; gap: 8px; background: var(--white); border-radius: 30px; padding: 8px 18px; box-shadow: var(--shadow); font-weight: 800; }
+    .cn-tp-clue .num { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.5rem; color: var(--terracotta); line-height: 1; }
+    .cn-tp-edit { border: 1.5px solid var(--gold-light); background: var(--white); color: var(--ink); border-radius: 30px; padding: 0.55rem 1rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .cn-tp-end { border: none; border-radius: 30px; padding: 0.8rem 1.8rem; font-weight: 800; font-size: 1.02rem; cursor: pointer; font-family: 'DM Sans', sans-serif; color: #fff; background: var(--cn-red); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .cn-tp-end.blue { background: var(--cn-blue); }
+    .cn-tp-end:disabled { opacity: 0.4; box-shadow: none; }
+
+    /* Clé secrète plein écran (maîtres-espions) */
+    .cn-key { position: fixed; inset: 0; z-index: 8500; background: #17131d; color: #fff; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; padding-top: calc(20px + env(safe-area-inset-top)); overflow-y: auto; }
+    .cn-key.active { display: flex; }
+    .cn-key-card { background: var(--white); color: var(--ink); border-radius: 24px; padding: 28px 26px; max-width: 520px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .cn-key-card h2 { font-family: 'Playfair Display', serif; font-weight: 900; font-size: 1.6rem; margin-bottom: 10px; }
+    .cn-key-card ol { text-align: left; margin: 0 0 16px 1.2em; padding: 0; color: var(--ink-light); line-height: 1.55; font-size: 0.98rem; }
+    .cn-key-card ol b { color: var(--ink); }
+    .cn-key-card p { color: var(--ink-light); line-height: 1.5; margin-bottom: 16px; }
+    .cn-key-acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .cn-kbtn { border: none; border-radius: 30px; padding: 0.85rem 1.6rem; font-weight: 800; font-size: 1rem; cursor: pointer; font-family: 'DM Sans', sans-serif; background: #2a2430; color: #fff; }
+    .cn-kbtn.go { background: linear-gradient(135deg, var(--terracotta), var(--gold)); }
+    .cn-kbtn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--gold-light); }
+    .cn-key-top { font-weight: 800; font-size: 1.05rem; margin-bottom: 10px; text-align: center; }
+    .cn-key-top .red { color: #ff8a80; } .cn-key-top .blue { color: #8ec5f5; }
+    .cn-key-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: min(96vw, 1000px); padding: 10px; border-radius: 18px; border: 5px solid var(--kc, #555); background: #0e0b12; }
+    .cn-key-grid.red { --kc: var(--cn-red); } .cn-key-grid.blue { --kc: var(--cn-blue); }
+    .cn-kc { height: clamp(54px, calc((100vh - 270px) / 5), 120px); border-radius: 10px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: clamp(0.72rem, 1.9vw, 1.3rem); padding: 2px; background: #e2cfa4; color: #4a3d22; word-break: break-word; }
+    .cn-kc.red { background: #d6483c; color: #fff; } .cn-kc.blue { background: #2f6fae; color: #fff; }
+    .cn-kc.assassin { background: #000; color: #fff; box-shadow: inset 0 0 0 3px #fff; }
+    .cn-kc.got { opacity: 0.28; text-decoration: line-through; }
+    .cn-key-foot { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .cn-key-tip { font-size: 0.85rem; opacity: 0.75; text-align: center; }
+    .cn-kbtn.hide { background: #fff; color: #17131d; padding: 1rem 2.4rem; font-size: 1.1rem; }
+
+    /* Plateau dévoilé sur l'écran de fin */
+    .cn-final { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: min(94vw, 720px); margin: 0 auto 20px; }
+    .cn-final .cn-kc { height: auto; min-height: 44px; font-size: clamp(0.56rem, 1.5vw, 0.95rem); }
+    .cn-final .cn-kc { opacity: 0.42; }
+    .cn-final .cn-kc.got { opacity: 1; text-decoration: none; }
+    .cn-final .cn-kc.assassin { opacity: 0.7; }
+    .cn-final .cn-kc.assassin.got { opacity: 1; box-shadow: inset 0 0 0 3px #e05a4e, 0 0 0 2px #e05a4e; }
+    .cn-final-hint { font-size: 0.8rem; color: var(--ink-light); margin: -12px 0 18px; text-align: center; }
+    .cn-setup-note { background: var(--white); border: 1.5px solid var(--gold-light); border-radius: 16px; padding: 12px 16px; margin: 6px auto 14px; max-width: 420px; text-align: left; font-size: 0.9rem; line-height: 1.5; color: var(--ink-light); }
+    .cn-setup-note b { color: var(--ink); }
   </style>
 </head>
 <body>
@@ -115,12 +195,19 @@
         </div>
         <div class="cn-header-actions">
           <div class="cn-minikey" id="cn-minikey" style="display:none" title="Ta carte-clé (maître-espion)"></div>
+          <button class="cn-key-btn" id="cn-key-btn" style="display:none" onclick="openKey()">🕵️ Clé (espions)</button>
           <button class="game-rules-btn cn-history-btn" onclick="openModal('modal-history');renderHistory()" title="Historique">📜<span class="badge" id="cn-hist-badge" style="display:none">0</span></button>
           <button class="game-rules-btn" onclick="openModal('modal-rules')" title="Règles">?</button>
           <button class="game-restart-btn" onclick="openModal('modal-restart')" title="Nouvelle partie">↻</button>
         </div>
       </div>
 
+      <!-- Mode table : compteurs d'équipe + tour en cours -->
+      <div class="cn-tt" id="cn-tt" style="display:none">
+        <div class="cn-tt-team red"><span class="n" id="cn-tt-red">9</span><span class="l">Rouges<br>à trouver</span></div>
+        <div class="cn-tt-mid"><div class="t" id="cn-tt-t"></div><div class="s" id="cn-tt-s"></div></div>
+        <div class="cn-tt-team blue"><span class="l" style="text-align:right">Bleus<br>à trouver</span><span class="n" id="cn-tt-blue">8</span></div>
+      </div>
       <div class="cn-turn" id="cn-turn"></div>
       <div id="cn-clue-area" class="cn-clue-area" style="display:none">
         <div class="cn-clue-box"><span class="cn-clue-word" id="cn-clue-word">—</span><span class="cn-clue-x">×</span><span class="cn-clue-num" id="cn-clue-num">0</span></div>
@@ -141,6 +228,7 @@
       <div class="cn-panel" id="cn-op-panel" style="display:none">
         <button class="cn-end-btn" id="cn-end-btn" onclick="endTurn()">Fin de tour</button>
       </div>
+      <div class="cn-tp" id="cn-tp" style="display:none"></div>
     </div>
 
     <!-- ══ RESULTS ══ -->
@@ -148,11 +236,16 @@
       <div class="res-emoji" id="res-emoji">🏆</div>
       <h2 class="res-title" id="res-title">—</h2>
       <p class="res-sub" id="res-sub">—</p>
+      <div class="cn-final" id="res-key"></div>
+      <div class="cn-final-hint" id="res-key-hint" style="display:none">Le plateau dévoilé — les cartes estompées n'avaient pas été trouvées.</div>
       <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
       <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
       <button class="btn-secondary" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
     </div>
   </div>
+
+  <!-- ══ Clé secrète (mode table) ══ -->
+  <div class="cn-key" id="cn-key"></div>
 
   <!-- ══ MODALS ══ -->
   <div class="modal" id="modal-history">
@@ -177,7 +270,9 @@
         <p>Deux équipes (🔴 Rouge / 🔵 Bleu). Chaque équipe a un <b>maître-espion</b> (qui voit la clé) et des <b>agents</b> (qui devinent).</p>
         <p style="margin-top:8px">À ton tour, ton maître-espion donne <b>1 indice (1 mot + 1 chiffre)</b>. Tes agents cliquent les mots de votre couleur.</p>
         <p style="margin-top:8px">Bonne couleur = continue · neutre ou couleur adverse = tour fini · <b>assassin (noir) = défaite immédiate</b>.</p>
+        <p style="margin-top:8px">Nombre d'essais = <b>chiffre de l'indice + 1</b> (au moins 1 essai par tour). Indice « 0 » ou « ∞ » = essais illimités.</p>
         <p style="margin-top:8px">La première équipe à trouver tous ses agents gagne.</p>
+        <p style="margin-top:8px" id="cn-rules-table" hidden><b>Mode table</b> : l'indice se donne à voix haute, on touche seulement son chiffre. Une carte se touche <b>deux fois</b> pour être validée. Les maîtres-espions consultent la clé avec « 🕵️ Clé (espions) ».</p>
       </div>
       <button class="btn-primary" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -214,7 +309,24 @@
       'CRISTAL','SOIE','LAINE','COTON','PLUME','ENCRE','COURONNE','TRÔNE','CAPE','MASQUE',
       'ÉNIGME','MYSTÈRE','INDICE','PISTE','TRACE','LANTERNE','PHARE','ANCRE','VOILE','CAPITAINE',
       'PIRATE','CORSAIRE','NAUFRAGE','GALION','FRÉGATE','SOUS-MARIN','MÉTÉORITE','CRATÈRE',
-      'SATELLITE','FUSÉE','GRAVITÉ','ORBITE','HORIZON','CANYON','VALLÉE','SOMMET','TORRENT'
+      'SATELLITE','FUSÉE','GRAVITÉ','ORBITE','HORIZON','CANYON','VALLÉE','SOMMET','TORRENT',
+      'BANQUE','HÔPITAL','ÉGLISE','MARCHÉ','USINE','FERME','MOULIN','PRISON','MUSÉE','HÔTEL',
+      'CIRQUE','ZOO','STADE','GARE','PORT','AÉROPORT','TUNNEL','TOUR','MUR','TOIT',
+      'CHEVAL','VACHE','COCHON','MOUTON','POULE','CANARD','LAPIN','SOURIS','LOUP','OURS',
+      'RENARD','HIBOU','CORBEAU','CYGNE','TORTUE','GRENOUILLE','ESCARGOT','CRABE','MÉDUSE','KANGOUROU',
+      'BOUCHE','MAIN','PIED','ŒIL','NEZ','OREILLE','DENT','CŒUR','LANGUE','BRAS',
+      'CHAPEAU','BOTTE','GANT','CEINTURE','ROBE','CRAVATE','LUNETTES','BAGUE','COLLIER','POCHE',
+      'MARTEAU','CLOU','SCIE','ÉCHELLE','CORDE','CHAÎNE','PELLE','BALAI','SEAU','AIGUILLE',
+      'BOUTEILLE','ASSIETTE','FOURCHETTE','CUILLÈRE','CASSEROLE','BOUCHON','PAILLE','SEL','SUCRE','MIEL',
+      'PAIN','BEURRE','ŒUF','SOUPE','SALADE','CAROTTE','TOMATE','CHAMPIGNON','NOIX','RAISIN',
+      'BALLON','RAQUETTE','FILET','MÉDAILLE','COUPE','ARBITRE','CHAMPION','ÉQUIPE','COURSE','SAUT',
+      'DOMINO','DÉ','PION','ÉCHECS','PUZZLE','POUPÉE','TOUPIE','CERF-VOLANT','MANÈGE','CLOWN',
+      'SOLDAT','GÉNÉRAL','CANON','BOMBE','BOUCLIER','ARC','FLÈCHE','CHEVALIER','NINJA','ESPION',
+      'NOTAIRE','JUGE','VOLEUR','DÉTECTIVE','CUISINIER','BOULANGER','FACTEUR','PROFESSEUR','PEINTRE','CHANTEUR',
+      'JOURNAL','LETTRE','TIMBRE','PHOTO','RADIO','ÉCRAN','CLAVIER','CÂBLE','PILE','ANTENNE',
+      'ATOME','VIRUS','MICROBE','POISON','VACCIN','SQUELETTE','CERVEAU','SANG','OS','MUSCLE',
+      'FRANCE','PARIS','LONDRES','ROME','ÉGYPTE','CHINE','JAPON','AMÉRIQUE','AFRIQUE','PÔLE',
+      'NOËL','CADEAU','FÊTE','MARIAGE','ANNIVERSAIRE','VACANCES','VOYAGE','VALISE','TENTE','CAMPING'
     ];
 
     var prevStatus = null;
@@ -230,11 +342,59 @@
       if (cur.clueLog && cur.clueLog.length) { var last = cur.clueLog[cur.clueLog.length - 1]; last.picks = (last.picks || []).concat([{ word: cur.words[idx], color: colorClass }]); cur.clueLog[cur.clueLog.length - 1] = last; }
     }
     function endTurnIn(cur) { cur.turn = otherTeam(cur.turn); cur.clue = null; cur.guessesLeft = 0; }
+    // Firebase rend un tableau creux sous forme d'objet : on ne compte jamais sur Array.prototype.
+    function revealedHas(state, v) { var r = state.revealed || {}; for (var k in r) if (r[k] === v) return true; return false; }
+    function unlimited(g) { return (g || 0) >= 50; }   // indice « 0 » ou « ∞ » → essais illimités
+    function guessesFor(num) { return (num >= 1 && num <= 9) ? num + 1 : 99; }
+    function turnPicks(cur) { var l = cur.clueLog || []; return l.length ? (l[l.length - 1].picks || []).length : 0; }
+    function norm(s) { return String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, ''); }
+    // Une proposition (commune au mode en ligne et au mode table).
+    function applyGuess(cur, idx) {
+      if (!cur.revealed) cur.revealed = [];
+      if (cur.revealed[idx]) return cur;
+      var color = (cur.key || [])[idx];
+      cur.revealed[idx] = color;
+      logPick(cur, idx, color);
+      if (color === 'assassin') { cur.winner = otherTeam(cur.turn); cur.status = 'ended'; return cur; }
+      if (color === 'red' || color === 'blue') {
+        cur.remaining[color] = Math.max(0, (cur.remaining[color] || 0) - 1);
+        if (cur.remaining[color] === 0) { cur.winner = color; cur.status = 'ended'; return cur; }
+      }
+      if (color === cur.turn) { cur.guessesLeft = (cur.guessesLeft || 1) - 1; if (cur.guessesLeft <= 0) endTurnIn(cur); }
+      else endTurnIn(cur); // neutre ou couleur adverse → fin de tour
+      return cur;
+    }
+
+    /* ━━ Mode table : une seule tablette, deux équipes (le nombre de joueurs importe peu) ━━ */
+    var TABLE = window.OFFLINE_MODE === 'local';
+    if (TABLE) document.body.classList.add('cn-tb');   // pas de défilement parasite : tout tient à l'écran
+    // Le moteur hors-ligne mémorise « n joueurs » pour tous les jeux : ici il n'y a qu'un
+    // pseudo-joueur (la table), on restaure donc les préférences de table après le départ.
+    var tablePrefs = null; try { tablePrefs = localStorage.getItem('games.table.v1'); } catch (e) {}
+    function restoreTablePrefs() { try { if (tablePrefs == null) localStorage.removeItem('games.table.v1'); else localStorage.setItem('games.table.v1', tablePrefs); } catch (e) {} }
+    // Mots déjà sortis récemment sur cet appareil : on évite de les resservir.
+    function pickWords() {
+      var recent = [];
+      try { recent = JSON.parse(localStorage.getItem('games.codenames.recent')) || []; } catch (e) {}
+      var fresh = WORDS.filter(function (w) { return recent.indexOf(w) < 0; });
+      var out = shuffle(fresh.length >= 25 ? fresh : WORDS).slice(0, 25);
+      try { localStorage.setItem('games.codenames.recent', JSON.stringify(recent.concat(out).slice(-200))); } catch (e) {}
+      return out;
+    }
 
     /* ━━ Enregistrement du salon ━━ */
     GameRoom({
       gameKey: 'codenames', name: 'Codenames', emoji: '🕵️', tagline: '2 équipes · maîtres-espions',
-      minPlayers: 4, maxPlayers: 8,
+      minPlayers: TABLE ? 1 : 4, maxPlayers: TABLE ? 1 : 8,
+      offline: { local: true, open: true, localNoBots: true },
+      offlineTurn: function (room) { return (room.order || [])[0]; },
+      offlineExtraSetup: function () {
+        // Pas de prénoms à saisir : on joue en 2 équipes autour de la tablette.
+        setTimeout(function () { var n = document.getElementById('off-names'); if (n && n.parentNode) n.parentNode.style.display = 'none'; }, 0);
+        return '<div class="cn-setup-note">👥 <b>2 équipes</b>, à partir de 4 joueurs (autant que vous voulez).<br>' +
+          '🕵️ Chaque équipe choisit son <b>maître-espion</b> : ils s\'assoient du même côté et regardent la clé en secret sur la tablette.<br>' +
+          '🗣️ Les indices se donnent <b>à voix haute</b> ; les équipiers touchent les cartes.</div>';
+      },
       rules: [
         'Deux équipes Rouge / Bleu, chacune un maître-espion + des agents',
         'Le maître-espion donne 1 indice (1 mot + 1 chiffre)',
@@ -269,6 +429,7 @@
     /* ━━ Mise en place ━━ */
     function onStart(players, cur) {
       var order = players.map(function (p) { return p.pid; });
+      if (cur && cur.table) { restoreTablePrefs(); return newBoard(); }
       // Répartition en équipes : on respecte les choix, on rééquilibre si besoin.
       var red = [], blue = [], un = [];
       order.forEach(function (pid) { var t = cur.players[pid].team; if (t === 'red') red.push(pid); else if (t === 'blue') blue.push(pid); else un.push(pid); });
@@ -281,7 +442,9 @@
         arr.forEach(function (pid) { cur.players[pid].team = team; cur.players[pid].role = (pid === spy ? 'spymaster' : 'operative'); });
       }
       fixTeam(red, 'red'); fixTeam(blue, 'blue');
-
+      return newBoard();
+    }
+    function newBoard() {
       // Clé : l'équipe qui commence a 9 agents, l'autre 8, + 7 neutres + 1 assassin.
       var starting = Math.random() < 0.5 ? 'red' : 'blue';
       var keyVals = [];
@@ -291,7 +454,7 @@
       var remaining = { red: 0, blue: 0 };
       keyVals.forEach(function (v) { if (v === 'red') remaining.red++; else if (v === 'blue') remaining.blue++; });
       return {
-        words: shuffle(WORDS).slice(0, 25), key: keyVals, revealed: [],
+        words: pickWords(), key: keyVals, revealed: [],
         turn: starting, starting: starting, remaining: remaining,
         clue: null, guessesLeft: 0, winner: null, clueLog: []
       };
@@ -308,6 +471,7 @@
     /* ━━ Rendu ━━ */
     function renderPlaying(state) {
       if (!state.words) return;
+      if (state.table) { renderTable(state); return; }
       var words = state.words, key = state.key || [], revealed = state.revealed || [];
       var turn = state.turn, clue = state.clue, guessesLeft = state.guessesLeft || 0;
       var me = (state.players && state.players[window.myPid]) || {};
@@ -332,7 +496,7 @@
       if (clue && clue.word) {
         clueArea.style.display = ''; waiting.style.display = 'none';
         setText('cn-clue-word', clue.word.toUpperCase()); setText('cn-clue-num', clue.number);
-        setText('cn-guesses-left', myTurn && !amSpy ? (guessesLeft + ' devine' + (guessesLeft > 1 ? 's' : '') + ' restante' + (guessesLeft > 1 ? 's' : '')) : 'Indice de ' + teamName(turn));
+        setText('cn-guesses-left', myTurn && !amSpy ? (unlimited(guessesLeft) ? 'Essais illimités' : (guessesLeft + ' essai' + (guessesLeft > 1 ? 's' : '') + ' restant' + (guessesLeft > 1 ? 's' : ''))) : 'Indice de ' + teamName(turn));
       } else {
         clueArea.style.display = 'none';
         waiting.style.display = '';
@@ -342,7 +506,8 @@
       var spyPanel = document.getElementById('cn-spy-panel'), opPanel = document.getElementById('cn-op-panel');
       spyPanel.style.display = (amSpy && myTurn && !clue) ? '' : 'none';
       opPanel.style.display = (!amSpy && myTurn && clue) ? '' : 'none';
-      if (!amSpy && myTurn && clue) document.getElementById('cn-end-btn').disabled = false;
+      // Règle : au moins une proposition avant de pouvoir passer.
+      if (!amSpy && myTurn && clue) document.getElementById('cn-end-btn').disabled = turnPicks(state) < 1;
 
       // Mini carte-clé des maîtres-espions (grille 5×5 dans l'en-tête).
       var mk = document.getElementById('cn-minikey');
@@ -384,11 +549,15 @@
       var num = parseInt(document.getElementById('cn-spy-num').value, 10);
       if (!word) { lbToast('Écris un indice'); return; }
       if (isNaN(num) || num < 0 || num > 9) { lbToast('Nombre entre 0 et 9'); return; }
+      // Interdit : un mot encore visible sur le plateau.
+      var rv = st.revealed || {}, nw = norm(word);
+      if ((st.words || []).some(function (w, i) { return !rv[i] && norm(w) === nw; })) { lbToast('Interdit : ce mot est sur le plateau'); return; }
       rref().transaction(function (cur) {
+        if (!cur || !cur.players) return cur;
         var m = cur.players[window.myPid] || {};
-        if (!cur || cur.status !== 'playing' || m.role !== 'spymaster' || cur.turn !== m.team || (cur.clue && cur.clue.word)) return cur;
+        if (cur.status !== 'playing' || m.role !== 'spymaster' || cur.turn !== m.team || (cur.clue && cur.clue.word)) return cur;
         cur.clue = { word: word, number: num };
-        cur.guessesLeft = num + 1; // bonus +1 (classique)
+        cur.guessesLeft = guessesFor(num); // chiffre + 1 (classique) ; 0 = illimité
         cur.clueLog = (cur.clueLog || []).concat([{ team: cur.turn, giver: window.myPid, word: word, number: num, picks: [] }]);
         return cur;
       }, function (err, committed) { if (committed) { document.getElementById('cn-spy-word').value = ''; document.getElementById('cn-spy-num').value = '2'; } });
@@ -401,22 +570,11 @@
       if (!st.clue || !st.clue.word || (st.guessesLeft || 0) <= 0) return;
       if (st.revealed && st.revealed[idx]) return;
       rref().transaction(function (cur) {
+        if (!cur || !cur.players) return cur;
         var m = cur.players[window.myPid] || {};
-        if (!cur || cur.status !== 'playing' || m.role === 'spymaster' || cur.turn !== m.team) return cur;
+        if (cur.status !== 'playing' || m.role === 'spymaster' || cur.turn !== m.team) return cur;
         if (!cur.clue || (cur.guessesLeft || 0) <= 0) return cur;
-        if (!cur.revealed) cur.revealed = [];
-        if (cur.revealed[idx]) return cur;
-        var color = (cur.key || [])[idx];
-        cur.revealed[idx] = color;
-        if (color === 'assassin') { logPick(cur, idx, 'assassin'); cur.winner = otherTeam(cur.turn); cur.status = 'ended'; return cur; }
-        logPick(cur, idx, color);
-        if (color === 'red' || color === 'blue') {
-          cur.remaining[color] = Math.max(0, (cur.remaining[color] || 0) - 1);
-          if (cur.remaining[color] === 0) { cur.winner = color; cur.status = 'ended'; return cur; }
-        }
-        if (color === cur.turn) { cur.guessesLeft = (cur.guessesLeft || 1) - 1; if (cur.guessesLeft <= 0) endTurnIn(cur); }
-        else endTurnIn(cur); // neutre ou couleur adverse → fin de tour
-        return cur;
+        return applyGuess(cur, idx);
       });
     }
 
@@ -424,11 +582,166 @@
       var st = window.room || {};
       var me = (st.players && st.players[window.myPid]) || {};
       if (st.status !== 'playing' || me.role === 'spymaster' || st.turn !== me.team || !st.clue) return;
+      if (turnPicks(st) < 1) { lbToast('Au moins une proposition avant de passer'); return; }
       rref().transaction(function (cur) {
+        if (!cur || !cur.players) return cur;
         var m = cur.players[window.myPid] || {};
-        if (!cur || cur.status !== 'playing' || m.role === 'spymaster' || cur.turn !== m.team || !cur.clue) return cur;
+        if (cur.status !== 'playing' || m.role === 'spymaster' || cur.turn !== m.team || !cur.clue || turnPicks(cur) < 1) return cur;
         endTurnIn(cur); return cur;
       });
+    }
+
+    /* ━━ MODE TABLE : rendu + actions ━━ */
+    var AGENT_SVG_T = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.2a3.4 3.4 0 0 1 3.4 3.4c0 .5-.1 1-.3 1.4h1.6a.9.9 0 1 1 0 1.8H7.3a.9.9 0 1 1 0-1.8h1.6c-.2-.4-.3-.9-.3-1.4A3.4 3.4 0 0 1 12 4.2zM6.8 20.2c.4-3.6 2.6-6 5.2-6s4.8 2.4 5.2 6z"/></svg>';
+    var tSel = -1;            // carte présélectionnée (2e toucher = validation)
+    var keyStep = null;       // null | 'intro' | 'warn' | 'show'  (écran de la clé secrète)
+    var keySeen = false, tPrevTurn = null;
+    function teamPlural(t) { return t === 'red' ? 'Rouges' : 'Bleus'; }
+
+    function renderTable(state) {
+      var sp = document.getElementById('s-playing'); sp.classList.add('cn-table');
+      var words = state.words, revealed = state.revealed || [];
+      var turn = state.turn, clue = state.clue, g = state.guessesLeft || 0;
+      var rem = state.remaining || { red: 0, blue: 0 };
+      ['cn-turn', 'cn-clue-area', 'cn-waiting', 'cn-spy-panel', 'cn-op-panel', 'cn-minikey', 'cn-score'].forEach(function (id) { document.getElementById(id).style.display = 'none'; });
+      var rl = document.getElementById('cn-role-label'); rl.textContent = '🎲 Mode table'; rl.style.color = '';
+      document.getElementById('cn-key-btn').style.display = '';
+      document.getElementById('cn-rules-table').hidden = false;
+      var log = state.clueLog || [], badge = document.getElementById('cn-hist-badge');
+      if (log.length) { badge.style.display = ''; badge.textContent = log.length; } else badge.style.display = 'none';
+
+      // Bandeau : cartes restantes par équipe + tour en cours.
+      var tt = document.getElementById('cn-tt'); tt.style.display = '';
+      tt.className = 'cn-tt turn-' + turn;
+      if (tPrevTurn && tPrevTurn !== turn) { void tt.offsetWidth; tt.classList.add('pulse'); }
+      tPrevTurn = turn;
+      setText('cn-tt-red', rem.red); setText('cn-tt-blue', rem.blue);
+      setText('cn-tt-t', teamEmoji(turn) + ' Au tour des ' + teamPlural(turn));
+      setText('cn-tt-s', clue
+        ? ('Indice pour ' + (clue.number === '∞' ? '∞' : clue.number) + ' mot' + (clue.number === 1 ? '' : 's') + ' · ' + (unlimited(g) ? 'essais illimités' : (g + ' essai' + (g > 1 ? 's' : '') + ' restant' + (g > 1 ? 's' : ''))))
+        : 'Le maître-espion donne son indice à voix haute');
+
+      // Panneau du bas : chiffre de l'indice, puis « fin du tour ».
+      var tp = document.getElementById('cn-tp'); tp.style.display = '';
+      if (!clue) {
+        var nb = ''; [1, 2, 3, 4, 5, 6, 7, 8, 9, 0].forEach(function (n) { nb += '<button class="cn-nb" data-n="' + n + '" onclick="tableClue(' + n + ')">' + n + '</button>'; });
+        nb += '<button class="cn-nb" data-n="inf" onclick="tableClue(\'inf\')">∞</button>';
+        tp.innerHTML = '<span class="cn-tp-label">Chiffre de l\'indice :</span><div class="cn-nbs">' + nb + '</div>';
+      } else {
+        var picks = turnPicks(state);
+        tp.innerHTML = '<div class="cn-tp-clue">Indice × <span class="num">' + clue.number + '</span></div>' +
+          (picks < 1 ? '<button class="cn-tp-edit" id="cn-tp-edit" onclick="tableUndoClue()">✎ Corriger le chiffre</button>' : '') +
+          '<button class="cn-tp-end ' + turn + '" id="cn-tp-end" onclick="tableEndTurn()"' + (picks < 1 ? ' disabled' : '') + '>Fin du tour des ' + teamPlural(turn) + ' ➜</button>';
+      }
+
+      // Plateau.
+      window._cnPrevRevealed = window._cnPrevRevealed || {};
+      if (tSel >= 0 && (revealed[tSel] || !clue)) tSel = -1;
+      var grid = document.getElementById('cn-grid'); grid.innerHTML = '';
+      words.forEach(function (word, idx) {
+        var tok = revealed[idx], el = document.createElement('div');
+        if (tok) {
+          el.className = 'cn-word revealed-' + tok + (!window._cnPrevRevealed[idx] ? ' flip-in' : '');
+          el.innerHTML = '<span class="cn-agent">' + (tok === 'assassin' ? '<span style="font-size:1.6em;line-height:1">💀</span>' : AGENT_SVG_T) + '</span><span class="rw">' + word + '</span>';
+        } else {
+          el.className = 'cn-word' + (idx === tSel ? ' sel' : '');
+          el.innerHTML = '<span class="w2">' + word + '</span><span class="w1">' + word + '</span>' + (idx === tSel ? '<span class="ok">Toucher encore pour valider</span>' : '');
+          el.onclick = (function (i) { return function () { tablePick(i); }; })(idx);
+        }
+        el.setAttribute('data-i', idx);
+        window._cnPrevRevealed[idx] = !!tok;
+        grid.appendChild(el);
+      });
+
+      if (!state.tableReady && keyStep === null) keyStep = 'intro';
+      renderKey(state);
+    }
+
+    // Le maître-espion a parlé : on saisit seulement son chiffre (1–9, 0 ou ∞).
+    function tableClue(n) {
+      var num = (n === 'inf') ? '∞' : n;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.table || cur.clue) return cur;
+        cur.clue = { word: '', number: num, oral: true };
+        cur.guessesLeft = guessesFor(n);
+        cur.clueLog = (cur.clueLog || []).concat([{ team: cur.turn, word: '', number: num, picks: [] }]);
+        return cur;
+      });
+    }
+    function tableUndoClue() {
+      tSel = -1;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.table || !cur.clue || turnPicks(cur) > 0) return cur;
+        cur.clue = null; cur.guessesLeft = 0;
+        cur.clueLog = (cur.clueLog || []).slice(0, -1);
+        return cur;
+      });
+    }
+    function tablePick(idx) {
+      var st = window.room || {};
+      if (st.status !== 'playing' || !st.tableReady) return;
+      if (!st.clue) { lbToast('Touchez d\'abord le chiffre de l\'indice'); return; }
+      if (tSel !== idx) { tSel = idx; renderTable(st); return; }   // 1er toucher : présélection
+      tSel = -1;
+      var team = st.turn, color = (st.key || [])[idx];
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.table || !cur.clue || (cur.guessesLeft || 0) <= 0) return cur;
+        return applyGuess(cur, idx);
+      }, function (err, ok) {
+        if (!ok) return;
+        var now = window.room || {};
+        if (now.status === 'ended') return;
+        if (color === team) lbToast(now.turn === team ? '✅ Bien vu ! Vous pouvez continuer' : '✅ Bien vu ! Essais épuisés — au tour des ' + teamPlural(now.turn));
+        else if (color === 'neutral') lbToast('😶 Témoin neutre — au tour des ' + teamPlural(now.turn));
+        else lbToast('❌ Agent adverse ! Au tour des ' + teamPlural(now.turn));
+      });
+    }
+    function tableEndTurn() {
+      tSel = -1;
+      rref().transaction(function (cur) {
+        if (!cur || cur.status !== 'playing' || !cur.table || !cur.clue || turnPicks(cur) < 1) return cur;
+        endTurnIn(cur); return cur;
+      });
+    }
+
+    /* ━━ Clé secrète (maîtres-espions) ━━ */
+    function keyGridHTML(state, cls) {
+      var rv = state.revealed || [];
+      return (state.words || []).map(function (w, i) { return '<div class="cn-kc ' + state.key[i] + (rv[i] ? ' got' : '') + '">' + w + '</div>'; }).join('');
+    }
+    function openKey() { keyStep = 'warn'; renderKey(window.room || {}); }
+    function keyGo(step) {
+      var st = window.room || {};
+      if (step === 'show') keySeen = true;
+      if (step === 'close') step = st.tableReady ? null : 'intro';
+      if (step === 'start') { keyStep = null; rref().child('tableReady').set(true); return; }
+      keyStep = step; renderKey(st);
+    }
+    function renderKey(state) {
+      var el = document.getElementById('cn-key');
+      if (!keyStep || !state.words) { el.classList.remove('active'); el.innerHTML = ''; return; }
+      var html;
+      if (keyStep === 'intro') {
+        html = '<div class="cn-key-card"><h2>🕵️ Mise en place</h2><ol>' +
+          '<li>Formez <b>deux équipes</b> : 🔴 Rouges et 🔵 Bleus.</li>' +
+          '<li>Chaque équipe désigne son <b>maître-espion</b>. Les deux s\'assoient du <b>même côté</b> de la table.</li>' +
+          '<li>Les maîtres-espions prennent la tablette et regardent la <b>clé secrète</b> — astuce : photographiez-la avec votre téléphone.</li>' +
+          '<li>Reposez la tablette au milieu : les ' + teamPlural(state.turn) + ' commencent.</li></ol>' +
+          '<div class="cn-key-acts"><button class="cn-kbtn' + (keySeen ? '' : ' go') + '" id="cn-key-show" onclick="keyGo(\'show\')">👁 ' + (keySeen ? 'Revoir la clé' : 'Voir la clé (espions seulement)') + '</button>' +
+          '<button class="cn-kbtn' + (keySeen ? ' go' : ' ghost') + '" id="cn-key-start" onclick="keyGo(\'start\')">▶ Commencer la partie</button></div></div>';
+      } else if (keyStep === 'warn') {
+        html = '<div class="cn-key-card"><h2>🕵️ Clé secrète</h2>' +
+          '<p>Réservée aux <b>deux maîtres-espions</b>.<br>Prenez la tablette et tournez-la vers vous : les autres ne regardent pas !</p>' +
+          '<div class="cn-key-acts"><button class="cn-kbtn ghost" id="cn-key-cancel" onclick="keyGo(\'close\')">Annuler</button>' +
+          '<button class="cn-kbtn go" id="cn-key-show" onclick="keyGo(\'show\')">👁 Afficher la clé</button></div></div>';
+      } else {
+        var rem = state.remaining || {};
+        html = '<div class="cn-key-top">Clé secrète — <span class="red">🔴 ' + rem.red + ' à trouver</span> · <span class="blue">🔵 ' + rem.blue + ' à trouver</span> · ⬛ assassin · les ' + teamPlural(state.starting || state.turn) + ' ont commencé</div>' +
+          '<div class="cn-key-grid ' + (state.starting || '') + '">' + keyGridHTML(state) + '</div>' +
+          '<div class="cn-key-foot"><button class="cn-kbtn hide" id="cn-key-hide" onclick="keyGo(\'close\')">🙈 Cacher la clé</button>' +
+          '<div class="cn-key-tip">Cachez la clé avant de reposer la tablette. Les cartes barrées sont déjà trouvées.</div></div>';
+      }
+      el.innerHTML = html; el.classList.add('active');
     }
 
     function renderHistory() {
@@ -438,7 +751,7 @@
       listEl.innerHTML = log.map(function (t) {
         var picks = (t.picks || []).map(function (p) { return '<span class="cn-hist-pick ' + (p.color || 'neutral') + '">' + escapeHtml(p.word || '') + '</span>'; }).join('');
         if (!(t.picks || []).length) picks = '<span class="cn-hist-pick" style="opacity:0.6">…en cours</span>';
-        return '<div class="cn-hist-turn"><div>' + teamEmoji(t.team) + ' <span class="cn-hist-clue">' + escapeHtml(t.word || '') + ' <span class="x">×</span> <span class="num">' + (t.number || '?') + '</span></span></div><div class="cn-hist-picks">' + picks + '</div></div>';
+        return '<div class="cn-hist-turn"><div>' + teamEmoji(t.team) + ' <span class="cn-hist-clue">' + escapeHtml(t.word || 'Indice oral') + ' <span class="x">×</span> <span class="num">' + (t.number != null ? t.number : '?') + '</span></span></div><div class="cn-hist-picks">' + picks + '</div></div>';
       }).join('');
     }
 
@@ -446,12 +759,17 @@
       showScreen('s-results');
       var win = state.winner;
       var me = (state.players && state.players[window.myPid]) || {};
-      var iWon = me.team === win;
+      var iWon = me.team === win || !!state.table;
+      keyStep = null; tSel = -1; keySeen = false; tPrevTurn = null; renderKey({});
       setText('res-emoji', iWon ? '🏆' : '💥');
       var t = document.getElementById('res-title'); t.textContent = 'L\'équipe ' + teamName(win) + ' gagne !'; t.className = 'res-title ' + win;
       // a-t-on perdu via l'assassin ?
-      var assassinHit = (state.revealed || []).indexOf('assassin') >= 0;
-      setText('res-sub', assassinHit ? 'L\'assassin a été démasqué…' : (iWon ? 'Bien joué !' : 'La prochaine sera la bonne !'));
+      var assassinHit = revealedHas(state, 'assassin');
+      setText('res-sub', assassinHit ? ('💀 Les ' + teamPlural(otherTeam(win)) + ' ont touché l\'assassin…') : (state.table ? 'Tous leurs agents ont été retrouvés. Bien joué !' : (iWon ? 'Bien joué !' : 'La prochaine sera la bonne !')));
+      // Plateau dévoilé (toutes les couleurs) : pratique autour de la table pour refaire le match.
+      var rk = document.getElementById('res-key'), ok = state.words && state.key && state.key.length === 25;
+      rk.innerHTML = ok ? keyGridHTML(state) : '';
+      document.getElementById('res-key-hint').style.display = ok ? '' : 'none';
     }
 
     function handleReplay() { Lobby.resetToLobby(['team', 'role']); }

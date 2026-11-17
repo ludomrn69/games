@@ -37,7 +37,7 @@
     return best;
   }
 
-  function chooseCard(rows, hand) {
+  function greedyCard(rows, hand) {
     if (!hand || !hand.length) return null;
     var best = hand[0], bestScore = Infinity;
     for (var k = 0; k < hand.length; k++) {
@@ -56,6 +56,64 @@
       if (score < bestScore) { bestScore = score; best = val; }
     }
     return best;
+  }
+
+  // Rangée visée par `val` (-1 si trop basse).
+  function targetRow(rows, val) {
+    var tgt = -1, tend = -1;
+    for (var i = 0; i < rows.length; i++) { var end = rows[i][rows[i].length - 1]; if (end < val && end > tend) { tend = end; tgt = i; } }
+    return tgt;
+  }
+
+  // IA principale : SIMULATION (Monte-Carlo) du tour. On ne connaît que les rangées
+  // et sa main : toutes les autres cartes sont « dehors ». Pour chaque carte de sa
+  // main, on tire des mains adverses plausibles parmi les cartes inconnues, on fait
+  // jouer les adversaires (gloutons, parfois au hasard), on résout le tour et on
+  // compte les têtes ramassées + un petit risque résiduel pour le tour suivant.
+  // opts (facultatif) : { nPlayers, sims, rnd }.
+  function chooseCard(rows, hand, opts) {
+    if (!hand || !hand.length) return null;
+    if (hand.length === 1) return hand[0];
+    opts = opts || {};
+    var rnd = opts.rnd || Math.random;
+    var nOpp = Math.max(1, (opts.nPlayers || 4) - 1);
+    var known = {}, i, j;
+    for (i = 0; i < rows.length; i++) for (j = 0; j < rows[i].length; j++) known[rows[i][j]] = true;
+    for (i = 0; i < hand.length; i++) known[hand[i]] = true;
+    var unseen = []; for (i = 1; i <= 104; i++) if (!known[i]) unseen.push(i);
+    var per = Math.min(hand.length, Math.floor(unseen.length / nOpp));
+    if (per < 1) return greedyCard(rows, hand);
+    var sims = opts.sims || Math.max(30, Math.min(120, Math.floor(1400 / hand.length)));
+    var tot = []; for (i = 0; i < hand.length; i++) tot.push(0);
+    for (var s = 0; s < sims; s++) {
+      // Mains adverses : tirage partiel (Fisher-Yates) parmi les cartes inconnues.
+      var need = per * nOpp, oppPicks = [];
+      for (i = 0; i < need; i++) { j = i + Math.floor(rnd() * (unseen.length - i)); var t = unseen[i]; unseen[i] = unseen[j]; unseen[j] = t; }
+      for (var o = 0; o < nOpp; o++) {
+        var oh = unseen.slice(o * per, o * per + per);
+        oppPicks.push(rnd() < 0.7 ? greedyCard(rows, oh) : oh[Math.floor(rnd() * oh.length)]);
+      }
+      for (var k = 0; k < hand.length; k++) {
+        var r2 = [rows[0].slice(), rows[1].slice(), rows[2].slice(), rows[3].slice()];
+        var picks = [{ pid: 'me', val: hand[k] }];
+        for (o = 0; o < nOpp; o++) picks.push({ pid: 'o' + o, val: oppPicks[o] });
+        var res = resolveTurn(r2, picks);
+        var cost = res.heads.me || 0;
+        // Risque résiduel : ce que la main restante peut encore jouer sans danger.
+        var safe = 0, lowest = 105;
+        for (j = 0; j < hand.length; j++) {
+          if (j === k) continue;
+          var tg = targetRow(r2, hand[j]);
+          if (tg >= 0 && r2[tg].length < 4) safe++;
+          if (hand[j] < lowest) lowest = hand[j];
+        }
+        if (hand.length > 1 && safe === 0) cost += 1.5;
+        tot[k] += cost - safe * 0.15;
+      }
+    }
+    var best = 0;
+    for (i = 1; i < hand.length; i++) if (tot[i] < tot[best] - 1e-9) best = i;
+    return hand[best];
   }
 
   // Simulation PURE d'un tour : place toutes les cartes par ordre croissant, gère
@@ -84,5 +142,5 @@
     return { hands: hands, rows: rows };
   }
 
-  root.SixNimmtAI = { chooseCard: chooseCard, chooseRow: chooseRow, heads: heads, sumHeads: sumHeads, resolveTurn: resolveTurn, deal: deal };
+  root.SixNimmtAI = { chooseCard: chooseCard, greedyCard: greedyCard, chooseRow: chooseRow, heads: heads, sumHeads: sumHeads, resolveTurn: resolveTurn, deal: deal };
 })(typeof module !== 'undefined' && module.exports ? module.exports : (this.window = this.window || this));

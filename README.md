@@ -42,19 +42,19 @@ la synchro temps réel.
 | 🔴 Puissance 4 | 2 | ✈️ | réflexion (IA forte) |
 | ⚫ Reversi | 2 | ✈️ | réflexion (IA forte) |
 | 🟤 Dames | 2 | ✈️ | réflexion (IA forte) |
-| ✨ Dobble | 2–8 |  | rapidité |
+| ✨ Dobble | 2–8 | ✈️ | rapidité |
 | ⚡ Crack-list | 2–8 |  | mots |
 | 🔍 Lynx | 2–12 |  | observation |
-| 🎨 Pictionary | 2–12 |  | dessin |
+| 🎨 Pictionary | 2–12 | ✈️ | dessin |
 | 🂡 Blackjack | 1–6 | ✈️ | cartes / 21 |
 | ♠️ Poker | 2–6 | ✈️ | cartes / Texas Hold'em |
 | 🃏 Uno | 2–8 | ✈️ | cartes |
 | 🎴 Skyjo | 2–8 | ✈️ | cartes |
 | 🧩 Blokus | 2–4 | ✈️ | placement |
 | 🚢 Bataille navale | 2 | ✈️ | déduction |
-| 🕵️ Codenames | 4–8 |  | mots / équipes |
+| 🕵️ Codenames | 4–8 | ✈️ | mots / équipes |
 | ⭕ Morpion | 2 | ✈️ | réflexion |
-| 🕵️‍♂️ Undercover | 3–12 |  | déduction sociale |
+| 🕵️‍♂️ Undercover | 3–12 | ✈️ | déduction sociale |
 | 🤵 Président | 3–8 | ✈️ | cartes |
 | 🐴 Petits chevaux | 2–4 | ✈️ | plateau / dés |
 | 💰 Le juste prix | 2–8 | ✈️ | déduction |

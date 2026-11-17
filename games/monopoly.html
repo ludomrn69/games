@@ -11,6 +11,9 @@
     .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
     .btn-ghost { background: var(--white); color: var(--ink); border: 1.5px solid var(--gold-light); box-shadow: var(--shadow); }
 
+    /* Empêche la marge haute de .app de « traverser » body (sinon la page dépasse l'écran
+       de 52 px et défile pour rien sur tablette). */
+    body { display: flow-root; }
     #s-playing { flex-direction: column; align-items: center; width: 100%; }
     .mo-top { position: sticky; top: 52px; z-index: 100; width: 100%; background: rgba(253,246,236,0.97); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--gold-light); padding: 6px 12px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
     html[data-theme="dark"] .mo-top { background: rgba(20,16,28,0.97); }
@@ -23,12 +26,12 @@
     .mo-wrap { width: 100%; max-width: 760px; padding: 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
     /* Plateau */
-    .mo-board { width: min(94vw, 74vh, 560px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(11, 1fr); gap: 2px; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 10px; padding: 2px; }
-    .mo-cell { position: relative; background: var(--cream); border-radius: 3px; overflow: hidden; display: flex; flex-direction: column; font-size: clamp(6px, 1.5vw, 9px); line-height: 1; cursor: pointer; min-width: 0; }
+    .mo-board { --bs: min(94vw, 74vh, 560px); width: var(--bs); height: var(--bs); flex: none; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); grid-template-rows: repeat(11, minmax(0, 1fr)); gap: 2px; background: var(--gold-light); border: 2px solid var(--gold-light); border-radius: 10px; padding: 2px; }
+    .mo-cell { position: relative; background: var(--cream); border-radius: 3px; overflow: hidden; display: flex; flex-direction: column; font-size: clamp(6px, calc(var(--bs) / 62), 12px); line-height: 1; cursor: pointer; min-width: 0; }
     html[data-theme="dark"] .mo-cell { background: #14101c; }
-    .mo-cell .bar { height: 7px; flex-shrink: 0; }
+    .mo-cell .bar { height: 8px; flex-shrink: 0; }
     .mo-cell .cbody { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-    .mo-cell .nm { padding: 1px 2px; font-weight: 700; color: var(--ink); line-height: 1; word-break: break-word; overflow-wrap: anywhere; hyphens: auto; -webkit-hyphens: auto; }
+    .mo-cell .nm { padding: 1px 2px; font-weight: 700; color: var(--ink); line-height: 1; overflow-wrap: anywhere; hyphens: manual; -webkit-hyphens: manual; }
     .mo-cell .pr { padding: 0 2px; color: var(--ink-light); font-size: 0.82em; margin-top: auto; }
     /* La bande de couleur regarde vers l'INTÉRIEUR du plateau (comme en vrai) :
        rangée du bas = bande en haut (défaut) · haut = bande en bas · côtés = bande verticale. */
@@ -36,18 +39,20 @@
     .mo-cell.side-t .pr { margin-top: 2px; }
     .mo-cell.side-l { flex-direction: row-reverse; }
     .mo-cell.side-r { flex-direction: row; }
-    .mo-cell.side-l .bar, .mo-cell.side-r .bar { width: 7px; height: auto; align-self: stretch; }
+    .mo-cell.side-l .bar, .mo-cell.side-r .bar { width: 8px; height: auto; align-self: stretch; }
     .mo-cell.side-l .cbody, .mo-cell.side-r .cbody { flex: 1; }
     /* Coins : émoji au-dessus d'un libellé court (fini le texte tronqué). */
     .mo-cell.corner .cor { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 100%; }
     .mo-cell.corner .ce { font-size: 1.7em; line-height: 1; }
     .mo-cell.corner .cl { font-size: 0.92em; font-weight: 800; text-align: center; line-height: 1.05; word-break: break-word; }
-    .mo-cell .own { position: absolute; top: 0px; right: 0px; min-width: 13px; height: 13px; border-radius: 7px; border: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; line-height: 1; }
+    .mo-cell .own { position: absolute; bottom: 1px; right: 1px; min-width: 13px; height: 13px; border-radius: 7px; border: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 9px; line-height: 1; }
     /* Maisons vertes / hôtel rouge DESSINÉS (petits blocs à toit, comme les pièces
        du jeu) — rendu identique sur tous les appareils, fini l'émoji qui bave à 7px. */
-    .mo-cell .hh { position: absolute; bottom: 1px; right: 1px; display: flex; gap: 1px; align-items: flex-end; }
-    .mo-house { display: inline-block; width: 6px; height: 6px; background: linear-gradient(#3ab066, #1f7a42); clip-path: polygon(50% 0, 100% 38%, 100% 100%, 0 100%, 0 38%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
-    .mo-hotel { display: inline-block; width: 10px; height: 8px; background: linear-gradient(#e0604e, #b73528); clip-path: polygon(50% 0, 100% 34%, 100% 100%, 0 100%, 0 34%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
+    .mo-cell .bar { display: flex; align-items: center; justify-content: center; }
+    .mo-cell .hh { display: flex; gap: 1px; align-items: center; justify-content: center; filter: drop-shadow(0 0 1px rgba(0,0,0,.9)); }
+    .mo-cell.side-l .hh, .mo-cell.side-r .hh { flex-direction: column; }
+    .mo-house { display: inline-block; flex: none; width: 6px; height: 6px; background: linear-gradient(#eafff1, #bff0d0); outline: 0; clip-path: polygon(50% 0, 100% 38%, 100% 100%, 0 100%, 0 38%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
+    .mo-hotel { display: inline-block; flex: none; width: 10px; height: 7px; background: linear-gradient(#fff, #ffd9d2); clip-path: polygon(50% 0, 100% 34%, 100% 100%, 0 100%, 0 34%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
     /* Icônes de cases spéciales (gare, compagnies, Chance, Caisse, taxes) : petits
        SVG maison au trait — l'iconographie qui fait « vrai plateau ». */
     .mo-cell .cic { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; color: #6b6156; }
@@ -77,6 +82,9 @@
     .mo-cell.corner { align-items: center; justify-content: center; text-align: center; padding: 1px; gap: 1px; }
     .mo-cell.mortg { opacity: .55; }
     .mo-toks { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0; pointer-events: none; }
+    /* Hors coins : les pions se rangent en bas à gauche pour ne pas cacher le nom de la rue. */
+    .mo-cell:not(.corner) .mo-toks { align-items: flex-end; align-content: flex-end; justify-content: flex-start; padding: 0 0 1px 1px; }
+    .mo-cell.side-l .mo-toks { padding-left: 1px; } .mo-cell.side-r .mo-toks { padding-left: calc(var(--bs) / 50 + 1px); }
     .mo-tok { font-size: 11px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
     .mo-tok.hop { animation: moHop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
     @keyframes moHop { 0% { transform: translateY(-16px) scale(1.7); opacity: 0.3; } 60% { transform: translateY(2px) scale(1.05); opacity: 1; } 100% { transform: none; } }
@@ -102,7 +110,7 @@
 
     .mo-players { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 8px; }
     .mo-pl { background: var(--white); border: 1px solid var(--gold-light); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: transform .12s, border-color .12s; }
-    .mo-pl:hover { transform: translateY(-2px); border-color: var(--gold); }
+    @media (hover: hover) { .mo-pl:hover { transform: translateY(-2px); border-color: var(--gold); } }
     .mo-pl.turn { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(198,152,90,.3); }
     .mo-pl.broke { opacity: .5; filter: grayscale(1); }
     .mo-pl-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
@@ -141,14 +149,49 @@
     .mo-ov { position: fixed; inset: 0; z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.7); backdrop-filter: blur(6px); }
     .mo-ov.active { display: flex; animation: fadeUp .3s ease both; }
     .mo-ov-card { background: var(--white); border-radius: 22px; padding: 30px 26px; text-align: center; max-width: 340px; width: 100%; box-shadow: var(--shadow-hover); }
-    @media (min-width: 760px) { .mo-wrap{max-width:820px} .mo-board{width:min(62vw,72vh,600px)} }
+    /* Tablette en PORTRAIT : le plateau prend toute la largeur, le panneau dessous
+       (action à gauche, joueurs à droite). */
+    @media (min-width: 700px) {
+      .mo-wrap { max-width: 1000px; }
+      .mo-board { --bs: min(calc(100vw - 24px), calc(100vh - 330px), 860px); --bs: min(calc(100vw - 24px), calc(100dvh - 330px), 860px); }
+      .mo-panel { max-width: min(calc(100vw - 24px), 860px); display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+      .mo-remaining, .mo-log { grid-column: 1 / -1; }
+    }
+    /* Pièces du plateau proportionnelles (pions, pastilles, maisons, icônes). */
+    @media (min-width: 700px) {
+      .mo-cell .bar { height: calc(var(--bs) / 50); }
+      .mo-cell.side-l .bar, .mo-cell.side-r .bar { width: calc(var(--bs) / 50); height: auto; }
+      .mo-cell .nm { padding: 2px 3px; font-size: 0.94em; }
+      .mo-cell.side-l .nm, .mo-cell.side-r .nm { font-size: 0.86em; padding: 2px 2px; letter-spacing: -0.2px; }
+      .mo-cell .pr { padding: 0 3px 2px; }
+      .mo-cell .cic svg, .mo-cell.side-l .cic svg, .mo-cell.side-r .cic svg { width: calc(var(--bs) / 30); height: calc(var(--bs) / 30); }
+      .mo-cell .cic.q { font-size: calc(var(--bs) / 28); }
+      .mo-cell .own { min-width: calc(var(--bs) / 38); height: calc(var(--bs) / 38); border-radius: 50%; font-size: calc(var(--bs) / 56); }
+      .mo-house { width: calc(var(--bs) / 66); height: calc(var(--bs) / 66); }
+      .mo-hotel { width: calc(var(--bs) / 44); height: calc(var(--bs) / 62); }
+      .mo-cell.side-l .mo-hotel, .mo-cell.side-r .mo-hotel { width: calc(var(--bs) / 62); height: calc(var(--bs) / 44); }
+      .mo-tok .pawn { width: calc(var(--bs) / 27); height: calc(var(--bs) / 27); font-size: calc(var(--bs) / 46); border-width: 2px; }
+      .mo-center .logo { font-size: calc(var(--bs) / 17); padding: 6px 22px; }
+      .mo-center .evt { font-size: 0.95rem; }
+      .mo-center-turn { font-size: 1.05rem; }
+      .mo-center-av { width: 30px; height: 30px; font-size: 17px; }
+      .mo-btn-row .btn-primary { min-height: 48px; font-size: 1rem; }
+      .mo-mini { padding: 9px 13px; font-size: 0.9rem; }
+      .mo-chk { padding: 8px 8px; font-size: 0.9rem; }
+      .mo-chk input { width: 20px; height: 20px; }
+      .mo-rem-chip { padding: 5px 9px; font-size: 0.78rem; }
+      .modal-card { max-width: 480px; }
+    }
     /* Sur grand écran (PC) : deux colonnes — le plateau tient dans la hauteur de
        l'écran (plus besoin de scroller pour le voir en entier) et le panneau
        (joueurs, rues, journal) défile à côté. */
     @media (min-width: 980px) {
-      .mo-wrap { flex-direction: row; align-items: flex-start; justify-content: center; max-width: 1180px; gap: 20px; }
-      .mo-board { width: min(48vw, calc(100vh - 140px), 660px); position: sticky; top: 100px; align-self: flex-start; }
-      .mo-panel { flex: 1 1 320px; max-width: 460px; }
+      .mo-wrap { flex-direction: row; align-items: flex-start; justify-content: center; max-width: 1400px; gap: 16px; padding: 10px 12px; }
+      .mo-board { --bs: min(calc(100vw - 370px), calc(100vh - 126px), 900px); --bs: min(calc(100vw - 370px), calc(100dvh - 126px), 900px); align-self: flex-start; }
+      /* Le panneau défile DANS sa colonne : la page ne bouge plus, le plateau reste entier. */
+      .mo-panel { flex: 1 1 320px; max-width: 460px; display: flex; align-items: stretch; max-height: calc(100vh - 126px); max-height: calc(100dvh - 126px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 2px 8px; }
+      .mo-panel > * { flex-shrink: 0; }
+      .mo-log { max-height: none; }
     }
   </style>
 </head>
@@ -226,6 +269,8 @@
     var escapeHtml = window.esc;
     ENG.setNameFn(function (pid) { return (window.Room && Room.name) ? Room.name(pid) : pid; });
 
+    // Mode TABLE (un seul appareil pour tous) : on nomme les joueurs au lieu de dire « toi ».
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function rref() { return window.roomRef; }
     function money(n) { return (n || 0) + ' €'; }
     function isBotPid(s, pid) { return !!(s.players && s.players[pid] && s.players[pid].isBot); }
@@ -243,9 +288,21 @@
         'Échange, hypothèque, enchères : tout est permis',
         'Le dernier joueur non ruiné gagne',
         'Partie courte (option) : après N tours, le plus gros patrimoine gagne'],
-      offline: { solo: true },
+      offline: { solo: true, local: true, open: true },
       bot: monoBot,
-      offlineTurn: function (room) { return ENG.actor(room); },
+      // Qui doit agir MAINTENANT sur l'appareil : le destinataire humain d'une
+      // proposition d'échange (il n'est pas forcément le joueur du tour), sinon
+      // l'enchérisseur en cours, sinon le joueur du tour.
+      offlineTurn: function (room) {
+        var t = room.trade;
+        if (t && t.to && !room.winner && !isBotPid(room, t.to) && !((room.bankrupt || {})[t.to])) return t.to;
+        return ENG.actor(room);
+      },
+      // Mode table : quand l'appareil change de mains, on referme les fenêtres du
+      // joueur précédent (bâtir, hypothèques, échange…).
+      offlineEnter: function () {
+        ['modal-build', 'modal-mortg', 'modal-trade', 'modal-props', 'modal-deed'].forEach(function (id) { closeModal(id); });
+      },
       lobbyExtraHTML: durationLobbyHTML,
       offlineExtraSetup: durationOfflineHTML,
       onState: onState,
@@ -314,6 +371,11 @@
     // On affiche le nom COMPLET (le CSS le fait passer à la ligne et s'adapte) ;
     // on ne coupe que les noms vraiment hors-normes, par sécurité.
     function abbr(n) { return n.length > 26 ? n.slice(0, 25) + '…' : n; }
+    // Libellés COURTS pour les cases du plateau (l'icône dit le reste ; le nom complet
+    // reste dans le titre de propriété) — évite les coupures du genre « Commu-nauté ».
+    var CELL_NM = { 'Caisse de Communauté': 'Caisse', 'Impôt sur le revenu': 'Impôts', 'Taxe de luxe': 'Taxe de luxe',
+      'Av. de la République': 'Av. Répu&shy;blique', 'Gare Montparnasse': 'Gare Mont&shy;parnasse', 'Champs-Élysées': 'Champs-Élysées', 'Électricité': 'Électri&shy;cité', 'Bd des Capucines': 'Bd des Capu&shy;cines', 'Av. de Breteuil': 'Av. de Bre&shy;teuil', 'Bd Saint-Michel': 'Bd St-Michel', 'Gare Saint-Lazare': 'Gare St-Lazare', 'Av. Henri-Martin': 'Av. Henri-Martin',
+      'Bd de la Villette': 'Bd de la Villette', 'Fbg Saint-Honoré': 'Fbg St-Honoré', 'Bd Malesherbes': 'Bd Males&shy;herbes', 'Rue de Courcelles': 'Rue de Cour&shy;celles' };
 
     // Icônes de cases dessinées (SVG au trait, couleur héritée) — gare, ampoule,
     // goutte d'eau, coffre, taxes. Chance reste un grand « ? » typographique.
@@ -357,22 +419,21 @@
         var side = corner ? '' : (i < 10 ? ' side-b' : i < 20 ? ' side-l' : i < 30 ? ' side-t' : ' side-r');
         var cls = 'mo-cell' + (corner ? ' corner' : side) + (s.mortg[i] ? ' mortg' : '') + (afterRoll ? ' mo-cell-here' : (iAmHere ? ' mo-cell-me' : ''));
         var inner = afterRoll ? '<div class="mo-here-pin">📍</div>' : '';
-        if (sp.t === 'prop') inner += '<div class="bar" style="background:' + GC[sp.g] + '"></div>';
+        var hN = s.houses[i] || 0;
+        var hh = hN === 5 ? '<span class="hh"><i class="mo-hotel"></i></span>' : (hN > 0 ? '<span class="hh">' + new Array(Math.min(hN, 4) + 1).join('<i class="mo-house"></i>') + '</span>' : '');
+        if (sp.t === 'prop') inner += '<div class="bar" style="background:' + GC[sp.g] + '">' + hh + '</div>';
         else if (sp.t === 'rail') inner += '<div class="bar" style="background:#2C2520"></div>';
         else if (sp.t === 'util') inner += '<div class="bar" style="background:#7e9bbf"></div>';
         if (corner) {
           var cor = i === 0 ? ['🏁', 'Départ'] : i === 10 ? ['⛓', 'Prison'] : i === 20 ? ['🅿️', 'Parc gratuit'] : ['🚓', 'En prison !'];
           inner += '<div class="cor"><span class="ce">' + cor[0] + '</span><span class="cl">' + cor[1] + '</span></div>';
         } else {
-          var body = '<div class="nm">' + abbr(sp.n) + '</div>' + cellIcon(sp);
+          var body = '<div class="nm">' + (CELL_NM[sp.n] || abbr(sp.n)) + '</div>' + cellIcon(sp);
           var prc = (sp.t === 'prop' || sp.t === 'rail' || sp.t === 'util');
           if (prc && s.owners[i] == null) body += '<div class="pr">' + sp.p + '</div>';
           inner += '<div class="cbody">' + body + '</div>';
           // Propriétaire : pastille à l'émoji du joueur (plus lisible qu'une couleur).
           if (s.owners[i] != null) inner += '<div class="own" style="background:' + Room.color(s.owners[i]) + '">' + Room.emoji(s.owners[i]) + '</div>';
-          var h = s.houses[i] || 0;
-          if (h === 5) inner += '<div class="hh"><i class="mo-hotel"></i></div>';
-          else if (h > 0) inner += '<div class="hh">' + new Array(Math.min(h, 4) + 1).join('<i class="mo-house"></i>') + '</div>';
         }
         if (toks[i]) inner += '<div class="mo-toks">' + toks[i].map(function (e) { return '<span class="mo-tok' + (hopAt[i] ? ' hop' : '') + '">' + e + '</span>'; }).join('') + '</div>';
         if (toks[i] && hopAt[i] && window.Fx) Fx.sfx('place'); // un pion vient d'arriver ici
@@ -383,7 +444,7 @@
       var d = s.dice || [0, 0];
       var turnLine = s.winner
         ? '<div class="mo-center-turn">🏆 ' + escapeHtml(Room.name(s.winner)) + '</div>'
-        : '<div class="mo-center-turn"><span class="mo-center-av" style="background:' + Room.color(actor) + '">' + Room.emoji(actor) + '</span> Au tour de ' + escapeHtml(Room.name(actor)) + '</div>';
+        : '<div class="mo-center-turn"><span class="mo-center-av" style="background:' + Room.color(actor) + '">' + Room.emoji(actor) + '</span>' + (s.phase === 'auction' ? ' Enchère — à ' : ' Au tour de ') + escapeHtml(Room.name(actor)) + '</div>';
       // Dés : de VRAIS dés à points (pips) + le total, animés au lancer.
       var diceSig = (d[0] || 0) + 'x' + (d[1] || 0);
       var diceFresh = window._moDiceSig !== undefined && window._moDiceSig !== diceSig && (d[0] || d[1]);
@@ -400,8 +461,9 @@
     function renderTop(s) {
       var a = ENG.actor(s);
       var txt = s.winner ? '🏆 ' + escapeHtml(Room.name(s.winner)) + ' gagne !'
-        : (s.phase === 'auction' ? 'Enchère — à <b>' + escapeHtml(Room.name(a)) + '</b>'
-          : 'Au tour de <b>' + escapeHtml(Room.name(a)) + '</b>' + (a === window.myPid ? ' (toi)' : ''));
+        : (s.trade && s.trade.to && !isBotPid(s, s.trade.to) ? '🤝 <b>' + escapeHtml(Room.name(s.trade.to)) + '</b> répond à l\'échange de ' + escapeHtml(Room.name(s.trade.from))
+        : s.phase === 'auction' ? 'Enchère — à <b>' + escapeHtml(Room.name(a)) + '</b>'
+          : 'Au tour de <b>' + escapeHtml(Room.name(a)) + '</b>' + (a === window.myPid && !isTable() ? ' (toi)' : ''));
       // Partie courte : où en est-on dans les tours de table.
       if (s.turnLimit && !s.winner) txt += ' <span style="color:var(--ink-light);font-weight:600">· tour ' + Math.min(s.round || 1, s.turnLimit) + '/' + s.turnLimit + '</span>';
       document.getElementById('mo-turn').innerHTML = txt;
@@ -483,28 +545,30 @@
         return;
       }
       var html = '';
+      // Mode table : chaque consigne commence par le prénom de celui qui doit agir.
+      var who = isTable() ? '<b style="color:var(--ink)">' + Room.emoji(me) + ' ' + escapeHtml(Room.name(me)) + '</b> · ' : '';
       if (s.phase === 'roll') {
         if (s.jail[me] > 0) {
-          html = '<div class="hint">⛓ Tu es en prison (essai ' + s.jail[me] + '/3)</div><div class="mo-btn-row">' +
+          html = '<div class="hint">' + who + '⛓ Tu es en prison (essai ' + s.jail[me] + '/3)</div><div class="mo-btn-row">' +
             '<button class="btn-primary" onclick="act(\'roll\')">🎲 Tenter un double</button>' +
             (s.cash[me] >= ENG.JAIL_FINE ? '<button class="btn-primary btn-ghost" onclick="act(\'payjail\')">Payer 50 €</button>' : '') +
             (s.getout[me] > 0 ? '<button class="btn-primary btn-ghost" onclick="act(\'getout\')">Carte « sortie »</button>' : '') + '</div>';
         } else {
-          html = '<div class="hint">' + (s.doubles > 0 ? 'Double ! Tu rejoues.' : 'À toi de jouer') + '</div>' +
+          html = '<div class="hint">' + who + (s.doubles > 0 ? 'Double ! Tu rejoues.' : 'À toi de jouer') + '</div>' +
             '<div class="mo-btn-row"><button class="btn-primary" onclick="act(\'roll\')">🎲 Lancer les dés</button>' +
             '<button class="btn-primary btn-ghost" onclick="openMortg()">🏦 Hypothèques</button>' +
             (canBuildAny(s, me) ? '<button class="btn-primary btn-ghost" onclick="openBuild()">🏗 Bâtir</button>' : '') + '</div>';
         }
       } else if (s.phase === 'buy') {
         var sp = B[s.pending];
-        html = '<div class="hint">' + escapeHtml(sp.n) + ' — ' + money(sp.p) + '</div><div class="mo-btn-row">' +
+        html = '<div class="hint">' + who + escapeHtml(sp.n) + ' — ' + money(sp.p) + (s.cash[me] < sp.p ? ' <span style="color:var(--terracotta)">(pas assez d\'argent)</span>' : '') + '</div><div class="mo-btn-row">' +
           '<button class="btn-primary" onclick="act(\'buy\')"' + (s.cash[me] < sp.p ? ' disabled' : '') + '>Acheter (' + sp.p + ')</button>' +
           '<button class="btn-primary btn-ghost" onclick="act(\'decline\')">Aux enchères</button>' +
           '<button class="mo-mini" onclick="openDeed(' + s.pending + ')">Voir le titre</button></div>';
       } else if (s.phase === 'auction') {
         var au = s.auction, sp2 = B[au.prop];
         var high = au.high ? (Room.name(au.high) + ' : ' + money(au.highBid)) : 'aucune enchère';
-        html = '<div class="hint">Enchère : ' + escapeHtml(sp2.n) + '<br>Meilleure : ' + escapeHtml(high) + '</div><div class="mo-btn-row">' +
+        html = '<div class="hint">' + who + 'Enchère : ' + escapeHtml(sp2.n) + ' (prix ' + sp2.p + ')<br>Meilleure : ' + escapeHtml(high) + ' · tu as ' + money(s.cash[me]) + '</div><div class="mo-btn-row">' +
           ['10', '50', '100'].map(function (inc) { var amt = au.highBid + (+inc); return '<button class="btn-primary" onclick="act(\'bid\',' + amt + ')"' + (s.cash[me] < amt ? ' disabled' : '') + '>+' + inc + '</button>'; }).join('') +
           '<button class="btn-primary btn-ghost" onclick="act(\'pass\')">Passer</button></div>';
       } else if (s.phase === 'manage') {
@@ -515,7 +579,7 @@
         var canBuild = canBuildAny(s, me);
         var partners = (s.order || []).filter(function (p) { return p !== me && !s.bankrupt[p]; });
         var canTrade = allStreetsOwned(s) && partners.length > 0;
-        html = '<div class="hint">Gère ton tour, puis termine</div><div class="mo-btn-row">' +
+        html = '<div class="hint">' + who + 'Gère ton tour, puis termine</div><div class="mo-btn-row">' +
           (canBuild ? '<button class="btn-primary" onclick="openBuild()">🏗 Bâtir</button>' : '') +
           '<button class="btn-primary btn-ghost" onclick="openMortg()">🏦 Hypothèques</button>' +
           (canTrade ? '<button class="btn-primary btn-ghost" onclick="openTrade()">🤝 Échange</button>' : '') +
@@ -733,7 +797,7 @@
       var empty = !t.give.props.length && !t.recv.props.length && !t.give.cash && !t.recv.cash;
       if (!tradeTarget || empty) { el.innerHTML = ''; return; }
       if (!isBotPid(s, tradeTarget)) { el.innerHTML = '<div class="modal-sub" style="text-align:left">👤 C\'est ' + escapeHtml(Room.name(tradeTarget)) + ' qui décidera d\'accepter ou non.</div>'; return; }
-      var ask = Math.ceil(ENG.tradeAsk(s, t.recv));
+      var ask = Math.ceil(ENG.tradeAsk(s, t.recv, t.from));
       var offer = Math.round(ENG.tradeRecvValue(s, t.give, tradeTarget));
       var ok = ENG.tradeValid(s, t) && ENG.aiAcceptTrade(s, t);
       var takes = t.recv.props.length || t.recv.cash;
@@ -748,7 +812,7 @@
     function fillFairCash() {
       var s = window.room, t = currentTrade();
       if (!isBotPid(s, tradeTarget)) return;
-      var ask = Math.ceil(ENG.tradeAsk(s, t.recv));
+      var ask = Math.ceil(ENG.tradeAsk(s, t.recv, t.from));
       var propsVal = ENG.tradeRecvValue(s, { props: t.give.props, cash: 0 }, tradeTarget);
       var need = Math.max(0, ask - propsVal), myCash = s.cash[window.myPid] || 0;
       var gcEl = document.getElementById('trade-give-cash');
@@ -785,7 +849,8 @@
       var t = s.trade;
       function lst(arr, cash) { var a = (arr || []).map(function (i) { return B[i].n; }); if (cash) a.push(money(cash)); return a.length ? a.map(escapeHtml).join(', ') : 'rien'; }
       // du point de vue du destinataire (moi) : je reçois t.give, je donne t.recv
-      return '<div class="hint">' + (t.counter ? '🔄 ' + escapeHtml(Room.name(t.from)) + ' fait une CONTRE-OFFRE' : '🤝 ' + escapeHtml(Room.name(t.from)) + ' te propose un échange') + '</div>' +
+      var to = isTable() ? '<b style="color:var(--ink)">' + Room.emoji(t.to) + ' ' + escapeHtml(Room.name(t.to)) + '</b> · ' : '';
+      return '<div class="hint">' + to + (t.counter ? '🔄 ' + escapeHtml(Room.name(t.from)) + ' fait une CONTRE-OFFRE' : '🤝 ' + escapeHtml(Room.name(t.from)) + ' te propose un échange') + '</div>' +
         '<div style="font-size:.85rem;text-align:center"><b>Tu reçois :</b> ' + lst(t.give.props, t.give.cash) + '<br><b>Tu donnes :</b> ' + lst(t.recv.props, t.recv.cash) + '</div>' +
         '<div class="mo-btn-row"><button class="btn-primary" onclick="respondTrade(true)">Accepter</button>' +
         '<button class="btn-primary btn-ghost" onclick="openCounter()">🔄 Contre-offre</button>' +
@@ -834,7 +899,7 @@
         }
         document.getElementById('mo-ov-card').innerHTML =
           '<div style="font-size:3rem">🏆</div><div class="modal-title">' +
-          (s.winner === window.myPid ? 'Tu as gagné !' : escapeHtml(Room.name(s.winner)) + ' gagne !') + '</div>' +
+          (s.winner === window.myPid && !isTable() ? 'Tu as gagné !' : escapeHtml(Room.name(s.winner)) + ' gagne !') + '</div>' +
           '<div class="modal-sub">' + (short ? s.turnLimit + ' tours joués — le plus gros patrimoine gagne.' : 'Dernier joueur non ruiné.') + '</div>' +
           rankHtml +
           '<button class="btn-primary" onclick="handleReplay()">Rejouer</button>' +

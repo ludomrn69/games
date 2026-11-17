@@ -115,6 +115,50 @@
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
 
+    .sk-tot { display: inline-flex; align-items: center; gap: 4px; background: var(--cream); border-radius: 20px; padding: 2px 9px 2px 3px; margin: 0 2px; font-weight: 800; font-size: 0.82rem; }
+    .sk-my-name { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.9rem; color: var(--ink-light); }
+    .sk-my-name b { color: var(--ink); }
+    /* Défausse en éventail : .sk-card pose position:relative → on re-précise l'empilement
+       (sinon les cartes du dessous s'affichaient en colonne au lieu d'être superposées). */
+    #sk-discard-wrap.fanpile > .sk-card { position: absolute; left: 0; top: 0; }
+    #sk-discard-wrap.fanpile > .sk-card:last-child { position: relative; }
+    @media (hover: none) { .sk-cell.tappable:hover { transform: none; } }
+    /* ── TABLETTE (iPad posé sur la table) : grilles adverses LISIBLES par toute la
+       tablée, grosses cartes au doigt. ── */
+    @media (min-width: 760px) and (min-height: 700px) {
+      .sk-header { padding: 10px 16px; }
+      .sk-round { font-size: 1.2rem; }
+      .sk-tot { font-size: 1rem; padding: 3px 12px 3px 4px; }
+      .sk-tot .sk-opp-av, .sk-my-name .sk-opp-av { width: 26px; height: 26px; font-size: 0.95rem; }
+      .sk-opp { padding: 10px 12px; border-radius: 16px; }
+      .sk-opp-name { font-size: 0.95rem; margin-bottom: 7px; gap: 6px; }
+      .sk-opp-av { width: 24px; height: 24px; font-size: 0.9rem; }
+      .sk-mini-grid { gap: 4px; }
+      .sk-mini-cell { width: 30px; height: 40px; border-radius: 5px; font-size: 0.95rem; }
+      .sk-center { width: min(94vw, 620px); gap: 60px; padding: 16px; min-height: 190px; }
+      .sk-pile-label { font-size: 1.15rem; }
+      .sk-card { width: 92px; height: 126px; font-size: 2.2rem; border-radius: 12px; }
+      .sk-status { font-size: 1.05rem; padding: 9px 24px; margin: 8px auto; }
+      .sk-act-btn { font-size: 1.02rem; padding: 0.7rem 1.4rem; min-height: 46px; }
+      .sk-my-name { font-size: 1.1rem; }
+      .sk-my-grid { gap: 12px; }
+      .sk-cell { width: 104px; height: 140px; font-size: 2.5rem; border-radius: 13px; }
+      .sk-overlay-card { max-width: 480px; padding: 32px 30px; }
+      .sk-row { font-size: 1.1rem; padding: 9px 16px; }
+    }
+    /* PAYSAGE tablette/ordi : deux colonnes — ma grille à gauche, piles + adversaires à droite. */
+    @media (min-width: 1000px) and (min-height: 700px) and (orientation: landscape) {
+      #s-playing.active { display: grid; grid-template-columns: minmax(480px, 1fr) minmax(0, 1.15fr); grid-template-rows: auto auto auto 1fr auto;
+        grid-template-areas: "head head" "status center" "my center" "my opps" "act opps"; column-gap: 18px; padding-bottom: 10px; }
+      .sk-header { grid-area: head; }
+      .sk-status { grid-area: status; align-self: center; }
+      .sk-my-wrap { grid-area: my; justify-content: center; }
+      .sk-actions { grid-area: act; min-height: 52px; align-items: center; }
+      .sk-center { grid-area: center; width: auto; margin: 12px 18px 8px 0; flex: none; }
+      .sk-opps { grid-area: opps; align-content: flex-start; padding: 6px 18px 0 0; margin: 0; max-width: none; }
+      .sk-mini-cell { width: 38px; height: 50px; font-size: 1.15rem; border-radius: 6px; }
+      .sk-opp-name { font-size: 1.05rem; }
+    }
     .res-rank-name { flex: 1; text-align: left; font-weight: 700; } .res-rank-score { font-weight: 800; color: var(--gold); }
   </style>
 </head>
@@ -152,6 +196,7 @@
       <div class="sk-actions" id="sk-actions"></div>
       <div class="sk-status" id="sk-status"></div>
       <div class="sk-my-wrap">
+        <div class="sk-my-name" id="sk-my-name"></div>
         <div class="sk-my-grid" id="sk-my-grid"></div>
       </div>
     </div>
@@ -195,7 +240,7 @@
       <div class="modal-body">
         <p>Chacun a une grille de 12 cartes face cachée. Au début, retourne-en 2.</p>
         <p style="margin-top:10px">À ton tour : pioche une carte (ou prends celle de la défausse), puis <b>échange-la</b> avec une de tes cartes, ou <b>défausse-la et retourne</b> une carte cachée.</p>
-        <p style="margin-top:10px">3 cartes identiques dans une <b>colonne</b> = colonne retirée. Quand quelqu'un a tout retourné, chacun joue un dernier tour. On compte les points (le but : le moins possible). Celui qui finit voit ses points <b>doublés</b> s'il n'est pas le plus bas. La partie s'arrête quand quelqu'un dépasse le seuil.</p>
+        <p style="margin-top:10px">3 cartes identiques dans une <b>colonne</b> = colonne retirée (y compris celles révélées au décompte final). Quand quelqu'un a tout retourné, chacun joue un dernier tour. On compte les points (le but : le moins possible). Celui qui finit voit ses points <b>doublés</b> s'il n'est pas le plus bas. La partie s'arrête quand quelqu'un dépasse le seuil.</p>
       </div>
       <button class="btn-primary mt-4" style="width:auto;padding:0.7rem 1.6rem;margin:18px auto 0" onclick="closeModal('modal-rules')">Compris</button>
     </div>
@@ -217,6 +262,8 @@
 
     /* ━━ State ━━ */
     var prevStatus = null, localMode = 'idle';
+    // Mode table (plusieurs joueurs sur le même appareil) : pas de « tu/toi », on nomme les joueurs.
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function rref() { return window.roomRef; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
@@ -231,11 +278,13 @@
         '3 cartes identiques en colonne = colonne retirée',
         'Le moins de points à la fin gagne (seuil = fin de partie)'
       ],
-      offline: { solo: true, local: true },
+      offline: { solo: true, local: true, open: true }, // tout est visible de tous : simple bandeau « au tour de… »
       bot: skyjoBot,
       offlineTurn: function (r) {
         if (r.status === 'ended') return null;
-        if (r.status === 'roundEnd') { var o = r.order || []; for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
+        if (r.status === 'roundEnd') { var o = r.order || [];
+          // Mode table : un seul « Manche suivante » pour toute la tablée.
+          if (isTable()) { var hm = o.filter(function (p) { return r.players[p] && !r.players[p].isBot; }); return hm.indexOf(window.myPid) >= 0 ? window.myPid : hm[0]; } for (var i = 0; i < o.length; i++) if (!(r.players[o[i]] && r.players[o[i]].nextReady)) return o[i]; return o[0]; }
         if (r.phase === 'flip2') { var o2 = r.order || []; for (var j = 0; j < o2.length; j++) if (flippedCount(r.players[o2[j]] || {}) < 2) return o2[j]; return o2[0]; }
         return r.turn;
       },
@@ -351,8 +400,12 @@
       setText('sk-round', 'Manche ' + (state.round || 1) + ' · seuil ' + (state.maxScore || 100));
       document.getElementById('sk-totals').innerHTML = ord.map(function (pid) {
         var t = (state.players[pid] && state.players[pid].totalScore) || 0;
-        return '<span style="color:' + Room.color(pid) + ';font-weight:700" id="sk-tot-' + pid + '">' + t + '</span>';
-      }).join(' · ');
+        return '<span class="sk-tot"><span class="sk-opp-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span><span id="sk-tot-' + pid + '">' + t + '</span></span>';
+      }).join('');
+      var meP = state.players[window.myPid] || {};
+      var myName = document.getElementById('sk-my-name');
+      if (myName) myName.innerHTML = '<span class="sk-opp-av" style="background:' + Room.color(window.myPid) + '">' + Room.emoji(window.myPid) + '</span>' +
+        (isTable() ? 'Grille de ' + escapeHtml(Room.name(window.myPid)) : 'Ta grille') + ' · <b>' + sumVisible(meP) + '</b> visible';
       // Les totaux DÉFILENT quand une manche vient d'être comptée.
       var tPrev = window._skTot || {};
       ord.forEach(function (pid) {
@@ -583,6 +636,10 @@
         var fl = (p.flipped || fillArray(12, false)).slice(), rm = p.removed || [];
         for (var i = 0; i < 12; i++) if (!rm[i]) fl[i] = true;
         cur.players[pid].flipped = fl;
+        // Règle officielle : une colonne de 3 cartes identiques RÉVÉLÉE au décompte final
+        // est retirée elle aussi (avant : ces cartes comptaient, ex. trois 12 = 36 points).
+        applyColumnElimination(cur, pid);
+        rm = cur.players[pid].removed || [];
         var s = 0, g = p.grid || []; for (var k = 0; k < 12; k++) if (!rm[k]) s += (g[k] || 0);
         scores[pid] = s;
       });
@@ -622,7 +679,17 @@
       document.getElementById('sk-overlay').classList.add('active');
       maybeNextRound(state);
     }
-    function setNextReady() { rref().child('players/' + window.myPid + '/nextReady').set(true); }
+    function setNextReady() {
+      if (isTable()) {
+        rref().transaction(function (cur) {
+          if (!cur || cur.status !== 'roundEnd') return cur;
+          (cur.order || []).forEach(function (p) { if (cur.players[p]) cur.players[p].nextReady = true; });
+          return cur;
+        });
+        return;
+      }
+      rref().child('players/' + window.myPid + '/nextReady').set(true);
+    }
     function maybeNextRound(state) {
       var ord = state.order || [];
       var online = ord.filter(function (p) { return state.players[p] && state.players[p].online; });
@@ -645,14 +712,14 @@
       ord.sort(function (a, b) { return tot(a) - tot(b); }); // le plus bas gagne
       var low = tot(ord[0]);
       var winners = ord.filter(function (p) { return tot(p) === low; });
-      var iWon = winners.indexOf(window.myPid) >= 0;
+      var iWon = winners.indexOf(window.myPid) >= 0 && !isTable();
       setText('res-emoji', winners.length > 1 ? '🤝' : '🏆');
       setText('res-title', winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !'));
       var medals = ['🥇', '🥈', '🥉'];
       document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid && !isTable() ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-score">' + tot(pid) + ' pts</span></div>';
       }).join('');
     }

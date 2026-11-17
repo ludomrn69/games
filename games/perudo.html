@@ -96,6 +96,17 @@
 
     .res-sub { color: var(--ink-light); }
     @media (min-width: 760px) { .pd-players,.pd-myhand{max-width:820px;margin-inline:auto} }
+    /* Mode table : les dés du joueur suivant restent MASQUÉS tant que l'écran « passe
+       l'appareil » est affiché (le voile flouté laissait deviner les points). */
+    body:has(#off-pass.show) .pd-myhand { visibility: hidden; }
+    /* ── TABLETTE (iPad posé sur la table) : tout est agrandi d'un bloc (les dés sont
+       dimensionnés en px par le script → on passe par zoom, géré par Safari). ── */
+    @media (min-width: 760px) and (min-height: 700px) {
+      .pd-players { zoom: 1.35; }
+      #pd-bid, .pd-banner { zoom: 1.6; }
+      #pd-reveal { zoom: 1.5; max-width: 1000px; margin: 0 auto; width: 100%; }
+      .pd-myzone { zoom: 1.45; }
+    }
   </style>
 </head>
 <body>
@@ -192,6 +203,25 @@
       ],
       offline: { solo: true, local: true },
       bot: perudoBot,
+      // Mode table : la RÉVÉLATION est publique → elle reste sur l'humain qui tient
+      // l'appareil (pas d'écran « passe l'appareil » par-dessus les dés révélés, et un
+      // seul « Suivant » pour toute la tablée — avant, la partie restait bloquée dès
+      // qu'il y avait 2 humains, chacun devant valider sur un écran qu'il n'avait jamais).
+      offlineTurn: function (r) {
+        if (r.status === 'ended') return null;
+        if (r.phase === 'reveal' && isTable()) {
+          var hm = (r.order || []).filter(function (p) { return r.players[p] && !r.players[p].isBot; });
+          return hm.indexOf(window.myPid) >= 0 ? window.myPid : hm[0];
+        }
+        // Solo : pendant la révélation, la main reste à l'HUMAIN qui doit valider (sinon le
+        // moteur « activait » l'ordi suivant, qui ne fait rien, et le clic « Suivant » de
+        // l'humain était enregistré au nom de l'ordi → il fallait cliquer deux fois).
+        if (r.phase === 'reveal') {
+          var w = activeHumans(r).filter(function (p) { return !(r.reveal && r.reveal.ack && r.reveal.ack[p]); });
+          if (w.length) return w[0];
+        }
+        return r.turn;
+      },
       offlineEnter: function () { pick = null; if (window.room) render(window.room); },
       onState: onState, onStart: onStart,
       lobbyExtraHTML: lobbyExtraHTML, offlineExtraSetup: offlineExtraSetup
@@ -356,6 +386,8 @@
     }
     // Joueurs humains encore en lice (dés > 0). La manche ne repart que lorsqu'ils ont
     // TOUS cliqué « Suivant » → on a le temps de voir les dés, même face aux ordis.
+    // Mode table (plusieurs joueurs sur le même appareil) : pas de « tu/toi », on nomme les joueurs.
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function activeHumans(cur) { return activePids(cur).filter(function (p) { return !((cur.players[p] || {}).isBot); }); }
     function revealAllAcked(cur) { var ack = (cur.reveal && cur.reveal.ack) || {}; return activeHumans(cur).every(function (p) { return ack[p]; }); }
     function advanceRound(cur) { cur.round = (cur.round || 1) + 1; startRound(cur, cur.turn); }
@@ -367,7 +399,8 @@
         if (!cur || cur.status !== 'playing' || cur.phase !== 'reveal') return cur;
         var ack = (cur.reveal && cur.reveal.ack) || {}; ack[window.myPid] = true;
         if (cur.reveal) cur.reveal.ack = ack;
-        if (revealAllAcked(cur)) advanceRound(cur);
+        // Mode table : tout le monde regarde le même écran → un « Suivant » suffit.
+        if (isTable() || revealAllAcked(cur)) advanceRound(cur);
         return cur;
       });
     }
@@ -467,7 +500,7 @@
           var isBot = (state.players[pid] || {}).isBot;
           // Indicateur « a validé Suivant ? » — les ordis sont toujours prêts (✓).
           var ready = isBot || acks[pid];
-          var ackIc = '<span class="pd-reveal-ack' + (ready ? '' : ' waiting') + '" title="' + (ready ? 'Prêt' : 'Doit encore appuyer sur Suivant') + '">' + (ready ? '✅' : '⏳') + '</span>';
+          var ackIc = isTable() ? '' : '<span class="pd-reveal-ack' + (ready ? '' : ' waiting') + '" title="' + (ready ? 'Prêt' : 'Doit encore appuyer sur Suivant') + '">' + (ready ? '✅' : '⏳') + '</span>';
           return '<div class="pd-reveal-row"><span class="pd-reveal-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
             '<span class="pd-reveal-name">' + escapeHtml(Room.name(pid)) + '</span><span class="pd-dice">' + diceRow(d, R.face, state.palifico) + '</span>' + ackIc + '</div>';
         }).join('') + '</div>';
@@ -508,6 +541,7 @@
         var meActive = (state.diceCount || {})[me] > 0;
         var acked = !!(state.reveal && state.reveal.ack && state.reveal.ack[me]);
         var waiting = activeHumans(state).filter(function (p) { return !(state.reveal && state.reveal.ack && state.reveal.ack[p]); });
+        if (isTable()) { host.innerHTML = '<button class="btn-primary" onclick="ackReveal()">Manche suivante ▶</button>'; return; }
         if (!meActive) { host.innerHTML = '<div class="pd-wait">Manche terminée — la partie continue…</div>'; return; }
         if (acked) {
           var names = waiting.map(function (p) { return Room.name(p); }).join(', ');
@@ -528,7 +562,7 @@
       }
       window._pdDiceSig = diceSig;
       var handHTML = myAlive
-        ? '<div class="pd-mylabel">Tes dés (cachés des autres)</div><div class="pd-myhand felt felt-wood">' + (myDice.length ? diceRow(myDice, myTurn && pick ? pick.face : 0, state.palifico, 38) : '—') + '</div>'
+        ? '<div class="pd-mylabel">' + (isTable() ? 'Dés de ' + escapeHtml(Room.name(me)) + ' (cache l\'écran aux autres)' : 'Tes dés (cachés des autres)') + '</div><div class="pd-myhand felt felt-wood">' + (myDice.length ? diceRow(myDice, myTurn && pick ? pick.face : 0, state.palifico, 38) : '—') + '</div>'
         : '<div class="pd-wait">☠️ Tu es éliminé·e — tu regardes la fin de la partie.</div>';
       if (!myTurn) {
         host.innerHTML = handHTML + (myAlive ? '<div class="pd-wait">Au tour de ' + escapeHtml(Room.name(state.turn)) + '…</div>' : '');
@@ -568,7 +602,7 @@
 
     function showResults(state) {
       showScreen('s-results');
-      var w = state.winner, iWon = w === window.myPid;
+      var w = state.winner, iWon = w === window.myPid && !isTable();
       setText('res-emoji', iWon ? '🏆' : '🎲');
       setText('res-title', iWon ? 'Tu gagnes ! 🏆' : Room.name(w) + ' gagne !');
       setText('res-sub', 'Dernier joueur avec des dés dans la main.');

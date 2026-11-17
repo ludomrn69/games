@@ -86,6 +86,37 @@
     .modal-btns { display: flex; gap: 10px; justify-content: center; }
     .modal-body { text-align: left; font-size: 0.9rem; color: var(--ink-light); line-height: 1.6; }
     .modal-body b { color: var(--ink); }
+    /* Mode table : la main du joueur suivant reste MASQUÉE tant que l'écran « passe
+       l'appareil » est affiché (le voile flouté laissait deviner les cartes). */
+    body:has(#off-pass.show) .pr-hand { visibility: hidden; }
+    @media (hover: none) { .pr-hand .card:not(.sel):hover { transform: none; } }
+    /* ── TABLETTE (iPad posé sur la table) : grand tapis, grosses cartes au doigt. ── */
+    @media (min-width: 760px) and (min-height: 700px) {
+      .pr-title-mini { font-size: 1.45rem; }
+      .pr-opps { gap: 10px; padding-top: 14px; }
+      .pr-opp { font-size: 1.05rem; padding: 7px 16px 7px 7px; }
+      .pr-opp-av { width: 32px; height: 32px; font-size: 1.15rem; }
+      .pr-opp .cnt { font-size: 0.95rem; padding: 1px 9px; }
+      .pr-opp .rank-badge { font-size: 0.9rem; }
+      .pr-banner { font-size: 1.08rem; padding: 9px 24px; margin: 10px auto 4px; }
+      .pr-pile-wrap { width: min(94vw, 1000px); max-width: none; min-height: 196px; border-radius: 26px; gap: 6px; padding: 10px 12px 12px; }
+      .pr-pile-label { font-size: 1.25rem; }
+      .pr-pile-empty { font-size: 1.5rem; }
+      .pr-pile { min-height: 150px; gap: 10px; }
+      .card { width: 84px; height: 120px; border-radius: 12px; }
+      .card .cnr { top: 5px; left: 7px; }
+      .card .cnr.b { bottom: 5px; right: 7px; }
+      .card .cnr .rk { font-size: 1.3rem; } .card .cnr .st { font-size: 0.95rem; }
+      .card .mid { font-size: 2.2rem; }
+      .pr-pile .card { width: 104px; height: 148px; }
+      .pr-pile .card .mid { font-size: 2.8rem; }
+      .pr-pile .card .cnr .rk { font-size: 1.5rem; }
+      .pr-my-label { font-size: 1.3rem; margin: 8px 0 14px; }
+      .pr-hand { gap: 10px; max-width: 1150px; padding-bottom: 6px; }
+      .pr-hand .card.sel { transform: translateY(-14px); }
+      .pr-actions { gap: 14px; }
+      .pr-act-btn { font-size: 1.1rem; padding: 0.8rem 2.2rem; min-height: 50px; }
+    }
     @keyframes cardFly { from { transform: translateY(44px) rotate(7deg) scale(1.18); opacity: 0; } to { opacity: 1; } }
     .card-in { animation: cardFly 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
     /* Chips de règles maison (setup solo) : toggle multi-sélection, grisé = éteint. */
@@ -117,7 +148,7 @@
         <div class="pr-pile-label" id="pr-mode">Pli en cours</div>
         <div class="pr-pile" id="pr-pile"></div>
       </div>
-      <div class="pr-my-label">Tes cartes <span id="pr-my-count"></span></div>
+      <div class="pr-my-label"><span id="pr-my-who">Tes cartes</span> <span id="pr-my-count"></span></div>
       <div class="pr-hand" id="pr-hand"></div>
       <div class="pr-actions">
         <button class="pr-act-btn" id="pr-pass-btn" onclick="passTurn()">Passer</button>
@@ -131,7 +162,7 @@
       <div class="res-emoji" id="res-emoji">👑</div>
       <h2 class="res-title" id="res-title">—</h2>
       <div class="res-rank" id="res-rank"></div>
-      <button class="btn-primary" onclick="handleReplay()">Rejouer</button>
+      <button class="btn-primary" onclick="handleReplay()">Revanche (avec échange de cartes)</button>
       <button class="btn-link mt-4" onclick="Lobby.peekBoard(function(){showScreen('s-results');})">🔍 Revoir le plateau</button>
       <button class="btn-link mt-4" onclick="window.location.href='/index.html'">Retour à l'accueil</button>
     </div>
@@ -188,6 +219,8 @@
 
     /* ━━ State ━━ */
     var prevStatus = null, selected = [];
+    // Mode table (plusieurs joueurs sur le même appareil) : pas de « tu/toi », on nomme les joueurs.
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     function rref() { return window.roomRef; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
@@ -526,7 +559,7 @@
       } else if (state.exchange) {
         pileEl.innerHTML = '<span class="pr-pile-empty">🔁 Échange des cartes en cours…</span>';
       } else {
-        pileEl.innerHTML = '<span class="pr-pile-empty">Nouveau pli' + (state.revolution ? ' ⚡ (révolution)' : '') + ' — à ' + (isMyTurn ? 'toi' : escapeHtml(Room.name(turn))) + ' de poser</span>';
+        pileEl.innerHTML = '<span class="pr-pile-empty">Nouveau pli' + (state.revolution ? ' ⚡ (révolution)' : '') + ' — à ' + (isMyTurn && !isTable() ? 'toi' : escapeHtml(Room.name(turn))) + ' de poser</span>';
       }
       // ⚡ Révolution en cours : rappel permanent dans l'étiquette du pli.
       if (state.revolution && !state.exchange) setText('pr-mode', document.getElementById('pr-mode').textContent + ' · ⚡ RÉVOLUTION (ordre inversé)');
@@ -534,6 +567,7 @@
       // Ma main
       var myHand = sortHand((state.players[window.myPid] && state.players[window.myPid].hand) || [], state);
       setText('pr-my-count', '(' + myHand.length + ')');
+      setText('pr-my-who', isTable() ? 'Cartes de ' + Room.name(window.myPid) : 'Tes cartes');
       var exchMe = state.exchange && state.exchange.pending && state.exchange.pending[window.myPid];
       var selRank = selected.length ? rankOf(selected[0]) : null;
       var cont = document.getElementById('pr-hand');
@@ -553,6 +587,9 @@
       var playBtn = document.getElementById('pr-play-btn');
       var passBtn = document.getElementById('pr-pass-btn');
       if (exchMe) {
+        var exTo = state.exchange.to && state.exchange.to[window.myPid];
+        setText('pr-banner', '🔁 ' + (isTable() ? Room.name(window.myPid) + ' : choisis ' : 'Choisis ') + exchMe + ' carte' + (exchMe > 1 ? 's' : '') + ' à donner à ' + Room.name(exTo));
+        document.getElementById('pr-banner').classList.add('me');
         playBtn.textContent = 'Donner ' + selected.length + '/' + exchMe + ' ↦';
         playBtn.disabled = selected.length !== exchMe;
         passBtn.disabled = true;
@@ -715,12 +752,12 @@
       var total = (state.order || []).length;
       var myPos = rank.indexOf(window.myPid);
       var pres = rank[0];
-      setText('res-emoji', myPos === 0 ? '👑' : myPos === total - 1 ? '💩' : '🎉');
-      setText('res-title', pres === window.myPid ? 'Tu es Président ! 👑' : 'Président : ' + Room.name(pres));
+      setText('res-emoji', (isTable() || myPos === 0) ? '👑' : myPos === total - 1 ? '💩' : '🎉');
+      setText('res-title', (pres === window.myPid && !isTable()) ? 'Tu es Président ! 👑' : 'Président : ' + Room.name(pres));
       document.getElementById('res-rank').innerHTML = rank.map(function (pid, i) {
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (i + 1) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid && !isTable() ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-title">' + rankTitle(i, total) + '</span></div>';
       }).join('');
     }

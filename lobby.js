@@ -351,7 +351,7 @@
         '<button class="lb-btn ghost" onclick="Lobby.joinFromInput()"' + onDis + '>Rejoindre</button>' +
         (c.offline ? ('<div style="margin:18px 0 6px;color:var(--ink-light);font-size:0.85rem">ou sans connexion ✈️</div>' +
           (c.offline.solo ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'solo\')">' + (c.offline.soloNoBots ? '⏱ Solo (chrono)' : '🤖 Solo (contre l\'ordi)') + '</button>' : '') +
-          (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">📱 Local (même appareil)</button>' : '')) : '') +
+          (c.offline.local ? '<button class="lb-btn ghost" onclick="Lobby.goOffline(\'local\')">🎲 Mode table (même appareil)</button>' : '')) : '') +
         (rules ? '<div class="lb-code-card" style="text-align:left;margin-top:24px"><div class="lb-code-label">Règles rapides</div><ul style="list-style:none;margin-top:6px;display:flex;flex-direction:column;gap:6px;font-size:0.86rem;color:var(--ink-light)">' + rules + '</ul></div>' : '') +
         '<a class="lb-link" href="/index.html">← Tous les jeux</a>' +
       '</div>';

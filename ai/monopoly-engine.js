@@ -62,9 +62,9 @@
     { x: 'Avancez jusqu’au Départ', a: 'go', pos: 0 },
     { x: 'Allez Rue de la Paix', a: 'go', pos: 39 },
     { x: 'Allez Av. Henri-Martin. Si vous passez par le Départ, touchez 200', a: 'go', pos: 24 },
-    { x: 'Avancez à la Gare la plus proche', a: 'nearRail' },
-    { x: 'Avancez à la Gare la plus proche', a: 'nearRail' },
-    { x: 'Avancez au service public le plus proche', a: 'nearUtil' },
+    { x: 'Avancez à la Gare la plus proche (loyer double si elle a un propriétaire)', a: 'nearRail' },
+    { x: 'Avancez à la Gare la plus proche (loyer double si elle a un propriétaire)', a: 'nearRail' },
+    { x: 'Avancez au service public le plus proche (loyer : 10 × les dés s’il a un propriétaire)', a: 'nearUtil' },
     { x: 'La banque vous verse un dividende de 50', a: 'cash', amt: 50 },
     { x: 'Sortez de prison gratuitement', a: 'getout' },
     { x: 'Reculez de 3 cases', a: 'move', delta: -3 },
@@ -178,11 +178,29 @@
         continue;
       }
       // hypothéquer une propriété sans maison
-      var mProp = -1;
-      B.forEach(function (sp, i) { if (s.owners[i] === pid && !s.mortg[i] && !(s.houses[i] > 0)) { if (mProp < 0) mProp = i; } });
+      // … en commençant par ce qui compte le moins (service, rue isolée) et en gardant
+      // les couleurs complètes pour la fin.
+      var mProp = -1, mKeep = 1e9;
+      B.forEach(function (sp, i) {
+        if (s.owners[i] !== pid || s.mortg[i] || (s.houses[i] > 0)) return;
+        var k = keepValue(s, i, pid);
+        if (k < mKeep) { mKeep = k; mProp = i; }
+      });
       if (mProp >= 0) { s.mortg[mProp] = true; s.cash[pid] += Math.floor(B[mProp].p / 2); continue; }
       break; // plus rien à liquider
     }
+  }
+
+  // Intérêt de GARDER une propriété non hypothéquée (plus c'est bas, plus on
+  // l'hypothèque volontiers) : couleur complète > paire presque complète > gares > reste.
+  function keepValue(s, i, pid) {
+    var sp = B[i];
+    if (sp.t === 'util') return 10 + sp.p / 100;
+    if (sp.t === 'rail') return 100 * countRails(s, pid) + 50;
+    var n = ownedInGroup(s, sp.g, pid), tot = GROUPS[sp.g].length;
+    if (n === tot) return 1000 + sp.p;
+    if (n === tot - 1) return 200 + sp.p / 10;
+    return 60 + sp.p / 10;
   }
 
   // Paye `amt` de `pid` vers `to` (pid ou null=banque). Liquide si besoin ; faillite sinon.
@@ -231,8 +249,11 @@
       else {
         s.jail[pid]++;
         if (s.jail[pid] > 3) { // 3 essais ratés → payer l'amende et avancer
-          if (pay(s, pid, JAIL_FINE, null)) { s.jail[pid] = 0; log(s, nameish(pid) + ' paie ' + JAIL_FINE + ' et sort'); move(s, pid, sum, rnd); }
-          if (s.phase !== 'over') endTurnFlow(s, false);
+          // Le déplacement gère lui-même la suite (achat, loyer, carte…) : on ne termine
+          // PAS le tour ici, sinon une case libre atteinte en sortant ne pouvait pas être
+          // achetée (et `pending` restait orphelin). Pas de rejeu : ce n'était pas un double.
+          if (pay(s, pid, JAIL_FINE, null)) { s.jail[pid] = 0; s.doubles = 0; log(s, nameish(pid) + ' paie ' + JAIL_FINE + ' et sort'); move(s, pid, sum, rnd); }
+          else if (s.phase !== 'over') endTurnFlow(s, false); // ruiné par l'amende
         } else { log(s, nameish(pid) + ' reste en prison'); endTurnFlow(s, false); }
       }
       return;
@@ -251,12 +272,14 @@
     s.pos[pid] = np;
     landOn(s, pid, np, steps, rnd);
   }
-  function moveTo(s, pid, pos, collectGo, rnd) {
+  function moveTo(s, pid, pos, collectGo, rnd, special) {
     if (collectGo && pos <= s.pos[pid]) { s.cash[pid] += GO_SALARY; log(s, nameish(pid) + ' passe le Départ (+' + GO_SALARY + ')'); }
-    s.pos[pid] = pos; landOn(s, pid, pos, (s.dice[0] + s.dice[1]), rnd);
+    s.pos[pid] = pos; landOn(s, pid, pos, (s.dice[0] + s.dice[1]), rnd, special);
   }
 
-  function landOn(s, pid, pos, diceSum, rnd) {
+  // special : 'rail2' (carte « gare la plus proche » → loyer double) ou 'util10'
+  // (carte « service le plus proche » → 10 × les dés), comme dans la règle officielle.
+  function landOn(s, pid, pos, diceSum, rnd, special) {
     var sp = B[pos];
     if (sp.t === 'go' || sp.t === 'jail' || sp.t === 'parking') { afterResolve(s, pid); return; }
     if (sp.t === 'gotojail') { log(s, nameish(pid) + ' va en prison'); goJail(s, pid); endTurnFlow(s, false); return; }
@@ -269,6 +292,8 @@
     if (owner === pid) { afterResolve(s, pid); return; }
     if (s.mortg[pos]) { afterResolve(s, pid); return; }
     var rent = rentOf(s, pos, diceSum);
+    if (special === 'rail2' && sp.t === 'rail') rent *= 2;
+    if (special === 'util10' && sp.t === 'util') rent = 10 * diceSum;
     log(s, nameish(pid) + ' paie ' + rent + ' de loyer à ' + nameish(owner) + ' (' + sp.n + ')');
     pay(s, pid, rent, owner);
     afterResolve(s, pid);
@@ -293,11 +318,11 @@
       case 'pay': pay(s, pid, c.amt, null); afterResolve(s, pid); return;
       case 'getout': s.getout[pid] = (s.getout[pid] || 0) + 1; afterResolve(s, pid); return;
       case 'jail': goJail(s, pid); endTurnFlow(s, false); return;
-      case 'each': { alive(s).forEach(function (q) { if (q !== pid) { pay(s, pid, c.amt, q); } }); afterResolve(s, pid); return; }
+      case 'each': { alive(s).forEach(function (q) { if (q !== pid && !s.bankrupt[pid]) { pay(s, pid, c.amt, q); } }); afterResolve(s, pid); return; }
       case 'collectEach': { alive(s).forEach(function (q) { if (q !== pid && !s.bankrupt[pid]) { pay(s, q, c.amt, pid); } }); afterResolve(s, pid); return; }
       case 'repairs': { var tot = 0; B.forEach(function (sp, i) { if (s.owners[i] === pid) { var h = s.houses[i] || 0; if (h === 5) tot += c.pht; else tot += h * c.ph; } }); pay(s, pid, tot, null); afterResolve(s, pid); return; }
-      case 'nearRail': { var np2 = nearestFrom(s.pos[pid], RAILS); moveTo(s, pid, np2, true, rnd); return; }
-      case 'nearUtil': { var np3 = nearestFrom(s.pos[pid], UTILS); moveTo(s, pid, np3, true, rnd); return; }
+      case 'nearRail': { var np2 = nearestFrom(s.pos[pid], RAILS); moveTo(s, pid, np2, true, rnd, 'rail2'); return; }
+      case 'nearUtil': { var np3 = nearestFrom(s.pos[pid], UTILS); moveTo(s, pid, np3, true, rnd, 'util10'); return; }
     }
     afterResolve(s, pid);
   }
@@ -472,7 +497,7 @@
     }
     // 2) sinon, ACHAT CASH (offre généreuse) de la case qui me manque.
     for (var c = 0; c < mineNeeds.length; c++) {
-      var m = mineNeeds[c], offer = Math.round(B[m.need].p * 1.4);
+      var m = mineNeeds[c], offer = Math.ceil(tradeAsk(s, { props: [m.need], cash: 0 }, pid) / 10) * 10;
       if ((s.cash[pid] || 0) < offer + 120) continue; // garder un coussin pour bâtir
       var t2 = { from: pid, to: m.owner, give: { props: [], cash: offer }, recv: { props: [m.need], cash: 0 } };
       if (tradeValid(s, t2)) return t2;
@@ -486,11 +511,19 @@
   // Barème calibré par simulation (des centaines de parties rejouées) : à ce prix,
   // l'échange d'un monopole est équitable — le vendeur n'y perd pas et l'acheteur y
   // gagne un peu — alors qu'une prime de +60 % faisait payer l'acheteur trop cher.
-  function tradeAsk(s, recv) {
-    var bare = (recv.cash || 0), houseInv = 0, mono = false;
-    (recv.props || []).forEach(function (i) { bare += B[i].p; houseInv += (s.houses[i] || 0) * (B[i].h || 0); });
-    (recv.props || []).forEach(function (i) { if (hasMonopoly(s, B[i].g, s.owners[i])) mono = true; });
-    return mono ? (1.8 * bare + 0.5 * houseInv) : ((bare + houseInv) * 1.15);
+  //  • rue qui COMPLÈTE une couleur de l'acheteur `buyer` (3e paramètre, optionnel) :
+  //    2× son prix — sinon on offrait un monopole à l'adversaire pour +15 %.
+  function tradeAsk(s, recv, buyer) {
+    var props = recv.props || [];
+    var bare = (recv.cash || 0), houseInv = 0, mono = false, extra = 0;
+    props.forEach(function (i) { bare += B[i].p; houseInv += (s.houses[i] || 0) * (B[i].h || 0); });
+    props.forEach(function (i) { if (hasMonopoly(s, B[i].g, s.owners[i])) mono = true; });
+    if (mono) return 1.8 * bare + 0.5 * houseInv;
+    if (buyer != null) props.forEach(function (i) {
+      var g = B[i].g;
+      if (g && GROUPS[g].every(function (k) { return s.owners[k] === buyer || props.indexOf(k) >= 0; })) extra += B[i].p * 0.85;
+    });
+    return (bare + houseInv) * 1.15 + extra;
   }
   // Valeur, pour `pid`, de ce qu'il REÇOIT dans un échange (cash + rues) :
   //  • prix nu de la rue en temps normal ;
@@ -509,7 +542,7 @@
   }
   // Le destinataire `t.to` évalue : accepte si la valeur reçue dépasse son prix demandé.
   function aiAcceptTrade(s, t) { norm(s);
-    return tradeRecvValue(s, t.give, t.to) >= tradeAsk(s, t.recv);
+    return tradeRecvValue(s, t.give, t.to) >= tradeAsk(s, t.recv, t.from);
   }
   // Si le bot (t.to) refuse, il peut faire une CONTRE-OFFRE : mêmes propriétés mais
   // il réclame le cash qui atteindrait son prix demandé (prime renforcée pour un
@@ -518,7 +551,7 @@
     if (!t || s.bankrupt[t.from] || s.bankrupt[t.to]) return null;
     var bot = t.to;
     var recvV = tradeRecvValue(s, t.give, bot);             // ce que le bot reçoit (rues utiles valorisées)
-    var target = Math.ceil(tradeAsk(s, t.recv));            // prix demandé par le bot pour ce qu'il cède
+    var target = Math.ceil(tradeAsk(s, t.recv, t.from));            // prix demandé par le bot pour ce qu'il cède
     if (recvV >= target) return null;                       // il accepterait déjà
     var extra = target - recvV;                             // cash en plus demandé à l'humain
     if ((t.give.cash || 0) + extra > (s.cash[t.from] || 0)) return null; // l'humain ne peut pas payer
@@ -579,18 +612,54 @@
   // reste saine, enchérit jusqu'à ~70 % de la valeur (110 % pour compléter un
   // monopole), construit dès qu'un monopole est nu, propose un échange utile à un
   // autre bot. « facile » : laisse parfois filer une propriété et ne construit pas.
+  // Plus gros loyer qu'un adversaire peut m'infliger en ce moment → trésorerie de
+  // sécurité (une liquidation forcée revend les maisons à moitié prix).
+  function botReserve(s, pid) {
+    var mx = 0;
+    for (var i = 0; i < 40; i++) { var o = s.owners[i]; if (o != null && o !== pid && !s.bankrupt[o]) { var r = rentOf(s, i, 7); if (r > mx) mx = r; } }
+    return Math.max(100, Math.min(450, Math.round(mx * 0.6)));
+  }
+  // Meilleure maison à bâtir : le plus gros gain de loyer par euro investi (ce qui
+  // pousse naturellement vers 3 maisons sur les bonnes couleurs avant les hôtels).
+  function bestBuild(s, pid) {
+    var best = -1, bs = 0;
+    for (var i = 0; i < 40; i++) {
+      if (!canBuildOn(s, i, pid)) continue;
+      var h = s.houses[i] || 0, cur = h === 0 ? B[i].r[0] * 2 : B[i].r[h];
+      var sc = (B[i].r[h + 1] - cur) / B[i].h;
+      if (sc > bs) { bs = sc; best = i; }
+    }
+    return best;
+  }
+  function unownedCount(s) { var n = 0; for (var i = 0; i < 40; i++) { var t = B[i].t; if ((t === 'prop' || t === 'rail' || t === 'util') && s.owners[i] == null) n++; } return n; }
+  // Jusqu'où le bot monte aux enchères pour `prop`.
+  function auctionCap(s, pid, prop) {
+    var pr = B[prop].p, g = B[prop].g, want = pr * 0.75;
+    if (g) {
+      var mine = ownedInGroup(s, g, pid), tot = GROUPS[g].length;
+      if (mine === tot - 1) want = pr * 1.6;                      // complète MA couleur
+      else if (mine > 0) want = pr * 0.95;
+      // bloquer un adversaire à une case du monopole
+      s.order.forEach(function (q) { if (q !== pid && !s.bankrupt[q] && ownedInGroup(s, g, q) === tot - 1) want = Math.max(want, pr * 1.25); });
+    } else if (B[prop].t === 'rail') { want = pr * (0.75 + 0.15 * countRails(s, pid)); }
+    return Math.min((s.cash[pid] || 0) - 30, want);
+  }
   function botStep(s, level) {
     if (s.winner) return;
+    norm(s);
     var pid = actor(s), ph = s.phase;
     if (s.trade && s.trade.from === pid) return; // attend une réponse
+    var easy = level === 'easy';
     if (ph === 'roll') {
       if (s.jail[pid] > 0) {
-        if (s.getout[pid] > 0) { useGetout(s, pid); return; }
-        if (s.cash[pid] >= JAIL_FINE + 300) { payJail(s, pid); return; }
+        // Début de partie : sortir vite pour acheter. Fin de partie (tout est vendu ou
+        // presque) : la prison est un abri, on tente juste le double.
+        var wantOut = easy || unownedCount(s) > 6;
+        if (wantOut && s.getout[pid] > 0) { useGetout(s, pid); return; }
+        if (wantOut && s.cash[pid] >= JAIL_FINE + 200) { payJail(s, pid); return; }
       }
       roll(s); return;
     }
-    var easy = level === 'easy';
     if (ph === 'buy') {
       var price = B[s.pending].p;
       if (easy && Math.random() < 0.4) { declineBuy(s); return; }
@@ -598,24 +667,50 @@
       return;
     }
     if (ph === 'auction') {
-      var au = s.auction, pr = B[au.prop].p, g = B[au.prop].g;
-      var maxWant = pr * 0.7;
-      if (g && ownedInGroup(s, g, pid) === GROUPS[g].length - 1) maxWant = pr * 1.1;
-      var cap = Math.min(s.cash[pid] - 30, maxWant), next = au.highBid + 10;
+      var au = s.auction, pr = B[au.prop].p;
+      var cap = easy ? Math.min(s.cash[pid] - 30, pr * 0.6) : auctionCap(s, pid, au.prop);
+      // Mises franches (pas de +10 à l'infini : chaque mise coûte un délai à l'écran).
+      var next = au.highBid === 0 ? Math.max(10, Math.round(cap * 0.4 / 10) * 10) : au.highBid + Math.max(10, Math.round(pr * 0.1 / 10) * 10);
+      if (next > cap && au.highBid + 10 <= cap) next = au.highBid + 10;
       if (next <= cap) auctionAct(s, pid, next); else auctionAct(s, pid, null);
       return;
     }
     if (ph === 'manage') {
       if (easy) { endTurn(s); return; } // facile : ne construit pas
-      for (var i = 0; i < 40; i++) { if (canBuildOn(s, i, pid) && s.cash[pid] - B[i].h >= 50) { buildHouse(s, i, pid); return; } }
-      // Échange : le bot cherche à compléter un monopole. `botProposed` évite de
-      // re-proposer en boucle si l'humain a déjà répondu ce tour-ci.
+      var reserve = botReserve(s, pid), cash = s.cash[pid] || 0, i;
+      // 1) lever les hypothèques (couleurs complètes d'abord) quand la caisse le permet
+      var um = -1, uk = -1;
+      for (i = 0; i < 40; i++) {
+        if (s.owners[i] !== pid || !s.mortg[i]) continue;
+        var kv = keepValue(s, i, pid);
+        if (kv > uk && cash - Math.ceil(B[i].p / 2 * 1.1) >= reserve) { uk = kv; um = i; }
+      }
+      if (um >= 0 && uk >= 1000) { unmortgage(s, um, pid); return; }
+      // 2) bâtir là où le loyer grimpe le plus par euro
+      var bb = bestBuild(s, pid);
+      if (bb >= 0) {
+        if (cash - B[bb].h >= reserve) { buildHouse(s, bb, pid); return; }
+        // « difficile » : hypothèque une rue isolée / un service pour atteindre 3 maisons
+        if (level === 'hard' && (s.houses[bb] || 0) < 3) {
+          var mp = -1, mk = 150;
+          for (i = 0; i < 40; i++) { if (s.owners[i] === pid && !s.mortg[i] && !(s.houses[i] > 0)) { var k2 = keepValue(s, i, pid); if (k2 < mk) { mk = k2; mp = i; } } }
+          if (mp >= 0 && mortgage(s, mp, pid)) return;
+        }
+      }
+      if (um >= 0 && bb < 0) { unmortgage(s, um, pid); return; }
+      // 3) Échange : le bot cherche à compléter un monopole. `botProposed` évite de
+      // re-proposer en boucle si l'humain a déjà répondu ce tour-ci ; `tradeCool`
+      // l'empêche de harceler un humain à chaque tour (une relance tous les 4 tours).
       if (s.botProposed !== pid) {
         var t = aiProposeTrade(s, pid);
         if (t) {
           var toIsBot = !s.players || (s.players[t.to] && s.players[t.to].isBot);
           if (toIsBot) { if (aiAcceptTrade(s, t)) { applyTrade(s, t); return; } } // bot ↔ bot : applique si l'autre accepte
-          else { s.trade = t; s.botProposed = pid; return; } // bot → HUMAIN : on propose et on ATTEND sa réponse
+          else {
+            s.tradeCool = s.tradeCool || {};
+            var last = s.tradeCool[pid];
+            if (last == null || (s.round || 1) - last >= 4) { s.tradeCool[pid] = s.round || 1; s.trade = t; s.botProposed = pid; return; } // bot → HUMAIN : on propose et on ATTEND sa réponse
+          }
         }
       }
       s.botProposed = null;

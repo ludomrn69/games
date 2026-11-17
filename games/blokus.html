@@ -8,6 +8,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
   <style>
+    /* body{min-height:100vh} + .app{margin-top:52px} (marges fusionnées) = page plus haute que l'écran de 52 px → scroll parasite. */
+    html body { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px); }
+    /* Tablette : boutons d'en-tête (règles, stats, nouvelle partie) à taille tactile. */
+    @media (min-width: 760px) { .game-rules-btn, .game-restart-btn { min-width: 44px; min-height: 44px; font-size: 1.05rem; } }
     :root { --bk-blue: #2f6fd0; --bk-yellow: #e6b800; --bk-red: #e05a4e; --bk-green: #34a853; }
 
     .btn-primary:disabled { opacity: 0.5; }
@@ -82,7 +86,31 @@
 
     .res-rank-colors { display: flex; gap: 3px; } .res-rank-colors .sw { width: 12px; height: 12px; border-radius: 3px; }
     .res-rank-score { font-weight: 800; color: var(--gold); min-width: 60px; text-align: right; }
-    @media (min-width: 760px) { .bk-board{width:min(70vw,600px)} }
+    /* ── Tablette : plateau au maximum de la place, pièces et boutons à taille tactile ── */
+    @media (min-width: 760px) {
+      .bk-board { width: min(94vw, max(420px, calc(100dvh - 610px))); border-radius: 14px; }
+      .bk-turn-label { font-size: 1.45rem; } .bk-turn-color { font-size: 1.1rem; padding: 4px 14px; }
+      .bk-summary-chip { font-size: 0.95rem; padding: 6px 14px; gap: 7px; } .bk-summary-chip .swatch { width: 16px; height: 16px; }
+      .bk-piece-cell { width: 13px; height: 13px; border-radius: 2px; }
+      .bk-piece-btn { min-width: 48px; min-height: 48px; padding: 6px; border-radius: 10px; }
+      .bk-tray-status { font-size: 1.35rem; } .bk-wait { font-size: 1.5rem; }
+      .bk-ctrl-btn { width: 56px; height: 56px; font-size: 1.5rem; border-radius: 14px; }
+      .bk-place-btn { font-size: 1.15rem; padding: 0.8rem 2.2rem; }
+      .bk-pass-btn { font-size: 1rem; padding: 0.7rem 1.4rem; min-height: 44px; }
+      /* Barre de pièces compacte : une seule grille sans intertitres. */
+      #bk-tray { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+      .bk-tray-section, .bk-tray-row { display: contents; } .bk-tray-label { display: none; }
+    }
+    /* Paysage : plateau à gauche sur toute la hauteur, pièces et commandes à droite. */
+    @media (min-width: 900px) and (orientation: landscape) {
+      #s-playing.active { display: grid; grid-template-columns: auto minmax(300px, 430px); grid-template-rows: auto auto auto 1fr; justify-content: center; column-gap: 24px; }
+      .bk-header { grid-column: 1 / -1; grid-row: 1; }
+      .bk-board-wrap { grid-column: 1; grid-row: 2 / span 3; padding: 10px 0; align-self: start; }
+      .bk-board { width: min(calc(100vw - 480px), calc(100dvh - 134px)); }
+      .bk-summary { grid-column: 2; grid-row: 2; padding: 12px 0 6px; }
+      .bk-tray-wrap, .bk-wait { grid-column: 2; grid-row: 3; padding: 4px 0 8px; }
+      .bk-controls { grid-column: 2; grid-row: 4; align-self: start; }
+    }
   </style>
 </head>
 <body>
@@ -191,6 +219,8 @@
     /* ━━ State (sélection locale) ━━ */
     var prevStatus = null, selectedPiece = null, selectedColor = null, selectedCells = null, ghostAnchor = null, ghostValid = false, boardBuilt = false;
     function rref() { return window.roomRef; }
+    // Mode table (un seul appareil au milieu) : on nomme le joueur au lieu de dire « toi ».
+    function isTable() { return window.OFFLINE_MODE === 'local'; }
     var escapeHtml = window.esc;  // mutualisé dans lobby.js
     function ownerOf(state, color) { return (state.colorOwner || {})[color]; }
     function colorsOf(state, pid) { return (state.turnOrder || []).filter(function (c) { return ownerOf(state, c) === pid; }); }
@@ -206,7 +236,7 @@
         'Quand tu ne peux plus jouer, passe',
         'Le moins de cases restantes gagne'
       ],
-      offline: { solo: true, local: true },
+      offline: { solo: true, local: true, open: true },
       bot: blokusBot,
       offlineTurn: function (r) { return (r.status === 'playing') ? ownerOf(r, r.turn) : null; },
       offlineEnter: function () { clearSelection(); if (window.room) renderPlaying(window.room); },
@@ -326,7 +356,7 @@
 
     function renderPlaying(state) {
       var turn = state.turn, owner = ownerOf(state, turn), isMyTurn = owner === window.myPid;
-      document.getElementById('bk-turn-label').textContent = isMyTurn ? 'À toi :' : ('À ' + Room.name(owner) + ' :');
+      document.getElementById('bk-turn-label').textContent = (isMyTurn && !isTable()) ? 'À toi :' : ('À ' + Room.name(owner) + ' :');
       var ct = document.getElementById('bk-turn-color'); ct.textContent = COLOR_NAME[turn]; ct.className = 'bk-turn-color ' + turn;
 
       // Résumé par couleur
@@ -386,13 +416,27 @@
       var status = document.getElementById('bk-tray-status');
       status.textContent = selectedPiece ? (ghostAnchor ? (ghostValid ? 'Tape « Placer » pour confirmer' : 'Pose invalide — glisse, tourne ou retourne') : 'Glisse la pièce sur le plateau')
         : (colorIsFirst(state, color) ? 'Première pièce — pose-la sur ton coin' : 'Choisis une pièce');
+      // Plus aucune pose possible pour cette couleur : on le dit (sinon on cherche en vain).
+      if (!selectedPiece && noMoveFor(state, color)) status.textContent = 'Plus aucune pose possible en ' + COLOR_NAME[color] + ' — passe cette couleur';
       document.getElementById('bk-controls').classList.toggle('active', !!selectedPiece);
     }
 
+    // Vrai si `color` n'a plus AUCUNE pose légale (mémorisé par position : le calcul énumère tout).
+    var _noMove = { key: null, val: false };
+    function noMoveFor(state, color) {
+      var board = state.board || emptyBoard(), pcs = (state.pieces && state.pieces[color]) || [];
+      var key = color + '|' + pcs.length + '|' + board;
+      if (_noMove.key !== key) {
+        var v = false;
+        try { v = !window.BlokusAI.randomMove(board, color, pcs, colorIsFirst(state, color)); } catch (e) { v = false; }
+        _noMove = { key: key, val: v };
+      }
+      return _noMove.val;
+    }
     function buildPieceIcon(cells, color) {
       var maxR = 0, maxC = 0; cells.forEach(function (c) { if (c[0] > maxR) maxR = c[0]; if (c[1] > maxC) maxC = c[1]; });
       var grid = document.createElement('div'); grid.className = 'bk-piece-grid';
-      grid.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', 9px)';
+      grid.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', auto)';
       var set = {}; cells.forEach(function (c) { set[c[0] + ',' + c[1]] = true; });
       for (var r = 0; r <= maxR; r++) for (var c = 0; c <= maxC; c++) { var d = document.createElement('div'); d.className = 'bk-piece-cell ' + (set[r + ',' + c] ? color : 'empty'); grid.appendChild(d); }
       return grid;
@@ -461,6 +505,7 @@
       var color = window.room && window.room.turn; if (!color) return;
       rref().transaction(function (cur) {
         if (!cur || cur.status !== 'playing' || cur.turn !== color) return cur;
+        if (ownerOf(cur, color) !== window.myPid) return cur; // on ne passe que SA couleur
         cur.passed = cur.passed || {}; cur.passed[color] = true;
         cur.turn = nextTurn(color, cur.passed, cur.pieces || {}, cur.turnOrder || []);
         if (!cur.turn) cur.status = 'ended';
@@ -479,13 +524,13 @@
       var winners = ord.filter(function (p) { return remaining(p) === low; });
       var iWon = winners.indexOf(window.myPid) >= 0;
       document.getElementById('res-emoji').textContent = winners.length > 1 ? '🤝' : '🏆';
-      document.getElementById('res-title').textContent = winners.length > 1 ? 'Égalité !' : (iWon ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !');
+      document.getElementById('res-title').textContent = winners.length > 1 ? 'Égalité !' : ((iWon && !isTable()) ? 'Tu gagnes !' : Room.name(ord[0]) + ' gagne !');
       var medals = ['🥇', '🥈', '🥉'];
       document.getElementById('res-rank').innerHTML = ord.map(function (pid, i) {
         var sw = colorsOf(state, pid).map(function (c) { return '<span class="sw ' + c + '"></span>'; }).join('');
         return '<div class="res-rank-row"><span class="res-rank-pos">' + (medals[i] || (i + 1)) + '</span>' +
           '<span class="res-rank-av" style="background:' + Room.color(pid) + '">' + Room.emoji(pid) + '</span>' +
-          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + (pid === window.myPid ? ' (toi)' : '') + '</span>' +
+          '<span class="res-rank-name">' + escapeHtml(Room.name(pid)) + ((pid === window.myPid && !isTable()) ? ' (toi)' : '') + '</span>' +
           '<span class="res-rank-colors">' + sw + '</span>' +
           '<span class="res-rank-score">' + remaining(pid) + ' cases</span></div>';
       }).join('');
