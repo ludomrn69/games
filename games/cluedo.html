@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <script src="/head.js" data-title="Cluedo 🔎" data-emoji="🔎"></script>
+  <!-- Ambiance de nuit forcée pour ce jeu (avant tout rendu, pas de flash clair). -->
+  <script>document.documentElement.classList.add('cl-night');</script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="/firebase-init.js"></script>
@@ -95,7 +97,6 @@
     .cl-pool .rtok { top: auto; bottom: 6%; left: 6%; right: 6%; }
     .cl-pool.reach { cursor: pointer; z-index: 5; box-shadow: inset 0 0 0 3px #a9ffbf, inset 0 0 calc(var(--u) * 1.2) rgba(0,0,0,0.6), 0 0 12px 2px rgba(110,255,150,0.6); }
     .cl-pool.reach .cl-pool-sub { color: #a9ffbf; }
-    .cl-note-btn { display: block; width: 100%; margin: 0; padding: 0.8rem 1rem; border: none; border-radius: 14px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 0.98rem; background: linear-gradient(135deg, #5a3a22, #8a5f33); color: #f6e3b4; box-shadow: 0 3px 12px rgba(60,30,10,0.3), inset 0 0 0 1.5px rgba(214,176,104,0.6); }
 
     .cl-panel { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 10px; }
     .cl-action { background: var(--white); border: 1px solid var(--gold-light); border-radius: 16px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
@@ -125,21 +126,6 @@
     .cl-chip .dot { width: 11px; height: 11px; border-radius: 50%; }
     .modal-btns { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 
-    /* Carnet — petite feuille papier comme dans la boîte du jeu */
-    .cl-paper { background: #fdf9ec; border: 1px solid #d8c9a4; border-radius: 6px; padding: 10px 8px 8px; box-shadow: 0 2px 8px rgba(90,70,40,0.18), inset 0 0 0 1px rgba(255,255,255,0.6); background-image: repeating-linear-gradient(0deg, transparent, transparent 21px, rgba(180,150,100,0.16) 21px, rgba(180,150,100,0.16) 22px); }
-    .cl-paper-title { font-family: 'Caveat', cursive; font-size: 1.3rem; text-align: center; color: #7a5a3a; margin-bottom: 4px; }
-    .cl-note { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
-    .cl-note th, .cl-note td { border: 1px solid #cdbb92; padding: 2px 3px; text-align: center; }
-    .cl-note th.cat { background: rgba(198,152,90,0.18); text-align: left; font-weight: 800; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: #7a5a3a; }
-    .cl-note td.cardname { text-align: left; white-space: nowrap; color: #3a2f28; }
-    .cl-note td.mark { cursor: pointer; font-weight: 800; min-width: 24px; font-family: 'Caveat', cursive; font-size: 1rem; line-height: 1; color: #b9a988; }
-    .cl-note td.mark.no { color: #b3402c; }
-    .cl-note td.mark.yes { color: #2c7a42; }
-    .cl-note td.mark.maybe { color: #c8811f; }
-    .cl-note .self { background: rgba(139,158,126,0.12); }
-    html[data-theme="dark"] .cl-paper { background: #efe6cf; }
-    .cl-legend { display: flex; gap: 10px; justify-content: center; font-size: 0.68rem; color: #7a5a3a; margin-top: 6px; flex-wrap: wrap; }
-
     .cl-ov { position: fixed; inset: 0; z-index: 600; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,16,28,0.7); backdrop-filter: blur(6px); }
     .cl-ov.active { display: flex; animation: fadeUp .3s ease both; }
     .cl-ov-card { background: var(--white); border-radius: 22px; padding: 30px 26px; text-align: center; max-width: 360px; width: 100%; box-shadow: var(--shadow-hover); }
@@ -148,23 +134,127 @@
       .cl-wrap { max-width: 1000px; }
       .cl-board { --bs: min(calc(100vw - 44px), calc(100vh - 400px), 860px); --bs: min(calc(100vw - 44px), calc(100dvh - 400px), 860px); }
       .cl-panel { max-width: min(calc(100vw - 24px), 880px); display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
-      .cl-hand { grid-column: 1 / -1; }
       .cl-log { grid-column: 1 / -1; }
       .cl-btn-row .btn-primary { min-height: 48px; font-size: 1rem; }
       .cl-chip { padding: 10px 14px; font-size: 0.95rem; }
-      .cl-note td.mark { min-width: 34px; height: 30px; font-size: 1.25rem; }
-      .cl-note { font-size: 0.85rem; }
+      .cl-note th, .cl-note td { height: 28px; }
+      .cl-note { font-size: 0.86rem; }
+      .cl-hand { grid-column: 2; }
+      .cl-notes { grid-column: 1 / -1; }
       .modal-card { max-width: 520px; }
     }
     /* Tablette PAYSAGE / ordinateur : le manoir à gauche sur toute la hauteur, le
        carnet et les actions dans une colonne à droite (qui défile seule). */
     @media (min-width: 980px) {
       .cl-wrap { flex-direction: row; align-items: flex-start; justify-content: center; max-width: 1400px; gap: 14px; }
-      .cl-board { --bs: min(calc(100vw - 400px), calc(100vh - 136px), 900px); --bs: min(calc(100vw - 400px), calc(100dvh - 136px), 900px); }
-      .cl-panel { flex: 1 1 320px; max-width: 460px; display: flex; align-items: stretch; max-height: calc(100vh - 118px); max-height: calc(100dvh - 118px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 2px 8px; }
+      .cl-board { --bs: min(calc(100vw - 470px), calc(100vh - 194px), 900px); --bs: min(calc(100vw - 470px), calc(100dvh - 194px), 900px); }
+      .cl-notes { order: 2; } .cl-hand { order: 3; } .cl-log { order: 4; }
+      .cl-note th, .cl-note td { height: 21px; }
+      .cl-panel { flex: 1 1 340px; max-width: 520px; display: flex; align-items: stretch; max-height: calc(100vh - 118px); max-height: calc(100dvh - 118px); overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 2px 8px; }
       .cl-panel > * { flex-shrink: 0; }
       .cl-log { max-height: none; }
     }
+
+    /* ══ AMBIANCE DE NUIT — forcée pour ce jeu, quel que soit le thème du site ══
+       (classe posée sur <html> dès le <head>). Fond très sombre, lampe chaude au
+       centre, vignettage ; le plateau est « éclairé » comme vu de dessus la nuit. */
+    html.cl-night.cl-night { --cream: #0d0a08; --gold: #e3b866; --gold-light: #3d2e20; --terracotta: #e2805e; --ink: #f3e9d8; --ink-light: #bcab92; --sage: #a5bf9e; --white: #1d1611; --warm-black: #f3e9d8; --blush: #3a2420;
+      --shadow: 0 2px 16px rgba(0,0,0,0.55); --shadow-hover: 0 8px 28px rgba(0,0,0,0.7); --nav-bg: rgba(12,9,7,0.95); --nav-dropdown-bg: rgba(12,9,7,0.98); color-scheme: dark; }
+    html.cl-night body { background: #0a0705; color: var(--ink); }
+    html.cl-night #s-playing { min-height: calc(100vh - 52px); min-height: calc(100dvh - 52px);
+      background: radial-gradient(ellipse 48% 52% at 30% 55%, rgba(255,178,92,0.17), rgba(255,178,92,0) 72%), radial-gradient(ellipse 120% 90% at 40% 45%, #21170f 0%, #120c08 55%, #070504 100%); }
+    html.cl-night .cl-top { background: rgba(13,9,6,0.92); border-bottom-color: #33261a; }
+    html.cl-night .game-rules-btn, html.cl-night .game-restart-btn, html.cl-night .cl-top button { background: rgba(255,230,190,0.08); border-color: rgba(227,184,102,0.35); color: #e3b866; }
+    html.cl-night .cl-board { box-shadow: 0 0 0 2px #c9a25a, 0 0 0 8px #2a190e, 0 0 0 9px #0b0705, 0 0 70px 22px rgba(255,170,80,0.10), 0 22px 44px rgba(0,0,0,0.75); }
+    /* sols et meubles en tons profonds + halo de lampe au plafond de chaque pièce */
+    html.cl-night .cl-room .rsvg { filter: brightness(0.62) saturate(0.85) sepia(0.32) contrast(1.06); }
+    html.cl-night .cl-room::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+      background: radial-gradient(ellipse 72% 66% at 50% 42%, rgba(255,198,120,0.26) 0%, rgba(255,170,90,0.06) 55%, rgba(6,3,0,0.48) 100%); }
+    html.cl-night .cl-corr { background: linear-gradient(145deg, #3e342b, #31291f); box-shadow: inset 0 0 0 1px rgba(8,5,2,0.75), inset 1px 1px 0 rgba(255,225,180,0.07); }
+    html.cl-night .cl-corr.alt { background: linear-gradient(145deg, #382f27, #2c241c); }
+
+    /* ── Rangée des joueurs au-dessus du plateau ── */
+    .cl-left { display: flex; flex-direction: column; align-items: center; flex: none; max-width: 100%; }
+    .cl-players { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 2px 0 0; max-width: 100%; }
+    .cl-pl { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 54px; position: relative; transition: transform .25s; }
+    .cl-pl-med { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1;
+      background: radial-gradient(circle at 32% 26%, rgba(255,255,255,0.55), rgba(255,255,255,0) 50%), var(--sc); border: 2px solid #c9a25a;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.6), inset 0 -3px 6px rgba(0,0,0,0.3); }
+    .cl-pl-sus { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.04em; color: #d9c7a6; white-space: nowrap; }
+    .cl-pl.turn .cl-pl-med { border-color: #ffe08a; }
+    .cl-pl.act { transform: translateY(-2px) scale(1.1); z-index: 1; }
+    .cl-pl.act .cl-pl-med { animation: clPlAct 1.3s ease-in-out infinite; }
+    .cl-pl.act .cl-pl-sus { color: #ffe08a; }
+    @keyframes clPlAct { 0%,100% { box-shadow: 0 0 0 2px rgba(255,224,138,0.6), 0 0 10px 2px rgba(255,200,100,0.5), 0 3px 8px rgba(0,0,0,0.6); } 50% { box-shadow: 0 0 0 3px #fff1c2, 0 0 20px 7px rgba(255,200,100,0.8), 0 3px 8px rgba(0,0,0,0.6); } }
+    .cl-pl-tag { position: absolute; top: -6px; right: -2px; font-size: 0.58rem; font-weight: 800; background: #ffe08a; color: #2a1a0c; border-radius: 8px; padding: 1px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+    .cl-pl.out { filter: grayscale(1); opacity: 0.45; }
+    .cl-pl.out .cl-pl-tag { background: #8a3b30; color: #fff; }
+
+    /* ── Carnet TOUJOURS visible (paysage) / repliable (portrait, mobile) ── */
+    .cl-notes { border-radius: 10px; padding: 10px 10px 8px; color: #3a2f28; position: relative;
+      background: #f6eedb; background-image: repeating-linear-gradient(0deg, transparent 0 19px, rgba(150,120,80,0.14) 19px 20px), linear-gradient(180deg, #fbf5e6, #efe3c6);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(120,90,50,0.35), inset 0 0 30px rgba(150,110,60,0.15); }
+    .cl-notes-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: none; border: none; padding: 0 2px 4px; color: #6a4a2a; font-family: 'Caveat', cursive; font-size: 1.35rem; font-weight: 700; cursor: pointer; text-align: left; }
+    .cl-notes-head .chev { font-family: 'DM Sans', sans-serif; font-size: 0.8rem; color: #8a6a44; transition: transform .2s; }
+    .cl-notes:not(.collapsed) .chev { transform: rotate(180deg); }
+    .cl-note { width: 100%; border-collapse: collapse; font-size: 0.78rem; table-layout: fixed; }
+    .cl-note col.c-name { width: 42%; }
+    .cl-note th, .cl-note td { border-bottom: 1px solid rgba(150,120,80,0.28); padding: 0 2px; height: 22px; text-align: center; }
+    .cl-note th.cat { text-align: left; font-family: 'Playfair Display', serif; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: #8a3b2a; padding-top: 6px; border-bottom: 1.5px solid #8a3b2a; }
+    .cl-note th.pc { padding-bottom: 3px; }
+    .cl-note th.pc span { display: inline-flex; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center; font-size: 13px; background: var(--sc); border: 1.5px solid #6a4a2a; box-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+    .cl-note th.pc.self span { border-color: #2c7a42; box-shadow: 0 0 0 2px rgba(44,122,66,0.45); }
+    .cl-note td.cardname { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: #3a2f28; padding-left: 4px; }
+    .cl-note td.cardname i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+    .cl-note td.mark { cursor: pointer; font-family: 'Caveat', cursive; font-weight: 700; font-size: 1.15rem; line-height: 1; color: #c8b896; }
+    .cl-note td.mark.self { background: rgba(44,122,66,0.07); }
+    .cl-note td.mark.no { color: #b3402c; }
+    .cl-note td.mark.yes { color: #2c7a42; }
+    .cl-note td.mark.maybe { color: #c8811f; }
+    .cl-note tr.out td.cardname { text-decoration: line-through; text-decoration-color: #8a3b2a; text-decoration-thickness: 2px; color: #9a8b74; }
+    .cl-note tr.out td.mark { opacity: 0.55; }
+    .cl-note tr.env td { background: rgba(227,184,102,0.32); }
+    .cl-note tr.env td.cardname::after { content: ' ← ?'; color: #8a3b2a; font-weight: 800; }
+    .cl-legend { display: flex; gap: 10px; justify-content: center; font-size: 0.68rem; color: #7a5a3a; margin-top: 6px; flex-wrap: wrap; }
+    @media (max-width: 979px) { .cl-notes.collapsed .cl-note-body { display: none; } .cl-notes.collapsed .cl-notes-head { padding-bottom: 0; } }
+    @media (min-width: 980px) { .cl-notes-head { cursor: default; pointer-events: none; } .cl-notes-head .chev { display: none; } }
+
+    /* ── Fenêtre « choisis une carte » (suggestion, accusation, réfutation) ── */
+    .modal.cl-pick { background: rgba(5,3,2,0.78); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    .cl-pick .modal-card { max-width: 980px; max-height: 94vh; max-height: 94dvh; padding: 18px 18px 14px; color: #f3e9d8; border: 1.5px solid #6e5228;
+      background: radial-gradient(ellipse at 50% 0%, rgba(255,190,110,0.14), rgba(255,190,110,0) 60%), radial-gradient(ellipse at 50% 40%, #233a2d 0%, #15241c 70%, #0e1913 100%);
+      box-shadow: 0 30px 70px rgba(0,0,0,0.8), inset 0 0 0 4px rgba(10,6,3,0.5), inset 0 0 0 5px rgba(214,176,104,0.35); }
+    .cl-pick .modal-title { color: #f0d896; font-size: 1.45rem; margin-bottom: 2px; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+    .cl-pick-sub { text-align: center; font-size: 0.92rem; color: #cbbf9f; margin-bottom: 6px; }
+    .cl-pick-sub b { color: #fff; }
+    .cl-pick-warn { color: #ffb39e; }
+    .cl-pick-grp { margin: 10px 0 4px; }
+    .cl-pick-grp h4 { font-family: 'Playfair Display', serif; font-size: 0.82rem; color: #e3c27a; text-transform: uppercase; letter-spacing: 0.16em; margin: 0 0 7px; text-align: center; }
+    .cl-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .cl-pcard { position: relative; width: 96px; height: 128px; padding: 6px 6px 0; border-radius: 10px; cursor: pointer; font: inherit; color: #3a2f28; display: flex; flex-direction: column; align-items: center;
+      background: linear-gradient(180deg, #fffaf0, #efe2c4); border: 2px solid #b8955a; box-shadow: 0 6px 14px rgba(0,0,0,0.55), inset 0 0 0 3px #fffaf0, inset 0 0 0 4px rgba(184,149,90,0.55);
+      transition: transform .16s, box-shadow .16s; -webkit-tap-highlight-color: transparent; }
+    .cl-pcard .pc-art { position: relative; width: 100%; flex: 1; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .cl-pcard .pc-art .rsvg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .cl-pcard .pc-nm { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 0.78rem; line-height: 1.05; padding: 5px 0 6px; text-align: center; min-height: 2.2em; display: flex; align-items: center; }
+    .pc-sus { width: 62px; height: 62px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-weight: 900; font-size: 30px; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.55);
+      background: radial-gradient(circle at 32% 26%, rgba(255,255,255,0.6), rgba(255,255,255,0) 48%), var(--sc); border: 3px solid #c9a25a; box-shadow: 0 0 0 2px #fffaf0, 0 0 0 3px rgba(184,149,90,0.7), 0 4px 8px rgba(0,0,0,0.35); }
+    .pc-wep { width: 66px; height: 66px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 40% 35%, #fffdf6, #e2d2ad); border: 2px solid #b8955a; box-shadow: inset 0 2px 6px rgba(0,0,0,0.15); }
+    .pc-wep svg { width: 48px; height: 48px; }
+    .cl-pcard.sel { transform: translateY(-7px); border-color: #ffd36b; box-shadow: 0 0 0 3px #ffd36b, 0 0 22px 6px rgba(255,211,107,0.55), 0 12px 20px rgba(0,0,0,0.6), inset 0 0 0 3px #fffaf0; }
+    .cl-pcard.known::after { content: '✗'; position: absolute; top: 3px; right: 6px; font-family: 'Caveat', cursive; font-size: 1.5rem; font-weight: 700; color: #b3402c; }
+    .cl-pcard.known:not(.sel) { opacity: 0.55; }
+    .cl-pcard.fixed { cursor: default; }
+    .cl-pcard.off { opacity: 0.32; filter: grayscale(0.8); cursor: not-allowed; }
+    .cl-pcard.big { width: 128px; height: 172px; }
+    .cl-pcard.big .pc-nm { font-size: 0.95rem; }
+    .cl-pick-foot { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(214,176,104,0.3); }
+    .cl-pick-sum { font-size: 0.95rem; color: #e8dcc2; min-width: 200px; text-align: center; }
+    .cl-pick-sum b { color: #ffe08a; }
+    .cl-go { border: none; border-radius: 30px; padding: 0.85rem 2.2rem; font: 800 1.08rem 'DM Sans', sans-serif; cursor: pointer; color: #2a1a0c; background: linear-gradient(180deg, #ffe39a, #d9a645); box-shadow: 0 4px 14px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.7); }
+    .cl-go:disabled { opacity: 0.4; cursor: not-allowed; }
+    .cl-cancel { background: none; border: 1.5px solid rgba(214,176,104,0.5); color: #e8dcc2; border-radius: 30px; padding: 0.7rem 1.3rem; font: 700 0.95rem 'DM Sans', sans-serif; cursor: pointer; }
+    @media (min-width: 700px) { .cl-pcard { width: 104px; height: 140px; } .pc-sus { width: 70px; height: 70px; font-size: 34px; } .pc-wep { width: 74px; height: 74px; } .pc-wep svg { width: 54px; height: 54px; } }
   </style>
 </head>
 <body>
@@ -188,20 +278,24 @@
         </div>
       </div>
       <div class="cl-wrap">
-        <div class="cl-board" id="cl-board"></div>
+        <div class="cl-left">
+          <div class="cl-players" id="cl-players"></div>
+          <div class="cl-board" id="cl-board"></div>
+        </div>
         <div class="cl-panel">
           <div class="cl-action" id="cl-action"></div>
-          <button class="cl-note-btn" id="cl-note-btn" onclick="openNote()">📓 Mon carnet de détective</button>
           <div class="cl-hand" id="cl-hand"></div>
+          <div class="cl-notes collapsed" id="cl-notes"></div>
           <div class="cl-log" id="cl-log"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="modal" id="modal-suggest"><div class="modal-card" id="suggest-card"></div></div>
-  <div class="modal" id="modal-accuse"><div class="modal-card" id="accuse-card"></div></div>
-  <div class="modal" id="modal-disprove"><div class="modal-card" id="disprove-card"></div></div>
+  <div class="modal cl-pick" id="modal-suggest"><div class="modal-card" id="suggest-card"></div></div>
+  <div class="modal cl-pick" id="modal-accuse"><div class="modal-card" id="accuse-card"></div></div>
+  <div class="modal cl-pick" id="modal-disprove"><div class="modal-card" id="disprove-card"></div></div>
+  <div class="modal cl-pick" id="modal-reveal"><div class="modal-card" id="reveal-card" style="max-width:420px"></div></div>
   <div class="modal" id="modal-note"><div class="modal-card" id="note-card"></div></div>
 
   <div class="modal" id="modal-restart">
@@ -358,8 +452,10 @@
       // Le joueur actif change : on referme tout ce que le précédent avait ouvert
       // (son carnet, une suggestion en cours…) avant de lui passer l'appareil.
       offlineEnter: function () {
-        ['modal-suggest', 'modal-accuse', 'modal-disprove', 'modal-note'].forEach(function (id) { closeModal(id); });
-        pickS = pickW = acS = acW = acR = null;
+        // (pas la fenêtre de réfutation : renderAction vient de l'ouvrir pour le nouveau joueur)
+        ['modal-suggest', 'modal-accuse', 'modal-reveal', 'modal-note'].forEach(function (id) { closeModal(id); });
+        pickS = pickW = acS = acW = acR = pickD = null;
+        notesOpen = false; renderNotes(room);
       },
       offlineTurn: function (room) { return CE.actor(room); },
       onState: onState,
@@ -379,7 +475,7 @@
       CE.setNameFn(function (pid) { return Room.name(pid); });
       showScreen('s-playing');
       autoNote(s);
-      renderBoard(s); renderTop(s); renderHand(s); renderLog(s); renderAction(s); maybeOverlay(s);
+      renderPlayers(s); renderBoard(s); renderTop(s); renderHand(s); renderNotes(s); renderLog(s); renderAction(s); maybeOverlay(s);
       if (window.Lobby && Lobby.absentBanner) {
         var h = (!s.winner && s.phase !== 'disprove' && s.phase !== 'over') ? s.turn : null;
         Lobby.absentBanner((h && h !== window.myPid && Lobby.isOffline(s, h)) ? h : null, function () {
@@ -522,9 +618,15 @@
     /* ━━━━━━━━━━ Action contextuelle ━━━━━━━━━━ */
     function renderAction(s) {
       var box = document.getElementById('cl-action'), me = window.myPid, a = CE.actor(s);
+      // Fenêtres de cartes : réfutation (c'est à moi de montrer) et carte reçue (j'ai suggéré).
+      var dpOn = !s.winner && s.phase === 'disprove' && a === me;
+      var dpEl = document.getElementById('modal-disprove');
+      if (!dpOn) { if (dpEl.classList.contains('active')) closeModal('modal-disprove'); }
+      else if (!dpEl.classList.contains('active')) openDisprove();
+      if (!(s.phase === 'postsuggest' && s.suggestion && s.suggestion.by === me && s.suggestion.disprover)) { if (document.getElementById('modal-reveal').classList.contains('active')) closeModal('modal-reveal'); }
+      else showReveal(s);
       if (s.winner) { box.innerHTML = '<div class="cl-hint">Affaire résolue.</div>'; return; }
-      // c'est à moi de réfuter ?
-      if (s.phase === 'disprove' && a === me) { box.innerHTML = disproveHTML(s); return; }
+      if (dpOn) { box.innerHTML = disproveHTML(s); return; }
       if (a !== me && s.phase !== 'disprove') { box.innerHTML = '<div class="cl-hint">⏳ En attente de ' + escapeHtml(Room.name(s.turn)) + '…</div>'; return; }
       if (a !== me) { box.innerHTML = '<div class="cl-hint">⏳ ' + escapeHtml(Room.name(a)) + ' réfléchit à une réfutation…</div>'; return; }
 
@@ -567,6 +669,34 @@
     }
     function tryMove(node) { if (window.Fx) { Fx.sfx('place'); Fx.vib(8); } tx(function (cur) { CE.moveTo(cur, node); }); }
 
+    /* ── Cartes illustrées (fenêtres de choix, réfutation, carte montrée) ── */
+    // Carte « innocentée » d'après MON carnet : quelqu'un la détient (✓).
+    function isCleared(n, c) { var o = (window.room || {}).order || []; for (var i = 0; i < o.length; i++) if (n[c + '|' + o[i]] === 'yes') return true; return false; }
+    function cardArt(c) {
+      var cat = CE.catOf(c);
+      if (cat === 'suspect') return '<span class="pc-sus" style="--sc:' + SUS_COLOR[c] + '">' + c[0] + '</span>';
+      if (cat === 'arme') return '<span class="pc-wep">' + wepPic(c) + '</span>';
+      return ROOM_SVG[CE.ROOMS.indexOf(c)] || '';
+    }
+    // extra : classes en plus ; onclick : fonction appelée au toucher (ou rien).
+    function cardHTML(c, kind, extra, onclick) {
+      return '<button type="button" class="cl-pcard' + (extra ? ' ' + extra : '') + '" data-kind="' + kind + '" data-v="' + escapeHtml(c) + '"' +
+        (onclick ? ' onclick="' + onclick + '(this)"' : ' tabindex="-1"') + '><span class="pc-art">' + cardArt(c) + '</span><span class="pc-nm">' + escapeHtml(c) + '</span></button>';
+    }
+    function cardRow(id, title, cards, kind, onclick) {
+      var n = loadNote();
+      return '<div class="cl-pick-grp"><h4>' + title + '</h4><div class="cl-cards" id="' + id + '">' +
+        cards.map(function (c) { return cardHTML(c, kind, isCleared(n, c) ? 'known' : '', onclick); }).join('') + '</div></div>';
+    }
+    function selectIn(el) { el.parentNode.querySelectorAll('.cl-pcard').forEach(function (x) { x.classList.remove('sel'); }); el.classList.add('sel'); if (window.Fx) Fx.vib(6); }
+    // Ouvre une fenêtre seulement une fois l'écran « passe l'appareil » levé (sinon le
+    // joueur qui tend la tablette pourrait la voir par transparence).
+    function openWhenVisible(id, still) {
+      var pass = document.getElementById('off-pass');
+      if (pass && pass.classList.contains('show')) { setTimeout(function () { if (!still || still()) openWhenVisible(id, still); }, 250); return; }
+      if (!still || still()) openModal(id);
+    }
+
     /* ── Suggestion ── */
     var pickS = null, pickW = null;
     function openSuggest() {
@@ -574,20 +704,29 @@
       if (!CE.isRoomNode(s.pos[me])) return;
       pickS = null; pickW = null;
       var room = CE.ROOMS[CE.roomIdx(s.pos[me])];
-      document.getElementById('suggest-card').innerHTML = '<div class="modal-title">💭 Suggestion</div>' +
-        '<div style="text-align:center;font-size:.85rem;color:var(--ink-light);margin-bottom:6px">Dans la <b>' + room + '</b></div>' +
-        '<div class="cl-pick-grp"><h4>Suspect</h4><div class="cl-chips" id="sg-sus">' + CE.SUSPECTS.map(function (c) { return chip(c, 'sus', '<span class="dot" style="background:' + SUS_COLOR[c] + '"></span>'); }).join('') + '</div></div>' +
-        '<div class="cl-pick-grp"><h4>Arme</h4><div class="cl-chips" id="sg-wep">' + CE.WEAPONS.map(function (c) { return chip(c, 'wep', wepPic(c)); }).join('') + '</div></div>' +
-        '<div class="modal-btns"><button class="btn-link" onclick="closeModal(\'modal-suggest\')">Annuler</button>' +
-        '<button class="btn-primary" style="width:auto;padding:.6rem 1.3rem" onclick="doSuggest()">Suggérer</button></div>';
+      document.getElementById('suggest-card').innerHTML = '<div class="modal-title">Suggestion</div>' +
+        '<div class="cl-pick-sub">Le crime a-t-il eu lieu ici, dans la pièce <b>' + escapeHtml(room) + '</b> ? Choisis qui, et avec quoi.</div>' +
+        cardRow('sg-sus', 'Qui ?', CE.SUSPECTS, 'sus', 'pickChip') +
+        cardRow('sg-wep', 'Avec quelle arme ?', CE.WEAPONS, 'wep', 'pickChip') +
+        '<div class="cl-pick-foot">' + cardHTML(room, 'room', 'fixed', null).replace('cl-pcard fixed', 'cl-pcard fixed sel') +
+        '<div class="cl-pick-sum" id="sg-sum"></div>' +
+        '<button class="cl-cancel" onclick="closeModal(\'modal-suggest\')">Annuler</button>' +
+        '<button class="cl-go" id="sg-go" onclick="doSuggest()" disabled>Suggérer</button></div>';
+      updSum('sg');
       openModal('modal-suggest');
     }
-    function chip(c, kind, deco) { return '<div class="cl-chip" data-kind="' + kind + '" data-v="' + c + '" onclick="pickChip(this)">' + (deco || '') + escapeHtml(c) + '</div>'; }
+    function updSum(which) {
+      var s1 = which === 'sg' ? pickS : acS, w1 = which === 'sg' ? pickW : acW, r1 = which === 'sg' ? null : acR;
+      var el = document.getElementById(which + '-sum'), go = document.getElementById(which + '-go');
+      var parts = [s1 ? '<b>' + escapeHtml(s1) + '</b>' : '<i>qui ?</i>', w1 ? '<b>' + escapeHtml(w1) + '</b>' : '<i>quelle arme ?</i>'];
+      if (which === 'ac') parts.push(r1 ? '<b>' + escapeHtml(r1) + '</b>' : '<i>quelle pièce ?</i>');
+      if (el) el.innerHTML = parts.join(' · ');
+      if (go) go.disabled = !(s1 && w1 && (which === 'sg' || r1));
+    }
     function pickChip(el) {
-      var kind = el.dataset.kind, box = el.parentNode;
-      box.querySelectorAll('.cl-chip').forEach(function (x) { x.classList.remove('sel'); });
-      el.classList.add('sel');
-      if (kind === 'sus') pickS = el.dataset.v; else pickW = el.dataset.v;
+      selectIn(el);
+      if (el.dataset.kind === 'sus') pickS = el.dataset.v; else pickW = el.dataset.v;
+      updSum('sg');
     }
     function doSuggest() {
       if (!pickS || !pickW) { lbToast('Choisis un suspect et une arme'); return; }
@@ -596,32 +735,67 @@
     }
 
     /* ── Réfutation (je dois montrer une carte) ── */
+    var pickD = null;
     function disproveHTML(s) {
       var sg = s.suggestion, me = window.myPid;
-      var has = sg.cards.filter(function (c) { return (s.hands[me] || []).indexOf(c) >= 0; });
       return '<div class="cl-hint">' + whoTag(me) + escapeHtml(Room.name(sg.by)) + ' suggère :<br>' + escapeHtml(sg.suspect) + ' · ' + escapeHtml(sg.arme) + ' · ' + escapeHtml(sg.piece) + '</div>' +
-        '<div style="font-size:.85rem;text-align:center">Montre-lui une carte' + (isTable() ? ' <b>en secret</b> (lui seul la verra)' : '') + ' :</div>' +
-        '<div class="cl-btn-row">' + has.map(function (c) { return '<button class="btn-primary" onclick="doDisprove(\'' + c + '\')">' + escapeHtml(c) + '</button>'; }).join('') + '</div>';
+        '<div class="cl-btn-row"><button class="btn-primary" onclick="openDisprove()">🃏 Choisir la carte à montrer</button></div>';
     }
-    function doDisprove(card) { tx(function (cur) { CE.disprove(cur, card); }); }
+    function openDisprove() {
+      var s = window.room, me = window.myPid, sg = s && s.suggestion;
+      if (!sg || s.phase !== 'disprove' || CE.actor(s) !== me) return;
+      var hand = s.hands[me] || [];
+      var has = sg.cards.filter(function (c) { return hand.indexOf(c) >= 0; });
+      pickD = has.length === 1 ? has[0] : null;
+      document.getElementById('disprove-card').innerHTML = '<div class="modal-title">Montre une carte</div>' +
+        '<div class="cl-pick-sub">' + (isTable() ? '<b>' + escapeHtml(Room.name(me)) + '</b>, ' : '') + escapeHtml(Room.name(sg.by)) + ' soupçonne <b>' + escapeHtml(sg.suspect) + '</b>, avec <b>' + escapeHtml(sg.arme) + '</b>, dans la pièce <b>' + escapeHtml(sg.piece) + '</b>.<br>' +
+        'Tu détiens ' + (has.length > 1 ? 'plusieurs de ces cartes : choisis celle que tu lui montres' : 'cette carte : tu dois la lui montrer') + (isTable() ? ' — <b>en secret</b>.' : '.') + '</div>' +
+        '<div class="cl-cards" id="dp-cards" style="margin-top:12px">' + sg.cards.map(function (c) {
+          var can = has.indexOf(c) >= 0;
+          return cardHTML(c, 'dp', 'big' + (can ? ' can' : ' off') + (c === pickD ? ' sel' : ''), can ? 'pickDisprove' : null);
+        }).join('') + '</div>' +
+        '<div class="cl-pick-foot"><button class="cl-cancel" onclick="closeModal(\'modal-disprove\')">Voir le plateau</button>' +
+        '<button class="cl-go" id="dp-go" onclick="doDisprove()"' + (pickD ? '' : ' disabled') + '>Montrer cette carte</button></div>';
+      openWhenVisible('modal-disprove', function () { var r = window.room; return r && r.phase === 'disprove' && CE.actor(r) === window.myPid; });
+    }
+    function pickDisprove(el) { selectIn(el); pickD = el.dataset.v; var g = document.getElementById('dp-go'); if (g) g.disabled = false; }
+    function doDisprove(card) {
+      card = card || pickD; if (!card) return;
+      closeModal('modal-disprove'); pickD = null;
+      tx(function (cur) { CE.disprove(cur, card); });
+    }
+    // Carte reçue (je suis le suggérant) : on la montre en grand, une fois par suggestion.
+    function showReveal(s) {
+      var sg = s.suggestion, key = (s.evN || 0) + '|' + sg.by;
+      if (window._clRevealed === key) return;
+      window._clRevealed = key;
+      document.getElementById('reveal-card').innerHTML = '<div class="modal-title">' + escapeHtml(Room.name(sg.disprover)) + ' te montre…</div>' +
+        '<div class="cl-pick-sub">' + (isTable() ? 'Garde-la pour toi, ' + escapeHtml(Room.name(sg.by)) + ' ! ' : '') + 'Elle n\'est donc pas dans l\'enveloppe — notée ✓ dans ton carnet.</div>' +
+        '<div class="cl-cards" style="margin-top:12px">' + cardHTML(sg.shown, 'rv', 'big fixed sel', null) + '</div>' +
+        '<div class="cl-pick-foot"><button class="cl-go" onclick="closeModal(\'modal-reveal\')">Compris</button></div>';
+      openWhenVisible('modal-reveal', function () { var r = window.room; return r && r.phase === 'postsuggest' && r.suggestion && r.suggestion.by === window.myPid; });
+    }
 
     /* ── Accusation ── */
     var acS = null, acW = null, acR = null;
     function openAccuse() {
       acS = acW = acR = null;
-      document.getElementById('accuse-card').innerHTML = '<div class="modal-title">🔍 Accusation finale</div>' +
-        '<div style="text-align:center;font-size:.82rem;color:var(--terracotta);margin-bottom:6px">Attention : si tu te trompes, tu es éliminé !</div>' +
-        '<div class="cl-pick-grp"><h4>Suspect</h4><div class="cl-chips" id="ac-sus">' + CE.SUSPECTS.map(function (c) { return achip(c, 'sus', '<span class="dot" style="background:' + SUS_COLOR[c] + '"></span>'); }).join('') + '</div></div>' +
-        '<div class="cl-pick-grp"><h4>Arme</h4><div class="cl-chips" id="ac-wep">' + CE.WEAPONS.map(function (c) { return achip(c, 'wep', wepPic(c)); }).join('') + '</div></div>' +
-        '<div class="cl-pick-grp"><h4>Pièce</h4><div class="cl-chips" id="ac-room">' + CE.ROOMS.map(function (c) { return achip(c, 'room', ''); }).join('') + '</div></div>' +
-        '<div class="modal-btns"><button class="btn-link" onclick="closeModal(\'modal-accuse\')">Annuler</button>' +
-        '<button class="btn-primary" style="width:auto;padding:.6rem 1.3rem" onclick="doAccuse()">Accuser !</button></div>';
+      document.getElementById('accuse-card').innerHTML = '<div class="modal-title">Accusation</div>' +
+        '<div class="cl-pick-sub cl-pick-warn">Une seule chance : si tu te trompes, tu es éliminé·e de l\'enquête.</div>' +
+        cardRow('ac-sus', 'Qui ?', CE.SUSPECTS, 'sus', 'pickAc') +
+        cardRow('ac-wep', 'Avec quelle arme ?', CE.WEAPONS, 'wep', 'pickAc') +
+        cardRow('ac-room', 'Dans quelle pièce ?', CE.ROOMS, 'room', 'pickAc') +
+        '<div class="cl-pick-foot"><div class="cl-pick-sum" id="ac-sum"></div>' +
+        '<button class="cl-cancel" onclick="closeModal(\'modal-accuse\')">Annuler</button>' +
+        '<button class="cl-go" id="ac-go" onclick="doAccuse()" disabled>Accuser !</button></div>';
+      updSum('ac');
       openModal('modal-accuse');
     }
-    function achip(c, kind, deco) { return '<div class="cl-chip" data-kind="' + kind + '" data-v="' + c + '" onclick="pickAc(this)">' + (deco || '') + escapeHtml(c) + '</div>'; }
     function pickAc(el) {
-      var kind = el.dataset.kind; el.parentNode.querySelectorAll('.cl-chip').forEach(function (x) { x.classList.remove('sel'); }); el.classList.add('sel');
+      selectIn(el);
+      var kind = el.dataset.kind;
       if (kind === 'sus') acS = el.dataset.v; else if (kind === 'wep') acW = el.dataset.v; else acR = el.dataset.v;
+      updSum('ac');
     }
     function doAccuse() {
       if (!acS || !acW || !acR) { lbToast('Choisis suspect, arme et pièce'); return; }
@@ -669,39 +843,52 @@
       }
       if (changed) saveNote(n);
     }
-    function openNote() {
-      var s = window.room, n = loadNote();
-      var cols = s.order, me = window.myPid;
+    // Carnet affiché en permanence (paysage) ou repliable (portrait / mobile).
+    var notesOpen = false;
+    function toggleNotes() { notesOpen = !notesOpen; renderNotes(window.room); }
+    function openNote() { notesOpen = true; renderNotes(window.room); var el = document.getElementById('cl-notes'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    function renderNotes(s) {
+      var box = document.getElementById('cl-notes'); if (!box || !s || !s.order) return;
+      var n = loadNote(), cols = s.order, me = window.myPid;
       var SYM = { yes: '✓', no: '✗', maybe: '≈' };
-      function headRow() {
-        return '<tr><th class="cat"></th>' + cols.map(function (p) {
-          var sus = (s.suspectOf || {})[p];
-          return '<th' + (p === me ? ' class="self"' : '') + ' title="' + escapeHtml(Room.name(p)) + '">' +
-            (sus ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + SUS_COLOR[sus] + ';margin-right:2px"></span>' : '') + Room.emoji(p) + '</th>';
-        }).join('') + '</tr>';
-      }
+      var DOT = function (c) { var cat = CE.catOf(c); return cat === 'suspect' ? SUS_COLOR[c] : cat === 'arme' ? '#8d6e63' : '#6f8fb3'; };
       function grp(title, cards) {
         return '<tr><th class="cat" colspan="' + (cols.length + 1) + '">' + title + '</th></tr>' +
           cards.map(function (c) {
-            return '<tr><td class="cardname">' + escapeHtml(c) + '</td>' + cols.map(function (p) {
+            var out = isCleared(n, c), env = !out && cols.every(function (p) { return n[c + '|' + p] === 'no'; });
+            return '<tr class="' + (out ? 'out' : env ? 'env' : '') + '"><td class="cardname"><i style="background:' + DOT(c) + '"></i>' + escapeHtml(c) + '</td>' + cols.map(function (p) {
               var v = n[c + '|' + p] || '';
-              var cls = 'mark' + (v ? ' ' + v : '') + (p === me ? ' self' : '');
-              return '<td class="' + cls + '" onclick="cycleNote(\'' + c.replace(/'/g, "\\'") + '\',\'' + p + '\')">' + (SYM[v] || '·') + '</td>';
+              return '<td class="mark' + (v ? ' ' + v : '') + (p === me ? ' self' : '') + '" onclick="cycleNote(\'' + c.replace(/'/g, "\\'") + '\',\'' + p + '\')">' + (SYM[v] || '·') + '</td>';
             }).join('') + '</tr>';
           }).join('');
       }
-      document.getElementById('note-card').innerHTML = '<div class="cl-paper">' +
-        '<div class="cl-paper-title">Carnet de ' + escapeHtml(Room.name(me)) + '</div>' +
-        '<table class="cl-note">' + headRow() + grp('Suspects', CE.SUSPECTS) + grp('Armes', CE.WEAPONS) + grp('Pièces', CE.ROOMS) + '</table>' +
-        '<div class="cl-legend"><span style="color:#b3402c">✗ ne l\'a pas</span><span style="color:#c8811f">≈ l\'a peut-être montrée</span><span style="color:#2c7a42">✓ l\'a (vue/déduite)</span></div>' +
-        '</div>' +
-        '<div class="modal-btns"><button class="btn-primary" style="width:auto;padding:.5rem 1.3rem" onclick="closeModal(\'modal-note\')">Fermer</button></div>';
-      openModal('modal-note');
+      var head = '<tr><th></th>' + cols.map(function (p) {
+        var sus = (s.suspectOf || {})[p];
+        return '<th class="pc' + (p === me ? ' self' : '') + '" title="' + escapeHtml(Room.name(p)) + (sus ? ' · ' + sus : '') + '"><span style="--sc:' + (sus ? SUS_COLOR[sus] : Room.color(p)) + '">' + Room.emoji(p) + '</span></th>';
+      }).join('') + '</tr>';
+      box.className = 'cl-notes' + (notesOpen ? '' : ' collapsed');
+      box.innerHTML = '<button type="button" class="cl-notes-head" onclick="toggleNotes()"><span>📓 Carnet de ' + escapeHtml(Room.name(me)) + '</span><span class="chev">▼</span></button>' +
+        '<div class="cl-note-body"><table class="cl-note"><colgroup><col class="c-name">' + cols.map(function () { return '<col>'; }).join('') + '</colgroup>' +
+        head + grp('Suspects', CE.SUSPECTS) + grp('Armes', CE.WEAPONS) + grp('Pièces', CE.ROOMS) + '</table>' +
+        '<div class="cl-legend"><span style="color:#2c7a42">✓ l\'a</span><span style="color:#b3402c">✗ ne l\'a pas</span><span style="color:#c8811f">≈ peut-être</span><span>touche une case pour noter</span></div></div>';
     }
     function cycleNote(card, pid) {
       var n = loadNote(), k = card + '|' + pid, v = n[k] || '';
       n[k] = v === '' ? 'no' : v === 'no' ? 'maybe' : v === 'maybe' ? 'yes' : '';
-      saveNote(n); openNote();
+      saveNote(n); renderNotes(window.room);
+    }
+    // Rangée des joueurs au-dessus du plateau : médaillon (émoji sur la couleur du
+    // suspect incarné) + nom du suspect ; joueur actif en avant, éliminés grisés.
+    function renderPlayers(s) {
+      var el = document.getElementById('cl-players'); if (!el) return;
+      var a = s.winner ? null : CE.actor(s), el2 = s.eliminated || {};
+      el.innerHTML = s.order.map(function (p) {
+        var sus = (s.suspectOf || {})[p], out = el2[p];
+        var tag = s.winner === p ? '🏆' : out ? 'éliminé' : (s.phase === 'disprove' && p === a) ? 'réfute' : (p === s.turn && !s.winner) ? 'joue' : '';
+        return '<div class="cl-pl' + (p === a ? ' act' : '') + (p === s.turn ? ' turn' : '') + (out ? ' out' : '') + '" title="' + escapeHtml(Room.name(p)) + '">' +
+          '<span class="cl-pl-med" style="--sc:' + (sus ? SUS_COLOR[sus] : Room.color(p)) + '">' + Room.emoji(p) + '</span>' +
+          '<span class="cl-pl-sus">' + escapeHtml(sus || Room.name(p)) + '</span>' + (tag ? '<span class="cl-pl-tag">' + tag + '</span>' : '') + '</div>';
+      }).join('');
     }
 
     /* ── Fin ── */
